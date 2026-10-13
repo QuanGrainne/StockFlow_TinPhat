@@ -1,0 +1,18 @@
+{
+  "ConnectionStrings": {
+    "StockFlowDb": "Host=localhost;Port=5432;Database=stockflow_dev;Username=postgres;Password=your_password"
+  },
+  "Jwt": {
+    "Issuer": "StockFlowAPI",
+    "Audience": "StockFlowClient",
+    "SecretKey": "CHANGE_THIS_SECRET_KEY_TO_A_LONG_RANDOM_STRING_AT_LEAST_32_CHARS"
+  },
+  "Logging": {
+    "LogLevel": {
+      "Default": "Debug",
+      "Microsoft.AspNetCore": "Debug",
+      "Microsoft.EntityFrameworkCore.Database.Command": "Information"
+    }
+  },
+  "AllowedHosts": "*"
+}
