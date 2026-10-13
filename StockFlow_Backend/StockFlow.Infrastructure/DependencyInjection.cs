@@ -20,7 +20,11 @@ public static class DependencyInjection
         services.AddDbContext<StockFlowDbContext>(options =>
             options.UseNpgsql(
                 configuration.GetConnectionString("StockFlowDb"),
-                npgsql => npgsql.MigrationsAssembly(typeof(StockFlowDbContext).Assembly.FullName)
+                npgsql =>
+                {
+                    npgsql.MigrationsAssembly(typeof(StockFlowDbContext).Assembly.FullName);
+                    npgsql.MigrationsHistoryTable("__EFMigrationsHistory", "stockflow");
+                }
             )
         );
 

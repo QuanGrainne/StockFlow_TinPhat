@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using StockFlow.Application;
 using StockFlow.Infrastructure;
 
@@ -76,5 +77,22 @@ app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
+
+// ─── Auto-apply EF Core Migrations on startup ─────────────────────────────────
+using (var scope = app.Services.CreateScope())
+{
+    var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+    try
+    {
+        var dbContext = scope.ServiceProvider.GetRequiredService<StockFlow.Infrastructure.Persistence.StockFlowDbContext>();
+        logger.LogInformation("Applying EF Core database migrations if any pending...");
+        await dbContext.Database.MigrateAsync();
+        logger.LogInformation("Database is up to date.");
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "An error occurred while migrating the database.");
+    }
+}
 
 app.Run();

@@ -1,0 +1,752 @@
+@startuml StockFlow_Full_ERD
+
+hide circle
+hide empty members
+
+skinparam linetype ortho
+skinparam nodesep 20
+skinparam ranksep 30
+
+scale max 3500x3500
+
+skinparam entity {
+    BackgroundColor #F8F9FA
+    BorderColor #343A40
+    FontColor #212529
+}
+
+skinparam package {
+    BackgroundColor #FFFFFF
+    BorderColor #6C757D
+    FontColor #212529
+}
+
+' =========================================================
+' 1. MASTER DATA
+' =========================================================
+package "Master Data" {
+
+    entity "mst_product_categories" as CATE {
+        * category_id : INT <<PK>>
+        --
+        category_name : NVARCHAR(100)
+        description : NVARCHAR(255)
+        is_active : BIT
+    }
+
+    entity "mst_products" as PROD {
+        * product_id : INT <<PK>>
+        --
+        product_code : NVARCHAR(30) <<UQ>>
+        product_name : NVARCHAR(150)
+        category_id : INT <<FK>>
+        base_unit_id : INT <<FK>>
+        product_type : NVARCHAR(20)
+        description : NVARCHAR(500)
+        reorder_point : DECIMAL(18,2)
+        moving_average_cost : DECIMAL(18,4)
+        is_active : BIT
+        created_at : DATETIME
+    }
+
+    entity "mst_product_images" as PIMG {
+        * image_id : INT <<PK>>
+        --
+        product_id : INT <<FK>>
+        image_url : NVARCHAR(500)
+        is_primary : BIT
+        display_order : INT
+        created_at : DATETIME
+    }
+
+    entity "mst_units" as UNIT {
+        * unit_id : INT <<PK>>
+        --
+        unit_name : NVARCHAR(50)
+        abbreviation : NVARCHAR(10)
+    }
+
+    entity "mst_unit_conversions" as UCONV {
+        * conversion_id : INT <<PK>>
+        --
+        product_id : INT <<FK, NULL>>
+        from_unit_id : INT <<FK>>
+        to_unit_id : INT <<FK>>
+        conversion_factor : DECIMAL(18,6)
+    }
+
+    entity "mst_business_partners" as BP {
+        * partner_id : INT <<PK>>
+        --
+        partner_code : NVARCHAR(30) <<UQ>>
+        partner_name : NVARCHAR(150)
+        partner_type : NVARCHAR(20)
+        phone : NVARCHAR(20)
+        email : NVARCHAR(100)
+        address : NVARCHAR(255)
+        credit_limit : DECIMAL(18,2)
+        current_debt : DECIMAL(18,2)
+        current_payable : DECIMAL(18,2)
+        is_active : BIT
+    }
+
+    entity "mst_warehouses" as WH {
+        * warehouse_id : INT <<PK>>
+        --
+        warehouse_code : NVARCHAR(20) <<UQ>>
+        warehouse_name : NVARCHAR(100)
+        address : NVARCHAR(255)
+        description : NVARCHAR(255)
+        is_active : BIT
+    }
+
+    entity "mst_warehouse_locations" as LOC {
+        * location_id : INT <<PK>>
+        --
+        warehouse_id : INT <<FK>>
+        location_code : NVARCHAR(30)
+        location_name : NVARCHAR(100)
+        is_active : BIT
+    }
+
+    entity "mst_boms" as BOM {
+        * bom_id : INT <<PK>>
+        --
+        product_id : INT <<FK>>
+        bom_name : NVARCHAR(100)
+        version : NVARCHAR(20)
+        is_active : BIT
+        created_at : DATETIME
+    }
+
+    entity "dtl_bom_items" as BOMI {
+* bom_item_id : INT <<PK>>
+        --
+        bom_id : INT <<FK>>
+        material_id : INT <<FK>>
+        quantity : DECIMAL(18,4)
+        unit_id : INT <<FK>>
+        wastage_rate : DECIMAL(5,2)
+    }
+}
+
+' =========================================================
+' 2. SECURITY / RBAC
+' =========================================================
+package "Security / RBAC" {
+
+    entity "sec_users" as USR {
+        * user_id : INT <<PK>>
+        --
+        username : NVARCHAR(50) <<UQ>>
+        password_hash : NVARCHAR(255)
+        full_name : NVARCHAR(100)
+        email : NVARCHAR(100)
+        phone : NVARCHAR(20)
+        is_active : BIT
+        created_at : DATETIME
+        updated_at : DATETIME
+    }
+
+    entity "sec_roles" as ROL {
+        * role_id : INT <<PK>>
+        --
+        role_name : NVARCHAR(50) <<UQ>>
+        description : NVARCHAR(255)
+    }
+
+    entity "sec_permissions" as PERM {
+        * permission_id : INT <<PK>>
+        --
+        permission_code : NVARCHAR(50) <<UQ>>
+        permission_name : NVARCHAR(100)
+        module : NVARCHAR(50)
+        description : NVARCHAR(255)
+    }
+
+    entity "jnc_role_permissions" as RP {
+        * role_id : INT <<PK, FK>>
+        * permission_id : INT <<PK, FK>>
+    }
+
+    entity "jnc_user_roles" as UR {
+        * user_id : INT <<PK, FK>>
+        * role_id : INT <<PK, FK>>
+        assigned_at : DATETIME
+    }
+
+    entity "jnc_user_warehouse_access" as UWA {
+        * user_id : INT <<PK, FK>>
+        * warehouse_id : INT <<PK, FK>>
+        assigned_at : DATETIME
+    }
+}
+
+' =========================================================
+' 3. INVENTORY
+' =========================================================
+package "Inventory" {
+
+    entity "mst_inventory_lots" as LOT {
+        * lot_id : INT <<PK>>
+        --
+        product_id : INT <<FK>>
+        lot_number : NVARCHAR(50)
+        mfg_date : DATE
+        expiry_date : DATE
+    }
+
+    entity "trx_inventory_balances" as INV_BAL {
+        * inventory_id : INT <<PK>>
+        --
+        warehouse_id : INT <<FK>>
+        location_id : INT <<FK, NULL>>
+        product_id : INT <<FK>>
+        lot_id : INT <<FK, NULL>>
+        quantity : DECIMAL(18,2)
+        unit_cost : DECIMAL(18,4)
+        last_updated : DATETIME
+        --
+        UNIQUE (
+            warehouse_id,
+            location_id,
+            product_id,
+            lot_id
+        )
+    }
+
+    entity "trx_inventory_transactions" as INV_TX {
+        * transaction_id : INT <<PK>>
+        --
+        warehouse_id : INT <<FK>>
+        location_id : INT <<FK, NULL>>
+        product_id : INT <<FK>>
+        lot_id : INT <<FK, NULL>>
+        transaction_type : NVARCHAR(30)
+        quantity : DECIMAL(18,2)
+        reference_type : NVARCHAR(50)
+        reference_id : INT
+        transaction_date : DATETIME
+        created_by : INT <<FK>>
+    }
+
+    entity "trx_stocktakes" as ST {
+        * stocktake_id : INT <<PK>>
+        --
+        stocktake_code : NVARCHAR(30) <<UQ>>
+        warehouse_id : INT <<FK>>
+conducted_by : INT <<FK>>
+        stocktake_date : DATETIME
+        status : NVARCHAR(20)
+        notes : NVARCHAR(500)
+    }
+
+    entity "dtl_stocktake_items" as STI {
+        * stocktake_item_id : INT <<PK>>
+        --
+        stocktake_id : INT <<FK>>
+        product_id : INT <<FK>>
+        location_id : INT <<FK, NULL>>
+        lot_id : INT <<FK, NULL>>
+        system_qty : DECIMAL(18,2)
+        actual_qty : DECIMAL(18,2)
+        discrepancy : DECIMAL(18,2)
+        discrepancy_reason : NVARCHAR(500)
+        adjustment_status : NVARCHAR(20)
+        recorded_by : INT <<FK, NULL>>
+        approved_by : INT <<FK, NULL>>
+        approval_date : DATETIME
+    }
+
+    entity "trx_inventory_disposals" as DISP {
+        * disposal_id : INT <<PK>>
+        --
+        disposal_code : NVARCHAR(30) <<UQ>>
+        warehouse_id : INT <<FK>>
+        processed_by : INT <<FK>>
+        disposal_date : DATETIME
+        reason : NVARCHAR(500)
+        status : NVARCHAR(20)
+    }
+
+    entity "dtl_inventory_disposal_items" as DISPI {
+        * disposal_item_id : INT <<PK>>
+        --
+        disposal_id : INT <<FK>>
+        product_id : INT <<FK>>
+        location_id : INT <<FK, NULL>>
+        lot_id : INT <<FK, NULL>>
+        quantity : DECIMAL(18,2)
+        reason : NVARCHAR(255)
+    }
+}
+
+' =========================================================
+' 4. INBOUND
+' =========================================================
+package "Inbound" {
+
+    entity "trx_goods_receipts" as GR {
+        * gr_id : INT <<PK>>
+        --
+        gr_code : NVARCHAR(30) <<UQ>>
+        external_po_number : NVARCHAR(50)
+        partner_id : INT <<FK>>
+        warehouse_id : INT <<FK>>
+        received_by : INT <<FK>>
+        received_date : DATETIME
+        status : NVARCHAR(20)
+        notes : NVARCHAR(500)
+    }
+
+    entity "dtl_goods_receipt_items" as GRI {
+        * gr_item_id : INT <<PK>>
+        --
+        gr_id : INT <<FK>>
+        product_id : INT <<FK>>
+        ordered_qty : DECIMAL(18,2)
+        received_qty : DECIMAL(18,2)
+        accepted_qty : DECIMAL(18,2)
+        defective_qty : DECIMAL(18,2)
+        damaged_qty : DECIMAL(18,2)
+        shortage_qty : DECIMAL(18,2)
+        unit_landed_cost : DECIMAL(18,4)
+        location_id : INT <<FK, NULL>>
+        lot_id : INT <<FK, NULL>>
+    }
+
+    entity "trx_inbound_costs" as IC {
+        * inbound_cost_id : INT <<PK>>
+        --
+        gr_id : INT <<FK>>
+        cost_type : NVARCHAR(50)
+        amount : DECIMAL(18,2)
+        description : NVARCHAR(255)
+        allocated_by : INT <<FK>>
+        created_at : DATETIME
+    }
+
+    entity "dtl_inbound_cost_allocations" as ICA {
+        * allocation_id : INT <<PK>>
+        --
+        inbound_cost_id : INT <<FK>>
+        gr_item_id : INT <<FK>>
+        allocated_amount : DECIMAL(18,4)
+    }
+}
+
+' =========================================================
+' 5. SALES / OUTBOUND
+' =========================================================
+package "Sales / Outbound" {
+entity "trx_orders" as ORD {
+        * order_id : INT <<PK>>
+        --
+        order_code : NVARCHAR(30) <<UQ>>
+        partner_id : INT <<FK>>
+        status : NVARCHAR(20)
+        consolidated_into_order_id : INT <<FK, NULL>>
+        total_amount : DECIMAL(18,2)
+        paid_amount : DECIMAL(18,2)
+        outstanding_amount : DECIMAL(18,2)
+        payment_status : NVARCHAR(20)
+        created_by : INT <<FK>>
+        order_date : DATETIME
+        notes : NVARCHAR(500)
+    }
+
+    entity "dtl_order_items" as ORDI {
+        * order_item_id : INT <<PK>>
+        --
+        order_id : INT <<FK>>
+        product_id : INT <<FK>>
+        quantity : DECIMAL(18,2)
+        unit_id : INT <<FK>>
+        unit_price : DECIMAL(18,2)
+    }
+
+    entity "trx_stock_issues" as SI {
+        * stock_issue_id : INT <<PK>>
+        --
+        issue_code : NVARCHAR(30) <<UQ>>
+        issue_type : NVARCHAR(20)
+        sales_order_id : INT <<FK, NULL>>
+        production_order_id : INT <<FK, NULL>>
+        warehouse_id : INT <<FK>>
+        requested_by : INT <<FK>>
+        processed_by : INT <<FK, NULL>>
+        requested_date : DATETIME
+        processed_date : DATETIME
+        status : NVARCHAR(20)
+        is_supplementary : BIT
+    }
+
+    entity "dtl_stock_issue_items" as SII {
+        * si_item_id : INT <<PK>>
+        --
+        stock_issue_id : INT <<FK>>
+        order_item_id : INT <<FK, NULL>>
+        material_requirement_id : INT <<FK, NULL>>
+        lot_id : INT <<FK, NULL>>
+        requested_qty : DECIMAL(18,2)
+        actual_issued_qty : DECIMAL(18,2)
+    }
+
+    entity "trx_credit_limit_requests" as CLR {
+        * request_id : INT <<PK>>
+        --
+        partner_id : INT <<FK>>
+        sales_order_id : INT <<FK, NULL>>
+        requested_by : INT <<FK>>
+        current_limit : DECIMAL(18,2)
+        requested_limit : DECIMAL(18,2)
+        reason : NVARCHAR(500)
+        status : NVARCHAR(20)
+        approved_by : INT <<FK, NULL>>
+        request_date : DATETIME
+        approval_date : DATETIME
+        approval_notes : NVARCHAR(500)
+    }
+}
+
+' =========================================================
+' 6. PRODUCTION
+' =========================================================
+package "Production" {
+
+    entity "trx_production_orders" as PRODORD {
+        * production_order_id : INT <<PK>>
+        --
+        production_order_code : NVARCHAR(30) <<UQ>>
+        product_id : INT <<FK>>
+        bom_id : INT <<FK>>
+        planned_quantity : DECIMAL(18,2)
+        actual_quantity : DECIMAL(18,2)
+        status : NVARCHAR(20)
+        created_by : INT <<FK>>
+        assigned_to : INT <<FK, NULL>>
+        start_date : DATETIME
+        end_date : DATETIME
+        notes : NVARCHAR(500)
+    }
+
+    entity "trx_production_material_requirements" as PMR {
+        * requirement_id : INT <<PK>>
+        --
+        production_order_id : INT <<FK>>
+        material_id : INT <<FK>>
+        required_qty : DECIMAL(18,2)
+        issued_qty : DECIMAL(18,2)
+shortage_qty : DECIMAL(18,2)
+        unit_id : INT <<FK>>
+    }
+
+    entity "trx_production_reports" as PR {
+        * report_id : INT <<PK>>
+        --
+        production_order_id : INT <<FK>>
+        reported_by : INT <<FK>>
+        batch_no : NVARCHAR(50)
+        produced_qty : DECIMAL(18,2)
+        defect_qty : DECIMAL(18,2)
+        wastage_qty : DECIMAL(18,2)
+        report_date : DATETIME
+        notes : NVARCHAR(500)
+    }
+
+    entity "trx_finished_goods_receipts" as FGR {
+        * fgr_id : INT <<PK>>
+        --
+        fgr_code : NVARCHAR(30) <<UQ>>
+        production_order_id : INT <<FK>>
+        report_id : INT <<FK>>
+        warehouse_id : INT <<FK>>
+        location_id : INT <<FK, NULL>>
+        product_id : INT <<FK>>
+        lot_id : INT <<FK, NULL>>
+        quantity : DECIMAL(18,2)
+        received_by : INT <<FK>>
+        received_date : DATETIME
+        status : NVARCHAR(20)
+        notes : NVARCHAR(500)
+        --
+        UNIQUE (report_id)
+    }
+}
+
+' =========================================================
+' 7. STOCK TRANSFER
+' =========================================================
+package "Stock Transfer" {
+
+    entity "trx_stock_transfers" as TRF {
+        * stock_transfer_id : INT <<PK>>
+        --
+        transfer_code : NVARCHAR(30) <<UQ>>
+        source_warehouse_id : INT <<FK>>
+        dest_warehouse_id : INT <<FK>>
+        created_by : INT <<FK>>
+        transfer_date : DATETIME
+        status : NVARCHAR(20)
+        notes : NVARCHAR(500)
+    }
+
+    entity "dtl_stock_transfer_items" as TRFI {
+        * transfer_item_id : INT <<PK>>
+        --
+        stock_transfer_id : INT <<FK>>
+        product_id : INT <<FK>>
+        lot_id : INT <<FK, NULL>>
+        source_location_id : INT <<FK, NULL>>
+        dest_location_id : INT <<FK, NULL>>
+        quantity : DECIMAL(18,2)
+        issued_quantity : DECIMAL(18,2)
+        received_quantity : DECIMAL(18,2)
+    }
+}
+
+' =========================================================
+' 8. RETURNS
+' =========================================================
+package "Returns" {
+
+    entity "trx_return_requests" as RR {
+        * return_request_id : INT <<PK>>
+        --
+        return_code : NVARCHAR(30) <<UQ>>
+        partner_id : INT <<FK>>
+        sales_order_id : INT <<FK>>
+        created_by : INT <<FK>>
+        request_date : DATETIME
+        reason : NVARCHAR(500)
+        status : NVARCHAR(20)
+    }
+
+    entity "dtl_return_request_items" as RRI {
+        * return_item_id : INT <<PK>>
+        --
+        return_request_id : INT <<FK>>
+        product_id : INT <<FK>>
+        order_item_id : INT <<FK, NULL>>
+        quantity : DECIMAL(18,2)
+        condition : NVARCHAR(50)
+        notes : NVARCHAR(255)
+    }
+
+    entity "trx_return_processing" as RTP {
+        * processing_id : INT <<PK>>
+        --
+        return_item_id : INT <<FK>>
+        category : NVARCHAR(20)
+        quantity : DECIMAL(18,2)
+        warehouse_id : INT <<FK, NULL>>
+        status : NVARCHAR(20)
+processed_by : INT <<FK>>
+        process_date : DATETIME
+        notes : NVARCHAR(500)
+    }
+}
+
+' =========================================================
+' 9. FINANCE
+' =========================================================
+package "Finance" {
+
+    entity "trx_financial_transactions" as FIN {
+        * tx_id : INT <<PK>>
+        --
+        partner_id : INT <<FK>>
+        tx_type : NVARCHAR(20)
+        amount : DECIMAL(18,2)
+        payment_method : NVARCHAR(50)
+        reference_type : NVARCHAR(50)
+        reference_id : INT
+        transaction_date : DATETIME
+        created_by : INT <<FK>>
+        status : NVARCHAR(20)
+        description : NVARCHAR(500)
+    }
+}
+
+' =========================================================
+' RELATIONSHIPS - MASTER DATA
+' =========================================================
+
+CATE ||--o{ PROD : category
+UNIT ||--o{ PROD : base_unit
+PROD ||--o{ PIMG : images
+
+PROD |o--o{ UCONV : product_specific
+UNIT ||--o{ UCONV : from_unit
+UNIT ||--o{ UCONV : to_unit
+
+PROD ||--o{ BOM : BOM
+BOM ||--o{ BOMI : items
+PROD ||--o{ BOMI : material
+UNIT ||--o{ BOMI : unit
+
+WH ||--o{ LOC : locations
+
+' =========================================================
+' RELATIONSHIPS - SECURITY
+' =========================================================
+
+USR ||--o{ UR : user_roles
+ROL ||--o{ UR : roles
+
+ROL ||--o{ RP : role_permissions
+PERM ||--o{ RP : permissions
+
+USR ||--o{ UWA : warehouse_access
+WH ||--o{ UWA : users
+
+' =========================================================
+' RELATIONSHIPS - INVENTORY
+' =========================================================
+
+PROD ||--o{ LOT : lots
+
+WH ||--o{ INV_BAL : balances
+LOC |o--o{ INV_BAL : location
+PROD ||--o{ INV_BAL : product
+LOT |o--o{ INV_BAL : lot
+
+WH ||--o{ INV_TX : transactions
+LOC |o--o{ INV_TX : location
+PROD ||--o{ INV_TX : product
+LOT |o--o{ INV_TX : lot
+USR ||--o{ INV_TX : created_by
+
+WH ||--o{ ST : stocktakes
+USR ||--o{ ST : conducted_by
+
+ST ||--o{ STI : items
+PROD ||--o{ STI : product
+LOC |o--o{ STI : location
+LOT |o--o{ STI : lot
+USR |o--o{ STI : recorded_by
+USR |o--o{ STI : approved_by
+
+WH ||--o{ DISP : disposals
+USR ||--o{ DISP : processed_by
+
+DISP ||--o{ DISPI : items
+PROD ||--o{ DISPI : product
+LOC |o--o{ DISPI : location
+LOT |o--o{ DISPI : lot
+
+' =========================================================
+' RELATIONSHIPS - INBOUND
+' =========================================================
+
+BP ||--o{ GR : supplier
+WH ||--o{ GR : warehouse
+USR ||--o{ GR : received_by
+
+GR ||--o{ GRI : items
+PROD ||--o{ GRI : product
+LOC |o--o{ GRI : location
+LOT |o--o{ GRI : lot
+
+GR ||--o{ IC : inbound_costs
+USR ||--o{ IC : allocated_by
+
+IC ||--o{ ICA : allocations
+GRI ||--o{ ICA : allocated_items
+
+' =========================================================
+' RELATIONSHIPS - SALES / OUTBOUND
+' =========================================================
+
+BP ||--o{ ORD : customer
+USR ||--o{ ORD : created_by
+
+ORD ||--o{ ORDI : items
+PROD ||--o{ ORDI : product
+UNIT ||--o{ ORDI : unit
+ORD |o--o{ SI : sales_issue
+PRODORD |o--o{ SI : material_issue
+WH ||--o{ SI : warehouse
+
+USR ||--o{ SI : requested_by
+USR |o--o{ SI : processed_by
+
+SI ||--o{ SII : items
+ORDI |o--o{ SII : order_item
+PMR |o--o{ SII : material_requirement
+LOT |o--o{ SII : lot
+
+ORD |o--o{ CLR : related_order
+BP ||--o{ CLR : customer
+USR ||--o{ CLR : requested_by
+USR |o--o{ CLR : approved_by
+
+ORD "0..*" --> "0..1" ORD : consolidated_into
+
+' =========================================================
+' RELATIONSHIPS - PRODUCTION
+' =========================================================
+
+PROD ||--o{ PRODORD : product
+BOM ||--o{ PRODORD : BOM
+
+USR ||--o{ PRODORD : created_by
+USR |o--o{ PRODORD : assigned_to
+
+PRODORD ||--o{ PMR : requirements
+PROD ||--o{ PMR : material
+UNIT ||--o{ PMR : unit
+
+PRODORD ||--o{ PR : reports
+USR ||--o{ PR : reported_by
+
+PRODORD ||--o{ FGR : receipts
+PR ||--o| FGR : source_report
+
+WH ||--o{ FGR : warehouse
+LOC |o--o{ FGR : location
+PROD ||--o{ FGR : product
+LOT |o--o{ FGR : lot
+USR ||--o{ FGR : received_by
+
+PRODORD |o--o{ SI : material_issue
+
+' =========================================================
+' RELATIONSHIPS - STOCK TRANSFER
+' =========================================================
+
+WH ||--o{ TRF : source_warehouse
+WH ||--o{ TRF : destination_warehouse
+USR ||--o{ TRF : created_by
+
+TRF ||--o{ TRFI : items
+PROD ||--o{ TRFI : product
+LOT |o--o{ TRFI : lot
+
+LOC |o--o{ TRFI : source_location
+LOC |o--o{ TRFI : destination_location
+
+' =========================================================
+' RELATIONSHIPS - RETURNS
+' =========================================================
+
+BP ||--o{ RR : customer
+ORD ||--o{ RR : original_order
+USR ||--o{ RR : created_by
+
+RR ||--o{ RRI : items
+PROD ||--o{ RRI : product
+ORDI |o--o{ RRI : original_item
+
+RRI ||--o{ RTP : processing
+WH |o--o{ RTP : warehouse
+USR ||--o{ RTP : processed_by
+
+' =========================================================
+' RELATIONSHIPS - FINANCE
+' =========================================================
+
+BP ||--o{ FIN : partner
+USR ||--o{ FIN : created_by
+
+@enduml
