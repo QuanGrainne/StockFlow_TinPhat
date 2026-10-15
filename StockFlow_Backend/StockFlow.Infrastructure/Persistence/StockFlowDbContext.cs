@@ -1,11 +1,12 @@
 using System;
 using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
+using StockFlow.Application.Common.Interfaces;
 using StockFlow.Domain.Entities;
 
 namespace StockFlow.Infrastructure.Persistence;
 
-public partial class StockFlowDbContext : DbContext
+public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
 {
     public StockFlowDbContext(DbContextOptions<StockFlowDbContext> options)
         : base(options)
