@@ -7,6 +7,8 @@ public static class DatabaseSeeder
 {
     public static async Task SeedAsync(StockFlowDbContext context)
     {
+        var now = DateTime.Now;
+
         // 1. Seed Roles
         if (!await context.SecRoles.AnyAsync())
         {
@@ -21,6 +23,7 @@ public static class DatabaseSeeder
 
             await context.SecRoles.AddRangeAsync(roles);
             await context.SaveChangesAsync();
+            await context.Database.ExecuteSqlRawAsync("SELECT setval(pg_get_serial_sequence('stockflow.sec_roles', 'role_id'), COALESCE(MAX(role_id), 1)) FROM stockflow.sec_roles;");
         }
 
         // 2. Seed Warehouses
@@ -34,6 +37,7 @@ public static class DatabaseSeeder
 
             await context.MstWarehouses.AddRangeAsync(warehouses);
             await context.SaveChangesAsync();
+            await context.Database.ExecuteSqlRawAsync("SELECT setval(pg_get_serial_sequence('stockflow.mst_warehouses', 'warehouse_id'), COALESCE(MAX(warehouse_id), 1)) FROM stockflow.mst_warehouses;");
         }
 
         // 3. Seed Users
@@ -44,24 +48,25 @@ public static class DatabaseSeeder
 
             var users = new List<SecUser>
             {
-                new() { UserId = 1, Username = "admin", FullName = "Quản trị viên Hệ thống", Email = "admin@tinphat.vn", Phone = "0901234567", PasswordHash = defaultHash, IsActive = true, CreatedAt = DateTime.UtcNow },
-                new() { UserId = 2, Username = "manager01", FullName = "Nguyễn Văn Quản Lý", Email = "manager01@tinphat.vn", Phone = "0901234568", PasswordHash = defaultHash, IsActive = true, CreatedAt = DateTime.UtcNow },
-                new() { UserId = 3, Username = "sales01", FullName = "Trần Thị Bán Hàng", Email = "sales01@tinphat.vn", Phone = "0901234569", PasswordHash = defaultHash, IsActive = true, CreatedAt = DateTime.UtcNow },
-                new() { UserId = 4, Username = "whstaff01", FullName = "Lê Văn Thủ Kho", Email = "whstaff01@tinphat.vn", Phone = "0901234570", PasswordHash = defaultHash, IsActive = true, CreatedAt = DateTime.UtcNow },
-                new() { UserId = 5, Username = "prodstaff01", FullName = "Phạm Văn Sản Xuất", Email = "prodstaff01@tinphat.vn", Phone = "0901234571", PasswordHash = defaultHash, IsActive = true, CreatedAt = DateTime.UtcNow }
+                new() { UserId = 1, Username = "admin", FullName = "Quản trị viên Hệ thống", Email = "admin@tinphat.vn", Phone = "0901234567", PasswordHash = defaultHash, IsActive = true, CreatedAt = now },
+                new() { UserId = 2, Username = "manager01", FullName = "Nguyễn Văn Quản Lý", Email = "manager01@tinphat.vn", Phone = "0901234568", PasswordHash = defaultHash, IsActive = true, CreatedAt = now },
+                new() { UserId = 3, Username = "sales01", FullName = "Trần Thị Bán Hàng", Email = "sales01@tinphat.vn", Phone = "0901234569", PasswordHash = defaultHash, IsActive = true, CreatedAt = now },
+                new() { UserId = 4, Username = "whstaff01", FullName = "Lê Văn Thủ Kho", Email = "whstaff01@tinphat.vn", Phone = "0901234570", PasswordHash = defaultHash, IsActive = true, CreatedAt = now },
+                new() { UserId = 5, Username = "prodstaff01", FullName = "Phạm Văn Sản Xuất", Email = "prodstaff01@tinphat.vn", Phone = "0901234571", PasswordHash = defaultHash, IsActive = true, CreatedAt = now }
             };
 
             await context.SecUsers.AddRangeAsync(users);
             await context.SaveChangesAsync();
+            await context.Database.ExecuteSqlRawAsync("SELECT setval(pg_get_serial_sequence('stockflow.sec_users', 'user_id'), COALESCE(MAX(user_id), 1)) FROM stockflow.sec_users;");
 
             // 4. Assign User Roles
             var userRoles = new List<JncUserRole>
             {
-                new() { UserId = 1, RoleId = 1, AssignedAt = DateTime.UtcNow },
-                new() { UserId = 2, RoleId = 2, AssignedAt = DateTime.UtcNow },
-                new() { UserId = 3, RoleId = 3, AssignedAt = DateTime.UtcNow },
-                new() { UserId = 4, RoleId = 4, AssignedAt = DateTime.UtcNow },
-                new() { UserId = 5, RoleId = 5, AssignedAt = DateTime.UtcNow }
+                new() { UserId = 1, RoleId = 1, AssignedAt = now },
+                new() { UserId = 2, RoleId = 2, AssignedAt = now },
+                new() { UserId = 3, RoleId = 3, AssignedAt = now },
+                new() { UserId = 4, RoleId = 4, AssignedAt = now },
+                new() { UserId = 5, RoleId = 5, AssignedAt = now }
             };
 
             await context.JncUserRoles.AddRangeAsync(userRoles);
@@ -69,12 +74,12 @@ public static class DatabaseSeeder
             // 5. Assign User Warehouse Access
             var warehouseAccesses = new List<JncUserWarehouseAccess>
             {
-                new() { UserId = 1, WarehouseId = 1, AssignedAt = DateTime.UtcNow },
-                new() { UserId = 1, WarehouseId = 2, AssignedAt = DateTime.UtcNow },
-                new() { UserId = 2, WarehouseId = 1, AssignedAt = DateTime.UtcNow },
-                new() { UserId = 2, WarehouseId = 2, AssignedAt = DateTime.UtcNow },
-                new() { UserId = 4, WarehouseId = 1, AssignedAt = DateTime.UtcNow },
-                new() { UserId = 4, WarehouseId = 2, AssignedAt = DateTime.UtcNow }
+                new() { UserId = 1, WarehouseId = 1, AssignedAt = now },
+                new() { UserId = 1, WarehouseId = 2, AssignedAt = now },
+                new() { UserId = 2, WarehouseId = 1, AssignedAt = now },
+                new() { UserId = 2, WarehouseId = 2, AssignedAt = now },
+                new() { UserId = 4, WarehouseId = 1, AssignedAt = now },
+                new() { UserId = 4, WarehouseId = 2, AssignedAt = now }
             };
 
             await context.JncUserWarehouseAccesses.AddRangeAsync(warehouseAccesses);
