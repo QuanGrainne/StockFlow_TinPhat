@@ -7,78 +7,100 @@ public static class DatabaseSeeder
 {
     public static async Task SeedAsync(StockFlowDbContext context)
     {
-        // 1. Seed Roles
-        if (!await context.SecRoles.AnyAsync())
-        {
-            var roles = new List<SecRole>
-            {
-                new() { RoleId = 1, RoleName = "Admin", Description = "Administrator - Quản trị hệ thống, tài khoản, phân quyền vai trò và phân quyền kho" },
-                new() { RoleId = 2, RoleName = "Manager", Description = "Manager - Quản lý cấu hình dữ liệu gốc, BOM, phê duyệt hạn mức nợ, kiểm kê, công nợ" },
-                new() { RoleId = 3, RoleName = "SalesStaff", Description = "Sales Staff - Tiếp nhận đơn hàng B2B, quản lý đơn chờ, yêu cầu xuất kho" },
-                new() { RoleId = 4, RoleName = "WarehouseStaff", Description = "Warehouse Staff - Nhập kho, xuất kho bán hàng, xuất NVL sản xuất, kiểm kê, chuyển kho" },
-                new() { RoleId = 5, RoleName = "ProductionStaff", Description = "Production Staff - Lệnh sản xuất, theo dõi cấp phát NVL, báo cáo hoàn thành thành phẩm, báo cáo lỗi" }
-            };
+        var seedTimestamp = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
 
-            await context.SecRoles.AddRangeAsync(roles);
-            await context.SaveChangesAsync();
+        // 1. Seed Roles
+        var roles = new List<SecRole>
+        {
+            new() { RoleId = 1, RoleName = "Admin", Description = "Administrator - Quản trị hệ thống, tài khoản, phân quyền vai trò và phân quyền kho" },
+            new() { RoleId = 2, RoleName = "Manager", Description = "Manager - Quản lý cấu hình dữ liệu gốc, BOM, phê duyệt hạn mức nợ, kiểm kê, công nợ" },
+            new() { RoleId = 3, RoleName = "SalesStaff", Description = "Sales Staff - Tiếp nhận đơn hàng B2B, quản lý đơn chờ, yêu cầu xuất kho" },
+            new() { RoleId = 4, RoleName = "WarehouseStaff", Description = "Warehouse Staff - Nhập kho, xuất kho bán hàng, xuất NVL sản xuất, kiểm kê, chuyển kho" },
+            new() { RoleId = 5, RoleName = "ProductionStaff", Description = "Production Staff - Lệnh sản xuất, theo dõi cấp phát NVL, báo cáo hoàn thành thành phẩm, báo cáo lỗi" }
+        };
+
+        foreach (var role in roles)
+        {
+            if (!await context.SecRoles.AnyAsync(r => r.RoleId == role.RoleId))
+            {
+                await context.SecRoles.AddAsync(role);
+            }
         }
+
+        await context.SaveChangesAsync();
 
         // 2. Seed Warehouses
-        if (!await context.MstWarehouses.AnyAsync())
+        var warehouses = new List<MstWarehouse>
         {
-            var warehouses = new List<MstWarehouse>
-            {
-                new() { WarehouseId = 1, WarehouseCode = "KTP-01", WarehouseName = "Kho Thành Phẩm", IsActive = true, Description = "Kho lưu trữ thành phẩm sẵn sàng xuất bán" },
-                new() { WarehouseId = 2, WarehouseCode = "KNVL-01", WarehouseName = "Kho Nguyên Vật Liệu", IsActive = true, Description = "Kho lưu trữ nguyên vật liệu phục vụ sản xuất" }
-            };
+            new() { WarehouseId = 1, WarehouseCode = "KTP-01", WarehouseName = "Kho Thành Phẩm", IsActive = true, Description = "Kho lưu trữ thành phẩm sẵn sàng xuất bán" },
+            new() { WarehouseId = 2, WarehouseCode = "KNVL-01", WarehouseName = "Kho Nguyên Vật Liệu", IsActive = true, Description = "Kho lưu trữ nguyên vật liệu phục vụ sản xuất" }
+        };
 
-            await context.MstWarehouses.AddRangeAsync(warehouses);
-            await context.SaveChangesAsync();
+        foreach (var warehouse in warehouses)
+        {
+            if (!await context.MstWarehouses.AnyAsync(w => w.WarehouseId == warehouse.WarehouseId))
+            {
+                await context.MstWarehouses.AddAsync(warehouse);
+            }
         }
+
+        await context.SaveChangesAsync();
 
         // 3. Seed Users
-        if (!await context.SecUsers.AnyAsync())
+        // Keep these records synchronized so an existing database can recover the documented default login.
+        const string defaultHash = "$2a$11$1opEHEFeQeA542CrjEh0MuByzd7olky/Tlz3MVn54bDuIpZfkGjpu";
+        var users = new List<SecUser>
         {
-            // Default BCrypt hash for "StockFlow@123"
-            const string defaultHash = "$2a$11$1opEHEFeQeA542CrjEh0MuByzd7olky/Tlz3MVn54bDuIpZfkGjpu";
+            new() { UserId = 1, Username = "admin", FullName = "Quản trị viên Hệ thống", Email = "admin@tinphat.vn", Phone = "0901234567", PasswordHash = defaultHash, IsActive = true },
+            new() { UserId = 2, Username = "manager01", FullName = "Nguyễn Văn Quản Lý", Email = "manager01@tinphat.vn", Phone = "0901234568", PasswordHash = defaultHash, IsActive = true },
+            new() { UserId = 3, Username = "sales01", FullName = "Trần Thị Bán Hàng", Email = "sales01@tinphat.vn", Phone = "0901234569", PasswordHash = defaultHash, IsActive = true },
+            new() { UserId = 4, Username = "whstaff01", FullName = "Lê Văn Thủ Kho", Email = "whstaff01@tinphat.vn", Phone = "0901234570", PasswordHash = defaultHash, IsActive = true },
+            new() { UserId = 5, Username = "prodstaff01", FullName = "Phạm Văn Sản Xuất", Email = "prodstaff01@tinphat.vn", Phone = "0901234571", PasswordHash = defaultHash, IsActive = true }
+        };
+        var userIds = new Dictionary<string, int>();
 
-            var users = new List<SecUser>
+        foreach (var seededUser in users)
+        {
+            var username = seededUser.Username!;
+            var user = await context.SecUsers.FirstOrDefaultAsync(u => u.Username == username);
+            if (user == null)
             {
-                new() { UserId = 1, Username = "admin", FullName = "Quản trị viên Hệ thống", Email = "admin@tinphat.vn", Phone = "0901234567", PasswordHash = defaultHash, IsActive = true, CreatedAt = DateTime.UtcNow },
-                new() { UserId = 2, Username = "manager01", FullName = "Nguyễn Văn Quản Lý", Email = "manager01@tinphat.vn", Phone = "0901234568", PasswordHash = defaultHash, IsActive = true, CreatedAt = DateTime.UtcNow },
-                new() { UserId = 3, Username = "sales01", FullName = "Trần Thị Bán Hàng", Email = "sales01@tinphat.vn", Phone = "0901234569", PasswordHash = defaultHash, IsActive = true, CreatedAt = DateTime.UtcNow },
-                new() { UserId = 4, Username = "whstaff01", FullName = "Lê Văn Thủ Kho", Email = "whstaff01@tinphat.vn", Phone = "0901234570", PasswordHash = defaultHash, IsActive = true, CreatedAt = DateTime.UtcNow },
-                new() { UserId = 5, Username = "prodstaff01", FullName = "Phạm Văn Sản Xuất", Email = "prodstaff01@tinphat.vn", Phone = "0901234571", PasswordHash = defaultHash, IsActive = true, CreatedAt = DateTime.UtcNow }
-            };
-
-            await context.SecUsers.AddRangeAsync(users);
-            await context.SaveChangesAsync();
-
-            // 4. Assign User Roles
-            var userRoles = new List<JncUserRole>
+                seededUser.CreatedAt = seedTimestamp;
+                await context.SecUsers.AddAsync(seededUser);
+            }
+            else
             {
-                new() { UserId = 1, RoleId = 1, AssignedAt = DateTime.UtcNow },
-                new() { UserId = 2, RoleId = 2, AssignedAt = DateTime.UtcNow },
-                new() { UserId = 3, RoleId = 3, AssignedAt = DateTime.UtcNow },
-                new() { UserId = 4, RoleId = 4, AssignedAt = DateTime.UtcNow },
-                new() { UserId = 5, RoleId = 5, AssignedAt = DateTime.UtcNow }
-            };
+                user.PasswordHash = defaultHash;
+                user.IsActive = true;
+            }
 
-            await context.JncUserRoles.AddRangeAsync(userRoles);
-
-            // 5. Assign User Warehouse Access
-            var warehouseAccesses = new List<JncUserWarehouseAccess>
-            {
-                new() { UserId = 1, WarehouseId = 1, AssignedAt = DateTime.UtcNow },
-                new() { UserId = 1, WarehouseId = 2, AssignedAt = DateTime.UtcNow },
-                new() { UserId = 2, WarehouseId = 1, AssignedAt = DateTime.UtcNow },
-                new() { UserId = 2, WarehouseId = 2, AssignedAt = DateTime.UtcNow },
-                new() { UserId = 4, WarehouseId = 1, AssignedAt = DateTime.UtcNow },
-                new() { UserId = 4, WarehouseId = 2, AssignedAt = DateTime.UtcNow }
-            };
-
-            await context.JncUserWarehouseAccesses.AddRangeAsync(warehouseAccesses);
-            await context.SaveChangesAsync();
+            userIds[username] = user?.UserId ?? seededUser.UserId;
         }
+
+        await context.SaveChangesAsync();
+
+        // 4. Assign User Roles
+        var userRoles = new[] { (Username: "admin", RoleId: 1), (Username: "manager01", RoleId: 2), (Username: "sales01", RoleId: 3), (Username: "whstaff01", RoleId: 4), (Username: "prodstaff01", RoleId: 5) };
+        foreach (var (username, roleId) in userRoles)
+        {
+            var userId = userIds[username];
+            if (!await context.JncUserRoles.AnyAsync(ur => ur.UserId == userId && ur.RoleId == roleId))
+            {
+                await context.JncUserRoles.AddAsync(new JncUserRole { UserId = userId, RoleId = roleId, AssignedAt = seedTimestamp });
+            }
+        }
+
+        // 5. Assign User Warehouse Access
+        var warehouseAccesses = new[] { (Username: "admin", WarehouseId: 1), (Username: "admin", WarehouseId: 2), (Username: "manager01", WarehouseId: 1), (Username: "manager01", WarehouseId: 2), (Username: "whstaff01", WarehouseId: 1), (Username: "whstaff01", WarehouseId: 2) };
+        foreach (var (username, warehouseId) in warehouseAccesses)
+        {
+            var userId = userIds[username];
+            if (!await context.JncUserWarehouseAccesses.AnyAsync(wa => wa.UserId == userId && wa.WarehouseId == warehouseId))
+            {
+                await context.JncUserWarehouseAccesses.AddAsync(new JncUserWarehouseAccess { UserId = userId, WarehouseId = warehouseId, AssignedAt = seedTimestamp });
+            }
+        }
+
+        await context.SaveChangesAsync();
     }
 }
