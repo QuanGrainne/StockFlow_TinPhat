@@ -87,11 +87,13 @@ using (var scope = app.Services.CreateScope())
         var dbContext = scope.ServiceProvider.GetRequiredService<StockFlow.Infrastructure.Persistence.StockFlowDbContext>();
         logger.LogInformation("Applying EF Core database migrations if any pending...");
         await dbContext.Database.MigrateAsync();
-        logger.LogInformation("Database is up to date.");
+        logger.LogInformation("Seeding initial database records if required...");
+        await StockFlow.Infrastructure.Persistence.DatabaseSeeder.SeedAsync(dbContext);
+        logger.LogInformation("Database is up to date and seeded.");
     }
     catch (Exception ex)
     {
-        logger.LogError(ex, "An error occurred while migrating the database.");
+        logger.LogError(ex, "An error occurred while migrating/seeding the database.");
     }
 }
 
