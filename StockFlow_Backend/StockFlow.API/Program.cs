@@ -2,6 +2,9 @@ using Microsoft.EntityFrameworkCore;
 using StockFlow.Application;
 using StockFlow.Infrastructure;
 
+// Support PostgreSQL timestamp without time zone with DateTime.UtcNow/DateTime.Now
+AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
+
 var builder = WebApplication.CreateBuilder(args);
 
 // ─── Services ────────────────────────────────────────────────────────────────
