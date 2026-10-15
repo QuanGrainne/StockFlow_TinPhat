@@ -1,8 +1,8 @@
-﻿export default function dashboardPage() {
+export default function DashboardPage() {
   return (
     <div>
-      <h1 className="text-2xl font-semibold text-gray-900">Dashboard</h1>
-      <p className="text-gray-500 mt-2">Tính năng đang được xây dựng...</p>
+      <h1 className="text-xl font-bold text-slate-800 mb-1">Tổng quan</h1>
+      <p className="text-sm text-slate-500">Chào mừng đến với hệ thống StockFlow — Công ty Tín Phát.</p>
     </div>
   );
 }

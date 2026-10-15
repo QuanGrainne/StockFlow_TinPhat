@@ -28,6 +28,14 @@ public static class DependencyInjection
             )
         );
 
+        // DbContext interface mapping
+        services.AddScoped<StockFlow.Application.Common.Interfaces.IStockFlowDbContext>(sp =>
+            sp.GetRequiredService<StockFlowDbContext>());
+
+        // Auth services
+        services.AddScoped<StockFlow.Application.Common.Interfaces.IPasswordHasher, Services.BcryptPasswordHasher>();
+        services.AddScoped<StockFlow.Application.Common.Interfaces.IJwtTokenGenerator, Services.JwtTokenGenerator>();
+
         // Unit of Work
         services.AddScoped<IUnitOfWork, UnitOfWork>();
 
