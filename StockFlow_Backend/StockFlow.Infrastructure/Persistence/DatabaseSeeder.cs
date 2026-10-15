@@ -9,7 +9,6 @@ public static class DatabaseSeeder
     {
         var seedTimestamp = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
 
-        // 1. Seed Roles
         var roles = new List<SecRole>
         {
             new() { RoleId = 1, RoleName = "Admin", Description = "Administrator - Quản trị hệ thống, tài khoản, phân quyền vai trò và phân quyền kho" },
@@ -28,8 +27,8 @@ public static class DatabaseSeeder
         }
 
         await context.SaveChangesAsync();
+        await context.Database.ExecuteSqlRawAsync("SELECT setval(pg_get_serial_sequence('stockflow.sec_roles', 'role_id'), COALESCE(MAX(role_id), 1)) FROM stockflow.sec_roles;");
 
-        // 2. Seed Warehouses
         var warehouses = new List<MstWarehouse>
         {
             new() { WarehouseId = 1, WarehouseCode = "KTP-01", WarehouseName = "Kho Thành Phẩm", IsActive = true, Description = "Kho lưu trữ thành phẩm sẵn sàng xuất bán" },
@@ -45,9 +44,8 @@ public static class DatabaseSeeder
         }
 
         await context.SaveChangesAsync();
+        await context.Database.ExecuteSqlRawAsync("SELECT setval(pg_get_serial_sequence('stockflow.mst_warehouses', 'warehouse_id'), COALESCE(MAX(warehouse_id), 1)) FROM stockflow.mst_warehouses;");
 
-        // 3. Seed Users
-        // Keep these records synchronized so an existing database can recover the documented default login.
         const string defaultHash = "$2a$11$1opEHEFeQeA542CrjEh0MuByzd7olky/Tlz3MVn54bDuIpZfkGjpu";
         var users = new List<SecUser>
         {
@@ -67,19 +65,19 @@ public static class DatabaseSeeder
             {
                 seededUser.CreatedAt = seedTimestamp;
                 await context.SecUsers.AddAsync(seededUser);
+                userIds[username] = seededUser.UserId;
             }
             else
             {
                 user.PasswordHash = defaultHash;
                 user.IsActive = true;
+                userIds[username] = user.UserId;
             }
-
-            userIds[username] = user?.UserId ?? seededUser.UserId;
         }
 
         await context.SaveChangesAsync();
+        await context.Database.ExecuteSqlRawAsync("SELECT setval(pg_get_serial_sequence('stockflow.sec_users', 'user_id'), COALESCE(MAX(user_id), 1)) FROM stockflow.sec_users;");
 
-        // 4. Assign User Roles
         var userRoles = new[] { (Username: "admin", RoleId: 1), (Username: "manager01", RoleId: 2), (Username: "sales01", RoleId: 3), (Username: "whstaff01", RoleId: 4), (Username: "prodstaff01", RoleId: 5) };
         foreach (var (username, roleId) in userRoles)
         {
@@ -90,7 +88,6 @@ public static class DatabaseSeeder
             }
         }
 
-        // 5. Assign User Warehouse Access
         var warehouseAccesses = new[] { (Username: "admin", WarehouseId: 1), (Username: "admin", WarehouseId: 2), (Username: "manager01", WarehouseId: 1), (Username: "manager01", WarehouseId: 2), (Username: "whstaff01", WarehouseId: 1), (Username: "whstaff01", WarehouseId: 2) };
         foreach (var (username, warehouseId) in warehouseAccesses)
         {
