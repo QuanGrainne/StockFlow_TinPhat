@@ -27,7 +27,9 @@ INSERT INTO sec_users (user_id, username, full_name, email, phone, password_hash
 (3, 'sales01', 'Trần Thị Bán Hàng', 'sales01@tinphat.vn', '0901234569', '$2a$11$1opEHEFeQeA542CrjEh0MuByzd7olky/Tlz3MVn54bDuIpZfkGjpu', true, NOW()),
 (4, 'whstaff01', 'Lê Văn Thủ Kho', 'whstaff01@tinphat.vn', '0901234570', '$2a$11$1opEHEFeQeA542CrjEh0MuByzd7olky/Tlz3MVn54bDuIpZfkGjpu', true, NOW()),
 (5, 'prodstaff01', 'Phạm Văn Sản Xuất', 'prodstaff01@tinphat.vn', '0901234571', '$2a$11$1opEHEFeQeA542CrjEh0MuByzd7olky/Tlz3MVn54bDuIpZfkGjpu', true, NOW())
-ON CONFLICT (user_id) DO NOTHING;
+ON CONFLICT (user_id) DO UPDATE
+SET password_hash = EXCLUDED.password_hash,
+    is_active = EXCLUDED.is_active;
 
 -- 4. Phân vai trò cho người dùng (jnc_user_roles)
 INSERT INTO jnc_user_roles (user_id, role_id, assigned_at) VALUES
