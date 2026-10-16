@@ -16,13 +16,12 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  {
-    label: 'Hàng hóa',
-    children: [
-      { label: 'Danh sách hàng hóa', href: '/products' },
-      { label: 'Thiết lập giá', href: '/products/pricing' },
-    ],
-  },
+  { label: 'Tổng quan', href: '/dashboard' },
+  { label: 'Hàng hóa', href: '/products' },
+  { label: 'Mua hàng', href: '/orders' },
+  { label: 'Đơn hàng', href: '/orders' },
+  { label: 'Khách hàng', href: '/suppliers' },
+  { label: 'Báo cáo', href: '/reports' },
 ];
 
 export default function Navbar() {
@@ -32,18 +31,17 @@ export default function Navbar() {
   const navRef = useRef<HTMLDivElement>(null);
 
   // Get username from localStorage
-  const [username, setUsername] = useState('');
-  useEffect(() => {
+  const [username] = useState(() => {
+    if (typeof window === 'undefined') return '';
     const raw = localStorage.getItem('stockflow_user');
-    if (raw) {
-      try {
-        const u = JSON.parse(raw);
-        setUsername(u.fullName ?? u.username ?? '');
-      } catch {
-        setUsername('');
-      }
+    if (!raw) return '';
+    try {
+      const u = JSON.parse(raw) as { fullName?: string; username?: string };
+      return u.fullName ?? u.username ?? '';
+    } catch {
+      return '';
     }
-  }, []);
+  });
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -63,14 +61,14 @@ export default function Navbar() {
   }
 
   return (
-    <header className="bg-white border-b border-slate-200 sticky top-0 z-50 shadow-sm">
+    <header className="sticky top-0 z-50 border-b border-[#005f9d] bg-[#0071BA] text-white shadow-sm">
       <div className="max-w-screen-xl mx-auto px-6 flex items-center h-14 gap-2">
         {/* Logo */}
         <Link href="/dashboard" className="flex items-center gap-2 mr-6 shrink-0">
-          <span className="w-8 h-8 rounded-lg bg-blue-600 text-white text-sm font-bold flex items-center justify-center">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-white text-sm font-bold text-[#0071BA]">
             S
           </span>
-          <span className="font-bold text-slate-800 text-base tracking-tight hidden sm:block">
+          <span className="hidden text-base font-bold tracking-tight text-white sm:block">
             StockFlow
           </span>
         </Link>
@@ -135,10 +133,10 @@ export default function Navbar() {
               <Link
                 key={item.label}
                 href={item.href!}
-                className={`px-3.5 py-2 rounded-lg text-sm font-medium transition ${
+                className={`rounded-lg px-3 py-2 text-sm font-medium transition ${
                   isActive
-                    ? 'bg-blue-50 text-blue-700'
-                    : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                    ? 'bg-white/20 text-white'
+                    : 'text-white/85 hover:bg-white/15 hover:text-white'
                 }`}
               >
                 {item.label}
@@ -150,13 +148,13 @@ export default function Navbar() {
         {/* Right side: user + logout */}
         <div className="flex items-center gap-3 ml-auto shrink-0">
           {username && (
-            <span className="text-sm text-slate-600 hidden sm:block">
-              Xin chào, <span className="font-semibold text-slate-800">{username}</span>
+            <span className="hidden text-sm text-white/85 sm:block">
+              Xin chào, <span className="font-semibold text-white">{username}</span>
             </span>
           )}
           <button
             onClick={handleLogout}
-            className="px-3 py-1.5 text-sm text-slate-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition font-medium"
+          className="rounded-lg px-3 py-1.5 text-sm font-medium text-white/85 transition hover:bg-white/15 hover:text-white"
           >
             Đăng xuất
           </button>

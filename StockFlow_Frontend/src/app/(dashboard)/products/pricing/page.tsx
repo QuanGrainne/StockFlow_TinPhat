@@ -14,7 +14,7 @@ export default function ProductPricingPage() {
   }
 
   return (
-    <div>
+    <div className="max-w-screen-xl mx-auto px-6 py-6 w-full">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
