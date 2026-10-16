@@ -1,7 +1,7 @@
 'use client';
 
 import { Calendar, ChevronDown, ChevronRight, ChevronUp, X } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import type { PurchaseFilterState, PurchaseStatus } from '@/app/(dashboard)/purchases/PurchasesClient';
 import DateRangePickerPopover, { formatDateVN } from '@/components/DateRangePickerPopover';
 import PeriodPickerPopover from '@/components/PeriodPickerPopover';
@@ -25,6 +25,7 @@ const STATUS_OPTIONS: { label: string; value: PurchaseStatus }[] = [
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function PurchaseFilterSidebar({ state, onChange, isCollapsed = false }: PurchaseFilterSidebarProps) {
+  const timeRangeRadioName = `purchase-time-range-${useId()}`;
   const [periodPopoverOpen, setPeriodPopoverOpen] = useState(false);
   const [dateRangeOpen, setDateRangeOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -63,8 +64,8 @@ export default function PurchaseFilterSidebar({ state, onChange, isCollapsed = f
   return (
     <aside
       ref={containerRef}
-      className={`shrink-0 bg-white border-r border-[#e5e7eb] select-none text-[#262626] relative transition-all duration-300 overflow-hidden ${
-        isCollapsed ? 'w-0 px-0 py-0' : 'w-[260px] px-4 py-5'
+      className={`relative shrink-0 bg-white border-r border-[#e5e7eb] select-none text-[#262626] transition-all duration-300 ${
+        isCollapsed ? 'w-0 overflow-hidden px-0 py-0' : 'w-[260px] overflow-visible px-4 py-5'
       }`}
     >
       {/* Title */}
@@ -117,7 +118,7 @@ export default function PurchaseFilterSidebar({ state, onChange, isCollapsed = f
               <div className="flex items-center gap-2.5 group">
                 <input
                   type="radio"
-                  name="purchase-time-range"
+                  name={timeRangeRadioName}
                   value="this_month"
                   checked={state.timeRange === 'this_month'}
                   onChange={() => activateTimeRange('this_month')}
@@ -175,7 +176,7 @@ export default function PurchaseFilterSidebar({ state, onChange, isCollapsed = f
               <div className="flex items-center gap-2.5 group">
                 <input
                   type="radio"
-                  name="purchase-time-range"
+                  name={timeRangeRadioName}
                   value="custom"
                   checked={state.timeRange === 'custom'}
                   onChange={() => activateTimeRange('custom')}
