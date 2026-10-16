@@ -48,6 +48,18 @@ export default function PurchaseFilterSidebar({ state, onChange, isCollapsed = f
     onChange({ statuses: next });
   }
 
+  function activateTimeRange(timeRange: PurchaseFilterState['timeRange']) {
+    onChange({ timeRange });
+    if (timeRange === 'this_month') {
+      setPeriodPopoverOpen(true);
+      setDateRangeOpen(false);
+      return;
+    }
+
+    setDateRangeOpen(true);
+    setPeriodPopoverOpen(false);
+  }
+
   return (
     <aside
       ref={containerRef}
@@ -98,40 +110,37 @@ export default function PurchaseFilterSidebar({ state, onChange, isCollapsed = f
           <div className="text-[13px] font-semibold text-slate-800 mb-2">
             Thời gian
           </div>
-          <div className="space-y-2">
+          <div className="space-y-2" role="radiogroup" aria-label="Lọc theo thời gian">
 
             {/* Option A: Tháng này / Chọn kỳ nhanh */}
             <div className="relative">
               <div className="flex items-center gap-2.5 group">
-                {/* Radio circle */}
-                <div
+                <input
+                  type="radio"
+                  name="purchase-time-range"
+                  value="this_month"
+                  checked={state.timeRange === 'this_month'}
+                  onChange={() => activateTimeRange('this_month')}
                   onClick={() => {
-                    onChange({ timeRange: 'this_month' });
-                    setPeriodPopoverOpen(true);
-                    setDateRangeOpen(false);
+                    if (state.timeRange === 'this_month') activateTimeRange('this_month');
                   }}
-                  className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 cursor-pointer transition ${
-                    state.timeRange === 'this_month'
-                      ? 'border-[#0071BA] bg-white'
-                      : 'border-slate-300 group-hover:border-slate-400 bg-white'
-                  }`}
-                  role="radio"
-                  aria-checked={state.timeRange === 'this_month'}
-                  title="Chọn theo kỳ"
-                >
-                  {state.timeRange === 'this_month' && (
-                    <div className="w-2 h-2 rounded-full bg-[#0071BA]" />
-                  )}
-                </div>
+                  className="h-4 w-4 shrink-0 cursor-pointer accent-[#0071BA]"
+                  aria-label="Chọn tháng hoặc kỳ nhanh"
+                />
 
                 {/* Input trigger box */}
-                <div
+                <button
+                  type="button"
                   onClick={() => {
-                    onChange({ timeRange: 'this_month' });
-                    setPeriodPopoverOpen((prev) => (state.timeRange === 'this_month' ? !prev : true));
-                    setDateRangeOpen(false);
+                    if (state.timeRange === 'this_month') {
+                      setPeriodPopoverOpen((prev) => !prev);
+                      setDateRangeOpen(false);
+                    } else {
+                      activateTimeRange('this_month');
+                    }
                   }}
-                  className={`flex-1 h-[34px] px-3 border rounded-[6px] bg-white flex items-center justify-between text-[13px] cursor-pointer transition ${
+                  aria-pressed={state.timeRange === 'this_month'}
+                  className={`flex-1 h-[34px] px-3 border rounded-[6px] bg-white flex items-center justify-between text-left text-[13px] cursor-pointer transition ${
                     periodPopoverOpen
                       ? 'border-blue-500 ring-2 ring-blue-100 shadow-xs text-slate-800'
                       : state.timeRange === 'this_month'
@@ -141,7 +150,7 @@ export default function PurchaseFilterSidebar({ state, onChange, isCollapsed = f
                 >
                   <span>{state.periodLabel || 'Tháng này'}</span>
                   <ChevronRight size={14} className="text-slate-400" />
-                </div>
+                </button>
               </div>
 
               {/* Period Picker Popover matching Image 1 */}
@@ -164,35 +173,32 @@ export default function PurchaseFilterSidebar({ state, onChange, isCollapsed = f
             {/* Option B: Tùy chỉnh */}
             <div className="relative">
               <div className="flex items-center gap-2.5 group">
-                {/* Radio circle */}
-                <div
+                <input
+                  type="radio"
+                  name="purchase-time-range"
+                  value="custom"
+                  checked={state.timeRange === 'custom'}
+                  onChange={() => activateTimeRange('custom')}
                   onClick={() => {
-                    onChange({ timeRange: 'custom' });
-                    setDateRangeOpen(true);
-                    setPeriodPopoverOpen(false);
+                    if (state.timeRange === 'custom') activateTimeRange('custom');
                   }}
-                  className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 cursor-pointer transition ${
-                    state.timeRange === 'custom'
-                      ? 'border-[#0071BA] bg-white'
-                      : 'border-slate-300 group-hover:border-slate-400 bg-white'
-                  }`}
-                  role="radio"
-                  aria-checked={state.timeRange === 'custom'}
-                  title="Chọn tùy chỉnh ngày"
-                >
-                  {state.timeRange === 'custom' && (
-                    <div className="w-2 h-2 rounded-full bg-[#0071BA]" />
-                  )}
-                </div>
+                  className="h-4 w-4 shrink-0 cursor-pointer accent-[#0071BA]"
+                  aria-label="Chọn khoảng ngày tùy chỉnh"
+                />
 
                 {/* Input trigger box */}
-                <div
+                <button
+                  type="button"
                   onClick={() => {
-                    onChange({ timeRange: 'custom' });
-                    setDateRangeOpen((prev) => (state.timeRange === 'custom' ? !prev : true));
-                    setPeriodPopoverOpen(false);
+                    if (state.timeRange === 'custom') {
+                      setDateRangeOpen((prev) => !prev);
+                      setPeriodPopoverOpen(false);
+                    } else {
+                      activateTimeRange('custom');
+                    }
                   }}
-                  className={`flex-1 h-[34px] px-3 border rounded-[6px] bg-white flex items-center justify-between text-[13px] cursor-pointer transition ${
+                  aria-pressed={state.timeRange === 'custom'}
+                  className={`flex-1 h-[34px] px-3 border rounded-[6px] bg-white flex items-center justify-between text-left text-[13px] cursor-pointer transition ${
                     dateRangeOpen
                       ? 'border-blue-500 ring-2 ring-blue-100 shadow-xs text-slate-800'
                       : state.timeRange === 'custom'
@@ -206,7 +212,7 @@ export default function PurchaseFilterSidebar({ state, onChange, isCollapsed = f
                       : 'Tùy chỉnh'}
                   </span>
                   <Calendar size={14} className="text-slate-500 shrink-0" />
-                </div>
+                </button>
               </div>
 
               {/* Dual-calendar Date Range Popover matching screenshot */}
