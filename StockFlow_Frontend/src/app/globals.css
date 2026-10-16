@@ -23,3 +23,15 @@ body {
 * {
   box-sizing: border-box;
 }
+
+.stockflow-products-table .ant-table-thead > tr > th {
+  background: #e8f2ff;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.stockflow-products-table .ant-table-thead > tr > th::before {
+  display: none;
+}
