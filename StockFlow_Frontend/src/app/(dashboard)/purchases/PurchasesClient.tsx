@@ -4,15 +4,13 @@ import {
   StarFilled,
   StarOutlined,
 } from '@ant-design/icons';
-import { message, Tag } from 'antd';
+import { message, Pagination, Tag } from 'antd';
 import {
   AlignJustify,
   Calendar,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
-  ChevronsLeft,
-  ChevronsRight,
   Copy,
   FileDown,
   Filter,
@@ -180,7 +178,7 @@ export default function PurchasesClient() {
 
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(15);
+  const [pageSize, setPageSize] = useState(20);
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [expandedRowKey, setExpandedRowKey] = useState<number | null>(null);
@@ -282,9 +280,6 @@ export default function PurchasesClient() {
     const start = (page - 1) * pageSize;
     return filtered.slice(start, start + pageSize);
   }, [filtered, page, pageSize]);
-  const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
-  const rangeStart = filtered.length === 0 ? 0 : (page - 1) * pageSize + 1;
-  const rangeEnd = Math.min(page * pageSize, filtered.length);
 
   // ─── Render ────────────────────────────────────────────────────────────────
 
@@ -800,72 +795,25 @@ export default function PurchasesClient() {
               )}
             </div>
 
-            {/* Pagination Footer */}
-            <div className="mt-auto flex flex-wrap items-center justify-between gap-3 px-1 py-3">
-              <div className="flex items-center gap-2 text-xs text-slate-600">
-                <label htmlFor="purchase-page-size">Hiển thị</label>
-                <select
-                  id="purchase-page-size"
-                  value={pageSize}
-                  onChange={(event) => {
-                    setPageSize(Number(event.target.value));
-                    setPage(1);
-                  }}
-                  className="h-7 rounded border border-slate-300 bg-white px-2 text-xs text-slate-700 outline-none focus:border-blue-500"
-                >
-                  <option value={15}>15 dòng</option>
-                  <option value={30}>30 dòng</option>
-                  <option value={50}>50 dòng</option>
-                  <option value={100}>100 dòng</option>
-                </select>
-                {selectedRowKeys.length > 0 && (
-                  <span className="text-slate-500">Đã chọn {selectedRowKeys.length} phiếu</span>
-                )}
+            {/* Pagination & Status Footer */}
+            <div className="flex flex-wrap items-center justify-between gap-3 px-1 py-4 mt-auto">
+              <div className="text-xs text-slate-500">
+                {selectedRowKeys.length > 0
+                  ? `Đã chọn ${selectedRowKeys.length} phiếu nhập`
+                  : 'Chọn phiếu nhập để thao tác hàng loạt'}
               </div>
-              <div className="flex flex-wrap items-center justify-end gap-3 text-xs text-slate-600">
-                <div className="flex items-center gap-1">
-                  <button
-                    type="button"
-                    onClick={() => setPage(1)}
-                    disabled={page <= 1}
-                    aria-label="Trang đầu"
-                    className="flex h-7 w-7 items-center justify-center rounded border border-slate-300 bg-white text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    <ChevronsLeft size={14} />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPage((current) => Math.max(1, current - 1))}
-                    disabled={page <= 1}
-                    aria-label="Trang trước"
-                    className="flex h-7 w-7 items-center justify-center rounded border border-slate-300 bg-white text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    <ChevronLeft size={14} />
-                  </button>
-                  <span className="flex h-7 min-w-10 items-center justify-center rounded border border-slate-300 bg-white px-2 text-slate-800" aria-current="page">
-                    {page}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setPage((current) => Math.min(pageCount, current + 1))}
-                    disabled={page >= pageCount}
-                    aria-label="Trang tiếp"
-                    className="flex h-7 w-7 items-center justify-center rounded border border-slate-300 bg-white text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    <ChevronRight size={14} />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPage(pageCount)}
-                    disabled={page >= pageCount}
-                    aria-label="Trang cuối"
-                    className="flex h-7 w-7 items-center justify-center rounded border border-slate-300 bg-white text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    <ChevronsRight size={14} />
-                  </button>
-                </div>
-                <span>{rangeStart}-{rangeEnd} trong {filtered.length} giao dịch</span>
-              </div>
+              <Pagination
+                current={page}
+                pageSize={pageSize}
+                total={filtered.length}
+                showSizeChanger
+                showQuickJumper
+                onChange={(nextPage, nextPageSize) => {
+                  setPage(nextPage);
+                  setPageSize(nextPageSize);
+                }}
+                showTotal={(total, range) => `${range[0]}-${range[1]} trên ${total}`}
+              />
             </div>
           </div>
         </main>
