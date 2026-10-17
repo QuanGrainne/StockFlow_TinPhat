@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useSyncExternalStore } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
+import { ShoppingCart } from 'lucide-react';
 
 interface DropdownItem {
   label: string;
@@ -18,11 +19,38 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { label: 'Tổng quan', href: '/dashboard' },
   { label: 'Hàng hóa', href: '/products' },
-  { label: 'Mua hàng', href: '/orders' },
+  {
+    label: 'Mua hàng',
+    children: [
+      { label: 'Nhập hàng', href: '/purchases' },
+    ],
+  },
   { label: 'Đơn hàng', href: '/orders' },
   { label: 'Khách hàng', href: '/suppliers' },
   { label: 'Báo cáo', href: '/reports' },
+  { label: 'Bán online', href: '/orders' },
 ];
+
+function subscribeUser(callback: () => void) {
+  window.addEventListener('storage', callback);
+  return () => window.removeEventListener('storage', callback);
+}
+
+function getUserSnapshot() {
+  if (typeof window === 'undefined') return '';
+  try {
+    const raw = localStorage.getItem('stockflow_user');
+    if (!raw) return '';
+    const u = JSON.parse(raw) as { fullName?: string; username?: string };
+    return u.fullName ?? u.username ?? '';
+  } catch {
+    return '';
+  }
+}
+
+function getServerUserSnapshot() {
+  return '';
+}
 
 export default function Navbar() {
   const pathname = usePathname();
@@ -30,18 +58,8 @@ export default function Navbar() {
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const navRef = useRef<HTMLDivElement>(null);
 
-  // Get username from localStorage
-  const [username] = useState(() => {
-    if (typeof window === 'undefined') return '';
-    const raw = localStorage.getItem('stockflow_user');
-    if (!raw) return '';
-    try {
-      const u = JSON.parse(raw) as { fullName?: string; username?: string };
-      return u.fullName ?? u.username ?? '';
-    } catch {
-      return '';
-    }
-  });
+  // Get username safely using useSyncExternalStore
+  const username = useSyncExternalStore(subscribeUser, getUserSnapshot, getServerUserSnapshot);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -62,7 +80,7 @@ export default function Navbar() {
 
   return (
     <header className="sticky top-0 z-50 border-b border-[#005f9d] bg-[#0071BA] text-white shadow-sm">
-      <div className="max-w-screen-xl mx-auto px-6 flex items-center h-14 gap-2">
+      <div className="w-full px-6 flex items-center h-14 gap-2">
         {/* Logo */}
         <Link href="/dashboard" className="flex items-center gap-2 mr-6 shrink-0">
           <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-white text-sm font-bold text-[#0071BA]">
@@ -74,7 +92,7 @@ export default function Navbar() {
         </Link>
 
         {/* Nav items */}
-        <nav ref={navRef} className="flex items-center gap-1 flex-1">
+        <nav ref={navRef} className="flex min-w-0 flex-1 items-center justify-center gap-1 whitespace-nowrap">
           {NAV_ITEMS.map((item) => {
             const isOpen = openMenu === item.label;
             const isActive = item.children
@@ -83,14 +101,14 @@ export default function Navbar() {
 
             if (item.children) {
               return (
-                <div key={item.label} className="relative">
+                <div key={item.label} className="relative shrink-0">
                   <button
                     id={`nav-${item.label}`}
                     onClick={() => setOpenMenu(isOpen ? null : item.label)}
-                    className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-medium transition select-none ${
+                    className={`flex shrink-0 items-center gap-1.5 whitespace-nowrap px-3 py-2 rounded-lg text-sm font-medium transition select-none ${
                       isActive || isOpen
-                        ? 'bg-blue-50 text-blue-700'
-                        : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                        ? 'bg-[#005f9d] text-white'
+                        : 'text-white/85 hover:bg-white/15 hover:text-white'
                     }`}
                   >
                     {item.label}
@@ -133,9 +151,9 @@ export default function Navbar() {
               <Link
                 key={item.label}
                 href={item.href!}
-                className={`rounded-lg px-3 py-2 text-sm font-medium transition ${
+                className={`shrink-0 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium transition ${
                   isActive
-                    ? 'bg-white/20 text-white'
+                    ? 'bg-[#005f9d] text-white'
                     : 'text-white/85 hover:bg-white/15 hover:text-white'
                 }`}
               >
@@ -145,8 +163,16 @@ export default function Navbar() {
           })}
         </nav>
 
-        {/* Right side: user + logout */}
+        {/* Right side: Bán hàng + user + logout */}
         <div className="flex items-center gap-3 ml-auto shrink-0">
+          <Link
+            href="/orders"
+            className="flex items-center gap-1.5 rounded-lg bg-white px-3.5 py-1.5 text-sm font-semibold text-[#0071BA] shadow-xs hover:bg-blue-50 transition"
+          >
+            <ShoppingCart size={16} className="text-[#0071BA]" />
+            <span>Bán hàng</span>
+          </Link>
+
           {username && (
             <span className="hidden text-sm text-white/85 sm:block">
               Xin chào, <span className="font-semibold text-white">{username}</span>
@@ -154,7 +180,7 @@ export default function Navbar() {
           )}
           <button
             onClick={handleLogout}
-          className="rounded-lg px-3 py-1.5 text-sm font-medium text-white/85 transition hover:bg-white/15 hover:text-white"
+            className="rounded-lg px-3 py-1.5 text-sm font-medium text-white/85 transition hover:bg-white/15 hover:text-white"
           >
             Đăng xuất
           </button>
