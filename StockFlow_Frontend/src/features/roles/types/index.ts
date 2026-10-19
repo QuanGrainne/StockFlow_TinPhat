@@ -16,7 +16,7 @@ export interface UserProfile {
 // ─── Master Data Types ────────────────────────────────────────────────────────
 export interface Customer {
   id: string;
-  code: string;           // Vd: KH001, KH002
+  code: string;           // Vd: KH-AP01, KH-HG03
   name: string;
   phone: string;
   address: string;
@@ -28,10 +28,10 @@ export interface Customer {
 
 export interface Product {
   id: string;
-  code: string;           // Vd: TP-MC-300, NVL-TON-15
+  code: string;           // Vd: TP-SP01, TP-KE001
   name: string;
   type: 'FINISHED' | 'RAW_MATERIAL' | 'SEMI_FINISHED';
-  uom: string;            // Đơn vị tính: Cây, Cuộn, Kg, Mét
+  uom: string;            // Đơn vị tính: Tấm, Tuýp, Cây, Cuộn, Kg, Thanh
   standardPrice: number;  // Giá tiêu chuẩn (VND)
   costPrice: number;      // Giá vốn (VND)
   stockQuantity: number;  // Tồn kho hiện tại
@@ -39,6 +39,7 @@ export interface Product {
 
 // ─── Sales Types ─────────────────────────────────────────────────────────────
 export type OrderStatus = 'DRAFT' | 'PENDING' | 'CONSOLIDATED' | 'DISPATCHED' | 'CANCELLED';
+export type OrderChannel = 'Zalo' | 'Điện thoại' | 'Tại quầy';
 
 export interface OrderItem {
   productId: string;
@@ -53,17 +54,22 @@ export interface OrderItem {
 
 export interface PendingOrder {
   id: string;
-  orderCode: string;      // Vd: SO-2026-001
+  orderCode: string;      // Vd: DC-2026-001
+  channel: OrderChannel;  // 'Zalo' | 'Điện thoại' | 'Tại quầy'
   customerId: string;
+  customerCode: string;   // KH-AP01
   customerName: string;
   customerPhone: string;
   orderDate: string;
+  createdAtTime: string;  // Vd: 18/10/2026 08:30
   deliveryDate: string;
   items: OrderItem[];
+  netAmount: number;      // Giá trị thuần (NET)
   totalAmount: number;
   paidAmount: number;
   remainingAmount: number;
   status: OrderStatus;
+  deliveryNotes?: string;
   notes?: string;
   createdBy: string;
 }
@@ -92,6 +98,26 @@ export interface CreditLimitRequest {
   reviewedBy?: string;
   reviewedAt?: string;
   reviewNotes?: string;
+}
+
+export interface ReturnClaim {
+  id: string;
+  claimCode: string;          // Vd: YCTH-2026-001
+  pxkCode: string;            // Vd: PXK-2026-095
+  customerId: string;
+  customerCode: string;       // Vd: KH-AP01
+  customerName: string;
+  customerPhone: string;
+  productId: string;
+  productCode: string;        // Vd: TP-SP01
+  productName: string;
+  returnQty: number;          // Vd: 6 Tấm
+  uom: string;
+  reason: 'Vận chuyển trầy xước' | 'Giao sai mã hàng' | 'Lỗi kỹ thuật sản phẩm' | 'Thừa vật tư công trình';
+  physicalCondition: string;  // Vd: Mẻ góc hèm khóa và trầy 5cm trên bề mặt film b...
+  customerNotes?: string;     // Chi tiết khiếu nại
+  qcStatus: 'CHO_KIEM_TRA' | 'DA_NHAP_LAI_KHO' | 'TU_CHOI';
+  submittedAt: string;        // Vd: 17/10/2026 15:45
 }
 
 // ─── Manager Types ───────────────────────────────────────────────────────────
@@ -150,6 +176,67 @@ export interface CashFlowVoucher {
   createdBy: string;
   referenceDoc?: string;    // Số hóa đơn / Số đơn hàng tham chiếu
 }
+
+export interface ManagerInventoryProduct {
+  id: string;
+  code: string;
+  name: string;
+  locationDetail: string;
+  category: 'Thành phẩm' | 'Nguyên vật liệu' | 'Combo gói';
+  uom: string;
+  actualStock: number;
+  netPrice: number | null;
+  macCost: number;
+  safeStockStatus: 'SAFE' | 'LOW';
+  thresholdText: string;
+}
+
+export interface LandedCostRecord {
+  id: string;
+  receiptCode: string;
+  supplierName: string;
+  receiptDate: string;
+  warehouseName: string;
+  productName: string;
+  quantityInfo: string;
+  landedCost: number;
+  macAfterInbound: number;
+  receivedBy: string;
+}
+
+export interface ManagerProductionPlan {
+  id: string;
+  orderCode: string;
+  productName: string;
+  bomCode: string;
+  status: 'Đang sản xuất' | 'Chờ nhập kho' | 'Hoàn thành';
+  workshop: string;
+  manager: string;
+  sourceWarehouse: string;
+  dueDate: string;
+  targetQty: number;
+  actualQty: number;
+  progressPercent: number;
+  materials: {
+    name: string;
+    needed: string;
+    status: 'Đủ vật tư' | 'Thiếu vật tư';
+  }[];
+}
+
+export interface PartnerCreditProfile {
+  id: string;
+  code: string;
+  name: string;
+  contact: string;
+  category: 'Khách hàng B2B' | 'Nhà cung cấp';
+  paymentTerm: string;
+  currentDebt: number;
+  creditLimit: number | null;
+  usagePercent: number | null;
+  barColor?: 'orange' | 'red' | 'green' | 'none';
+}
+
 
 export interface PaginationParams {
   page: number;
@@ -243,4 +330,53 @@ export interface SystemUser {
   status: 'ACTIVE' | 'INACTIVE';
   lastLogin?: string;
 }
+
+export interface StaffAccount {
+  id: string;
+  code: string;           // Vd: TP-AD001, TP-MN002
+  name: string;           // Vd: Nguyễn Văn A
+  title: string;          // Vd: Giám đốc Công nghệ
+  email: string;
+  phone: string;
+  department: string;     // Quản trị hệ thống, Ban Giám đốc, Phòng Kinh doanh, Kho vận & Logistics, Xưởng Sản xuất
+  role: UserRole;
+  roleTitle: string;      // Quản trị viên, Quản lý, Nhân viên bán hàng, Nhân viên kho, Nhân viên sản xuất
+  assignedWarehouses: string[]; // Vd: ['WH-HN-01', 'WH-HN-02']
+  status: 'ACTIVE' | 'LOCKED';
+  avatar?: string;
+}
+
+export interface WarehouseFacility {
+  id: string;
+  code: string;           // WH-HN-01, WH-HN-02, WH-HN-03, WH-HN-04
+  name: string;           // Kho Tổng Gia Lâm, Kho Đông Anh, Kho Hà Đông, Kho Hoàn Kiếm
+  address: string;
+  staffCount: number;
+  area: string;           // 8,500 m²
+  status: 'ACTIVE' | 'INACTIVE';
+}
+
+export interface RoleDefinition {
+  id: string;
+  name: string;           // Quản trị viên, Quản lý...
+  code: string;           // ROLE_ADMIN, ROLE_MANAGER...
+  rank: string;           // Rank #1 ... Rank #5
+  isSystem: boolean;
+  description: string;
+  staffCount: number;
+}
+
+export interface PermissionMatrixModule {
+  id: string;
+  stt: string;            // 01, 02 ... 08
+  name: string;
+  code: string;           // [AUTH], [MASTER]...
+  description: string;
+  read: boolean;
+  create: boolean;
+  update: boolean;
+  delete: boolean;
+  approve: boolean;
+}
+
 

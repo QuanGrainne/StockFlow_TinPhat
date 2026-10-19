@@ -1,174 +1,348 @@
-// src/components/common/Sidebar.tsx
-// Sidebar có nút thu gọn (Collapsible), danh mục menu theo từng Role
+// src/features/roles/components/common/Sidebar.tsx
+// Navigation Tabs Bar theo giao diện AI Studio:
+// Sales: [Tổng quan bán hàng] [Đơn chờ xử lý v] [Gộp đơn xuất kho v] [Ngoại lệ công nợ v] [Quản lý trả hàng v]
+// Admin: [Tổng quan] [Tài khoản nhân viên v] [Phân quyền vai trò v] [Phân quyền kho v]
 
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { UserRole } from '../../types';
 import {
-  ChevronLeft,
-  ChevronRight,
-  LayoutDashboard,
-  ShoppingCart,
-  ShieldAlert,
+  LayoutGrid,
+  ClipboardList,
   GitMerge,
-  Cpu,
+  AlertCircle,
+  RotateCcw,
+  ChevronDown,
   Users,
-  Wallet,
-  Settings,
+  ShieldCheck,
+  Building2,
+  CheckCircle2,
+  Sliders,
+  MapPin,
+  Warehouse,
+  Inbox,
+  Layers,
+  ShoppingBag,
+  BarChart3,
 } from 'lucide-react';
+
+interface DropdownItem {
+  id: string;
+  title: string;
+  desc: string;
+  icon: any;
+}
+
+interface TabConfig {
+  id: string;
+  label: string;
+  icon: any;
+  hasDropdown: boolean;
+  hasBadgeDot?: boolean;
+  dropdownItems?: DropdownItem[];
+}
 
 interface SidebarProps {
   currentRole: UserRole;
   activeScreen: string;
   onNavigate: (screenId: string) => void;
-  isCollapsed: boolean;
-  onToggleCollapse: () => void;
-  pendingApprovalsCount?: number;
+  isCollapsed?: boolean;
+  onToggleCollapse?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
   currentRole,
   activeScreen,
   onNavigate,
-  isCollapsed,
-  onToggleCollapse,
-  pendingApprovalsCount = 1,
 }) => {
-  // Menu cho Sales
-  const salesMenuItems = [
-    { id: 'sales-dashboard', label: 'Tổng quan Kinh doanh', icon: LayoutDashboard },
-    { id: 'sales-orders', label: 'Đơn hàng chờ duyệt', icon: ShoppingCart },
-    { id: 'sales-credit-limits', label: 'Yêu cầu hạn mức nợ', icon: ShieldAlert },
+  const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpenDropdownId(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const adminTabs: TabConfig[] = [
+    {
+      id: 'admin-dashboard',
+      label: 'Tổng quan',
+      icon: LayoutGrid,
+      hasDropdown: false,
+    },
+    {
+      id: 'admin-staff',
+      label: 'Tài khoản nhân viên',
+      icon: Users,
+      hasDropdown: true,
+      dropdownItems: [
+        {
+          id: 'admin-staff',
+          title: 'Tất cả nhân sự',
+          desc: 'Danh sách nhân viên công ty',
+          icon: Users,
+        },
+        {
+          id: 'admin-staff-active',
+          title: 'Đang hoạt động',
+          desc: 'Tài khoản đang khả dụng',
+          icon: CheckCircle2,
+        },
+      ],
+    },
+    {
+      id: 'admin-roles',
+      label: 'Phân quyền vai trò',
+      icon: ShieldCheck,
+      hasDropdown: true,
+      dropdownItems: [
+        {
+          id: 'admin-roles',
+          title: 'Danh mục vai trò',
+          desc: 'Các cấp bậc phân quyền',
+          icon: ShieldCheck,
+        },
+        {
+          id: 'admin-matrix',
+          title: 'Cấu hình ma trận',
+          desc: 'Quyền hạn theo phân hệ',
+          icon: Sliders,
+        },
+      ],
+    },
+    {
+      id: 'admin-warehouse-perms',
+      label: 'Phân quyền kho',
+      icon: Building2,
+      hasDropdown: true,
+      dropdownItems: [
+        {
+          id: 'admin-warehouse-perms',
+          title: 'Danh sách quyền kho',
+          desc: 'Ma trận nhân sự và kho',
+          icon: Warehouse,
+        },
+        {
+          id: 'admin-warehouse-facilities',
+          title: 'Cơ sở kho',
+          desc: 'Cách ly dữ liệu kho vật lý',
+          icon: MapPin,
+        },
+      ],
+    },
   ];
 
-  // Menu cho Manager (BỎ QUA Return Tracking, Machine Status, Inventory Disposal)
-  const managerMenuItems = [
-    { id: 'manager-dashboard', label: 'Tổng quan điều hành', icon: LayoutDashboard },
+  const managerTabs: TabConfig[] = [
+    {
+      id: 'manager-dashboard',
+      label: 'Tổng quan tồn kho',
+      icon: LayoutGrid,
+      hasDropdown: false,
+    },
     {
       id: 'manager-approvals',
-      label: 'Hộp thư xét duyệt',
-      icon: ShieldAlert,
-      badge: pendingApprovalsCount > 0 ? pendingApprovalsCount : undefined,
+      label: 'Hộp thư duyệt',
+      icon: Inbox,
+      hasDropdown: false,
+      hasBadgeDot: true,
     },
-    { id: 'manager-bom', label: 'Quản lý định mức BOM', icon: Cpu },
-    { id: 'manager-partners', label: 'Hạn mức nợ đối tác', icon: Users },
-    { id: 'manager-cashflow', label: 'Sổ quỹ Thu / Chi', icon: Wallet },
-    { id: 'manager-production', label: 'Kế hoạch sản xuất', icon: GitMerge },
+    {
+      id: 'manager-production',
+      label: 'Quản trị sản xuất',
+      icon: Layers,
+      hasDropdown: true,
+      dropdownItems: [
+        {
+          id: 'manager-production',
+          title: 'Quản lý lệnh sản xuất',
+          desc: 'Giám sát tiến độ gia công xưởng',
+          icon: Layers,
+        },
+        {
+          id: 'manager-bom',
+          title: 'Cấu hình định mức BOM',
+          desc: 'Định mức nguyên vật liệu sản phẩm',
+          icon: Sliders,
+        },
+      ],
+    },
+    {
+      id: 'manager-partners',
+      label: 'Đối tác tài chính',
+      icon: Users,
+      hasDropdown: true,
+      dropdownItems: [
+        {
+          id: 'manager-partners',
+          title: 'Đối tác và hạn mức tín dụng',
+          desc: 'Quản trị công nợ khách hàng B2B & NCC',
+          icon: Users,
+        },
+        {
+          id: 'manager-cashflow',
+          title: 'Sổ quỹ thu chi',
+          desc: 'Quản lý phiếu thu, chi dòng tiền',
+          icon: GitMerge,
+        },
+      ],
+    },
+    {
+      id: 'manager-landed-cost',
+      label: 'Mua bán chi phí',
+      icon: ShoppingBag,
+      hasDropdown: true,
+      dropdownItems: [
+        {
+          id: 'manager-landed-cost',
+          title: 'Chi phí mua hàng & Landed Cost',
+          desc: 'Phân bổ chi phí cấu thành giá vốn MAC',
+          icon: ShoppingBag,
+        },
+      ],
+    },
+    {
+      id: 'manager-reports',
+      label: 'Báo cáo quản trị',
+      icon: BarChart3,
+      hasDropdown: false,
+    },
   ];
 
-  // Menu cho Warehouse Staff
-  const warehouseMenuItems = [
-    { id: 'warehouse-inbound', label: 'Kiểm hàng & Nhập kho', icon: ShoppingCart },
-    { id: 'warehouse-stock', label: 'Vị trí kho (Bin Location)', icon: Cpu },
+  const salesTabs: TabConfig[] = [
+    {
+      id: 'sales-dashboard',
+      label: 'Tổng quan bán hàng',
+      icon: LayoutGrid,
+      hasDropdown: false,
+    },
+    {
+      id: 'sales-orders',
+      label: 'Đơn chờ xử lý',
+      icon: ClipboardList,
+      hasDropdown: true,
+    },
+    {
+      id: 'sales-consolidate',
+      label: 'Gộp đơn xuất kho',
+      icon: GitMerge,
+      hasDropdown: true,
+    },
+    {
+      id: 'sales-credit-limits',
+      label: 'Ngoại lệ công nợ',
+      icon: AlertCircle,
+      hasDropdown: true,
+    },
+    {
+      id: 'sales-returns',
+      label: 'Quản lý trả hàng',
+      icon: RotateCcw,
+      hasDropdown: true,
+    },
   ];
 
-  // Menu cho Production Staff
-  const productionMenuItems = [
-    { id: 'production-shifts', label: 'Ghi nhận sản lượng ca', icon: GitMerge },
-  ];
+  const tabs =
+    currentRole === 'ADMIN'
+      ? adminTabs
+      : currentRole === 'MANAGER'
+      ? managerTabs
+      : salesTabs;
 
-  // Menu cho Admin
-  const adminMenuItems = [
-    { id: 'admin-users', label: 'Quản trị User & Quyền Kho', icon: Users },
-  ];
-
-  let menuItems = salesMenuItems;
-  let roleTitle = 'Phân hệ Kinh doanh';
-
-  switch (currentRole) {
-    case 'SALES':
-      menuItems = salesMenuItems;
-      roleTitle = 'Phân hệ Kinh doanh';
-      break;
-    case 'MANAGER':
-      menuItems = managerMenuItems;
-      roleTitle = 'Phân hệ Quản lý';
-      break;
-    case 'WAREHOUSE':
-      menuItems = warehouseMenuItems;
-      roleTitle = 'Phân hệ Thủ kho';
-      break;
-    case 'PRODUCTION':
-      menuItems = productionMenuItems;
-      roleTitle = 'Phân hệ Sản xuất';
-      break;
-    case 'ADMIN':
-      menuItems = adminMenuItems;
-      roleTitle = 'Phân hệ Quản trị';
-      break;
-  }
+  const isTabActive = (tab: TabConfig) => {
+    if (tab.id === activeScreen) return true;
+    if (tab.dropdownItems?.some((sub) => sub.id === activeScreen)) return true;
+    if (tab.id === 'admin-staff' && activeScreen === 'admin-staff-active') return true;
+    if (tab.id === 'admin-roles' && activeScreen === 'admin-matrix') return true;
+    if (tab.id === 'admin-warehouse-perms' && activeScreen === 'admin-warehouse-facilities') return true;
+    if (tab.id === 'manager-production' && activeScreen === 'manager-bom') return true;
+    if (tab.id === 'manager-partners' && activeScreen === 'manager-cashflow') return true;
+    return false;
+  };
 
   return (
-    <aside
-      className={`relative shrink-0 bg-white border-r border-slate-200 select-none flex flex-col transition-all duration-300 min-h-[calc(100vh-56px)] ${
-        isCollapsed ? 'w-16' : 'w-64'
-      }`}
-    >
-      {/* Role Title Bar */}
-      <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
-        {!isCollapsed && (
-          <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider truncate">
-            {roleTitle}
-          </div>
-        )}
-        <button
-          type="button"
-          onClick={onToggleCollapse}
-          className="p-1 rounded-[6px] text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition cursor-pointer mx-auto"
-          title={isCollapsed ? 'Mở rộng menu' : 'Thu gọn menu'}
-        >
-          {isCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
-        </button>
-      </div>
+    <div ref={containerRef} className="bg-white border-b border-slate-200 px-6 py-2 flex items-center gap-2 select-none relative z-30">
+      {tabs.map((tab) => {
+        const active = isTabActive(tab);
+        const Icon = tab.icon;
+        const isOpen = openDropdownId === tab.id;
 
-      {/* Nav List */}
-      <nav className="flex-1 py-3 px-2 space-y-1">
-        {menuItems.map((item) => {
-          const isActive = activeScreen === item.id;
-          const Icon = item.icon;
-          return (
+        return (
+          <div key={tab.id} className="relative">
             <button
-              key={item.id}
               type="button"
-              onClick={() => onNavigate(item.id)}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-[8px] text-xs font-medium transition cursor-pointer group ${
-                isActive
-                  ? 'bg-blue-50 text-[#2B6CB0] font-semibold'
-                  : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+              onClick={() => {
+                if (tab.hasDropdown && tab.dropdownItems && tab.dropdownItems.length > 0) {
+                  if (isOpen) {
+                    setOpenDropdownId(null);
+                  } else {
+                    setOpenDropdownId(tab.id);
+                    onNavigate(tab.id);
+                  }
+                } else {
+                  setOpenDropdownId(null);
+                  onNavigate(tab.id);
+                }
+              }}
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-[8px] text-xs font-semibold transition cursor-pointer border ${
+                active
+                  ? 'bg-blue-50/80 text-[#2B6CB0] border-blue-200 shadow-2xs'
+                  : 'text-slate-600 border-transparent hover:text-slate-900 hover:bg-slate-50'
               }`}
-              title={isCollapsed ? item.label : undefined}
             >
-              <Icon
-                size={18}
-                className={`shrink-0 ${
-                  isActive ? 'text-[#2B6CB0]' : 'text-slate-400 group-hover:text-slate-600'
-                }`}
-              />
-              {!isCollapsed && (
-                <span className="flex-1 text-left truncate">{item.label}</span>
+              <Icon size={15} className={active ? 'text-[#2B6CB0]' : 'text-slate-500'} />
+              <span>{tab.label}</span>
+              {tab.hasBadgeDot && (
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
               )}
-              {!isCollapsed && item.badge !== undefined && (
-                <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-500 text-white">
-                  {item.badge}
-                </span>
+              {tab.hasDropdown && (
+                <ChevronDown
+                  size={12}
+                  className={`transition-transform duration-150 ${active ? 'text-[#2B6CB0]' : 'text-slate-400'} ${
+                    isOpen ? 'rotate-180' : ''
+                  }`}
+                />
               )}
             </button>
-          );
-        })}
-      </nav>
 
-      {/* Footer Info */}
-      <div className="p-3 border-t border-slate-100 text-slate-400 text-[11px]">
-        {!isCollapsed ? (
-          <div className="flex items-center gap-2">
-            <Settings size={14} />
-            <span>StockFlow v1.0 Desktop</span>
+
+            {/* Dropdown Menu Modal */}
+            {isOpen && tab.dropdownItems && (
+              <div className="absolute top-full left-0 mt-1.5 w-64 bg-white rounded-[10px] shadow-xl border border-slate-200 py-1.5 z-50 animate-in fade-in duration-100">
+                {tab.dropdownItems.map((item) => {
+                  const ItemIcon = item.icon;
+                  const isItemActive = activeScreen === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => {
+                        setOpenDropdownId(null);
+                        onNavigate(item.id);
+                      }}
+                      className={`w-full text-left px-3.5 py-2.5 flex items-start gap-3 transition cursor-pointer hover:bg-blue-50/70 ${
+                        isItemActive ? 'bg-blue-50 text-[#2B6CB0]' : 'text-slate-700'
+                      }`}
+                    >
+                      <div className={`mt-0.5 p-1 rounded-[6px] shrink-0 ${isItemActive ? 'text-[#2B6CB0]' : 'text-slate-400'}`}>
+                        <ItemIcon size={16} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-xs font-bold leading-tight">{item.title}</div>
+                        <div className="text-[11px] text-slate-400 mt-0.5 leading-tight">{item.desc}</div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
-        ) : (
-          <div className="flex justify-center">
-            <Settings size={14} />
-          </div>
-        )}
-      </div>
-    </aside>
+        );
+      })}
+    </div>
   );
 };
+
