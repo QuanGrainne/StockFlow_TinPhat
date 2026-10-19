@@ -7,12 +7,14 @@ import {
   Customer,
   Product,
   ConsolidateOrdersPayload,
+  ReturnClaim,
 } from '../types';
 import {
   INITIAL_CUSTOMERS,
   INITIAL_PRODUCTS,
   INITIAL_PENDING_ORDERS,
   INITIAL_CREDIT_REQUESTS,
+  INITIAL_RETURN_CLAIMS,
 } from '../data/mockData';
 
 // In-memory data store for live simulation
@@ -20,6 +22,7 @@ let customers = [...INITIAL_CUSTOMERS];
 let products = [...INITIAL_PRODUCTS];
 let pendingOrders = [...INITIAL_PENDING_ORDERS];
 let creditRequests = [...INITIAL_CREDIT_REQUESTS];
+let returnClaims = [...INITIAL_RETURN_CLAIMS];
 
 export const salesService = {
   // ─── Master Data for Sales ───────────────────────────────────────────────
@@ -196,5 +199,43 @@ export const salesService = {
 
     creditRequests = [newReq, ...creditRequests];
     return newReq;
+  },
+
+  // ─── Return Claims (Quản lý hàng trả lại) ─────────────────────────────────
+  async getReturnClaims(search?: string, status?: string): Promise<ReturnClaim[]> {
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    let result = [...returnClaims];
+
+    if (search) {
+      const q = search.toLowerCase();
+      result = result.filter(
+        (c) =>
+          c.claimCode.toLowerCase().includes(q) ||
+          c.pxkCode.toLowerCase().includes(q) ||
+          c.customerName.toLowerCase().includes(q)
+      );
+    }
+
+    if (status && status !== 'ALL') {
+      result = result.filter((c) => c.qcStatus === status);
+    }
+
+    return result;
+  },
+
+  async createReturnClaim(
+    payload: Omit<ReturnClaim, 'id' | 'claimCode' | 'submittedAt' | 'qcStatus'>
+  ): Promise<ReturnClaim> {
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    const newCode = `YCTH-2026-${String(returnClaims.length + 1).padStart(3, '0')}`;
+    const newClaim: ReturnClaim = {
+      ...payload,
+      id: `RC-${Date.now()}`,
+      claimCode: newCode,
+      qcStatus: 'CHO_KIEM_TRA',
+      submittedAt: new Date().toLocaleString('vi-VN'),
+    };
+    returnClaims = [newClaim, ...returnClaims];
+    return newClaim;
   },
 };
