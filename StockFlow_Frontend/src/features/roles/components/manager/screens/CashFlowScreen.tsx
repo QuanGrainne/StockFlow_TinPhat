@@ -14,6 +14,7 @@ import {
   AlertTriangle,
   CreditCard,
   Banknote,
+  X,
 } from 'lucide-react';
 
 export const CashFlowScreen: React.FC = () => {
@@ -308,182 +309,165 @@ export const CashFlowScreen: React.FC = () => {
         searchPlaceholder="Tìm theo mã chứng từ, tên đối tác hoặc nội dung..."
       />
 
-      {/* ── Modal gộp: Create Cash Flow Voucher (Thu & Chi) ── */}
-      <Modal
-        isOpen={modalOpen}
-        onClose={() => setModalOpen(false)}
-        title={formType === 'RECEIPT' ? 'Lập Phiếu Thu Tiền' : 'Lập Phiếu Chi Tiền'}
-        subtitle="Chứng từ dòng tiền chính thức cho hệ thống StockFlow OIMS"
-        onSave={handleSaveVoucher}
-        saveText={formType === 'RECEIPT' ? 'Lưu Phiếu Thu' : 'Lưu Phiếu Chi'}
-        isSaving={isSaving}
-        maxWidth="lg"
-      >
-        {formError && (
-          <div className="p-3 rounded-[6px] bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
-            <AlertTriangle size={15} />
-            <span>{formError}</span>
-          </div>
-        )}
-
-        {/* Radio Toggle: Chọn Thu hoặc Chi */}
-        <div>
-          <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-            Loại chứng từ dòng tiền <span className="text-rose-500">*</span>
-          </label>
-          <div className="grid grid-cols-2 gap-3">
-            <label
-              className={`flex items-center justify-center gap-2 p-2.5 rounded-[6px] border text-xs font-bold cursor-pointer transition ${
-                formType === 'RECEIPT'
-                  ? 'border-emerald-500 bg-emerald-50/50 text-emerald-800 ring-2 ring-emerald-100'
-                  : 'border-slate-300 text-slate-600 hover:bg-slate-50'
-              }`}
+      {/* ── Modal Lập chứng từ thu chi chuẩn theo thiết kế AI Studio (Ảnh 2 bên trái) ── */}
+      {modalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4 animate-in fade-in">
+          <div className="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-md p-5 relative">
+            <button
+              type="button"
+              onClick={() => setModalOpen(false)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 cursor-pointer"
             >
-              <input
-                type="radio"
-                name="voucherType"
-                checked={formType === 'RECEIPT'}
-                onChange={() => {
+              <X size={16} />
+            </button>
+
+            {/* Header with $ icon */}
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold text-sm shrink-0 border border-emerald-100">
+                $
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-slate-900">Lập chứng từ thu chi</h3>
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  Màn hình 3.2.2.13 • Giảm trừ công nợ tức thì
+                </p>
+              </div>
+            </div>
+
+            {/* Toggle Pills */}
+            <div className="bg-slate-100 p-1 rounded-lg flex items-center mb-3.5">
+              <button
+                type="button"
+                onClick={() => {
                   setFormType('RECEIPT');
                   setFormCategory('Thu tiền khách hàng');
                 }}
-                className="hidden"
-              />
-              <ArrowDownLeft size={16} className="text-emerald-600" />
-              <span>PHIẾU THU (+)</span>
-            </label>
-
-            <label
-              className={`flex items-center justify-center gap-2 p-2.5 rounded-[6px] border text-xs font-bold cursor-pointer transition ${
-                formType === 'PAYMENT'
-                  ? 'border-rose-500 bg-rose-50/50 text-rose-800 ring-2 ring-rose-100'
-                  : 'border-slate-300 text-slate-600 hover:bg-slate-50'
-              }`}
-            >
-              <input
-                type="radio"
-                name="voucherType"
-                checked={formType === 'PAYMENT'}
-                onChange={() => {
+                className={`flex-1 py-1.5 rounded-md text-xs font-semibold text-center transition cursor-pointer ${
+                  formType === 'RECEIPT'
+                    ? 'bg-white text-slate-800 shadow-2xs'
+                    : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                Phiếu thu (Giảm nợ AR)
+              </button>
+              <button
+                type="button"
+                onClick={() => {
                   setFormType('PAYMENT');
                   setFormCategory('Chi trả NCC');
                 }}
-                className="hidden"
-              />
-              <ArrowUpRight size={16} className="text-rose-600" />
-              <span>PHIẾU CHI (-)</span>
-            </label>
+                className={`flex-1 py-1.5 rounded-md text-xs font-semibold text-center transition cursor-pointer ${
+                  formType === 'PAYMENT'
+                    ? 'bg-white text-slate-800 shadow-2xs'
+                    : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                Phiếu chi (Giảm nợ AP)
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              {/* Partner Dropdown */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  {formType === 'RECEIPT' ? 'Khách hàng nộp tiền' : 'Nhà cung cấp nhận tiền'}{' '}
+                  <span className="text-rose-500">*</span>
+                </label>
+                <select
+                  value={formPartnerId}
+                  onChange={(e) => {
+                    setFormPartnerId(e.target.value);
+                    const c = customers.find((cust) => cust.id === e.target.value);
+                    if (c) setFormPartnerName(c.name);
+                  }}
+                  className="w-full h-9 px-3 rounded-lg border border-slate-200 text-xs text-slate-700 focus:outline-none focus:border-blue-500 bg-white"
+                >
+                  <option value="CUST-001">
+                    Công ty Cổ phần Nội thất An Phát — Nợ hiện tại: 320.000.000 đ
+                  </option>
+                  <option value="CUST-002">
+                    Đại lý Trang trí Hoàng Gia — Nợ hiện tại: 145.000.000 đ
+                  </option>
+                  <option value="CUST-003">
+                    Công ty TNHH Xây dựng Minh Khang — Nợ hiện tại: 78.000.000 đ
+                  </option>
+                  {formType === 'PAYMENT' && (
+                    <>
+                      <option value="NCC-01">Công ty Cổ phần Nhựa Đông Á — Nợ: 420.000.000 đ</option>
+                      <option value="NCC-02">Tổng Công ty Hóa chất Việt Nhật — Nợ: 185.000.000 đ</option>
+                    </>
+                  )}
+                </select>
+              </div>
+
+              {/* Amount & Subtext */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Số tiền thanh toán (VNĐ) <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="number"
+                  value={formAmount || 50000000}
+                  onChange={(e) => setFormAmount(Number(e.target.value))}
+                  placeholder="50000000"
+                  className="w-full h-9 px-3 rounded-lg border border-slate-200 text-xs font-semibold text-slate-800 focus:outline-none focus:border-blue-500"
+                />
+                <div className="text-[11px] text-slate-400 mt-1 italic font-medium">
+                  Bằng chữ: {(formAmount || 50000000).toLocaleString('vi-VN')} đ
+                </div>
+              </div>
+
+              {/* Payment Method */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Phương thức giao dịch <span className="text-rose-500">*</span>
+                </label>
+                <select
+                  value={formMethod}
+                  onChange={(e) => setFormMethod(e.target.value as any)}
+                  className="w-full h-9 px-3 rounded-lg border border-slate-200 text-xs text-slate-700 focus:outline-none focus:border-blue-500 bg-white"
+                >
+                  <option value="BANK_TRANSFER">Chuyển khoản (VietQR / Internet Banking)</option>
+                  <option value="CASH">Tiền mặt tại quỹ</option>
+                </select>
+              </div>
+
+              {/* Description */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Nội dung diễn giải <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={formDescription || 'Thu tiền hàng cấn trừ công nợ khách hàng'}
+                  onChange={(e) => setFormDescription(e.target.value)}
+                  placeholder="Thu tiền hàng cấn trừ công nợ khách hàng"
+                  className="w-full h-9 px-3 rounded-lg border border-slate-200 text-xs text-slate-700 focus:outline-none focus:border-blue-500"
+                />
+              </div>
+
+              {/* Footer */}
+              <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setModalOpen(false)}
+                  className="px-4 py-2 rounded-lg border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 cursor-pointer"
+                >
+                  Hủy bỏ
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveVoucher}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[#1E56A0] hover:bg-[#184580] text-xs font-semibold text-white cursor-pointer shadow-xs"
+                >
+                  <span>Xác nhận ghi sổ</span>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
+      )}
 
-        {/* Hạng mục thu chi */}
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
-              Hạng mục thu/chi
-            </label>
-            <select
-              value={formCategory}
-              onChange={(e) => setFormCategory(e.target.value)}
-              className="w-full h-9 px-3 rounded-[6px] border border-slate-300 text-xs bg-white text-slate-800 focus:outline-none focus:border-[#2B6CB0]"
-            >
-              {formType === 'RECEIPT' ? (
-                <>
-                  <option value="Thu tiền khách hàng">Thu tiền nợ khách hàng (Trừ công nợ)</option>
-                  <option value="Khách đặt cọc">Khách tạm ứng / Đặt cọc đơn hàng</option>
-                  <option value="Thu nhập khác">Thu nhập khác / Thanh lý phế liệu</option>
-                </>
-              ) : (
-                <>
-                  <option value="Chi trả NCC">Chi thanh toán tiền hàng NCC</option>
-                  <option value="Chi phí vận hành">Chi cước xe tải / Bốc xếp (Landed Cost)</option>
-                  <option value="Chi lương & SX">Chi tạm ứng công thợ sản xuất</option>
-                  <option value="Chi khác">Chi phí văn phòng & điện nước</option>
-                </>
-              )}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
-              Hình thức thanh toán
-            </label>
-            <select
-              value={formMethod}
-              onChange={(e) => setFormMethod(e.target.value as any)}
-              className="w-full h-9 px-3 rounded-[6px] border border-slate-300 text-xs bg-white text-slate-800 focus:outline-none focus:border-[#2B6CB0]"
-            >
-              <option value="BANK_TRANSFER">Chuyển khoản Ngân hàng (Vietcombank)</option>
-              <option value="CASH">Tiền mặt tại quỹ công ty</option>
-            </select>
-          </div>
-        </div>
-
-        {/* Đối tác & Số tiền */}
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
-              Đối tác (Khách hàng / NCC)
-            </label>
-            <select
-              value={formPartnerId}
-              onChange={(e) => {
-                setFormPartnerId(e.target.value);
-                const c = customers.find((cust) => cust.id === e.target.value);
-                if (c) setFormPartnerName(c.name);
-              }}
-              className="w-full h-9 px-3 rounded-[6px] border border-slate-300 text-xs bg-white text-slate-800 focus:outline-none focus:border-[#2B6CB0]"
-            >
-              <option value="">-- Chọn đối tác hoặc tự nhập --</option>
-              {customers.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.code} - {c.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
-              Số tiền thanh toán (VND) <span className="text-rose-500">*</span>
-            </label>
-            <input
-              type="number"
-              step={1000000}
-              value={formAmount}
-              onChange={(e) => setFormAmount(Number(e.target.value))}
-              placeholder="0"
-              className="w-full h-9 px-3 rounded-[6px] border border-slate-300 text-xs text-slate-800 font-bold focus:outline-none focus:border-[#2B6CB0]"
-            />
-          </div>
-        </div>
-
-        <div>
-          <label className="block text-xs font-semibold text-slate-700 mb-1">
-            Số chứng từ gốc tham chiếu (Hóa đơn / Đơn hàng PO, SO)
-          </label>
-          <input
-            type="text"
-            value={formRefDoc}
-            onChange={(e) => setFormRefDoc(e.target.value)}
-            placeholder="Vd: SO-2026-001 hoặc HD-981"
-            className="w-full h-9 px-3 rounded-[6px] border border-slate-300 text-xs text-slate-800 focus:outline-none focus:border-[#2B6CB0]"
-          />
-        </div>
-
-        <div>
-          <label className="block text-xs font-semibold text-slate-700 mb-1">
-            Nội dung diễn giải chi tiết <span className="text-rose-500">*</span>
-          </label>
-          <textarea
-            rows={2}
-            value={formDescription}
-            onChange={(e) => setFormDescription(e.target.value)}
-            placeholder="Ghi rõ lý do thu hoặc chi, người nhận tiền..."
-            className="w-full p-2.5 border border-slate-300 rounded-[6px] text-xs resize-none text-slate-800 focus:outline-none focus:border-[#2B6CB0]"
-          />
-        </div>
-      </Modal>
     </div>
   );
 };

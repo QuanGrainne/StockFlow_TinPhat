@@ -7,6 +7,10 @@ import {
   CashFlowVoucher,
   Customer,
   CreditLimitRequest,
+  ManagerInventoryProduct,
+  LandedCostRecord,
+  ManagerProductionPlan,
+  PartnerCreditProfile,
 } from '../types';
 import {
   INITIAL_BOMS,
@@ -14,6 +18,10 @@ import {
   INITIAL_VOUCHERS,
   INITIAL_CUSTOMERS,
   INITIAL_CREDIT_REQUESTS,
+  INITIAL_MANAGER_INVENTORY,
+  INITIAL_MANAGER_LANDED_COSTS,
+  INITIAL_MANAGER_PRODUCTION_PLANS,
+  INITIAL_PARTNER_PROFILES,
 } from '../data/mockData';
 
 let boms = [...INITIAL_BOMS];
@@ -21,6 +29,11 @@ let productionOrders = [...INITIAL_PRODUCTION_ORDERS];
 let vouchers = [...INITIAL_VOUCHERS];
 let customers = [...INITIAL_CUSTOMERS];
 let creditRequests = [...INITIAL_CREDIT_REQUESTS];
+let managerInventory = [...INITIAL_MANAGER_INVENTORY];
+let managerLandedCosts = [...INITIAL_MANAGER_LANDED_COSTS];
+let managerProductionPlans = [...INITIAL_MANAGER_PRODUCTION_PLANS];
+let partnerProfiles = [...INITIAL_PARTNER_PROFILES];
+
 
 export const managerService = {
   // ─── Executive Dashboard ─────────────────────────────────────────────────
@@ -202,4 +215,98 @@ export const managerService = {
     customer.paymentTermDays = paymentTermDays;
     return customer;
   },
+
+  // ─── Manager Inventory & Safe Stock Thresholds (Ảnh 1) ─────────────────
+  async getInventory(
+    search?: string,
+    categoryFilter?: string,
+    warehouseFilter?: string,
+    lowStockOnly?: boolean
+  ): Promise<ManagerInventoryProduct[]> {
+    await new Promise((r) => setTimeout(r, 100));
+    let list = [...managerInventory];
+
+    if (search) {
+      const q = search.toLowerCase();
+      list = list.filter(
+        (p) =>
+          p.code.toLowerCase().includes(q) ||
+          p.name.toLowerCase().includes(q)
+      );
+    }
+
+    if (categoryFilter && categoryFilter !== 'ALL') {
+      list = list.filter((p) => p.category === categoryFilter);
+    }
+
+    if (warehouseFilter && warehouseFilter !== 'ALL') {
+      list = list.filter((p) => p.locationDetail.includes(warehouseFilter));
+    }
+
+    if (lowStockOnly) {
+      list = list.filter((p) => p.safeStockStatus === 'LOW');
+    }
+
+    return list;
+  },
+
+  // ─── Landed Cost & PO Inbound Tracking (Ảnh 4) ─────────────────────────
+  async getLandedCostRecords(): Promise<LandedCostRecord[]> {
+    await new Promise((r) => setTimeout(r, 100));
+    return [...managerLandedCosts];
+  },
+
+  // ─── Production Orders & BOM Tracking (Ảnh 3) ──────────────────────────
+  async getManagerProductionPlans(): Promise<ManagerProductionPlan[]> {
+    await new Promise((r) => setTimeout(r, 100));
+    return [...managerProductionPlans];
+  },
+
+  async createProductionPlan(payload: Omit<ManagerProductionPlan, 'id' | 'actualQty' | 'progressPercent'>): Promise<ManagerProductionPlan> {
+    await new Promise((r) => setTimeout(r, 200));
+    const newPlan: ManagerProductionPlan = {
+      ...payload,
+      id: `MPP-${Date.now()}`,
+      actualQty: 0,
+      progressPercent: 0,
+    };
+    managerProductionPlans.unshift(newPlan);
+    return newPlan;
+  },
+
+  // ─── Partner & Credit Profiles (Ảnh 5) ─────────────────────────────────
+  async getPartnerProfiles(search?: string, categoryFilter?: string): Promise<PartnerCreditProfile[]> {
+    await new Promise((r) => setTimeout(r, 100));
+    let list = [...partnerProfiles];
+
+    if (search) {
+      const q = search.toLowerCase();
+      list = list.filter(
+        (p) =>
+          p.code.toLowerCase().includes(q) ||
+          p.name.toLowerCase().includes(q) ||
+          p.contact.toLowerCase().includes(q)
+      );
+    }
+
+    if (categoryFilter && categoryFilter !== 'ALL') {
+      list = list.filter((p) => p.category === categoryFilter);
+    }
+
+    return list;
+  },
+
+  async updatePartnerProfileLimit(id: string, newLimit: number): Promise<PartnerCreditProfile> {
+    await new Promise((r) => setTimeout(r, 150));
+    const idx = partnerProfiles.findIndex((p) => p.id === id);
+    if (idx === -1) throw new Error('Không tìm thấy đối tác');
+    const partner = partnerProfiles[idx];
+    partner.creditLimit = newLimit;
+    if (newLimit > 0) {
+      partner.usagePercent = Math.round((partner.currentDebt / newLimit) * 1000) / 10;
+      partner.barColor = partner.usagePercent > 95 ? 'red' : partner.usagePercent > 80 ? 'orange' : 'green';
+    }
+    return partner;
+  },
 };
+
