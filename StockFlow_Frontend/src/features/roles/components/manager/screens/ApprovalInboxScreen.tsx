@@ -125,6 +125,12 @@ export const ApprovalInboxScreen: React.FC = () => {
   const [pinModalOpen, setPinModalOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
+  // Modal Yêu cầu kiểm lại (Khớp 100% Ảnh 2)
+  const [recountModalOpen, setRecountModalOpen] = useState(false);
+  const [selectedAdjustment, setSelectedAdjustment] = useState<InventoryAdjustmentRequest | null>(null);
+  const [recountNotes, setRecountNotes] = useState('Yêu cầu tổ kiểm đếm đếm lại lần 2');
+  const [recountPin, setRecountPin] = useState('');
+
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 2500);
@@ -171,10 +177,25 @@ export const ApprovalInboxScreen: React.FC = () => {
   };
 
   const handleRecountInventory = (item: InventoryAdjustmentRequest) => {
+    setSelectedAdjustment(item);
+    setRecountNotes('Yêu cầu tổ kiểm đếm đếm lại lần 2');
+    setRecountPin('');
+    setRecountModalOpen(true);
+  };
+
+  const handleConfirmRecount = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedAdjustment) return;
+    if (recountPin && recountPin !== '1234') {
+      alert('Mã PIN bảo mật không chính xác! (Mặc định thử nghiệm: 1234)');
+      return;
+    }
+
     setInventoryAdjustments((prev) =>
-      prev.map((i) => (i.id === item.id ? { ...i, status: 'RECOUNT' } : i))
+      prev.map((i) => (i.id === selectedAdjustment.id ? { ...i, status: 'RECOUNT' } : i))
     );
-    showToast(`Đã gửi yêu cầu thủ kho đếm lại biên bản ${item.code}!`);
+    showToast(`Đã gửi yêu cầu thủ kho đếm lại biên bản ${selectedAdjustment.code}!`);
+    setRecountModalOpen(false);
   };
 
   const formatCurrency = (val: number) => {
@@ -598,6 +619,104 @@ export const ApprovalInboxScreen: React.FC = () => {
                 Đóng
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: Yêu cầu kiểm lại (Khớp 100% Ảnh 2) */}
+      {recountModalOpen && selectedAdjustment && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4 animate-in fade-in">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200/80 w-full max-w-md p-6 relative">
+            <button
+              type="button"
+              onClick={() => setRecountModalOpen(false)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 transition cursor-pointer"
+            >
+              <X size={18} />
+            </button>
+
+            {/* Modal Header */}
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center border border-blue-100 shrink-0">
+                <KeyRound size={20} />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900">Yêu cầu kiểm lại</h3>
+                <p className="text-xs text-slate-500">Xác thực quyền quản lý cấp cao</p>
+              </div>
+            </div>
+
+            {/* Product discrepancy info box */}
+            <div className="p-3.5 bg-blue-50/50 border border-blue-100 rounded-xl mb-4">
+              <div className="font-bold text-slate-900 text-xs">
+                {selectedAdjustment.productName}
+              </div>
+              <div className="text-[11px] text-slate-500 mt-0.5">
+                Chênh lệch:{' '}
+                <span
+                  className={`font-semibold ${
+                    selectedAdjustment.difference < 0 ? 'text-rose-600' : 'text-emerald-600'
+                  }`}
+                >
+                  {selectedAdjustment.difference > 0
+                    ? `+${selectedAdjustment.difference}`
+                    : selectedAdjustment.difference}
+                </span>{' '}
+                ({selectedAdjustment.warehouse})
+              </div>
+            </div>
+
+            {/* Form */}
+            <form onSubmit={handleConfirmRecount} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  Ý kiến phê duyệt <span className="text-rose-500">*</span>
+                </label>
+                <textarea
+                  rows={3}
+                  value={recountNotes}
+                  onChange={(e) => setRecountNotes(e.target.value)}
+                  placeholder="Yêu cầu tổ kiểm đếm đếm lại lần 2"
+                  className="w-full p-3 rounded-xl border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500 transition resize-none"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  Mã PIN bảo mật quản lý <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="password"
+                  maxLength={6}
+                  value={recountPin}
+                  onChange={(e) => setRecountPin(e.target.value)}
+                  placeholder="Nhập 4-6 chữ số PIN"
+                  className="w-full h-11 px-3.5 rounded-xl border border-slate-200 text-center font-mono text-sm tracking-widest placeholder:tracking-normal placeholder:font-sans placeholder-slate-400 focus:outline-none focus:border-blue-500 transition"
+                  required
+                />
+                <div className="text-[11px] text-slate-400 mt-1.5 text-center font-mono">
+                  Gợi ý mã thử nghiệm: 1234
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="pt-2 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setRecountModalOpen(false)}
+                  className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition cursor-pointer"
+                >
+                  Hủy bỏ
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-[#1E56A0] hover:bg-[#184580] text-xs font-semibold text-white transition cursor-pointer shadow-xs"
+                >
+                  Xác nhận duyệt
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
