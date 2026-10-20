@@ -5,6 +5,7 @@ import React, { useState } from 'react';
 import { UserRole } from '../types';
 import { Header } from './common/Header';
 import { Sidebar } from './common/Sidebar';
+import { GoodsCatalogScreen } from './common/GoodsCatalogScreen';
 
 // Sales Screens
 import { SalesDashboard } from './sales/screens/SalesDashboard';
@@ -25,11 +26,17 @@ import { ReportsScreen } from './manager/screens/ReportsScreen';
 
 
 // Warehouse Screens
-import { InboundReceiptsScreen } from './warehouse/screens/InboundReceiptsScreen';
-import { StockInventoryScreen } from './warehouse/screens/StockInventoryScreen';
+import { WarehouseOverviewScreen } from './warehouse/screens/WarehouseOverviewScreen';
+import { WarehouseInboundScreen } from './warehouse/screens/WarehouseInboundScreen';
+import { WarehouseOutboundScreen } from './warehouse/screens/WarehouseOutboundScreen';
+import { WarehouseTransferScreen } from './warehouse/screens/WarehouseTransferScreen';
+import { WarehouseAuditScreen } from './warehouse/screens/WarehouseAuditScreen';
+import { WarehouseReturnsScreen } from './warehouse/screens/WarehouseReturnsScreen';
 
 // Production Screens
-import { ProductionShiftsScreen } from './production/screens/ProductionShiftsScreen';
+import { ProductionTrackingScreen } from './production/screens/ProductionTrackingScreen';
+import { ProductionPlanImportScreen } from './production/screens/ProductionPlanImportScreen';
+import { ProductionReferenceLogsScreen } from './production/screens/ProductionReferenceLogsScreen';
 
 // Admin Screens
 import { AdminDashboard } from './admin/screens/AdminDashboard';
@@ -44,6 +51,7 @@ export const AppLayout: React.FC = () => {
   const [activeScreen, setActiveScreen] = useState<string>('sales-dashboard');
   const [selectedMatrixRole, setSelectedMatrixRole] = useState<string>('ROLE_ADMIN');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [hasImportedProductionPlan, setHasImportedProductionPlan] = useState(false);
 
   // Xử lý chuyển đổi vai trò (RBAC Switcher)
   const handleRoleChange = (newRole: UserRole) => {
@@ -53,9 +61,9 @@ export const AppLayout: React.FC = () => {
     } else if (newRole === 'MANAGER') {
       setActiveScreen('manager-dashboard');
     } else if (newRole === 'WAREHOUSE') {
-      setActiveScreen('warehouse-inbound');
+      setActiveScreen('warehouse-overview');
     } else if (newRole === 'PRODUCTION') {
-      setActiveScreen('production-shifts');
+      setActiveScreen('production-orders');
     } else if (newRole === 'ADMIN') {
       setActiveScreen('admin-dashboard');
     }
@@ -79,6 +87,7 @@ export const AppLayout: React.FC = () => {
       case 'manager-dashboard':
         return <ManagerDashboard onNavigate={setActiveScreen} />;
       case 'manager-approvals':
+      case 'manager-inbox':
         return <ApprovalInboxScreen />;
       case 'manager-bom':
         return <BomManagementScreen />;
@@ -95,15 +104,48 @@ export const AppLayout: React.FC = () => {
         return <ReportsScreen onNavigate={setActiveScreen} />;
 
 
-      // ─── Warehouse Screens ───
+      // ─── Warehouse Screens (Đã bỏ Vị trí ô kệ) ───
+      case 'warehouse-overview':
+        return <WarehouseOverviewScreen onNavigate={setActiveScreen} />;
       case 'warehouse-inbound':
-        return <InboundReceiptsScreen />;
-      case 'warehouse-stock':
-        return <StockInventoryScreen />;
+        return <WarehouseInboundScreen />;
+      case 'warehouse-outbound':
+        return <WarehouseOutboundScreen />;
+      case 'warehouse-transfer':
+        return <WarehouseTransferScreen />;
+      case 'warehouse-audit':
+        return <WarehouseAuditScreen />;
+      case 'warehouse-returns':
+        return <WarehouseReturnsScreen />;
 
       // ─── Production Screens ───
-      case 'production-shifts':
-        return <ProductionShiftsScreen />;
+      case 'production-orders':
+        return (
+          <ProductionTrackingScreen
+            onNavigate={setActiveScreen}
+            isImportedPlan={hasImportedProductionPlan}
+          />
+        );
+      case 'production-open-report-modal':
+        return (
+          <ProductionTrackingScreen
+            onNavigate={setActiveScreen}
+            isImportedPlan={hasImportedProductionPlan}
+            initialOpenDetail={true}
+          />
+        );
+      case 'production-import':
+        return (
+          <ProductionPlanImportScreen
+            onNavigate={setActiveScreen}
+            onApprovePlan={() => {
+              setHasImportedProductionPlan(true);
+              setActiveScreen('production-orders');
+            }}
+          />
+        );
+      case 'production-logs':
+        return <ProductionReferenceLogsScreen />;
 
       // ─── Admin Screens ───
       case 'admin-dashboard':
@@ -129,11 +171,27 @@ export const AppLayout: React.FC = () => {
       case 'admin-users':
         return <StaffAccountsScreen initialFilter="ALL" />;
 
+      // ─── Common / Goods Catalog Screens (Tất cả Role) ───
+      case 'goods-catalog':
+      case 'admin-goods':
+      case 'manager-goods':
+      case 'sales-goods':
+      case 'warehouse-goods':
+      case 'production-goods':
+      case 'products':
+        return <GoodsCatalogScreen onNavigate={setActiveScreen} currentRole={currentRole} />;
+
       default:
         if (currentRole === 'SALES') return <SalesDashboard onNavigate={setActiveScreen} />;
         if (currentRole === 'MANAGER') return <ManagerDashboard onNavigate={setActiveScreen} />;
-        if (currentRole === 'WAREHOUSE') return <InboundReceiptsScreen />;
-        if (currentRole === 'PRODUCTION') return <ProductionShiftsScreen />;
+        if (currentRole === 'WAREHOUSE') return <WarehouseOverviewScreen onNavigate={setActiveScreen} />;
+        if (currentRole === 'PRODUCTION')
+          return (
+            <ProductionTrackingScreen
+              onNavigate={setActiveScreen}
+              isImportedPlan={hasImportedProductionPlan}
+            />
+          );
         if (currentRole === 'ADMIN') return <AdminDashboard onNavigate={setActiveScreen} />;
         return <SalesDashboard onNavigate={setActiveScreen} />;
     }
@@ -152,6 +210,7 @@ export const AppLayout: React.FC = () => {
         currentRole={currentRole}
         activeScreen={activeScreen}
         onNavigate={setActiveScreen}
+        productionBadge={hasImportedProductionPlan ? '10' : '4'}
       />
 
       {/* 3. Main Workspace Content */}
