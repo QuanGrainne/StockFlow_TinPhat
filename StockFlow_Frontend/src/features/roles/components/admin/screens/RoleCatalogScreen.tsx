@@ -27,6 +27,7 @@ export const RoleCatalogScreen: React.FC<RoleCatalogScreenProps> = ({ onNavigate
   const [newRoleName, setNewRoleName] = useState('');
   const [newRoleCode, setNewRoleCode] = useState('');
   const [newRoleDesc, setNewRoleDesc] = useState('');
+  const [newRolePriority, setNewRolePriority] = useState<number>(6);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const loadData = async () => {
@@ -166,29 +167,32 @@ export const RoleCatalogScreen: React.FC<RoleCatalogScreenProps> = ({ onNavigate
         ))}
       </div>
 
-      {/* MODAL: Tạo Vai trò mới */}
+      {/* MODAL: Thêm vai trò mới (Khớp 100% Ảnh 1 bên trái - MÀN HÌNH 3.2.1.6) */}
       {createModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4 animate-in fade-in">
-          <div className="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-md p-6 relative">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-lg p-6 relative">
             <button
               type="button"
               onClick={() => setCreateModalOpen(false)}
-              className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 cursor-pointer"
+              className="absolute top-5 right-5 text-slate-400 hover:text-slate-600 transition cursor-pointer"
             >
               <X size={18} />
             </button>
 
+            {/* Header: MÀN HÌNH 3.2.1.6 • Tạo vai trò */}
             <div className="flex items-center gap-3 mb-5">
-              <div className="w-10 h-10 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
-                <Sparkles size={20} />
+              <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 border border-blue-100 flex items-center justify-center shrink-0">
+                <Shield size={18} />
               </div>
               <div>
-                <h3 className="text-base font-bold text-slate-900">Tạo vai trò RBAC mới</h3>
-                <p className="text-xs text-slate-500">Định nghĩa vai trò người dùng trong hệ thống OIMS</p>
+                <div className="text-[11px] font-bold text-blue-600 uppercase tracking-wider">
+                  MÀN HÌNH 3.2.1.6 <span className="text-slate-400 font-normal">• Tạo vai trò</span>
+                </div>
+                <h3 className="text-base font-bold text-slate-900 mt-0.5">Thêm vai trò mới</h3>
               </div>
             </div>
 
-            <form onSubmit={handleCreateRole} className="space-y-3.5">
+            <form onSubmit={handleCreateRole} className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
                   Tên vai trò <span className="text-rose-500">*</span>
@@ -198,51 +202,72 @@ export const RoleCatalogScreen: React.FC<RoleCatalogScreenProps> = ({ onNavigate
                   required
                   value={newRoleName}
                   onChange={(e) => setNewRoleName(e.target.value)}
-                  placeholder="Vd: Chuyên viên Mua hàng"
-                  className="w-full h-9 px-3 rounded-lg border border-slate-200 text-xs focus:outline-none focus:border-blue-500"
+                  placeholder="VD: Giám sát vùng"
+                  className="w-full h-10 px-3.5 rounded-xl border border-slate-200 text-xs focus:outline-none focus:border-blue-500 shadow-xs"
                 />
               </div>
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Mã vai trò (System Code) <span className="text-rose-500">*</span>
+                  Mã vai trò (Code) <span className="text-rose-500">*</span>
                 </label>
                 <input
                   type="text"
                   required
                   value={newRoleCode}
-                  onChange={(e) => setNewRoleCode(e.target.value)}
-                  placeholder="Vd: ROLE_PURCHASE"
-                  className="w-full h-9 px-3 rounded-lg border border-slate-200 text-xs font-mono uppercase focus:outline-none focus:border-blue-500"
+                  onChange={(e) => setNewRoleCode(e.target.value.toUpperCase())}
+                  placeholder="VD: ROLE_SUPERVISOR"
+                  className="w-full h-10 px-3.5 rounded-xl border border-slate-200 text-xs font-mono uppercase focus:outline-none focus:border-blue-500 shadow-xs"
                 />
+                <p className="text-[11px] text-slate-400 mt-1">
+                  Tự động chuẩn hóa định dạng in hoa tiền tố ROLE_
+                </p>
               </div>
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Mô tả chức năng & đặc quyền
+                  Mức độ ưu tiên (Priority)
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  max={99}
+                  value={newRolePriority}
+                  onChange={(e) => setNewRolePriority(Number(e.target.value))}
+                  placeholder="6"
+                  className="w-full h-10 px-3.5 rounded-xl border border-slate-200 text-xs font-mono focus:outline-none focus:border-blue-500 shadow-xs"
+                />
+                <p className="text-[11px] text-slate-400 mt-1">
+                  Thứ bậc ưu tiên trong phân cấp quản lý hệ thống
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Mô tả phạm vi vai trò
                 </label>
                 <textarea
                   rows={3}
                   value={newRoleDesc}
                   onChange={(e) => setNewRoleDesc(e.target.value)}
-                  placeholder="Mô tả phạm vi truy cập và nhiệm vụ của vai trò này..."
-                  className="w-full p-2.5 rounded-lg border border-slate-200 text-xs focus:outline-none focus:border-blue-500"
+                  placeholder="Mô tả trách nhiệm và quyền hạn công việc của vai trò..."
+                  className="w-full p-3 rounded-xl border border-slate-200 text-xs focus:outline-none focus:border-blue-500 shadow-xs resize-none"
                 />
               </div>
 
-              <div className="pt-3 flex items-center justify-end gap-2">
+              <div className="pt-2 flex items-center justify-end gap-2.5">
                 <button
                   type="button"
                   onClick={() => setCreateModalOpen(false)}
-                  className="px-4 py-2 rounded-lg border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 cursor-pointer"
+                  className="px-5 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition cursor-pointer"
                 >
-                  Hủy bỏ
+                  Hủy
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 rounded-lg bg-[#1E56A0] hover:bg-[#184580] text-xs font-semibold text-white cursor-pointer"
+                  className="px-5 py-2.5 rounded-xl bg-[#1E56A0] hover:bg-[#184580] text-xs font-bold text-white transition shadow-xs cursor-pointer"
                 >
-                  Tạo vai trò
+                  Thêm mới
                 </button>
               </div>
             </form>
