@@ -618,6 +618,38 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
             entity.Property(e => e.ReorderPoint)
                 .HasPrecision(18, 2)
                 .HasColumnName("reorder_point");
+            entity.Property(e => e.Barcode)
+                .HasMaxLength(50)
+                .HasColumnName("barcode");
+            entity.Property(e => e.Brand)
+                .HasMaxLength(100)
+                .HasColumnName("brand");
+            entity.Property(e => e.StandardPrice)
+                .HasPrecision(18, 2)
+                .HasColumnName("standard_price");
+            entity.Property(e => e.MinSafeStock)
+                .HasPrecision(18, 2)
+                .HasColumnName("min_safe_stock");
+            entity.Property(e => e.MaxSafeStock)
+                .HasPrecision(18, 2)
+                .HasColumnName("max_safe_stock");
+            entity.Property(e => e.Weight)
+                .HasPrecision(18, 2)
+                .HasColumnName("weight");
+            entity.Property(e => e.Dimensions)
+                .HasMaxLength(100)
+                .HasColumnName("dimensions");
+            entity.Property(e => e.LocationName)
+                .HasMaxLength(100)
+                .HasColumnName("location_name");
+            entity.Property(e => e.IsDirectSale)
+                .HasColumnName("is_direct_sale");
+            entity.Property(e => e.HasRewardPoints)
+                .HasColumnName("has_reward_points");
+            entity.Property(e => e.ImageUrl)
+                .HasColumnName("image_url");
+            entity.Property(e => e.VariantsJson)
+                .HasColumnName("variants_json");
 
             entity.HasOne(d => d.BaseUnit).WithMany(p => p.MstProducts)
                 .HasForeignKey(d => d.BaseUnitId)

@@ -19,6 +19,7 @@ export const adminService = {
 
   // Permission & Warehouse methods
   getWarehouseFacilities: permissionService.getWarehouseFacilities,
+  createWarehouseFacility: permissionService.createWarehouseFacility,
   updateWarehousePermissions: permissionService.updateWarehousePermissions,
   getRoleDefinitions: permissionService.getRoleDefinitions,
   createRole: permissionService.createRole,

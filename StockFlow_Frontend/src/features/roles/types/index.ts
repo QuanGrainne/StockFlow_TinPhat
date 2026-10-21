@@ -26,6 +26,30 @@ export interface Customer {
   status: 'ACTIVE' | 'LOCKED';
 }
 
+export interface ProductVariant {
+  id?: string;
+  attributeValue?: string;
+  unitName: string;
+  conversionRate: number;
+  code: string;
+  barcode: string;
+  costPrice: number;
+  salePrice: number;
+  stock: number;
+}
+
+export interface ProductUnitConversion {
+  name: string;
+  conversionRate: number;
+  isBase: boolean;
+  isDirectSale: boolean;
+}
+
+export interface ProductAttributeDef {
+  name: string;
+  values: string[];
+}
+
 export interface Product {
   id: string;
   code: string;           // Vd: TP-SP01, TP-KE001
@@ -35,6 +59,20 @@ export interface Product {
   standardPrice: number;  // Giá tiêu chuẩn (VND)
   costPrice: number;      // Giá vốn (VND)
   stockQuantity: number;  // Tồn kho hiện tại
+  barcode?: string;
+  brand?: string;
+  minSafeStock?: number;
+  maxSafeStock?: number;
+  weight?: number;
+  dimensions?: { width: number; length: number; unit: string };
+  locationName?: string;
+  isDirectSale?: boolean;
+  hasRewardPoints?: boolean;
+  imageUrl?: string;
+  description?: string;
+  units?: ProductUnitConversion[];
+  attributes?: ProductAttributeDef[];
+  variants?: ProductVariant[];
 }
 
 // ─── Sales Types ─────────────────────────────────────────────────────────────

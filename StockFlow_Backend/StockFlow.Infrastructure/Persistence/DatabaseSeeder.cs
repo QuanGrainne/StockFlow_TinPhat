@@ -10,6 +10,23 @@ public static class DatabaseSeeder
     {
         var seedTimestamp = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
 
+        // Ensure newly supported product specification columns exist
+        await context.Database.ExecuteSqlRawAsync(@"
+            ALTER TABLE stockflow.mst_products ADD COLUMN IF NOT EXISTS barcode character varying(50);
+            ALTER TABLE stockflow.mst_products ADD COLUMN IF NOT EXISTS brand character varying(100);
+            ALTER TABLE stockflow.mst_products ADD COLUMN IF NOT EXISTS standard_price numeric(18,2) DEFAULT 0;
+            ALTER TABLE stockflow.mst_products ADD COLUMN IF NOT EXISTS min_safe_stock numeric(18,2) DEFAULT 0;
+            ALTER TABLE stockflow.mst_products ADD COLUMN IF NOT EXISTS max_safe_stock numeric(18,2) DEFAULT 999999999;
+            ALTER TABLE stockflow.mst_products ADD COLUMN IF NOT EXISTS weight numeric(18,2);
+            ALTER TABLE stockflow.mst_products ADD COLUMN IF NOT EXISTS dimensions character varying(100);
+            ALTER TABLE stockflow.mst_products ADD COLUMN IF NOT EXISTS location_name character varying(100);
+            ALTER TABLE stockflow.mst_products ADD COLUMN IF NOT EXISTS is_direct_sale boolean DEFAULT true;
+            ALTER TABLE stockflow.mst_products ADD COLUMN IF NOT EXISTS has_reward_points boolean DEFAULT true;
+            ALTER TABLE stockflow.mst_products ADD COLUMN IF NOT EXISTS image_url text;
+            ALTER TABLE stockflow.mst_products ALTER COLUMN image_url TYPE text;
+            ALTER TABLE stockflow.mst_products ADD COLUMN IF NOT EXISTS variants_json text;
+        ");
+
         var roles = new List<SecRole>
         {
             new() { RoleId = 1, RoleName = "Admin", Description = "Administrator - Quản trị hệ thống, tài khoản, phân quyền vai trò và phân quyền kho" },
@@ -123,7 +140,118 @@ public static class DatabaseSeeder
                 }
             }
         }
+        var additionalWarehouses = new List<MstWarehouse>
+        {
+            new() { WarehouseId = 3, WarehouseCode = "WH-HN-01", WarehouseName = "Kho Tổng Gia Lâm", IsActive = true, Address = "Số 18 Đường Dệt May, Gia Lâm, Hà Nội", Description = "8,500 m² - Kho trung tâm thành phẩm và phụ kiện" },
+            new() { WarehouseId = 4, WarehouseCode = "WH-HN-02", WarehouseName = "Kho Đông Anh", IsActive = true, Address = "CCN Nguyên Khê, Đông Anh, Hà Nội", Description = "4,200 m² - Kho nguyên vật liệu cơ khí và tôn mạ" },
+            new() { WarehouseId = 5, WarehouseCode = "WH-HN-03", WarehouseName = "Kho Hà Đông", IsActive = true, Address = "Km14 Quốc lộ 6, Yên Nghĩa, Hà Đông, Hà Nội", Description = "3,800 m² - Kho trung chuyển phân phối Tây Hà Nội" },
+            new() { WarehouseId = 6, WarehouseCode = "WH-HN-04", WarehouseName = "Kho Hoàn Kiếm", IsActive = true, Address = "42 Phố Trần Hưng Đạo, Hoàn Kiếm, Hà Nội", Description = "1,500 m² - Điểm giao hàng nhanh nội đô" }
+        };
 
+        foreach (var wh in additionalWarehouses)
+        {
+            if (!await context.MstWarehouses.AnyAsync(w => w.WarehouseCode == wh.WarehouseCode))
+            {
+                await context.MstWarehouses.AddAsync(wh);
+            }
+        }
+        await context.SaveChangesAsync();
+        await context.Database.ExecuteSqlRawAsync("SELECT setval(pg_get_serial_sequence('stockflow.mst_warehouses', 'warehouse_id'), COALESCE(MAX(warehouse_id), 1)) FROM stockflow.mst_warehouses;");
+
+        var whMap = await context.MstWarehouses.Where(w => w.WarehouseCode != null).ToDictionaryAsync(w => w.WarehouseCode!, w => w.WarehouseId);
+        var physicalAccesses = new[]
+        {
+            ("admin", "WH-HN-01"), ("manager01", "WH-HN-01"), ("sales01", "WH-HN-01"), ("whstaff01", "WH-HN-01"),
+            ("admin", "WH-HN-02"), ("manager01", "WH-HN-02"), ("whstaff01", "WH-HN-02"), ("prodstaff01", "WH-HN-02"),
+            ("admin", "WH-HN-03"), ("manager01", "WH-HN-03"),
+            ("admin", "WH-HN-04")
+        };
+        foreach (var (username, whCode) in physicalAccesses)
+        {
+            if (userIds.TryGetValue(username, out var uid) && whMap.TryGetValue(whCode, out var wid))
+            {
+                if (!await context.JncUserWarehouseAccesses.AnyAsync(wa => wa.UserId == uid && wa.WarehouseId == wid))
+                {
+                    await context.JncUserWarehouseAccesses.AddAsync(new JncUserWarehouseAccess { UserId = uid, WarehouseId = wid, AssignedAt = seedTimestamp });
+                }
+            }
+        }
+        await context.SaveChangesAsync();
+
+        // Seed Categories
+        var categories = new List<MstProductCategory>
+        {
+            new() { CategoryId = 1, CategoryName = "Thành phẩm tấm ốp & phào chỉ", Description = "Tấm ốp Nano PVC, phào chỉ PU, nẹp nhôm trang trí", IsActive = true },
+            new() { CategoryId = 2, CategoryName = "Keo dán & Phụ liệu", Description = "Keo dán chuyên dụng, silicon, đinh vít", IsActive = true },
+            new() { CategoryId = 3, CategoryName = "Nguyên vật liệu thép tôn", Description = "Tôn mạ kẽm cuộn, thanh nhôm định hình, sơn bột", IsActive = true }
+        };
+        foreach (var cat in categories)
+        {
+            if (!await context.MstProductCategories.AnyAsync(c => c.CategoryId == cat.CategoryId))
+            {
+                await context.MstProductCategories.AddAsync(cat);
+            }
+        }
+        await context.SaveChangesAsync();
+        await context.Database.ExecuteSqlRawAsync("SELECT setval(pg_get_serial_sequence('stockflow.mst_product_categories', 'category_id'), COALESCE(MAX(category_id), 1)) FROM stockflow.mst_product_categories;");
+
+        // Seed Units
+        var units = new List<MstUnit>
+        {
+            new() { UnitId = 1, UnitName = "Tấm", Abbreviation = "tam" },
+            new() { UnitId = 2, UnitName = "Tuýp", Abbreviation = "tuyp" },
+            new() { UnitId = 3, UnitName = "Cây", Abbreviation = "cay" },
+            new() { UnitId = 4, UnitName = "Thanh", Abbreviation = "thanh" },
+            new() { UnitId = 5, UnitName = "Cuộn", Abbreviation = "cuon" },
+            new() { UnitId = 6, UnitName = "Kg", Abbreviation = "kg" },
+            new() { UnitId = 7, UnitName = "Mét", Abbreviation = "m" },
+            new() { UnitId = 8, UnitName = "Cái", Abbreviation = "cai" }
+        };
+        foreach (var u in units)
+        {
+            if (!await context.MstUnits.AnyAsync(x => x.UnitId == u.UnitId))
+            {
+                await context.MstUnits.AddAsync(u);
+            }
+        }
+        await context.SaveChangesAsync();
+        await context.Database.ExecuteSqlRawAsync("SELECT setval(pg_get_serial_sequence('stockflow.mst_units', 'unit_id'), COALESCE(MAX(unit_id), 1)) FROM stockflow.mst_units;");
+
+        // Seed Products
+        var products = new List<MstProduct>
+        {
+            new() { ProductId = 1, ProductCode = "TP-SP01", ProductName = "Tấm ốp Nano PVC vân đá 9mm", ProductType = "FINISHED", CategoryId = 1, BaseUnitId = 1, ReorderPoint = 50, MovingAverageCost = 130000, IsActive = true, CreatedAt = seedTimestamp, Description = "Tấm ốp Nano PVC cao cấp công nghệ phủ UV" },
+            new() { ProductId = 2, ProductCode = "TP-KE001", ProductName = "Keo dán chuyên dụng Tín Phát 300ml", ProductType = "FINISHED", CategoryId = 2, BaseUnitId = 2, ReorderPoint = 30, MovingAverageCost = 38000, IsActive = true, CreatedAt = seedTimestamp, Description = "Keo dán xây dựng siêu dính khô nhanh" },
+            new() { ProductId = 3, ProductCode = "TP-SP02", ProductName = "Phào chỉ cổ trần PU dát vàng 2.4m", ProductType = "FINISHED", CategoryId = 1, BaseUnitId = 3, ReorderPoint = 20, MovingAverageCost = 65000, IsActive = true, CreatedAt = seedTimestamp, Description = "Phào chỉ PU phong cách tân cổ điển" },
+            new() { ProductId = 4, ProductCode = "TP-SP03", ProductName = "Nẹp nhôm chữ T mạ Anode 2.5m", ProductType = "FINISHED", CategoryId = 1, BaseUnitId = 4, ReorderPoint = 25, MovingAverageCost = 28000, IsActive = true, CreatedAt = seedTimestamp, Description = "Nẹp nhôm hoàn thiện chỉ tiếp giáp" },
+            new() { ProductId = 5, ProductCode = "NVL-TON-01", ProductName = "Tôn cuộn mạ kẽm Posco 1.2mm", ProductType = "RAW_MATERIAL", CategoryId = 3, BaseUnitId = 5, ReorderPoint = 10, MovingAverageCost = 22000000, IsActive = true, CreatedAt = seedTimestamp, Description = "Nguyên liệu gia công máng cáp và khung đỡ" }
+        };
+        foreach (var prod in products)
+        {
+            if (!await context.MstProducts.AnyAsync(p => p.ProductCode == prod.ProductCode))
+            {
+                await context.MstProducts.AddAsync(prod);
+            }
+        }
+        await context.SaveChangesAsync();
+        await context.Database.ExecuteSqlRawAsync("SELECT setval(pg_get_serial_sequence('stockflow.mst_products', 'product_id'), COALESCE(MAX(product_id), 1)) FROM stockflow.mst_products;");
+
+        // Seed Initial Inventory Balances
+        var balances = new List<TrxInventoryBalance>
+        {
+            new() { ProductId = 1, WarehouseId = 1, Quantity = 450, UnitCost = 130000, LastUpdated = seedTimestamp },
+            new() { ProductId = 2, WarehouseId = 1, Quantity = 280, UnitCost = 38000, LastUpdated = seedTimestamp },
+            new() { ProductId = 3, WarehouseId = 1, Quantity = 120, UnitCost = 65000, LastUpdated = seedTimestamp },
+            new() { ProductId = 4, WarehouseId = 1, Quantity = 200, UnitCost = 28000, LastUpdated = seedTimestamp },
+            new() { ProductId = 5, WarehouseId = 2, Quantity = 15, UnitCost = 22000000, LastUpdated = seedTimestamp }
+        };
+        foreach (var bal in balances)
+        {
+            if (!await context.TrxInventoryBalances.AnyAsync(b => b.ProductId == bal.ProductId && b.WarehouseId == bal.WarehouseId))
+            {
+                await context.TrxInventoryBalances.AddAsync(bal);
+            }
+        }
         await context.SaveChangesAsync();
 
         // 6. Seed 45 permissions for 9 modules

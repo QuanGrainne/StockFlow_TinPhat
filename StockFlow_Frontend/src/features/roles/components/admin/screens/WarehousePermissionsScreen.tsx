@@ -12,6 +12,7 @@ import {
   X,
   Shield,
   Building2,
+  Plus,
 } from 'lucide-react';
 import { StaffAccount, WarehouseFacility } from '../../../types';
 import { adminService } from '../../../services/adminService';
@@ -28,6 +29,15 @@ export const WarehousePermissionsScreen: React.FC = () => {
   const [selectedStaff, setSelectedStaff] = useState<StaffAccount | null>(null);
   const [selectedWarehouses, setSelectedWarehouses] = useState<string[]>([]);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Modal Thêm kho mới
+  const [createWhModalOpen, setCreateWhModalOpen] = useState(false);
+  const [newWhCode, setNewWhCode] = useState('');
+  const [newWhName, setNewWhName] = useState('');
+  const [newWhAddress, setNewWhAddress] = useState('');
+  const [newWhArea, setNewWhArea] = useState('3,500 m²');
+  const [isCreatingWh, setIsCreatingWh] = useState(false);
+  const [createWhError, setCreateWhError] = useState('');
 
   const loadData = async () => {
     setLoading(true);
@@ -64,6 +74,49 @@ export const WarehousePermissionsScreen: React.FC = () => {
     showToast(`Đã cập nhật phân quyền kho cho nhân sự ${selectedStaff.name}`);
     setModalOpen(false);
     loadData();
+  };
+
+  const handleOpenCreateWhModal = () => {
+    setNewWhCode(`WH-HN-0${facilities.length + 1}`);
+    setNewWhName('');
+    setNewWhAddress('');
+    setNewWhArea('3,500 m²');
+    setCreateWhError('');
+    setCreateWhModalOpen(true);
+  };
+
+  const handleSaveNewWarehouse = async () => {
+    if (!newWhCode.trim()) {
+      setCreateWhError('Vui lòng nhập mã kho');
+      return;
+    }
+    if (!newWhName.trim()) {
+      setCreateWhError('Vui lòng nhập tên cơ sở kho');
+      return;
+    }
+    if (!newWhAddress.trim()) {
+      setCreateWhError('Vui lòng nhập địa chỉ kho');
+      return;
+    }
+
+    setIsCreatingWh(true);
+    setCreateWhError('');
+    try {
+      const created = await adminService.createWarehouseFacility({
+        code: newWhCode.trim(),
+        name: newWhName.trim(),
+        address: newWhAddress.trim(),
+        area: newWhArea.trim(),
+      });
+      setFacilities((prev) => [created, ...prev]);
+      showToast(`Đã thêm mới cơ sở kho: ${created.name}`);
+      setCreateWhModalOpen(false);
+      await loadData();
+    } catch (err: any) {
+      setCreateWhError(err.message || 'Lỗi khi tạo kho mới');
+    } finally {
+      setIsCreatingWh(false);
+    }
   };
 
   const filteredStaff = staffList.filter((s) => {
@@ -105,10 +158,17 @@ export const WarehousePermissionsScreen: React.FC = () => {
           </p>
         </div>
 
-        <div>
+        <div className="flex items-center gap-2.5">
           <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-blue-200 bg-blue-50/70 text-blue-700 text-xs font-semibold">
             Quy tắc BR-03 Đang áp dụng
           </span>
+          <button
+            onClick={handleOpenCreateWhModal}
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-[#1E56A0] hover:bg-[#184580] text-white text-xs font-semibold shadow-xs transition cursor-pointer"
+          >
+            <Plus size={14} />
+            <span>Thêm cơ sở kho</span>
+          </button>
         </div>
       </div>
 
@@ -369,6 +429,112 @@ export const WarehousePermissionsScreen: React.FC = () => {
                 className="px-4 py-2 rounded-lg bg-[#1E56A0] hover:bg-[#184580] text-xs font-semibold text-white cursor-pointer"
               >
                 Lưu phân quyền
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Thêm Cơ Sở Kho Mới */}
+      {createWhModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl border border-slate-200 p-6 relative animate-in fade-in zoom-in-95">
+            <button
+              onClick={() => setCreateWhModalOpen(false)}
+              className="absolute top-4 right-4 p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition cursor-pointer"
+            >
+              <X size={18} />
+            </button>
+
+            <div className="flex items-center gap-3 mb-5">
+              <div className="w-10 h-10 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                <Building2 size={20} />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900">
+                  Thêm cơ sở kho vật lý mới
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Cơ sở kho mới sẽ tự động cập nhật vào ma trận phân quyền
+                </p>
+              </div>
+            </div>
+
+            {createWhError && (
+              <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-xs text-red-600">
+                {createWhError}
+              </div>
+            )}
+
+            <div className="space-y-4 mb-6">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Mã kho <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={newWhCode}
+                  onChange={(e) => setNewWhCode(e.target.value)}
+                  placeholder="Vd: WH-HN-05"
+                  className="w-full h-9 px-3 rounded-lg bg-slate-50 border border-slate-200 text-xs font-mono text-slate-800 uppercase focus:outline-none focus:border-blue-500 focus:bg-white transition"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Tên kho <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={newWhName}
+                  onChange={(e) => setNewWhName(e.target.value)}
+                  placeholder="Vd: Kho Cầu Giấy"
+                  className="w-full h-9 px-3 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-800 focus:outline-none focus:border-blue-500 focus:bg-white transition"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Địa chỉ kho <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={newWhAddress}
+                  onChange={(e) => setNewWhAddress(e.target.value)}
+                  placeholder="Vd: Số 10 Duy Tân, Cầu Giấy, Hà Nội"
+                  className="w-full h-9 px-3 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-800 focus:outline-none focus:border-blue-500 focus:bg-white transition"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Diện tích / Quy mô kho
+                </label>
+                <input
+                  type="text"
+                  value={newWhArea}
+                  onChange={(e) => setNewWhArea(e.target.value)}
+                  placeholder="Vd: 3,500 m²"
+                  className="w-full h-9 px-3 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-800 focus:outline-none focus:border-blue-500 focus:bg-white transition"
+                />
+              </div>
+            </div>
+
+            <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setCreateWhModalOpen(false)}
+                className="px-4 py-2 rounded-lg border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 cursor-pointer"
+              >
+                Hủy bỏ
+              </button>
+              <button
+                type="button"
+                disabled={isCreatingWh}
+                onClick={handleSaveNewWarehouse}
+                className="px-4 py-2 rounded-lg bg-[#1E56A0] hover:bg-[#184580] text-xs font-semibold text-white cursor-pointer disabled:opacity-50"
+              >
+                {isCreatingWh ? 'Đang lưu...' : 'Tạo cơ sở kho'}
               </button>
             </div>
           </div>
