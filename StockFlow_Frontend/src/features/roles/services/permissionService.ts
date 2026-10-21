@@ -54,8 +54,6 @@ let permissionMatrices: Record<string, PermissionMatrixModule[]> = {
   })),
 };
 
-import { apiClient } from '@/lib/api/client';
-
 export const permissionService = {
   // ─── 1. Physical Warehouses (Data Isolation - Phân quyền kho) ─────────────
   async getWarehouseFacilities(): Promise<WarehouseFacility[]> {
