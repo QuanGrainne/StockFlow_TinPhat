@@ -13,6 +13,9 @@ import {
   CheckCircle2,
   X,
   Warehouse,
+  Lock,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import { adminService } from '../../../services/adminService';
 import { UserRole } from '../../../types';
@@ -22,24 +25,35 @@ interface AdminDashboardProps {
 }
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) => {
-  // Modal State: Đổi mật khẩu & Thêm nhân viên
+  // Modal State: Đổi mật khẩu (Khớp 100% Ảnh 3 bên trái - MÀN HÌNH 3.2.1.2)
   const [passwordModalOpen, setPasswordModalOpen] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [passwordSuccess, setPasswordSuccess] = useState(false);
 
+  // Modal State: Tạo tài khoản mới (Khớp 100% Ảnh 2 bên trái - MÀN HÌNH 3.2.1.4)
   const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [formCode, setFormCode] = useState('TP-EMP0051');
   const [formName, setFormName] = useState('');
   const [formEmail, setFormEmail] = useState('');
   const [formPhone, setFormPhone] = useState('');
   const [formTitle, setFormTitle] = useState('');
-  const [formDept, setFormDept] = useState('Phòng Kinh doanh');
-  const [formRole, setFormRole] = useState<UserRole>('SALES');
+  const [formDept, setFormDept] = useState('Kho vận & Logistics');
+  const [formRole, setFormRole] = useState<UserRole>('WAREHOUSE');
+  const [formPassword, setFormPassword] = useState('TinPhat@2026');
   const [formWarehouses, setFormWarehouses] = useState<string[]>(['WH-HN-01']);
   const [createSuccess, setCreateSuccess] = useState(false);
 
   const handlePasswordSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!currentPassword) {
+      alert('Vui lòng nhập mật khẩu hiện tại!');
+      return;
+    }
     if (!newPassword || newPassword !== confirmPassword) {
       alert('Mật khẩu xác nhận không khớp!');
       return;
@@ -48,6 +62,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
     setTimeout(() => {
       setPasswordSuccess(false);
       setPasswordModalOpen(false);
+      setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
     }, 1200);
@@ -69,11 +84,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
     };
 
     await adminService.createStaff({
-      code: `NV-NV00${Math.floor(Math.random() * 90) + 10}`,
+      code: formCode || `NV-NV00${Math.floor(Math.random() * 90) + 10}`,
       name: formName,
-      title: formTitle || 'Chuyên viên',
+      title: formTitle || 'Thủ kho, Nhân viên bán hàng',
       email: formEmail,
-      phone: formPhone || '0900 000 000',
+      phone: formPhone || '0912 345 678',
       department: formDept,
       role: formRole,
       roleTitle: roleTitleMap[formRole],
@@ -85,6 +100,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
     setTimeout(() => {
       setCreateSuccess(false);
       setCreateModalOpen(false);
+      setFormCode('TP-EMP0051');
       setFormName('');
       setFormEmail('');
       setFormPhone('');
@@ -283,25 +299,46 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
         </div>
       </div>
 
-      {/* MODAL: Đổi Mật Khẩu */}
+      {/* MODAL: Đổi Mật Khẩu (Khớp 100% Ảnh 3 bên trái - MÀN HÌNH 3.2.1.2) */}
       {passwordModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4 animate-in fade-in">
-          <div className="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-md p-6 relative">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-md p-6 relative">
             <button
               type="button"
               onClick={() => setPasswordModalOpen(false)}
-              className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 cursor-pointer"
+              className="absolute top-5 right-5 text-slate-400 hover:text-slate-600 transition cursor-pointer"
             >
               <X size={18} />
             </button>
 
-            <div className="flex items-center gap-3 mb-5">
-              <div className="w-10 h-10 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
-                <KeyRound size={20} />
+            {/* Header: MÀN HÌNH 3.2.1.2 • Popup */}
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 border border-blue-100 flex items-center justify-center shrink-0">
+                <KeyRound size={18} />
               </div>
               <div>
-                <h3 className="text-base font-bold text-slate-900">Đổi mật khẩu quản trị</h3>
-                <p className="text-xs text-slate-500">Cập nhật mật khẩu bảo mật cho tài khoản admin</p>
+                <div className="text-[11px] font-bold text-blue-600 uppercase tracking-wider">
+                  MÀN HÌNH 3.2.1.2 <span className="text-slate-400 font-normal">• Popup</span>
+                </div>
+                <h3 className="text-base font-bold text-slate-900 mt-0.5">Đổi mật khẩu</h3>
+              </div>
+            </div>
+
+            {/* User Info Card */}
+            <div className="flex items-center gap-3 p-3 bg-white rounded-xl border border-slate-200/80 shadow-xs mb-4">
+              <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-700 text-white flex items-center justify-center font-bold text-xs shadow-xs shrink-0">
+                NA
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs font-bold text-slate-900">Nguyễn Văn A</span>
+                  <span className="px-1.5 py-0.2 rounded-[3px] bg-blue-100 text-[#2B6CB0] font-mono text-[10px] font-bold">
+                    TP-AD001
+                  </span>
+                </div>
+                <div className="text-[11px] text-slate-500 mt-0.5">
+                  admin@tinphat.com • Quản trị viên
+                </div>
               </div>
             </div>
 
@@ -311,45 +348,131 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
                 <p className="text-sm font-bold text-slate-800">Đổi mật khẩu thành công!</p>
               </div>
             ) : (
-              <form onSubmit={handlePasswordSubmit} className="space-y-4">
+              <form onSubmit={handlePasswordSubmit} className="space-y-3.5">
+                {/* Mật khẩu hiện tại */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Mật khẩu hiện tại <span className="text-rose-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <Lock
+                      size={15}
+                      className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
+                    />
+                    <input
+                      type={showCurrentPassword ? 'text' : 'password'}
+                      required
+                      value={currentPassword}
+                      onChange={(e) => setCurrentPassword(e.target.value)}
+                      placeholder="Nhập mật khẩu đang dùng"
+                      className="w-full h-10 pl-10 pr-10 rounded-xl border border-slate-200 text-xs focus:outline-none focus:border-blue-500 shadow-xs"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                    >
+                      {showCurrentPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Mật khẩu mới */}
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">
                     Mật khẩu mới <span className="text-rose-500">*</span>
                   </label>
-                  <input
-                    type="password"
-                    required
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    placeholder="Nhập tối thiểu 8 ký tự..."
-                    className="w-full h-9 px-3 rounded-lg border border-slate-200 text-xs focus:outline-none focus:border-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Xác nhận mật khẩu mới <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="password"
-                    required
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    placeholder="Nhập lại mật khẩu mới..."
-                    className="w-full h-9 px-3 rounded-lg border border-slate-200 text-xs focus:outline-none focus:border-blue-500"
-                  />
+                  <div className="relative">
+                    <Lock
+                      size={15}
+                      className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
+                    />
+                    <input
+                      type={showNewPassword ? 'text' : 'password'}
+                      required
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      placeholder="Nhập mật khẩu mới an toàn"
+                      className="w-full h-10 pl-10 pr-10 rounded-xl border border-slate-200 text-xs focus:outline-none focus:border-blue-500 shadow-xs"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowNewPassword(!showNewPassword)}
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                    >
+                      {showNewPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                    </button>
+                  </div>
                 </div>
 
-                <div className="pt-3 flex items-center justify-end gap-2">
+                {/* Xác nhận mật khẩu mới */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Xác nhận mật khẩu <span className="text-rose-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <Lock
+                      size={15}
+                      className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
+                    />
+                    <input
+                      type={showConfirmPassword ? 'text' : 'password'}
+                      required
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      placeholder="Nhập lại mật khẩu mới"
+                      className="w-full h-10 pl-10 pr-10 rounded-xl border border-slate-200 text-xs focus:outline-none focus:border-blue-500 shadow-xs"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                    >
+                      {showConfirmPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Tiêu chuẩn mật khẩu (SRS 3.2.1.2) */}
+                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 space-y-2">
+                  <div className="text-[11px] font-bold text-slate-700">
+                    Tiêu chuẩn mật khẩu (SRS 3.2.1.2):
+                  </div>
+                  <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-[11px]">
+                    <div className="flex items-center gap-1.5 text-slate-600">
+                      <CheckCircle2 size={13} className="text-emerald-500 shrink-0" />
+                      <span>Tối thiểu 8 ký tự</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-slate-600">
+                      <CheckCircle2 size={13} className="text-emerald-500 shrink-0" />
+                      <span>Chữ hoa (A-Z)</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-slate-600">
+                      <CheckCircle2 size={13} className="text-emerald-500 shrink-0" />
+                      <span>Chữ thường (a-z)</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-slate-600">
+                      <CheckCircle2 size={13} className="text-emerald-500 shrink-0" />
+                      <span>Chữ số (0-9)</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-slate-600 col-span-2">
+                      <CheckCircle2 size={13} className="text-emerald-500 shrink-0" />
+                      <span>Ký tự đặc biệt (!@#$%^&*+)</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-2 flex items-center justify-end gap-2.5">
                   <button
                     type="button"
                     onClick={() => setPasswordModalOpen(false)}
-                    className="px-4 py-2 rounded-lg border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 cursor-pointer"
+                    className="px-5 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition cursor-pointer"
                   >
-                    Hủy bỏ
+                    Hủy
                   </button>
                   <button
                     type="submit"
-                    className="px-4 py-2 rounded-lg bg-[#1E56A0] hover:bg-[#184580] text-xs font-semibold text-white cursor-pointer"
+                    className="px-5 py-2.5 rounded-xl bg-[#1E56A0] hover:bg-[#184580] text-xs font-bold text-white transition shadow-xs cursor-pointer"
                   >
                     Cập nhật mật khẩu
                   </button>
@@ -360,25 +483,28 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
         </div>
       )}
 
-      {/* MODAL: Thêm Nhân Viên Mới */}
+      {/* MODAL: Tạo tài khoản mới (Khớp 100% Ảnh 2 bên trái - MÀN HÌNH 3.2.1.4) */}
       {createModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4 animate-in fade-in">
-          <div className="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-lg p-6 relative">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-2xl p-6 relative">
             <button
               type="button"
               onClick={() => setCreateModalOpen(false)}
-              className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 cursor-pointer"
+              className="absolute top-5 right-5 text-slate-400 hover:text-slate-600 transition cursor-pointer"
             >
               <X size={18} />
             </button>
 
+            {/* Header: MÀN HÌNH 3.2.1.4 • Biểu mẫu */}
             <div className="flex items-center gap-3 mb-5">
-              <div className="w-10 h-10 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
-                <UserPlus size={20} />
+              <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 border border-blue-100 flex items-center justify-center shrink-0">
+                <UserPlus size={18} />
               </div>
               <div>
-                <h3 className="text-base font-bold text-slate-900">Thêm nhân viên mới</h3>
-                <p className="text-xs text-slate-500">Khởi tạo tài khoản nhân sự và cấp quyền hệ thống OIMS</p>
+                <div className="text-[11px] font-bold text-blue-600 uppercase tracking-wider">
+                  MÀN HÌNH 3.2.1.4 <span className="text-slate-400 font-normal">• Biểu mẫu</span>
+                </div>
+                <h3 className="text-base font-bold text-slate-900 mt-0.5">Tạo tài khoản mới</h3>
               </div>
             </div>
 
@@ -389,7 +515,21 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
               </div>
             ) : (
               <form onSubmit={handleCreateStaffSubmit} className="space-y-3.5">
-                <div className="grid grid-cols-2 gap-3">
+                {/* Row 1: Mã NV & Họ tên */}
+                <div className="grid grid-cols-2 gap-3.5">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      Mã nhân viên <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={formCode}
+                      onChange={(e) => setFormCode(e.target.value)}
+                      placeholder="TP-EMP0051"
+                      className="w-full h-10 px-3.5 rounded-xl border border-slate-200 text-xs font-mono font-semibold text-slate-800 focus:outline-none focus:border-blue-500 shadow-xs"
+                    />
+                  </div>
                   <div>
                     <label className="block text-xs font-semibold text-slate-700 mb-1">
                       Họ và tên <span className="text-rose-500">*</span>
@@ -399,36 +539,25 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
                       required
                       value={formName}
                       onChange={(e) => setFormName(e.target.value)}
-                      placeholder="Vd: Hoàng Văn Nam"
-                      className="w-full h-9 px-3 rounded-lg border border-slate-200 text-xs focus:outline-none focus:border-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">
-                      Chức danh công việc
-                    </label>
-                    <input
-                      type="text"
-                      value={formTitle}
-                      onChange={(e) => setFormTitle(e.target.value)}
-                      placeholder="Vd: Chuyên viên kinh doanh"
-                      className="w-full h-9 px-3 rounded-lg border border-slate-200 text-xs focus:outline-none focus:border-blue-500"
+                      placeholder="VD: Nguyễn Văn A"
+                      className="w-full h-10 px-3.5 rounded-xl border border-slate-200 text-xs focus:outline-none focus:border-blue-500 shadow-xs"
                     />
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                {/* Row 2: Email & Điện thoại */}
+                <div className="grid grid-cols-2 gap-3.5">
                   <div>
                     <label className="block text-xs font-semibold text-slate-700 mb-1">
-                      Email đăng nhập <span className="text-rose-500">*</span>
+                      Email công ty <span className="text-rose-500">*</span>
                     </label>
                     <input
                       type="email"
                       required
                       value={formEmail}
                       onChange={(e) => setFormEmail(e.target.value)}
-                      placeholder="nam.hoang@tinphat.com"
-                      className="w-full h-9 px-3 rounded-lg border border-slate-200 text-xs focus:outline-none focus:border-blue-500"
+                      placeholder="VD: admin@tinphat.com"
+                      className="w-full h-10 px-3.5 rounded-xl border border-slate-200 text-xs focus:outline-none focus:border-blue-500 shadow-xs"
                     />
                   </div>
                   <div>
@@ -439,60 +568,124 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
                       type="text"
                       value={formPhone}
                       onChange={(e) => setFormPhone(e.target.value)}
-                      placeholder="0912 345 678"
-                      className="w-full h-9 px-3 rounded-lg border border-slate-200 text-xs focus:outline-none focus:border-blue-500"
+                      placeholder="VD: 0912 345 678"
+                      className="w-full h-10 px-3.5 rounded-xl border border-slate-200 text-xs focus:outline-none focus:border-blue-500 shadow-xs"
                     />
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                {/* Row 3: Phòng ban & Chức danh */}
+                <div className="grid grid-cols-2 gap-3.5">
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">Phòng ban</label>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      Phòng ban <span className="text-rose-500">*</span>
+                    </label>
                     <select
                       value={formDept}
                       onChange={(e) => setFormDept(e.target.value)}
-                      className="w-full h-9 px-3 rounded-lg border border-slate-200 text-xs focus:outline-none focus:border-blue-500 bg-white"
+                      className="w-full h-10 px-3.5 rounded-xl border border-slate-200 text-xs focus:outline-none focus:border-blue-500 bg-white shadow-xs font-medium"
                     >
+                      <option value="Kho vận & Logistics">Kho vận & Logistics</option>
+                      <option value="Phòng Kinh doanh">Phòng Kinh doanh</option>
+                      <option value="Xưởng Sản xuất">Xưởng Sản xuất</option>
                       <option value="Ban Giám đốc">Ban Giám đốc</option>
                       <option value="Quản trị hệ thống">Quản trị hệ thống</option>
-                      <option value="Phòng Kinh doanh">Phòng Kinh doanh</option>
-                      <option value="Kho vận & Logistics">Kho vận & Logistics</option>
-                      <option value="Xưởng Sản xuất">Xưởng Sản xuất</option>
                     </select>
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">Vai trò RBAC</label>
-                    <select
-                      value={formRole}
-                      onChange={(e) => setFormRole(e.target.value as UserRole)}
-                      className="w-full h-9 px-3 rounded-lg border border-slate-200 text-xs focus:outline-none focus:border-blue-500 bg-white"
-                    >
-                      <option value="SALES">Nhân viên bán hàng (ROLE_SALES)</option>
-                      <option value="WAREHOUSE">Nhân viên kho (ROLE_WAREHOUSE)</option>
-                      <option value="PRODUCTION">Nhân viên sản xuất (ROLE_PRODUCTION)</option>
-                      <option value="MANAGER">Quản lý (ROLE_MANAGER)</option>
-                      <option value="ADMIN">Quản trị viên (ROLE_ADMIN)</option>
-                    </select>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      Chức danh công việc
+                    </label>
+                    <input
+                      type="text"
+                      value={formTitle}
+                      onChange={(e) => setFormTitle(e.target.value)}
+                      placeholder="VD: Thủ kho, Nhân viên bán hàng"
+                      className="w-full h-10 px-3.5 rounded-xl border border-slate-200 text-xs focus:outline-none focus:border-blue-500 shadow-xs"
+                    />
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                    Kho được phân quyền (Quy tắc BR-03)
-                  </label>
-                  <div className="grid grid-cols-2 gap-2 text-xs">
+                {/* Row 4: Vai trò RBAC & Mật khẩu ban đầu */}
+                <div className="grid grid-cols-2 gap-3.5">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      Vai trò RBAC <span className="text-rose-500">*</span>
+                    </label>
+                    <select
+                      value={formRole}
+                      onChange={(e) => setFormRole(e.target.value as UserRole)}
+                      className="w-full h-10 px-3.5 rounded-xl border border-slate-200 text-xs focus:outline-none focus:border-blue-500 bg-white shadow-xs font-medium"
+                    >
+                      <option value="WAREHOUSE">Nhân viên kho (ROLE_WAREHOUSE)</option>
+                      <option value="SALES">Nhân viên bán hàng (ROLE_SALES)</option>
+                      <option value="MANAGER">Quản lý (ROLE_MANAGER)</option>
+                      <option value="PRODUCTION">Nhân viên sản xuất (ROLE_PRODUCTION)</option>
+                      <option value="ADMIN">Quản trị viên (ROLE_ADMIN)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      Mật khẩu ban đầu <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={formPassword}
+                      onChange={(e) => setFormPassword(e.target.value)}
+                      placeholder="TinPhat@2026"
+                      className="w-full h-10 px-3.5 rounded-xl border border-slate-200 text-xs font-mono focus:outline-none focus:border-blue-500 shadow-xs"
+                    />
+                  </div>
+                </div>
+
+                {/* Warehouse Selection Box */}
+                <div className="space-y-2 pt-1">
+                  <div className="flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-1.5 font-semibold text-slate-700">
+                      <Building2 size={14} className="text-blue-600" />
+                      <span>
+                        Kho trực thuộc (Quy tắc BR-03) <span className="text-rose-500">*</span>
+                      </span>
+                    </div>
+                    <span className="text-[11px] text-slate-500">
+                      Đã chọn:{' '}
+                      <strong className="text-blue-600 font-bold">{formWarehouses.length}</strong> / 4
+                      kho
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2.5 text-xs">
                     {[
-                      { code: 'WH-HN-01', label: 'Kho Tổng Gia Lâm' },
-                      { code: 'WH-HN-02', label: 'Kho Đông Anh' },
-                      { code: 'WH-HN-03', label: 'Kho Hà Đông' },
-                      { code: 'WH-HN-04', label: 'Kho Hoàn Kiếm' },
+                      {
+                        code: 'WH-HN-01',
+                        name: 'Kho Tổng Gia Lâm',
+                        address: 'Số 18 Đường Dệt May, Gia Lâm, Hà Nội',
+                      },
+                      {
+                        code: 'WH-HN-02',
+                        name: 'Kho Đông Anh',
+                        address: 'CCN Nguyên Khê, Đông Anh, Hà Nội',
+                      },
+                      {
+                        code: 'WH-HN-03',
+                        name: 'Kho Hà Đông',
+                        address: 'Km14 Quốc lộ 6, Yên Nghĩa, Hà Đông, Hà Nội',
+                      },
+                      {
+                        code: 'WH-HN-04',
+                        name: 'Kho Hoàn Kiếm',
+                        address: '42 Phố Trần Hưng Đạo, Hoàn Kiếm, Hà Nội',
+                      },
                     ].map((w) => {
                       const isChecked = formWarehouses.includes(w.code);
                       return (
                         <label
                           key={w.code}
-                          className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition ${
-                            isChecked ? 'border-blue-300 bg-blue-50/60 text-blue-900' : 'border-slate-200 hover:bg-slate-50'
+                          className={`flex items-start gap-2.5 p-2.5 rounded-xl border cursor-pointer transition ${
+                            isChecked
+                              ? 'border-blue-400 bg-blue-50/50 shadow-xs'
+                              : 'border-slate-200 hover:bg-slate-50'
                           }`}
                         >
                           <input
@@ -505,28 +698,41 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
                                 setFormWarehouses(formWarehouses.filter((c) => c !== w.code));
                               }
                             }}
-                            className="rounded text-blue-600"
+                            className="mt-0.5 rounded text-blue-600 focus:ring-blue-500 cursor-pointer"
                           />
-                          <span className="font-medium">{w.code} - {w.label}</span>
+                          <div className="min-w-0 flex-1">
+                            <div className="font-bold text-slate-800 text-xs">
+                              {w.name}{' '}
+                              <span className="font-mono text-[10px] text-slate-400 font-normal">
+                                ({w.code})
+                              </span>
+                            </div>
+                            <div className="text-[10px] text-slate-500 truncate mt-0.5">
+                              {w.address}
+                            </div>
+                          </div>
                         </label>
                       );
                     })}
                   </div>
+                  <p className="text-[11px] text-slate-400 italic">
+                    * BR-03: Nhân viên chỉ được xem và thao tác dữ liệu thuộc các kho được phân quyền
+                  </p>
                 </div>
 
-                <div className="pt-3 flex items-center justify-end gap-2">
+                <div className="pt-2 flex items-center justify-end gap-2.5">
                   <button
                     type="button"
                     onClick={() => setCreateModalOpen(false)}
-                    className="px-4 py-2 rounded-lg border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 cursor-pointer"
+                    className="px-5 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition cursor-pointer"
                   >
-                    Hủy bỏ
+                    Hủy
                   </button>
                   <button
                     type="submit"
-                    className="px-4 py-2 rounded-lg bg-[#1E56A0] hover:bg-[#184580] text-xs font-semibold text-white cursor-pointer"
+                    className="px-5 py-2.5 rounded-xl bg-[#1E56A0] hover:bg-[#184580] text-xs font-bold text-white transition shadow-xs cursor-pointer"
                   >
-                    Lưu nhân viên
+                    Thêm mới
                   </button>
                 </div>
               </form>

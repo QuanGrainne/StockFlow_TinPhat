@@ -7,6 +7,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { UserRole } from '../../types';
 import {
   LayoutGrid,
+  Package,
   ClipboardList,
   GitMerge,
   AlertCircle,
@@ -23,6 +24,14 @@ import {
   Layers,
   ShoppingBag,
   BarChart3,
+  ArrowDownToLine,
+  ArrowUpFromLine,
+  Repeat,
+  ClipboardCheck,
+  FileSpreadsheet,
+  RefreshCw,
+  FileText,
+  BookOpen,
 } from 'lucide-react';
 
 interface DropdownItem {
@@ -38,6 +47,8 @@ interface TabConfig {
   icon: any;
   hasDropdown: boolean;
   hasBadgeDot?: boolean;
+  badgeText?: string;
+  badgeColor?: string;
   dropdownItems?: DropdownItem[];
 }
 
@@ -47,12 +58,14 @@ interface SidebarProps {
   onNavigate: (screenId: string) => void;
   isCollapsed?: boolean;
   onToggleCollapse?: () => void;
+  productionBadge?: string;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
   currentRole,
   activeScreen,
   onNavigate,
+  productionBadge,
 }) => {
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -134,6 +147,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
         },
       ],
     },
+    {
+      id: 'admin-goods',
+      label: 'Danh mục hàng hóa',
+      icon: Package,
+      hasDropdown: false,
+    },
   ];
 
   const managerTabs: TabConfig[] = [
@@ -210,6 +229,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
       icon: BarChart3,
       hasDropdown: false,
     },
+    {
+      id: 'manager-goods',
+      label: 'Danh mục hàng hóa',
+      icon: Package,
+      hasDropdown: false,
+    },
   ];
 
   const salesTabs: TabConfig[] = [
@@ -217,6 +242,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
       id: 'sales-dashboard',
       label: 'Tổng quan bán hàng',
       icon: LayoutGrid,
+      hasDropdown: false,
+    },
+    {
+      id: 'sales-goods',
+      label: 'Danh mục hàng hóa',
+      icon: Package,
       hasDropdown: false,
     },
     {
@@ -245,11 +276,93 @@ export const Sidebar: React.FC<SidebarProps> = ({
     },
   ];
 
+  const warehouseTabs: TabConfig[] = [
+    {
+      id: 'warehouse-overview',
+      label: 'Tổng quan Kho (3.2.5.1)',
+      icon: LayoutGrid,
+      hasDropdown: false,
+    },
+    {
+      id: 'warehouse-goods',
+      label: 'Danh mục hàng hóa',
+      icon: Package,
+      hasDropdown: false,
+    },
+    {
+      id: 'warehouse-inbound',
+      label: 'Nhập kho từ Chứng từ (3.2.5.2)',
+      icon: ArrowDownToLine,
+      hasDropdown: false,
+      badgeText: '2',
+      badgeColor: 'bg-blue-600',
+    },
+    {
+      id: 'warehouse-outbound',
+      label: 'Xuất kho theo Phiếu giấy (3.2.5.4)',
+      icon: ArrowUpFromLine,
+      hasDropdown: false,
+      badgeText: '2',
+      badgeColor: 'bg-amber-600',
+    },
+    {
+      id: 'warehouse-transfer',
+      label: 'Điều chuyển Kho (3.2.5.6)',
+      icon: Repeat,
+      hasDropdown: false,
+    },
+    {
+      id: 'warehouse-audit',
+      label: 'Kiểm kê Giấy (3.2.5.9)',
+      icon: ClipboardCheck,
+      hasDropdown: false,
+    },
+    {
+      id: 'warehouse-returns',
+      label: 'Biên bản Trả hàng (3.2.5.11)',
+      icon: RotateCcw,
+      hasDropdown: false,
+    },
+  ];
+
+  const productionTabs: TabConfig[] = [
+    {
+      id: 'production-orders',
+      label: 'Theo dõi Lệnh sản xuất',
+      icon: ClipboardList,
+      hasDropdown: false,
+      badgeText: productionBadge || '4',
+      badgeColor: 'bg-[#1E56A0]',
+    },
+    {
+      id: 'production-goods',
+      label: 'Danh mục hàng hóa / Vật tư',
+      icon: Package,
+      hasDropdown: false,
+    },
+    {
+      id: 'production-import',
+      label: 'Nhận kế hoạch (Import File)',
+      icon: RefreshCw,
+      hasDropdown: false,
+    },
+    {
+      id: 'production-logs',
+      label: 'Sổ Nhật ký Phiếu tham chiếu',
+      icon: FileText,
+      hasDropdown: false,
+    },
+  ];
+
   const tabs =
     currentRole === 'ADMIN'
       ? adminTabs
       : currentRole === 'MANAGER'
       ? managerTabs
+      : currentRole === 'WAREHOUSE'
+      ? warehouseTabs
+      : currentRole === 'PRODUCTION'
+      ? productionTabs
       : salesTabs;
 
   const isTabActive = (tab: TabConfig) => {
@@ -260,53 +373,64 @@ export const Sidebar: React.FC<SidebarProps> = ({
     if (tab.id === 'admin-warehouse-perms' && activeScreen === 'admin-warehouse-facilities') return true;
     if (tab.id === 'manager-production' && activeScreen === 'manager-bom') return true;
     if (tab.id === 'manager-partners' && activeScreen === 'manager-cashflow') return true;
+    if (activeScreen === 'goods-catalog' && tab.id.endsWith('-goods')) return true;
     return false;
   };
 
   return (
-    <div ref={containerRef} className="bg-white border-b border-slate-200 px-6 py-2 flex items-center gap-2 select-none relative z-30">
-      {tabs.map((tab) => {
-        const active = isTabActive(tab);
-        const Icon = tab.icon;
-        const isOpen = openDropdownId === tab.id;
+    <div ref={containerRef} className="bg-white border-b border-slate-200 px-6 py-2 flex items-center justify-between gap-2 select-none relative z-30">
+      <div className="flex items-center gap-2 overflow-x-auto">
+        {tabs.map((tab) => {
+          const active = isTabActive(tab);
+          const Icon = tab.icon;
+          const isOpen = openDropdownId === tab.id;
 
-        return (
-          <div key={tab.id} className="relative">
-            <button
-              type="button"
-              onClick={() => {
-                if (tab.hasDropdown && tab.dropdownItems && tab.dropdownItems.length > 0) {
-                  if (isOpen) {
-                    setOpenDropdownId(null);
+          return (
+            <div key={tab.id} className="relative shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  if (tab.hasDropdown && tab.dropdownItems && tab.dropdownItems.length > 0) {
+                    if (isOpen) {
+                      setOpenDropdownId(null);
+                    } else {
+                      setOpenDropdownId(tab.id);
+                      onNavigate(tab.id);
+                    }
                   } else {
-                    setOpenDropdownId(tab.id);
+                    setOpenDropdownId(null);
                     onNavigate(tab.id);
                   }
-                } else {
-                  setOpenDropdownId(null);
-                  onNavigate(tab.id);
-                }
-              }}
-              className={`flex items-center gap-2 px-3.5 py-2 rounded-[8px] text-xs font-semibold transition cursor-pointer border ${
-                active
-                  ? 'bg-blue-50/80 text-[#2B6CB0] border-blue-200 shadow-2xs'
-                  : 'text-slate-600 border-transparent hover:text-slate-900 hover:bg-slate-50'
-              }`}
-            >
-              <Icon size={15} className={active ? 'text-[#2B6CB0]' : 'text-slate-500'} />
-              <span>{tab.label}</span>
-              {tab.hasBadgeDot && (
-                <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
-              )}
-              {tab.hasDropdown && (
-                <ChevronDown
-                  size={12}
-                  className={`transition-transform duration-150 ${active ? 'text-[#2B6CB0]' : 'text-slate-400'} ${
-                    isOpen ? 'rotate-180' : ''
-                  }`}
-                />
-              )}
-            </button>
+                }}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-[8px] text-xs font-semibold transition cursor-pointer border ${
+                  active
+                    ? 'bg-blue-50/80 text-[#2B6CB0] border-blue-200 shadow-2xs'
+                    : 'text-slate-600 border-transparent hover:text-slate-900 hover:bg-slate-50'
+                }`}
+              >
+                <Icon size={14} className={active ? 'text-[#2B6CB0]' : 'text-slate-500'} />
+                <span>{tab.label}</span>
+                {tab.hasBadgeDot && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                )}
+                {tab.badgeText && (
+                  <span
+                    className={`w-4 h-4 rounded-full text-white text-[10px] font-bold flex items-center justify-center ${
+                      tab.badgeColor || 'bg-blue-600'
+                    }`}
+                  >
+                    {tab.badgeText}
+                  </span>
+                )}
+                {tab.hasDropdown && (
+                  <ChevronDown
+                    size={12}
+                    className={`transition-transform duration-150 ${active ? 'text-[#2B6CB0]' : 'text-slate-400'} ${
+                      isOpen ? 'rotate-180' : ''
+                    }`}
+                  />
+                )}
+              </button>
 
 
             {/* Dropdown Menu Modal */}
@@ -342,6 +466,34 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         );
       })}
+      </div>
+
+      {/* Right shortcut prompt for Warehouse Desktop data entry */}
+      {currentRole === 'WAREHOUSE' && (
+        <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded bg-slate-50 border border-slate-200 text-[11px] text-slate-500 font-medium shrink-0">
+          <span>Phím</span>
+          <kbd className="px-1.5 py-0.5 rounded bg-white border border-slate-200 text-[10px] font-mono font-bold text-slate-700 shadow-2xs">
+            Tab
+          </kbd>
+          <span>/</span>
+          <kbd className="px-1.5 py-0.5 rounded bg-white border border-slate-200 text-[10px] font-mono font-bold text-slate-700 shadow-2xs">
+            Enter
+          </kbd>
+          <span>nhập liệu nhanh</span>
+        </div>
+      )}
+
+      {/* Right Action Button for Production Staff: Nhập báo cáo giấy */}
+      {currentRole === 'PRODUCTION' && (
+        <button
+          type="button"
+          onClick={() => onNavigate('production-open-report-modal')}
+          className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-[#1E56A0] hover:bg-[#16437E] text-white text-xs font-semibold shadow-2xs transition cursor-pointer shrink-0"
+        >
+          <FileText size={14} />
+          <span>Nhập báo cáo giấy</span>
+        </button>
+      )}
     </div>
   );
 };

@@ -6,6 +6,7 @@ import {
   Search,
   Filter,
   Building,
+  Building2,
   UserPlus,
   Pencil,
   KeyRound,
@@ -35,15 +36,17 @@ export const StaffAccountsScreen: React.FC<StaffAccountsScreenProps> = ({
   );
   const [deptFilter, setDeptFilter] = useState('ALL');
 
-  // Modal State: Create / Edit
+  // Modal State: Create / Edit (Khớp 100% Ảnh 2 bên trái - MÀN HÌNH 3.2.1.4)
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editingStaff, setEditingStaff] = useState<StaffAccount | null>(null);
+  const [formCode, setFormCode] = useState('TP-EMP0051');
   const [formName, setFormName] = useState('');
   const [formEmail, setFormEmail] = useState('');
   const [formPhone, setFormPhone] = useState('');
   const [formTitle, setFormTitle] = useState('');
-  const [formDept, setFormDept] = useState('Phòng Kinh doanh');
-  const [formRole, setFormRole] = useState<UserRole>('SALES');
+  const [formDept, setFormDept] = useState('Kho vận & Logistics');
+  const [formRole, setFormRole] = useState<UserRole>('WAREHOUSE');
+  const [formPassword, setFormPassword] = useState('TinPhat@2026');
   const [formWarehouses, setFormWarehouses] = useState<string[]>(['WH-HN-01']);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -68,24 +71,28 @@ export const StaffAccountsScreen: React.FC<StaffAccountsScreenProps> = ({
 
   const handleOpenCreate = () => {
     setEditingStaff(null);
+    setFormCode('TP-EMP0051');
     setFormName('');
     setFormEmail('');
     setFormPhone('');
     setFormTitle('');
-    setFormDept('Phòng Kinh doanh');
-    setFormRole('SALES');
+    setFormDept('Kho vận & Logistics');
+    setFormRole('WAREHOUSE');
+    setFormPassword('TinPhat@2026');
     setFormWarehouses(['WH-HN-01']);
     setEditModalOpen(true);
   };
 
   const handleOpenEdit = (staff: StaffAccount) => {
     setEditingStaff(staff);
+    setFormCode(staff.code);
     setFormName(staff.name);
     setFormEmail(staff.email);
     setFormPhone(staff.phone);
     setFormTitle(staff.title);
     setFormDept(staff.department);
     setFormRole(staff.role);
+    setFormPassword('TinPhat@2026');
     setFormWarehouses(staff.assignedWarehouses || []);
     setEditModalOpen(true);
   };
@@ -120,11 +127,11 @@ export const StaffAccountsScreen: React.FC<StaffAccountsScreenProps> = ({
         showToast(`Đã cập nhật thông tin nhân viên ${formName}`);
       } else {
         await adminService.createStaff({
-          code: `NV-NV00${Math.floor(Math.random() * 90) + 10}`,
+          code: formCode || `NV-NV00${Math.floor(Math.random() * 90) + 10}`,
           name: formName,
           email: formEmail,
           phone: formPhone,
-          title: formTitle || 'Chuyên viên',
+          title: formTitle || 'Thủ kho, Nhân viên bán hàng',
           department: formDept,
           role: formRole,
           roleTitle: roleTitleMap[formRole],
@@ -439,36 +446,49 @@ export const StaffAccountsScreen: React.FC<StaffAccountsScreenProps> = ({
         </div>
       </div>
 
-      {/* MODAL: Tạo / Sửa Nhân viên */}
+      {/* MODAL: Tạo tài khoản mới (Khớp 100% Ảnh 2 bên trái - MÀN HÌNH 3.2.1.4) */}
       {editModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4 animate-in fade-in">
-          <div className="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-lg p-6 relative">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-2xl p-6 relative">
             <button
               type="button"
               onClick={() => setEditModalOpen(false)}
-              className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 cursor-pointer"
+              className="absolute top-5 right-5 text-slate-400 hover:text-slate-600 transition cursor-pointer"
             >
               <X size={18} />
             </button>
 
+            {/* Header: MÀN HÌNH 3.2.1.4 • Biểu mẫu */}
             <div className="flex items-center gap-3 mb-5">
-              <div className="w-10 h-10 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
-                {editingStaff ? <Pencil size={20} /> : <UserPlus size={20} />}
+              <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 border border-blue-100 flex items-center justify-center shrink-0">
+                <UserPlus size={18} />
               </div>
               <div>
-                <h3 className="text-base font-bold text-slate-900">
-                  {editingStaff ? 'Cập nhật tài khoản nhân viên' : 'Thêm nhân viên mới'}
+                <div className="text-[11px] font-bold text-blue-600 uppercase tracking-wider">
+                  MÀN HÌNH 3.2.1.4 <span className="text-slate-400 font-normal">• Biểu mẫu</span>
+                </div>
+                <h3 className="text-base font-bold text-slate-900 mt-0.5">
+                  {editingStaff ? 'Cập nhật tài khoản nhân viên' : 'Tạo tài khoản mới'}
                 </h3>
-                <p className="text-xs text-slate-500">
-                  {editingStaff
-                    ? `Mã nhân sự: ${editingStaff.code}`
-                    : 'Khởi tạo tài khoản nhân viên trong hệ thống StockFlow'}
-                </p>
               </div>
             </div>
 
             <form onSubmit={handleSaveStaff} className="space-y-3.5">
-              <div className="grid grid-cols-2 gap-3">
+              {/* Row 1: Mã NV & Họ tên */}
+              <div className="grid grid-cols-2 gap-3.5">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Mã nhân viên <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={formCode}
+                    onChange={(e) => setFormCode(e.target.value)}
+                    placeholder="TP-EMP0051"
+                    className="w-full h-10 px-3.5 rounded-xl border border-slate-200 text-xs font-mono font-semibold text-slate-800 focus:outline-none focus:border-blue-500 shadow-xs"
+                  />
+                </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">
                     Họ và tên <span className="text-rose-500">*</span>
@@ -478,36 +498,25 @@ export const StaffAccountsScreen: React.FC<StaffAccountsScreenProps> = ({
                     required
                     value={formName}
                     onChange={(e) => setFormName(e.target.value)}
-                    placeholder="Vd: Nguyễn Văn A"
-                    className="w-full h-9 px-3 rounded-lg border border-slate-200 text-xs focus:outline-none focus:border-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Chức danh công việc
-                  </label>
-                  <input
-                    type="text"
-                    value={formTitle}
-                    onChange={(e) => setFormTitle(e.target.value)}
-                    placeholder="Vd: Chuyên viên kinh doanh"
-                    className="w-full h-9 px-3 rounded-lg border border-slate-200 text-xs focus:outline-none focus:border-blue-500"
+                    placeholder="VD: Nguyễn Văn A"
+                    className="w-full h-10 px-3.5 rounded-xl border border-slate-200 text-xs focus:outline-none focus:border-blue-500 shadow-xs"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              {/* Row 2: Email & Điện thoại */}
+              <div className="grid grid-cols-2 gap-3.5">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Email đăng nhập <span className="text-rose-500">*</span>
+                    Email công ty <span className="text-rose-500">*</span>
                   </label>
                   <input
                     type="email"
                     required
                     value={formEmail}
                     onChange={(e) => setFormEmail(e.target.value)}
-                    placeholder="admin@tinphat.com"
-                    className="w-full h-9 px-3 rounded-lg border border-slate-200 text-xs focus:outline-none focus:border-blue-500"
+                    placeholder="VD: admin@tinphat.com"
+                    className="w-full h-10 px-3.5 rounded-xl border border-slate-200 text-xs focus:outline-none focus:border-blue-500 shadow-xs"
                   />
                 </div>
                 <div>
@@ -518,60 +527,124 @@ export const StaffAccountsScreen: React.FC<StaffAccountsScreenProps> = ({
                     type="text"
                     value={formPhone}
                     onChange={(e) => setFormPhone(e.target.value)}
-                    placeholder="0912 345 678"
-                    className="w-full h-9 px-3 rounded-lg border border-slate-200 text-xs focus:outline-none focus:border-blue-500"
+                    placeholder="VD: 0912 345 678"
+                    className="w-full h-10 px-3.5 rounded-xl border border-slate-200 text-xs focus:outline-none focus:border-blue-500 shadow-xs"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              {/* Row 3: Phòng ban & Chức danh */}
+              <div className="grid grid-cols-2 gap-3.5">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Phòng ban</label>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Phòng ban <span className="text-rose-500">*</span>
+                  </label>
                   <select
                     value={formDept}
                     onChange={(e) => setFormDept(e.target.value)}
-                    className="w-full h-9 px-3 rounded-lg border border-slate-200 text-xs focus:outline-none focus:border-blue-500 bg-white"
+                    className="w-full h-10 px-3.5 rounded-xl border border-slate-200 text-xs focus:outline-none focus:border-blue-500 bg-white shadow-xs font-medium"
                   >
+                    <option value="Kho vận & Logistics">Kho vận & Logistics</option>
+                    <option value="Phòng Kinh doanh">Phòng Kinh doanh</option>
+                    <option value="Xưởng Sản xuất">Xưởng Sản xuất</option>
                     <option value="Ban Giám đốc">Ban Giám đốc</option>
                     <option value="Quản trị hệ thống">Quản trị hệ thống</option>
-                    <option value="Phòng Kinh doanh">Phòng Kinh doanh</option>
-                    <option value="Kho vận & Logistics">Kho vận & Logistics</option>
-                    <option value="Xưởng Sản xuất">Xưởng Sản xuất</option>
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Vai trò RBAC</label>
-                  <select
-                    value={formRole}
-                    onChange={(e) => setFormRole(e.target.value as UserRole)}
-                    className="w-full h-9 px-3 rounded-lg border border-slate-200 text-xs focus:outline-none focus:border-blue-500 bg-white"
-                  >
-                    <option value="ADMIN">Quản trị viên (ROLE_ADMIN)</option>
-                    <option value="MANAGER">Quản lý (ROLE_MANAGER)</option>
-                    <option value="SALES">Nhân viên bán hàng (ROLE_SALES)</option>
-                    <option value="WAREHOUSE">Nhân viên kho (ROLE_WAREHOUSE)</option>
-                    <option value="PRODUCTION">Nhân viên sản xuất (ROLE_PRODUCTION)</option>
-                  </select>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Chức danh công việc
+                  </label>
+                  <input
+                    type="text"
+                    value={formTitle}
+                    onChange={(e) => setFormTitle(e.target.value)}
+                    placeholder="VD: Thủ kho, Nhân viên bán hàng"
+                    className="w-full h-10 px-3.5 rounded-xl border border-slate-200 text-xs focus:outline-none focus:border-blue-500 shadow-xs"
+                  />
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                  Kho được phân quyền (Quy tắc BR-03)
-                </label>
-                <div className="grid grid-cols-2 gap-2 text-xs">
+              {/* Row 4: Vai trò RBAC & Mật khẩu ban đầu */}
+              <div className="grid grid-cols-2 gap-3.5">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Vai trò RBAC <span className="text-rose-500">*</span>
+                  </label>
+                  <select
+                    value={formRole}
+                    onChange={(e) => setFormRole(e.target.value as UserRole)}
+                    className="w-full h-10 px-3.5 rounded-xl border border-slate-200 text-xs focus:outline-none focus:border-blue-500 bg-white shadow-xs font-medium"
+                  >
+                    <option value="WAREHOUSE">Nhân viên kho (ROLE_WAREHOUSE)</option>
+                    <option value="SALES">Nhân viên bán hàng (ROLE_SALES)</option>
+                    <option value="MANAGER">Quản lý (ROLE_MANAGER)</option>
+                    <option value="PRODUCTION">Nhân viên sản xuất (ROLE_PRODUCTION)</option>
+                    <option value="ADMIN">Quản trị viên (ROLE_ADMIN)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Mật khẩu ban đầu <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={formPassword}
+                    onChange={(e) => setFormPassword(e.target.value)}
+                    placeholder="TinPhat@2026"
+                    className="w-full h-10 px-3.5 rounded-xl border border-slate-200 text-xs font-mono focus:outline-none focus:border-blue-500 shadow-xs"
+                  />
+                </div>
+              </div>
+
+              {/* Warehouse Selection Box */}
+              <div className="space-y-2 pt-1">
+                <div className="flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-1.5 font-semibold text-slate-700">
+                    <Building2 size={14} className="text-blue-600" />
+                    <span>
+                      Kho trực thuộc (Quy tắc BR-03) <span className="text-rose-500">*</span>
+                    </span>
+                  </div>
+                  <span className="text-[11px] text-slate-500">
+                    Đã chọn:{' '}
+                    <strong className="text-blue-600 font-bold">{formWarehouses.length}</strong> / 4
+                    kho
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2.5 text-xs">
                   {[
-                    { code: 'WH-HN-01', label: 'Kho Tổng Gia Lâm' },
-                    { code: 'WH-HN-02', label: 'Kho Đông Anh' },
-                    { code: 'WH-HN-03', label: 'Kho Hà Đông' },
-                    { code: 'WH-HN-04', label: 'Kho Hoàn Kiếm' },
+                    {
+                      code: 'WH-HN-01',
+                      name: 'Kho Tổng Gia Lâm',
+                      address: 'Số 18 Đường Dệt May, Gia Lâm, Hà Nội',
+                    },
+                    {
+                      code: 'WH-HN-02',
+                      name: 'Kho Đông Anh',
+                      address: 'CCN Nguyên Khê, Đông Anh, Hà Nội',
+                    },
+                    {
+                      code: 'WH-HN-03',
+                      name: 'Kho Hà Đông',
+                      address: 'Km14 Quốc lộ 6, Yên Nghĩa, Hà Đông, Hà Nội',
+                    },
+                    {
+                      code: 'WH-HN-04',
+                      name: 'Kho Hoàn Kiếm',
+                      address: '42 Phố Trần Hưng Đạo, Hoàn Kiếm, Hà Nội',
+                    },
                   ].map((w) => {
                     const isChecked = formWarehouses.includes(w.code);
                     return (
                       <label
                         key={w.code}
-                        className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition ${
-                          isChecked ? 'border-blue-300 bg-blue-50/60 text-blue-900' : 'border-slate-200 hover:bg-slate-50'
+                        className={`flex items-start gap-2.5 p-2.5 rounded-xl border cursor-pointer transition ${
+                          isChecked
+                            ? 'border-blue-400 bg-blue-50/50 shadow-xs'
+                            : 'border-slate-200 hover:bg-slate-50'
                         }`}
                       >
                         <input
@@ -584,28 +657,42 @@ export const StaffAccountsScreen: React.FC<StaffAccountsScreenProps> = ({
                               setFormWarehouses(formWarehouses.filter((c) => c !== w.code));
                             }
                           }}
-                          className="rounded text-blue-600"
+                          className="mt-0.5 rounded text-blue-600 focus:ring-blue-500 cursor-pointer"
                         />
-                        <span className="font-medium">{w.code} - {w.label}</span>
+                        <div className="min-w-0 flex-1">
+                          <div className="font-bold text-slate-800 text-xs">
+                            {w.name}{' '}
+                            <span className="font-mono text-[10px] text-slate-400 font-normal">
+                              ({w.code})
+                            </span>
+                          </div>
+                          <div className="text-[10px] text-slate-500 truncate mt-0.5">
+                            {w.address}
+                          </div>
+                        </div>
                       </label>
                     );
                   })}
                 </div>
+                <p className="text-[11px] text-slate-400 italic">
+                  * BR-03: Nhân viên chỉ được xem và thao tác dữ liệu thuộc các kho được phân quyền
+                </p>
               </div>
 
-              <div className="pt-3 flex items-center justify-end gap-2">
+              {/* Action buttons */}
+              <div className="pt-2 flex items-center justify-end gap-2.5">
                 <button
                   type="button"
                   onClick={() => setEditModalOpen(false)}
-                  className="px-4 py-2 rounded-lg border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 cursor-pointer"
+                  className="px-5 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition cursor-pointer"
                 >
-                  Hủy bỏ
+                  Hủy
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 rounded-lg bg-[#1E56A0] hover:bg-[#184580] text-xs font-semibold text-white cursor-pointer"
+                  className="px-5 py-2.5 rounded-xl bg-[#1E56A0] hover:bg-[#184580] text-xs font-bold text-white transition shadow-xs cursor-pointer"
                 >
-                  {editingStaff ? 'Cập nhật' : 'Thêm mới'}
+                  {editingStaff ? 'Lưu thay đổi' : 'Thêm mới'}
                 </button>
               </div>
             </form>

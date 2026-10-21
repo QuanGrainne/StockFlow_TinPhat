@@ -1,7 +1,10 @@
+// src/features/roles/components/common/Header.tsx
+// Header giao diện: Topbar chuẩn theo thiết kế AI Studio (Logo SF, Badge Role, Search input, User profile avatar & Switch Role dropdown khớp Ảnh 4)
+
 import React, { useState, useEffect } from 'react';
 import { UserRole, StaffAccount } from '../../types';
 import {
-  ShieldCheck,
+  Shield,
   ChevronDown,
   Search,
   Check,
@@ -11,6 +14,8 @@ import {
   UserCheck,
   LogOut,
   Users,
+  Warehouse,
+  Factory,
 } from 'lucide-react';
 import { adminService } from '../../services/adminService';
 import { useRouter } from 'next/navigation';
@@ -29,7 +34,6 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   const router = useRouter();
   const [roleDropdownOpen, setRoleDropdownOpen] = useState(false);
-  const [userDropdownOpen, setUserDropdownOpen] = useState(false);
   const [globalSearch, setGlobalSearch] = useState('');
   const [currentUser, setCurrentUser] = useState<{
     name: string;
@@ -96,42 +100,54 @@ export const Header: React.FC<HeaderProps> = ({
       }
     }
 
-    // Tải danh sách nhân viên để phục vụ dropdown đổi nhanh
+    // Tải danh sách nhân viên để phục vụ đổi nhanh
     adminService.getStaffList().then((list) => {
       if (list && list.length > 0) setStaffList(list);
     });
   }, [currentRole]);
 
-  const rolesConfig: { id: UserRole; label: string; desc: string; icon: any }[] = [
+  // 5 Role options khớp thứ tự & mã SRS chính xác theo Ảnh 4
+  const rolesConfig: {
+    id: UserRole;
+    label: string;
+    subtext: string;
+    srs: string;
+    icon: any;
+  }[] = [
     {
       id: 'SALES',
-      label: 'Nhân viên Bán hàng (Sales)',
-      desc: 'Quản lý đơn hàng, công nợ & gộp đơn xuất kho',
-      icon: Store,
+      label: 'Nhân viên bán hàng',
+      subtext: 'Lê Văn C • TP-SL003',
+      srs: '3.2.4',
+      icon: Users,
+    },
+    {
+      id: 'ADMIN',
+      label: 'Quản trị viên',
+      subtext: 'Nguyễn Văn A • TP-AD001',
+      srs: '3.2.1',
+      icon: Shield,
     },
     {
       id: 'MANAGER',
-      label: 'Quản lý vận hành (Manager)',
-      desc: 'Duyệt hạn mức, quản lý BOM, dòng tiền & sản xuất',
+      label: 'Quản lý',
+      subtext: 'Trần Thị B • TP-MN002',
+      srs: '3.2.2',
       icon: Briefcase,
     },
     {
       id: 'WAREHOUSE',
-      label: 'Thủ kho (Warehouse Staff)',
-      desc: 'Kiểm hàng nhập kho, số lượng đạt/hỏng & vị trí Bin',
-      icon: Layers,
+      label: 'Nhân viên kho',
+      subtext: 'Phạm Văn D • TP-WH004',
+      srs: '3.2.5',
+      icon: Warehouse,
     },
     {
       id: 'PRODUCTION',
-      label: 'Sản xuất (Production Staff)',
-      desc: 'Ghi nhận sản lượng ca, hao hụt & tiến độ gia công',
-      icon: Briefcase,
-    },
-    {
-      id: 'ADMIN',
-      label: 'Quản trị viên (Admin)',
-      desc: 'Quản lý tài khoản & phân quyền truy cập kho OIMS',
-      icon: ShieldCheck,
+      label: 'Nhân viên sản xuất',
+      subtext: 'Hoàng Thị E • TP-PD005',
+      srs: '3.2.3',
+      icon: Factory,
     },
   ];
 
@@ -152,7 +168,6 @@ export const Header: React.FC<HeaderProps> = ({
 
     const color = roleTitleMap[staff.role]?.color || 'from-blue-600 to-indigo-700';
 
-    // Lưu vào localStorage
     const numericId = parseInt(staff.id.replace(/\D/g, ''), 10) || 1;
     const updatedStorage = {
       userId: numericId,
@@ -174,7 +189,7 @@ export const Header: React.FC<HeaderProps> = ({
     });
 
     onRoleChange(staff.role);
-    setUserDropdownOpen(false);
+    setRoleDropdownOpen(false);
   };
 
   const handleLogout = () => {
@@ -193,63 +208,15 @@ export const Header: React.FC<HeaderProps> = ({
         <div>
           <div className="flex items-center gap-2">
             <span className="text-base font-bold text-slate-900 tracking-tight">StockFlow</span>
-            <button
-              type="button"
-              onClick={() => setRoleDropdownOpen(!roleDropdownOpen)}
-              className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-[4px] bg-[#EBF4FF] text-[#2B6CB0] font-bold text-[11px] uppercase tracking-wider hover:bg-blue-100 transition cursor-pointer"
-              title="Nhấn để đổi vai trò"
-            >
-              <span>{currentUser.role}</span>
-              <ChevronDown size={12} className="text-[#2B6CB0]" />
-            </button>
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-[4px] bg-[#EBF4FF] text-[#2B6CB0] font-bold text-[11px] uppercase tracking-wider">
+              {currentUser.role}
+            </span>
           </div>
           <div className="text-[11px] text-slate-400 font-medium">
             Công ty Tín Phát • OIMS
           </div>
         </div>
       </div>
-
-      {/* Role Dropdown Menu */}
-      {roleDropdownOpen && (
-        <>
-          <div className="fixed inset-0 z-40" onClick={() => setRoleDropdownOpen(false)} />
-          <div className="absolute top-14 left-24 w-80 bg-white text-slate-800 rounded-[8px] shadow-xl border border-slate-200 py-1.5 z-50 animate-in fade-in duration-100">
-            <div className="px-3 py-2 border-b border-slate-100 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
-              Chuyển đổi phân quyền (RBAC Switcher)
-            </div>
-            {rolesConfig.map((item) => {
-              const isSelected = item.id === currentRole;
-              const IconComponent = item.icon;
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => {
-                    onRoleChange(item.id);
-                    setRoleDropdownOpen(false);
-                  }}
-                  className={`w-full text-left px-3.5 py-2.5 flex items-start gap-3 transition cursor-pointer hover:bg-blue-50 ${
-                    isSelected ? 'bg-blue-50/70 text-[#2B6CB0]' : 'text-slate-700'
-                  }`}
-                >
-                  <div className={`p-1.5 rounded-[6px] shrink-0 mt-0.5 ${isSelected ? 'bg-[#2B6CB0] text-white' : 'bg-slate-100 text-slate-500'}`}>
-                    <IconComponent size={14} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-xs font-semibold flex items-center justify-between">
-                      <span>{item.label}</span>
-                      {isSelected && <Check size={14} className="text-[#2B6CB0]" />}
-                    </div>
-                    <div className="text-[11px] text-slate-400 truncate mt-0.5">
-                      {item.desc}
-                    </div>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        </>
-      )}
 
       {/* Center: Global Search Bar */}
       <div className="flex-1 max-w-xl mx-8">
@@ -265,12 +232,13 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       </div>
 
-      {/* Right: User Profile Avatar & Switcher Dropdown */}
-      <div className="relative">
+      {/* Right: User Profile Avatar & Switch Role Dropdown (Khớp 100% Ảnh 4) */}
+      <div className="flex items-center gap-3 relative">
         <button
           type="button"
-          onClick={() => setUserDropdownOpen(!userDropdownOpen)}
-          className="flex items-center gap-2.5 cursor-pointer hover:opacity-90 transition p-1.5 rounded-lg hover:bg-slate-50"
+          onClick={() => setRoleDropdownOpen(!roleDropdownOpen)}
+          className="flex items-center gap-2.5 cursor-pointer hover:bg-slate-50 p-1.5 rounded-xl transition border border-transparent hover:border-slate-200"
+          title="Click để chuyển đổi phân quyền & tài khoản"
         >
           <div className="relative">
             <div className={`w-9 h-9 rounded-full bg-gradient-to-tr ${currentUser.avatarColor} text-white flex items-center justify-center font-bold text-xs ring-2 ring-white shadow-xs overflow-hidden`}>
@@ -283,7 +251,12 @@ export const Header: React.FC<HeaderProps> = ({
               <span className="px-1.5 py-0.2 rounded-[3px] bg-blue-100 text-[#2B6CB0] font-mono text-[10px] font-bold">
                 {currentUser.code}
               </span>
-              <ChevronDown size={13} className={`text-slate-400 transition-transform ${userDropdownOpen ? 'rotate-180' : ''}`} />
+              <ChevronDown
+                size={13}
+                className={`text-slate-400 transition-transform duration-200 ${
+                  roleDropdownOpen ? 'rotate-180 text-blue-600' : ''
+                }`}
+              />
             </div>
             <div className="flex items-center gap-1 text-[11px] text-slate-500 font-medium">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
@@ -292,53 +265,116 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </button>
 
-        {/* User Switcher Dropdown Menu */}
-        {userDropdownOpen && (
+        {/* Dropdown Menu (Khớp 100% Ảnh 4 + Đổi tài khoản + Đăng xuất) */}
+        {roleDropdownOpen && (
           <>
-            <div className="fixed inset-0 z-40" onClick={() => setUserDropdownOpen(false)} />
-            <div className="absolute top-14 right-0 w-80 bg-white text-slate-800 rounded-xl shadow-2xl border border-slate-200 py-2 z-50 animate-in fade-in duration-100">
-              <div className="px-3.5 py-2 border-b border-slate-100">
-                <div className="flex items-center gap-2 text-xs font-bold text-slate-800">
-                  <Users size={14} className="text-blue-600" />
-                  <span>Đổi nhanh nhân viên</span>
+            <div className="fixed inset-0 z-40" onClick={() => setRoleDropdownOpen(false)} />
+            <div className="absolute right-0 top-14 w-84 bg-white text-slate-800 rounded-2xl shadow-2xl border border-slate-100 p-3 z-50 animate-in fade-in zoom-in-95 duration-150">
+              {/* Header profile inside dropdown */}
+              <div className="flex items-center gap-3 p-2 border-b border-slate-100 pb-3">
+                <div className={`w-11 h-11 rounded-full bg-gradient-to-tr ${currentUser.avatarColor} text-white flex items-center justify-center font-bold text-sm ring-2 ring-blue-100 shadow-xs shrink-0`}>
+                  <span>{currentUser.initials}</span>
                 </div>
-                <p className="text-[11px] text-slate-400 mt-0.5">
-                  Chọn tài khoản khác để trải nghiệm phân quyền
-                </p>
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-bold text-slate-900 truncate">{currentUser.name}</div>
+                  <div className="text-xs text-slate-500 truncate">{currentUser.title}</div>
+                  <div className="text-xs font-mono font-bold text-blue-600 mt-0.5">{currentUser.code}</div>
+                </div>
               </div>
 
-              <div className="max-h-64 overflow-y-auto py-1">
-                {staffList.map((staff) => {
-                  const isCurrent = staff.name === currentUser.name || staff.code === currentUser.code;
+              {/* Section 1: Switch Role (Ảnh 4) */}
+              <div className="px-2 pt-3 pb-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                CHUYỂN ĐỔI PHÂN QUYỀN (SWITCH ROLE)
+              </div>
+              <div className="space-y-1">
+                {rolesConfig.map((item) => {
+                  const isSelected = item.id === currentRole;
+                  const IconComponent = item.icon;
                   return (
                     <button
-                      key={staff.id || staff.code}
+                      key={item.id}
                       type="button"
-                      onClick={() => handleSwitchUser(staff)}
-                      className={`w-full text-left px-3.5 py-2 flex items-center justify-between transition cursor-pointer hover:bg-slate-50 ${
-                        isCurrent ? 'bg-blue-50/70 text-[#2B6CB0]' : 'text-slate-700'
+                      onClick={() => {
+                        onRoleChange(item.id);
+                        setRoleDropdownOpen(false);
+                      }}
+                      className={`w-full text-left p-2.5 rounded-xl flex items-center gap-3 transition cursor-pointer ${
+                        isSelected
+                          ? 'bg-blue-50/80 border border-blue-200/80 text-blue-900 shadow-xs'
+                          : 'border border-transparent hover:bg-slate-50 text-slate-700'
                       }`}
                     >
-                      <div className="min-w-0 pr-2">
-                        <div className="text-xs font-bold truncate flex items-center gap-1.5">
-                          <span>{staff.name}</span>
-                          <span className="text-[10px] font-mono text-slate-400">({staff.code})</span>
+                      <div
+                        className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
+                          isSelected
+                            ? 'bg-blue-100 text-blue-600'
+                            : 'bg-slate-100 text-slate-500'
+                        }`}
+                      >
+                        <IconComponent size={16} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-xs font-bold leading-tight truncate">
+                          {item.label}
                         </div>
-                        <div className="text-[11px] text-slate-400 truncate">
-                          {staff.department} • <span className="font-semibold text-slate-600">{staff.roleTitle}</span>
+                        <div
+                          className={`text-[11px] truncate mt-0.5 ${
+                            isSelected ? 'text-blue-600/80' : 'text-slate-400'
+                          }`}
+                        >
+                          {item.subtext}
                         </div>
                       </div>
-                      {isCurrent && <UserCheck size={16} className="text-[#2B6CB0] shrink-0" />}
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <span
+                          className={`font-mono text-[10px] px-1.5 py-0.5 rounded ${
+                            isSelected
+                              ? 'bg-blue-100/70 border border-blue-200 text-blue-600'
+                              : 'bg-slate-50 border border-slate-200/60 text-slate-400'
+                          }`}
+                        >
+                          {item.srs}
+                        </span>
+                        {isSelected && <Check size={14} className="text-blue-600 stroke-[2.5]" />}
+                      </div>
                     </button>
                   );
                 })}
               </div>
 
-              <div className="pt-1.5 border-t border-slate-100 px-2">
+              {/* Section 2: Quick switch staff account */}
+              {staffList.length > 0 && (
+                <>
+                  <div className="px-2 pt-3 pb-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider border-t border-slate-100 mt-2">
+                    ĐỔI NHANH NHÂN VIÊN
+                  </div>
+                  <div className="max-h-40 overflow-y-auto space-y-0.5">
+                    {staffList.slice(0, 5).map((staff) => {
+                      const isCurrent = staff.name === currentUser.name || staff.code === currentUser.code;
+                      return (
+                        <button
+                          key={staff.id || staff.code}
+                          type="button"
+                          onClick={() => handleSwitchUser(staff)}
+                          className={`w-full text-left px-2.5 py-1.5 rounded-lg flex items-center justify-between text-xs transition cursor-pointer hover:bg-slate-50 ${
+                            isCurrent ? 'bg-blue-50/70 text-blue-700 font-bold' : 'text-slate-700'
+                          }`}
+                        >
+                          <span className="truncate">{staff.name} ({staff.code})</span>
+                          {isCurrent && <UserCheck size={14} className="text-blue-600 shrink-0" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+
+              {/* Section 3: Logout button */}
+              <div className="pt-2 border-t border-slate-100 mt-2">
                 <button
                   type="button"
                   onClick={handleLogout}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer"
+                  className="w-full flex items-center gap-2 px-3 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 rounded-xl transition cursor-pointer"
                 >
                   <LogOut size={14} />
                   <span>Đăng xuất khỏi hệ thống</span>
@@ -351,4 +387,3 @@ export const Header: React.FC<HeaderProps> = ({
     </header>
   );
 };
-
