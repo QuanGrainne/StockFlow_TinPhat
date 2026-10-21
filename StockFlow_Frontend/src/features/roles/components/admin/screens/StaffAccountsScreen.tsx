@@ -112,36 +112,41 @@ export const StaffAccountsScreen: React.FC<StaffAccountsScreenProps> = ({
       PRODUCTION: 'Nhân viên sản xuất',
     };
 
-    if (editingStaff) {
-      await adminService.updateStaff(editingStaff.id, {
-        name: formName,
-        email: formEmail,
-        phone: formPhone,
-        title: formTitle,
-        department: formDept,
-        role: formRole,
-        roleTitle: roleTitleMap[formRole],
-        assignedWarehouses: formWarehouses,
-      });
-      showToast(`Đã cập nhật thông tin nhân viên ${formName}`);
-    } else {
-      await adminService.createStaff({
-        code: formCode || `TP-EMP00${Math.floor(Math.random() * 40) + 50}`,
-        name: formName,
-        email: formEmail,
-        phone: formPhone,
-        title: formTitle || 'Thủ kho, Nhân viên bán hàng',
-        department: formDept,
-        role: formRole,
-        roleTitle: roleTitleMap[formRole],
-        assignedWarehouses: formWarehouses,
-        status: 'ACTIVE',
-      });
-      showToast(`Đã thêm nhân viên mới ${formName}`);
-    }
+    try {
+      if (editingStaff) {
+        await adminService.updateStaff(editingStaff.id, {
+          name: formName,
+          email: formEmail,
+          phone: formPhone,
+          title: formTitle,
+          department: formDept,
+          role: formRole,
+          roleTitle: roleTitleMap[formRole],
+          assignedWarehouses: formWarehouses,
+        });
+        showToast(`Đã cập nhật thông tin nhân viên ${formName}`);
+      } else {
+        await adminService.createStaff({
+          code: formCode || `NV-NV00${Math.floor(Math.random() * 90) + 10}`,
+          name: formName,
+          email: formEmail,
+          phone: formPhone,
+          title: formTitle || 'Thủ kho, Nhân viên bán hàng',
+          department: formDept,
+          role: formRole,
+          roleTitle: roleTitleMap[formRole],
+          assignedWarehouses: formWarehouses,
+          status: 'ACTIVE',
+        });
+        showToast(`Đã thêm nhân viên mới ${formName}`);
+      }
 
-    setEditModalOpen(false);
-    loadData();
+      setEditModalOpen(false);
+      loadData();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Có lỗi xảy ra khi lưu nhân viên';
+      alert(`Lỗi: ${msg}`);
+    }
   };
 
   const handleToggleStatus = async (staff: StaffAccount) => {

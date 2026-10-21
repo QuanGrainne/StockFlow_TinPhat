@@ -1612,6 +1612,70 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
                 .HasConstraintName("fk_trx_stocktakes_warehouse_id");
         });
 
+        modelBuilder.Entity<SecUser>(entity =>
+        {
+            entity.HasKey(e => e.UserId).HasName("sec_users_pkey");
+            entity.ToTable("sec_users", "stockflow");
+            entity.HasIndex(e => e.Username, "uq_sec_users_1").IsUnique();
+
+            entity.Property(e => e.UserId).HasColumnName("user_id");
+            entity.Property(e => e.Username).HasMaxLength(50).HasColumnName("username");
+            entity.Property(e => e.PasswordHash).HasMaxLength(255).HasColumnName("password_hash");
+            entity.Property(e => e.FullName).HasMaxLength(100).HasColumnName("full_name");
+            entity.Property(e => e.Email).HasMaxLength(100).HasColumnName("email");
+            entity.Property(e => e.Phone).HasMaxLength(20).HasColumnName("phone");
+            entity.Property(e => e.IsActive).HasColumnName("is_active");
+            entity.Property(e => e.CreatedAt).HasColumnType("timestamp without time zone").HasColumnName("created_at");
+            entity.Property(e => e.UpdatedAt).HasColumnType("timestamp without time zone").HasColumnName("updated_at");
+        });
+
+        modelBuilder.Entity<SecRole>(entity =>
+        {
+            entity.HasKey(e => e.RoleId).HasName("sec_roles_pkey");
+            entity.ToTable("sec_roles", "stockflow");
+            entity.HasIndex(e => e.RoleName, "uq_sec_roles_1").IsUnique();
+
+            entity.Property(e => e.RoleId).HasColumnName("role_id");
+            entity.Property(e => e.RoleName).HasMaxLength(50).HasColumnName("role_name");
+            entity.Property(e => e.Description).HasMaxLength(255).HasColumnName("description");
+        });
+
+        modelBuilder.Entity<JncUserRole>(entity =>
+        {
+            entity.HasKey(e => new { e.UserId, e.RoleId }).HasName("jnc_user_roles_pkey");
+            entity.ToTable("jnc_user_roles", "stockflow");
+
+            entity.Property(e => e.UserId).HasColumnName("user_id");
+            entity.Property(e => e.RoleId).HasColumnName("role_id");
+            entity.Property(e => e.AssignedAt).HasColumnType("timestamp without time zone").HasColumnName("assigned_at");
+
+            entity.HasOne(d => d.Role).WithMany(p => p.JncUserRoles)
+                .HasForeignKey(d => d.RoleId)
+                .HasConstraintName("fk_jnc_user_roles_role_id");
+
+            entity.HasOne(d => d.User).WithMany(p => p.JncUserRoles)
+                .HasForeignKey(d => d.UserId)
+                .HasConstraintName("fk_jnc_user_roles_user_id");
+        });
+
+        modelBuilder.Entity<JncUserWarehouseAccess>(entity =>
+        {
+            entity.HasKey(e => new { e.UserId, e.WarehouseId }).HasName("jnc_user_warehouse_access_pkey");
+            entity.ToTable("jnc_user_warehouse_access", "stockflow");
+
+            entity.Property(e => e.UserId).HasColumnName("user_id");
+            entity.Property(e => e.WarehouseId).HasColumnName("warehouse_id");
+            entity.Property(e => e.AssignedAt).HasColumnType("timestamp without time zone").HasColumnName("assigned_at");
+
+            entity.HasOne(d => d.Warehouse).WithMany(p => p.JncUserWarehouseAccesses)
+                .HasForeignKey(d => d.WarehouseId)
+                .HasConstraintName("fk_jnc_user_warehouse_access_warehouse_id");
+
+            entity.HasOne(d => d.User).WithMany(p => p.JncUserWarehouseAccesses)
+                .HasForeignKey(d => d.UserId)
+                .HasConstraintName("fk_jnc_user_warehouse_access_user_id");
+        });
+
         OnModelCreatingPartial(modelBuilder);
     }
 
