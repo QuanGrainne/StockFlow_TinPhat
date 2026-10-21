@@ -1,6 +1,7 @@
 // src/features/roles/services/adminService.ts
 // Service xử lý API cho phân hệ Quản trị viên (Admin - OIMS)
 
+import { apiClient } from '@/lib/api/client';
 import {
   StaffAccount,
   WarehouseFacility,
@@ -56,7 +57,22 @@ let permissionMatrices: Record<string, PermissionMatrixModule[]> = {
 export const adminService = {
   // ─── 1. Staff Accounts ───────────────────────────────────────────────────
   async getStaffList(search?: string, statusFilter?: string, deptFilter?: string): Promise<StaffAccount[]> {
-    await new Promise((r) => setTimeout(r, 100));
+    try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('stockflow_token') ?? undefined : undefined;
+      const params = new URLSearchParams();
+      if (search) params.append('search', search);
+      if (statusFilter && statusFilter !== 'ALL') params.append('status', statusFilter);
+      if (deptFilter && deptFilter !== 'ALL') params.append('department', deptFilter);
+
+      const qs = params.toString() ? `?${params.toString()}` : '';
+      const data = await apiClient.get<StaffAccount[]>(`/api/Staff${qs}`, token);
+      if (Array.isArray(data) && data.length > 0) {
+        return data;
+      }
+    } catch (e) {
+      console.warn('API getStaffList failed, fallback to local data:', e);
+    }
+
     let list = [...staffAccounts];
 
     if (search) {
@@ -82,17 +98,31 @@ export const adminService = {
   },
 
   async createStaff(payload: Omit<StaffAccount, 'id'>): Promise<StaffAccount> {
-    await new Promise((r) => setTimeout(r, 150));
-    const newStaff: StaffAccount = {
-      ...payload,
-      id: `STAFF-${Date.now()}`,
-    };
-    staffAccounts.push(newStaff);
-    return newStaff;
+    const token = typeof window !== 'undefined' ? localStorage.getItem('stockflow_token') ?? undefined : undefined;
+    try {
+      const newStaff = await apiClient.post<StaffAccount>('/api/Staff', payload, token);
+      staffAccounts.unshift(newStaff);
+      return newStaff;
+    } catch (e) {
+      console.error('API createStaff failed:', e);
+      throw e;
+    }
   },
 
   async updateStaff(id: string, updates: Partial<StaffAccount>): Promise<StaffAccount> {
-    await new Promise((r) => setTimeout(r, 100));
+    try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('stockflow_token') ?? undefined : undefined;
+      const numericId = parseInt(id.replace(/\D/g, ''), 10);
+      if (!isNaN(numericId)) {
+        const updated = await apiClient.put<StaffAccount>(`/api/Staff/${numericId}`, updates, token);
+        const idx = staffAccounts.findIndex((s) => s.id === id);
+        if (idx !== -1) staffAccounts[idx] = updated;
+        return updated;
+      }
+    } catch (e) {
+      console.warn('API updateStaff failed, fallback to local state:', e);
+    }
+
     const idx = staffAccounts.findIndex((s) => s.id === id);
     if (idx === -1) throw new Error('Không tìm thấy tài khoản nhân viên');
     staffAccounts[idx] = { ...staffAccounts[idx], ...updates };
@@ -100,7 +130,16 @@ export const adminService = {
   },
 
   async toggleStaffStatus(id: string): Promise<StaffAccount> {
-    await new Promise((r) => setTimeout(r, 100));
+    try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('stockflow_token') ?? undefined : undefined;
+      const numericId = parseInt(id.replace(/\D/g, ''), 10);
+      if (!isNaN(numericId)) {
+        await apiClient.put(`/api/Staff/${numericId}/toggle-status`, {}, token);
+      }
+    } catch (e) {
+      console.warn('API toggleStaffStatus failed, fallback to local state:', e);
+    }
+
     const idx = staffAccounts.findIndex((s) => s.id === id);
     if (idx === -1) throw new Error('Không tìm thấy tài khoản nhân viên');
     staffAccounts[idx] = {
@@ -111,8 +150,17 @@ export const adminService = {
   },
 
   async resetStaffPassword(id: string): Promise<string> {
-    await new Promise((r) => setTimeout(r, 100));
-    return '123456a@A';
+    try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('stockflow_token') ?? undefined : undefined;
+      const numericId = parseInt(id.replace(/\D/g, ''), 10);
+      if (!isNaN(numericId)) {
+        const res = await apiClient.post<{ defaultPassword: string }>(`/api/Staff/${numericId}/reset-password`, {}, token);
+        return res.defaultPassword;
+      }
+    } catch (e) {
+      console.warn('API resetStaffPassword failed, fallback to default:', e);
+    }
+    return 'StockFlow@123';
   },
 
   // ─── 2. Physical Warehouses (Data Isolation) ──────────────────────────────

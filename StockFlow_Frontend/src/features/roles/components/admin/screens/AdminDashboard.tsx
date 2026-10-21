@@ -84,7 +84,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
     };
 
     await adminService.createStaff({
-      code: formCode || `TP-EMP00${Math.floor(Math.random() * 40) + 50}`,
+      code: formCode || `NV-NV00${Math.floor(Math.random() * 90) + 10}`,
       name: formName,
       title: formTitle || 'Thủ kho, Nhân viên bán hàng',
       email: formEmail,
@@ -109,6 +109,39 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
     }, 800);
   };
 
+  const [currentAdmin, setCurrentAdmin] = useState({
+    name: 'Quản trị viên Hệ thống',
+    code: 'NV-ADMIN',
+    title: 'Quản trị hệ thống',
+    email: 'admin@tinphat.vn',
+    initials: 'AD',
+  });
+
+  React.useEffect(() => {
+    const rawUser = typeof window !== 'undefined' ? localStorage.getItem('stockflow_user') : null;
+    if (rawUser) {
+      try {
+        const u = JSON.parse(rawUser);
+        const name = u.fullName || u.username || 'Quản trị viên';
+        const code = u.code || `NV-NV${String(u.userId || 1).padStart(3, '0')}`;
+        const words = name.trim().split(/\s+/);
+        const initials = words.length > 1
+          ? (words[0][0] + words[words.length - 1][0]).toUpperCase()
+          : name.slice(0, 2).toUpperCase();
+
+        setCurrentAdmin({
+          name,
+          code,
+          title: 'Quản trị hệ thống',
+          email: u.email || 'admin@tinphat.vn',
+          initials,
+        });
+      } catch (e) {
+        console.error(e);
+      }
+    }
+  }, []);
+
   return (
     <div className="space-y-6">
       {/* 1. Top Admin Profile Card */}
@@ -116,14 +149,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
         <div className="flex items-center gap-4">
           {/* Avatar Profile */}
           <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-blue-700 via-indigo-600 to-sky-500 text-white flex items-center justify-center font-bold text-xl ring-4 ring-blue-50 shadow-sm shrink-0">
-            <span>NA</span>
+            <span>{currentAdmin.initials}</span>
           </div>
 
           <div className="space-y-1.5">
             <div className="flex flex-wrap items-center gap-2.5">
-              <h2 className="text-xl font-bold text-slate-900 tracking-tight">Nguyễn Văn A</h2>
+              <h2 className="text-xl font-bold text-slate-900 tracking-tight">{currentAdmin.name}</h2>
               <span className="font-mono text-[11px] font-bold px-2 py-0.5 rounded-[4px] bg-[#EBF4FF] text-[#2B6CB0]">
-                TP-AD001
+                {currentAdmin.code}
               </span>
               <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
@@ -131,7 +164,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
               </span>
             </div>
             <p className="text-xs text-slate-500 font-medium">
-              Giám đốc Công nghệ • Quản trị hệ thống • admin@tinphat.com
+              {currentAdmin.title} • {currentAdmin.email}
             </p>
           </div>
         </div>
