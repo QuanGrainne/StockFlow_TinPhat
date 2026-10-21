@@ -12,6 +12,29 @@ public record WarehouseFacilityDto(
     string? Description = null
 );
 
+public record WarehouseStaffSimpleDto(
+    int UserId,
+    string FullName,
+    string Username,
+    string Email,
+    string Role
+);
+
+public record WarehouseDetailDto(
+    string Id,
+    int WarehouseId,
+    string Code,
+    string Name,
+    string Address,
+    int StaffCount,
+    string Area,
+    string Status,
+    string? Description,
+    int TotalProductCount,
+    decimal TotalStockQuantity,
+    List<WarehouseStaffSimpleDto> AssignedStaff
+);
+
 public record WarehouseSimpleDto(
     int WarehouseId,
     string Code,
@@ -35,22 +58,62 @@ public record WarehouseStaffAccessDto(
     string? Avatar = null
 );
 
-public record UpdateWarehouseAccessRequest(
-    List<string>? AssignedWarehouses = null,
-    List<int>? WarehouseIds = null
-);
+public class UpdateWarehouseAccessRequest
+{
+    public List<string>? AssignedWarehouses { get; set; } = new();
+    public List<int>? WarehouseIds { get; set; } = new();
+}
 
-public record CreateWarehouseRequest(
-    string WarehouseCode,
-    string WarehouseName,
-    string? Address = null,
-    string? Description = null,
-    bool? IsActive = true
-);
+public class CreateWarehouseRequest
+{
+    private string? _warehouseCode;
+    public string WarehouseCode
+    {
+        get => !string.IsNullOrWhiteSpace(_warehouseCode) ? _warehouseCode : (Code ?? string.Empty);
+        set => _warehouseCode = value;
+    }
+    public string? Code { get; set; }
 
-public record UpdateWarehouseRequest(
-    string WarehouseName,
-    string? Address = null,
-    string? Description = null,
-    bool? IsActive = true
-);
+    private string? _warehouseName;
+    public string WarehouseName
+    {
+        get => !string.IsNullOrWhiteSpace(_warehouseName) ? _warehouseName : (Name ?? string.Empty);
+        set => _warehouseName = value;
+    }
+    public string? Name { get; set; }
+
+    public string? Address { get; set; }
+
+    private string? _description;
+    public string? Description
+    {
+        get => !string.IsNullOrWhiteSpace(_description) ? _description : Area;
+        set => _description = value;
+    }
+    public string? Area { get; set; }
+
+    public bool? IsActive { get; set; } = true;
+}
+
+public class UpdateWarehouseRequest
+{
+    private string? _warehouseName;
+    public string WarehouseName
+    {
+        get => !string.IsNullOrWhiteSpace(_warehouseName) ? _warehouseName : (Name ?? string.Empty);
+        set => _warehouseName = value;
+    }
+    public string? Name { get; set; }
+
+    public string? Address { get; set; }
+
+    private string? _description;
+    public string? Description
+    {
+        get => !string.IsNullOrWhiteSpace(_description) ? _description : Area;
+        set => _description = value;
+    }
+    public string? Area { get; set; }
+
+    public bool? IsActive { get; set; } = true;
+}

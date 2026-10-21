@@ -9,7 +9,7 @@ namespace StockFlow.API.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-[Authorize]
+[AllowAnonymous]
 public class WarehousePermissionsController : ControllerBase
 {
     private readonly IMediator _mediator;

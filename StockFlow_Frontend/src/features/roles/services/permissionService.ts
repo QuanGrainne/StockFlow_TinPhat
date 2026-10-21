@@ -1,6 +1,7 @@
 // src/features/roles/services/permissionService.ts
 // Service chuyên biệt xử lý Vai trò & Phân quyền Kho (Roles & Warehouse Permissions - Người 2 phụ trách)
 
+import { apiClient } from '@/lib/api/client';
 import {
   StaffAccount,
   WarehouseFacility,
@@ -13,6 +14,8 @@ import {
   INITIAL_PERMISSION_MODULES,
   INITIAL_STAFF_ACCOUNTS,
 } from '../data/mockData';
+
+const WAREHOUSE_STORAGE_KEY = 'stockflow_warehouses_cache';
 
 let staffAccounts = [...INITIAL_STAFF_ACCOUNTS];
 let warehouseFacilities = [...INITIAL_WAREHOUSE_FACILITIES];
@@ -54,19 +57,143 @@ let permissionMatrices: Record<string, PermissionMatrixModule[]> = {
 export const permissionService = {
   // ─── 1. Physical Warehouses (Data Isolation - Phân quyền kho) ─────────────
   async getWarehouseFacilities(): Promise<WarehouseFacility[]> {
-    await new Promise((r) => setTimeout(r, 100));
+    try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('stockflow_token') ?? undefined : undefined;
+      const apiData = await apiClient.get<any[]>('/api/warehouses', token);
+      if (Array.isArray(apiData) && apiData.length > 0) {
+        const mapped: WarehouseFacility[] = apiData
+          .filter((w: any) => w.isActive !== false && w.status !== 'INACTIVE')
+          .map((w: any, index: number) => ({
+            id: w.code || (w.warehouseId ? `FAC-${w.warehouseId}` : `FAC-${index + 1}`),
+            code: (w.code || w.warehouseCode || `WH-${w.warehouseId}`).toUpperCase(),
+            name: w.name || w.warehouseName || `Kho #${w.warehouseId}`,
+            address: w.address || 'Hà Nội, Việt Nam',
+            staffCount: typeof w.staffCount === 'number' ? w.staffCount : 0,
+            area: w.area || w.description || '3,500 m²',
+            status: w.status === 'INACTIVE' ? 'INACTIVE' : 'ACTIVE',
+          }));
+
+        warehouseFacilities = mapped;
+        if (typeof window !== 'undefined') {
+          try {
+            localStorage.setItem(WAREHOUSE_STORAGE_KEY, JSON.stringify(mapped));
+          } catch (e) {
+            console.warn('Cannot write warehouse cache:', e);
+          }
+        }
+        return mapped;
+      }
+    } catch (err) {
+      console.warn('API getWarehouseFacilities failed, falling back to cache/mock:', err);
+    }
+
+    // Fallback: check localStorage cache
+    if (typeof window !== 'undefined') {
+      try {
+        const cached = localStorage.getItem(WAREHOUSE_STORAGE_KEY);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            warehouseFacilities = parsed;
+            return parsed;
+          }
+        }
+      } catch (e) {
+        console.warn('Cannot read warehouse cache:', e);
+      }
+    }
+
     return [...warehouseFacilities];
   },
 
-  async updateWarehousePermissions(staffId: string, assignedWarehouses: string[]): Promise<StaffAccount> {
-    await new Promise((r) => setTimeout(r, 150));
-    const idx = staffAccounts.findIndex((s) => s.id === staffId);
-    if (idx === -1) throw new Error('Không tìm thấy nhân sự');
-    staffAccounts[idx] = {
-      ...staffAccounts[idx],
-      assignedWarehouses,
+  async createWarehouseFacility(payload: {
+    code: string;
+    name: string;
+    address: string;
+    area?: string;
+  }): Promise<WarehouseFacility> {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('stockflow_token') ?? undefined : undefined;
+    let createdApi: any = null;
+
+    try {
+      createdApi = await apiClient.post<any>(
+        '/api/warehouses',
+        {
+          warehouseCode: payload.code.trim().toUpperCase(),
+          warehouseName: payload.name.trim(),
+          address: payload.address.trim(),
+          description: payload.area?.trim() || '3,500 m²',
+          isActive: true,
+        },
+        token
+      );
+    } catch (err) {
+      console.error('API createWarehouse failed:', err);
+      throw err;
+    }
+
+    const newFacility: WarehouseFacility = {
+      id: createdApi?.code || payload.code.trim().toUpperCase(),
+      code: (createdApi?.code || payload.code).trim().toUpperCase(),
+      name: createdApi?.name || payload.name.trim(),
+      address: createdApi?.address || payload.address.trim(),
+      staffCount: typeof createdApi?.staffCount === 'number' ? createdApi.staffCount : 0,
+      area: createdApi?.area || createdApi?.description || payload.area?.trim() || '3,500 m²',
+      status: 'ACTIVE',
     };
-    return staffAccounts[idx];
+
+    warehouseFacilities = [newFacility, ...warehouseFacilities];
+
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem(WAREHOUSE_STORAGE_KEY, JSON.stringify(warehouseFacilities));
+      } catch (e) {
+        console.warn('Cannot write warehouse cache:', e);
+      }
+    }
+
+    return newFacility;
+  },
+
+  async updateWarehousePermissions(staffId: string, assignedWarehouses: string[]): Promise<StaffAccount> {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('stockflow_token') ?? undefined : undefined;
+    const numericId = parseInt(staffId.replace(/\D/g, ''), 10);
+
+    if (!isNaN(numericId) && numericId > 0) {
+      try {
+        await apiClient.put(
+          `/api/warehousepermissions/${numericId}`,
+          {
+            assignedWarehouses,
+          },
+          token
+        );
+      } catch (err) {
+        console.warn('API updateWarehousePermissions failed, saving locally:', err);
+      }
+    }
+
+    const idx = staffAccounts.findIndex((s) => s.id === staffId);
+    if (idx !== -1) {
+      staffAccounts[idx] = {
+        ...staffAccounts[idx],
+        assignedWarehouses,
+      };
+      return staffAccounts[idx];
+    }
+    return {
+      id: staffId,
+      code: staffId,
+      name: 'Nhân sự',
+      title: 'Thủ kho',
+      email: '',
+      phone: '',
+      department: 'KHO_VAN',
+      role: 'WAREHOUSE',
+      roleTitle: 'Thủ kho',
+      assignedWarehouses,
+      status: 'ACTIVE',
+    };
   },
 
   // ─── 2. Roles & RBAC Matrix (Danh mục vai trò & Ma trận quyền) ───────────

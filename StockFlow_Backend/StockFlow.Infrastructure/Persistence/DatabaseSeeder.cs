@@ -9,6 +9,23 @@ public static class DatabaseSeeder
     {
         var seedTimestamp = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
 
+        // Ensure newly supported product specification columns exist
+        await context.Database.ExecuteSqlRawAsync(@"
+            ALTER TABLE stockflow.mst_products ADD COLUMN IF NOT EXISTS barcode character varying(50);
+            ALTER TABLE stockflow.mst_products ADD COLUMN IF NOT EXISTS brand character varying(100);
+            ALTER TABLE stockflow.mst_products ADD COLUMN IF NOT EXISTS standard_price numeric(18,2) DEFAULT 0;
+            ALTER TABLE stockflow.mst_products ADD COLUMN IF NOT EXISTS min_safe_stock numeric(18,2) DEFAULT 0;
+            ALTER TABLE stockflow.mst_products ADD COLUMN IF NOT EXISTS max_safe_stock numeric(18,2) DEFAULT 999999999;
+            ALTER TABLE stockflow.mst_products ADD COLUMN IF NOT EXISTS weight numeric(18,2);
+            ALTER TABLE stockflow.mst_products ADD COLUMN IF NOT EXISTS dimensions character varying(100);
+            ALTER TABLE stockflow.mst_products ADD COLUMN IF NOT EXISTS location_name character varying(100);
+            ALTER TABLE stockflow.mst_products ADD COLUMN IF NOT EXISTS is_direct_sale boolean DEFAULT true;
+            ALTER TABLE stockflow.mst_products ADD COLUMN IF NOT EXISTS has_reward_points boolean DEFAULT true;
+            ALTER TABLE stockflow.mst_products ADD COLUMN IF NOT EXISTS image_url text;
+            ALTER TABLE stockflow.mst_products ALTER COLUMN image_url TYPE text;
+            ALTER TABLE stockflow.mst_products ADD COLUMN IF NOT EXISTS variants_json text;
+        ");
+
         var roles = new List<SecRole>
         {
             new() { RoleId = 1, RoleName = "Admin", Description = "Administrator - Quản trị hệ thống, tài khoản, phân quyền vai trò và phân quyền kho" },
@@ -114,6 +131,26 @@ public static class DatabaseSeeder
         }
         await context.SaveChangesAsync();
         await context.Database.ExecuteSqlRawAsync("SELECT setval(pg_get_serial_sequence('stockflow.mst_warehouses', 'warehouse_id'), COALESCE(MAX(warehouse_id), 1)) FROM stockflow.mst_warehouses;");
+
+        var whMap = await context.MstWarehouses.Where(w => w.WarehouseCode != null).ToDictionaryAsync(w => w.WarehouseCode!, w => w.WarehouseId);
+        var physicalAccesses = new[]
+        {
+            ("admin", "WH-HN-01"), ("manager01", "WH-HN-01"), ("sales01", "WH-HN-01"), ("whstaff01", "WH-HN-01"),
+            ("admin", "WH-HN-02"), ("manager01", "WH-HN-02"), ("whstaff01", "WH-HN-02"), ("prodstaff01", "WH-HN-02"),
+            ("admin", "WH-HN-03"), ("manager01", "WH-HN-03"),
+            ("admin", "WH-HN-04")
+        };
+        foreach (var (username, whCode) in physicalAccesses)
+        {
+            if (userIds.TryGetValue(username, out var uid) && whMap.TryGetValue(whCode, out var wid))
+            {
+                if (!await context.JncUserWarehouseAccesses.AnyAsync(wa => wa.UserId == uid && wa.WarehouseId == wid))
+                {
+                    await context.JncUserWarehouseAccesses.AddAsync(new JncUserWarehouseAccess { UserId = uid, WarehouseId = wid, AssignedAt = seedTimestamp });
+                }
+            }
+        }
+        await context.SaveChangesAsync();
 
         // Seed Categories
         var categories = new List<MstProductCategory>

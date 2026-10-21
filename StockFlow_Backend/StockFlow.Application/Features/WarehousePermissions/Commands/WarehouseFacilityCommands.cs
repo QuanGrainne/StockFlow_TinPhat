@@ -58,7 +58,7 @@ public class CreateWarehouseCommandHandler : IRequestHandler<CreateWarehouseComm
             Name: warehouse.WarehouseName,
             Address: warehouse.Address ?? "Hà Nội, Việt Nam",
             StaffCount: 0,
-            Area: !string.IsNullOrWhiteSpace(warehouse.Description) && warehouse.Description.Contains("m²") ? warehouse.Description : "3,500 m²",
+            Area: !string.IsNullOrWhiteSpace(warehouse.Description) ? warehouse.Description : "3,500 m²",
             Status: warehouse.IsActive != false ? "ACTIVE" : "INACTIVE",
             Description: warehouse.Description
         );
@@ -109,7 +109,7 @@ public class UpdateWarehouseCommandHandler : IRequestHandler<UpdateWarehouseComm
             Name: warehouse.WarehouseName,
             Address: warehouse.Address ?? "Hà Nội, Việt Nam",
             StaffCount: warehouse.JncUserWarehouseAccesses.Count,
-            Area: !string.IsNullOrWhiteSpace(warehouse.Description) && warehouse.Description.Contains("m²") ? warehouse.Description : "3,500 m²",
+            Area: !string.IsNullOrWhiteSpace(warehouse.Description) ? warehouse.Description : "3,500 m²",
             Status: warehouse.IsActive != false ? "ACTIVE" : "INACTIVE",
             Description: warehouse.Description
         );
@@ -117,3 +117,80 @@ public class UpdateWarehouseCommandHandler : IRequestHandler<UpdateWarehouseComm
         return Result.Success(dto);
     }
 }
+
+public record ToggleWarehouseStatusCommand(int WarehouseId) : IRequest<Result<bool>>;
+
+public class ToggleWarehouseStatusCommandHandler : IRequestHandler<ToggleWarehouseStatusCommand, Result<bool>>
+{
+    private readonly IStockFlowDbContext _context;
+
+    public ToggleWarehouseStatusCommandHandler(IStockFlowDbContext context)
+    {
+        _context = context;
+    }
+
+    public async Task<Result<bool>> Handle(ToggleWarehouseStatusCommand command, CancellationToken cancellationToken)
+    {
+        var warehouse = await _context.MstWarehouses.FirstOrDefaultAsync(w => w.WarehouseId == command.WarehouseId, cancellationToken);
+        if (warehouse == null)
+        {
+            return Result.Failure<bool>("Không tìm thấy kho.");
+        }
+
+        warehouse.IsActive = warehouse.IsActive != true;
+        await _context.SaveChangesAsync(cancellationToken);
+
+        return Result.Success(warehouse.IsActive.Value);
+    }
+}
+
+public record DeleteWarehouseCommand(int WarehouseId) : IRequest<Result<bool>>;
+
+public class DeleteWarehouseCommandHandler : IRequestHandler<DeleteWarehouseCommand, Result<bool>>
+{
+    private readonly IStockFlowDbContext _context;
+
+    public DeleteWarehouseCommandHandler(IStockFlowDbContext context)
+    {
+        _context = context;
+    }
+
+    public async Task<Result<bool>> Handle(DeleteWarehouseCommand command, CancellationToken cancellationToken)
+    {
+        var warehouse = await _context.MstWarehouses
+            .Include(w => w.TrxInventoryBalances)
+            .Include(w => w.JncUserWarehouseAccesses)
+            .FirstOrDefaultAsync(w => w.WarehouseId == command.WarehouseId, cancellationToken);
+
+        if (warehouse == null)
+        {
+            return Result.Failure<bool>("Không tìm thấy kho.");
+        }
+
+        var hasInventory = warehouse.TrxInventoryBalances.Any(b => (b.Quantity ?? 0) > 0);
+        if (hasInventory)
+        {
+            // Soft-deactivate if warehouse has inventory stock
+            warehouse.IsActive = false;
+            await _context.SaveChangesAsync(cancellationToken);
+            return Result.Success(true);
+        }
+
+        try
+        {
+            // Remove user accesses first
+            _context.JncUserWarehouseAccesses.RemoveRange(warehouse.JncUserWarehouseAccesses);
+            _context.MstWarehouses.Remove(warehouse);
+            await _context.SaveChangesAsync(cancellationToken);
+            return Result.Success(true);
+        }
+        catch
+        {
+            // Fallback soft deactivate on foreign key constraint
+            warehouse.IsActive = false;
+            await _context.SaveChangesAsync(cancellationToken);
+            return Result.Success(true);
+        }
+    }
+}
+
