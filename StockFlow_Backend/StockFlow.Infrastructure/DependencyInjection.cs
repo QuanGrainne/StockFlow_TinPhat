@@ -18,6 +18,7 @@ public static class DependencyInjection
     {
         // PostgreSQL via Npgsql
         services.AddDbContext<StockFlowDbContext>(options =>
+        {
             options.UseNpgsql(
                 configuration.GetConnectionString("StockFlowDb"),
                 npgsql =>
@@ -25,8 +26,9 @@ public static class DependencyInjection
                     npgsql.MigrationsAssembly(typeof(StockFlowDbContext).Assembly.FullName);
                     npgsql.MigrationsHistoryTable("__EFMigrationsHistory", "stockflow");
                 }
-            )
-        );
+            );
+            options.ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning));
+        });
 
         // DbContext interface mapping
         services.AddScoped<StockFlow.Application.Common.Interfaces.IStockFlowDbContext>(sp =>

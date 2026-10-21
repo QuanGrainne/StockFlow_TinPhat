@@ -10,6 +10,11 @@ public interface IStockFlowDbContext
     DbSet<JncUserRole> JncUserRoles { get; }
     DbSet<MstWarehouse> MstWarehouses { get; }
     DbSet<JncUserWarehouseAccess> JncUserWarehouseAccesses { get; }
+    DbSet<MstProduct> MstProducts { get; }
+    DbSet<MstProductCategory> MstProductCategories { get; }
+    DbSet<MstUnit> MstUnits { get; }
+    DbSet<TrxInventoryBalance> TrxInventoryBalances { get; }
+    DbSet<TrxInventoryTransaction> TrxInventoryTransactions { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }
