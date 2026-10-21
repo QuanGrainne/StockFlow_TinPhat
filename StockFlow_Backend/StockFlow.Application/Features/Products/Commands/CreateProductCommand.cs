@@ -89,6 +89,20 @@ public class CreateProductCommandHandler : IRequestHandler<CreateProductCommand,
         }
 
         // 3. Create Product
+        var minSafeStock = req.MinSafeStock ?? req.ReorderPoint ?? 0m;
+        var standardPrice = req.StandardPrice ?? (req.CostPrice.HasValue && req.CostPrice.Value > 0 ? Math.Round(req.CostPrice.Value * 1.35m, 0) : 0m);
+
+        string? variantsJson = req.VariantsJson;
+        if (string.IsNullOrEmpty(variantsJson) && (req.Variants != null || req.Units != null || req.Attributes != null))
+        {
+            variantsJson = System.Text.Json.JsonSerializer.Serialize(new
+            {
+                units = req.Units,
+                attributes = req.Attributes,
+                variants = req.Variants
+            });
+        }
+
         var product = new MstProduct
         {
             ProductCode = codeNormalized,
@@ -97,8 +111,20 @@ public class CreateProductCommandHandler : IRequestHandler<CreateProductCommand,
             BaseUnitId = baseUnitId,
             ProductType = string.IsNullOrWhiteSpace(req.Type) ? "FINISHED" : req.Type.Trim().ToUpper(),
             Description = req.Description?.Trim(),
-            ReorderPoint = req.ReorderPoint ?? 10m,
+            ReorderPoint = minSafeStock,
+            MinSafeStock = minSafeStock,
+            MaxSafeStock = req.MaxSafeStock ?? 999999999m,
             MovingAverageCost = req.CostPrice ?? 0m,
+            StandardPrice = standardPrice,
+            Barcode = req.Barcode?.Trim(),
+            Brand = req.Brand?.Trim(),
+            Weight = req.Weight,
+            Dimensions = req.Dimensions?.Trim(),
+            LocationName = req.LocationName?.Trim(),
+            IsDirectSale = req.IsDirectSale ?? true,
+            HasRewardPoints = req.HasRewardPoints ?? true,
+            ImageUrl = req.ImageUrl?.Trim(),
+            VariantsJson = variantsJson,
             IsActive = true,
             CreatedAt = DateTime.UtcNow
         };
@@ -137,7 +163,6 @@ public class CreateProductCommandHandler : IRequestHandler<CreateProductCommand,
             .FirstAsync(p => p.ProductId == product.ProductId, cancellationToken);
 
         var costPrice = createdProduct.MovingAverageCost ?? 0;
-        var standardPrice = req.StandardPrice ?? (costPrice > 0 ? Math.Round(costPrice * 1.35m, 0) : 0);
 
         var dto = new ProductDto(
             Id: createdProduct.ProductId.ToString(),
@@ -149,11 +174,22 @@ public class CreateProductCommandHandler : IRequestHandler<CreateProductCommand,
             CategoryName: createdProduct.Category?.CategoryName ?? "Chung",
             BaseUnitId: createdProduct.BaseUnitId,
             Uom: createdProduct.BaseUnit?.UnitName ?? createdProduct.BaseUnit?.Abbreviation ?? "Cái",
-            StandardPrice: standardPrice,
+            StandardPrice: createdProduct.StandardPrice ?? standardPrice,
             CostPrice: costPrice,
             ReorderPoint: createdProduct.ReorderPoint ?? 0,
             StockQuantity: initialStockQty,
             Status: "ACTIVE",
+            Barcode: createdProduct.Barcode,
+            Brand: createdProduct.Brand,
+            MinSafeStock: createdProduct.MinSafeStock,
+            MaxSafeStock: createdProduct.MaxSafeStock,
+            Weight: createdProduct.Weight,
+            Dimensions: createdProduct.Dimensions,
+            LocationName: createdProduct.LocationName,
+            IsDirectSale: createdProduct.IsDirectSale,
+            HasRewardPoints: createdProduct.HasRewardPoints,
+            ImageUrl: createdProduct.ImageUrl,
+            VariantsJson: createdProduct.VariantsJson,
             Description: createdProduct.Description,
             CreatedAt: createdProduct.CreatedAt
         );

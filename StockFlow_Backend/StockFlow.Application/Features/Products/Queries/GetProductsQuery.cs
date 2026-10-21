@@ -76,8 +76,7 @@ public class GetProductsQueryHandler : IRequestHandler<GetProductsQuery, Result<
             }
 
             var costPrice = p.MovingAverageCost ?? 0;
-            // If standard price is not a separate column, compute typical markup 30-40% or equal
-            var standardPrice = costPrice > 0 ? Math.Round(costPrice * 1.35m, 0) : 0;
+            var standardPrice = p.StandardPrice ?? (costPrice > 0 ? Math.Round(costPrice * 1.35m, 0) : 0);
 
             return new ProductDto(
                 Id: p.ProductId.ToString(),
@@ -94,6 +93,17 @@ public class GetProductsQueryHandler : IRequestHandler<GetProductsQuery, Result<
                 ReorderPoint: p.ReorderPoint ?? 0,
                 StockQuantity: stockQty,
                 Status: p.IsActive != false ? "ACTIVE" : "INACTIVE",
+                Barcode: p.Barcode,
+                Brand: p.Brand,
+                MinSafeStock: p.MinSafeStock,
+                MaxSafeStock: p.MaxSafeStock,
+                Weight: p.Weight,
+                Dimensions: p.Dimensions,
+                LocationName: p.LocationName,
+                IsDirectSale: p.IsDirectSale,
+                HasRewardPoints: p.HasRewardPoints,
+                ImageUrl: p.ImageUrl,
+                VariantsJson: p.VariantsJson,
                 Description: p.Description,
                 CreatedAt: p.CreatedAt
             );

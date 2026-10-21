@@ -94,9 +94,79 @@ public class UpdateProductCommandHandler : IRequestHandler<UpdateProductCommand,
             product.MovingAverageCost = req.CostPrice.Value;
         }
 
-        if (req.ReorderPoint.HasValue)
+        if (req.StandardPrice.HasValue)
+        {
+            product.StandardPrice = req.StandardPrice.Value;
+        }
+
+        if (req.MinSafeStock.HasValue)
+        {
+            product.MinSafeStock = req.MinSafeStock.Value;
+            product.ReorderPoint = req.MinSafeStock.Value;
+        }
+        else if (req.ReorderPoint.HasValue)
         {
             product.ReorderPoint = req.ReorderPoint.Value;
+            product.MinSafeStock = req.ReorderPoint.Value;
+        }
+
+        if (req.MaxSafeStock.HasValue)
+        {
+            product.MaxSafeStock = req.MaxSafeStock.Value;
+        }
+
+        if (req.Barcode != null)
+        {
+            product.Barcode = req.Barcode.Trim();
+        }
+
+        if (req.Brand != null)
+        {
+            product.Brand = req.Brand.Trim();
+        }
+
+        if (req.Weight.HasValue)
+        {
+            product.Weight = req.Weight.Value;
+        }
+
+        if (req.Dimensions != null)
+        {
+            product.Dimensions = req.Dimensions.Trim();
+        }
+
+        if (req.LocationName != null)
+        {
+            product.LocationName = req.LocationName.Trim();
+        }
+
+        if (req.IsDirectSale.HasValue)
+        {
+            product.IsDirectSale = req.IsDirectSale.Value;
+        }
+
+        if (req.HasRewardPoints.HasValue)
+        {
+            product.HasRewardPoints = req.HasRewardPoints.Value;
+        }
+
+        if (req.ImageUrl != null)
+        {
+            product.ImageUrl = req.ImageUrl.Trim();
+        }
+
+        if (!string.IsNullOrEmpty(req.VariantsJson))
+        {
+            product.VariantsJson = req.VariantsJson;
+        }
+        else if (req.Variants != null || req.Units != null || req.Attributes != null)
+        {
+            product.VariantsJson = System.Text.Json.JsonSerializer.Serialize(new
+            {
+                units = req.Units,
+                attributes = req.Attributes,
+                variants = req.Variants
+            });
         }
 
         if (req.Description != null)
@@ -119,7 +189,7 @@ public class UpdateProductCommandHandler : IRequestHandler<UpdateProductCommand,
             .FirstAsync(p => p.ProductId == product.ProductId, cancellationToken);
 
         var costPrice = updatedProduct.MovingAverageCost ?? 0;
-        var standardPrice = req.StandardPrice ?? (costPrice > 0 ? Math.Round(costPrice * 1.35m, 0) : 0);
+        var standardPrice = updatedProduct.StandardPrice ?? (costPrice > 0 ? Math.Round(costPrice * 1.35m, 0) : 0);
         var totalStock = updatedProduct.TrxInventoryBalances.Sum(b => b.Quantity ?? 0);
 
         var dto = new ProductDto(
@@ -137,6 +207,17 @@ public class UpdateProductCommandHandler : IRequestHandler<UpdateProductCommand,
             ReorderPoint: updatedProduct.ReorderPoint ?? 0,
             StockQuantity: totalStock,
             Status: updatedProduct.IsActive != false ? "ACTIVE" : "INACTIVE",
+            Barcode: updatedProduct.Barcode,
+            Brand: updatedProduct.Brand,
+            MinSafeStock: updatedProduct.MinSafeStock,
+            MaxSafeStock: updatedProduct.MaxSafeStock,
+            Weight: updatedProduct.Weight,
+            Dimensions: updatedProduct.Dimensions,
+            LocationName: updatedProduct.LocationName,
+            IsDirectSale: updatedProduct.IsDirectSale,
+            HasRewardPoints: updatedProduct.HasRewardPoints,
+            ImageUrl: updatedProduct.ImageUrl,
+            VariantsJson: updatedProduct.VariantsJson,
             Description: updatedProduct.Description,
             CreatedAt: updatedProduct.CreatedAt
         );

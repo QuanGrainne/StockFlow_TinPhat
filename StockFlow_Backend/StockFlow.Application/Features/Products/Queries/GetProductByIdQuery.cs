@@ -33,7 +33,7 @@ public class GetProductByIdQueryHandler : IRequestHandler<GetProductByIdQuery, R
         }
 
         var costPrice = product.MovingAverageCost ?? 0;
-        var standardPrice = costPrice > 0 ? Math.Round(costPrice * 1.35m, 0) : 0;
+        var standardPrice = product.StandardPrice ?? (costPrice > 0 ? Math.Round(costPrice * 1.35m, 0) : 0);
         var totalStock = product.TrxInventoryBalances.Sum(b => b.Quantity ?? 0);
 
         var warehouses = product.TrxInventoryBalances
@@ -50,6 +50,35 @@ public class GetProductByIdQueryHandler : IRequestHandler<GetProductByIdQuery, R
                 );
             }).ToList();
 
+        List<ProductConversionUnitDto>? units = null;
+        List<ProductAttributeDto>? attributes = null;
+        List<ProductVariantItemDto>? variants = null;
+
+        if (!string.IsNullOrWhiteSpace(product.VariantsJson))
+        {
+            try
+            {
+                using var doc = System.Text.Json.JsonDocument.Parse(product.VariantsJson);
+                var root = doc.RootElement;
+                if (root.TryGetProperty("units", out var uEl))
+                {
+                    units = System.Text.Json.JsonSerializer.Deserialize<List<ProductConversionUnitDto>>(uEl.GetRawText());
+                }
+                if (root.TryGetProperty("attributes", out var aEl))
+                {
+                    attributes = System.Text.Json.JsonSerializer.Deserialize<List<ProductAttributeDto>>(aEl.GetRawText());
+                }
+                if (root.TryGetProperty("variants", out var vEl))
+                {
+                    variants = System.Text.Json.JsonSerializer.Deserialize<List<ProductVariantItemDto>>(vEl.GetRawText());
+                }
+            }
+            catch
+            {
+                // Ignore parse errors on malformed JSON
+            }
+        }
+
         var detail = new ProductDetailDto(
             Id: product.ProductId.ToString(),
             ProductId: product.ProductId,
@@ -65,9 +94,23 @@ public class GetProductByIdQueryHandler : IRequestHandler<GetProductByIdQuery, R
             ReorderPoint: product.ReorderPoint ?? 0,
             TotalStockQuantity: totalStock,
             Status: product.IsActive != false ? "ACTIVE" : "INACTIVE",
+            Barcode: product.Barcode,
+            Brand: product.Brand,
+            MinSafeStock: product.MinSafeStock,
+            MaxSafeStock: product.MaxSafeStock,
+            Weight: product.Weight,
+            Dimensions: product.Dimensions,
+            LocationName: product.LocationName,
+            IsDirectSale: product.IsDirectSale,
+            HasRewardPoints: product.HasRewardPoints,
+            ImageUrl: product.ImageUrl,
+            VariantsJson: product.VariantsJson,
             Description: product.Description,
             CreatedAt: product.CreatedAt,
-            Warehouses: warehouses
+            Warehouses: warehouses,
+            Units: units,
+            Attributes: attributes,
+            Variants: variants
         );
 
         return Result.Success(detail);
