@@ -132,7 +132,7 @@ export const PermissionMatrixScreen: React.FC<PermissionMatrixScreenProps> = ({
     if (m.approve) count++;
     return acc + count;
   }, 0);
-  const maxPermissions = 40; // 8 modules * 5 actions
+  const maxPermissions = (modules.length || 9) * 5; // Tính động theo số phân hệ (9 * 5 = 45)
   const percentGranted = Math.round((totalPermissions / maxPermissions) * 100);
 
   return (
@@ -155,7 +155,7 @@ export const PermissionMatrixScreen: React.FC<PermissionMatrixScreenProps> = ({
             Cấu hình ma trận phân quyền
           </h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Thiết lập chi tiết quyền Xem, Thêm, Sửa, Xóa, Duyệt cho 8 phân hệ nghiệp vụ
+            Thiết lập chi tiết quyền Xem, Thêm, Sửa, Xóa, Duyệt cho {modules.length || 9} phân hệ nghiệp vụ
           </p>
         </div>
 
