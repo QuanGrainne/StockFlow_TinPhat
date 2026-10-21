@@ -1,5 +1,5 @@
 // src/features/roles/components/admin/screens/RoleCatalogScreen.tsx
-// Màn hình 3.2.1.6: Danh mục vai trò phân quyền (RBAC Roles) theo giao diện AI Studio Ảnh 3
+// Danh mục vai trò phân quyền (RBAC Roles) với đầy đủ tính năng CRUD
 
 import React, { useState, useEffect } from 'react';
 import {
@@ -9,7 +9,9 @@ import {
   Users,
   CheckCircle2,
   X,
-  Sparkles,
+  Pencil,
+  Trash2,
+  AlertTriangle,
 } from 'lucide-react';
 import { RoleDefinition } from '../../../types';
 import { adminService } from '../../../services/adminService';
@@ -27,7 +29,17 @@ export const RoleCatalogScreen: React.FC<RoleCatalogScreenProps> = ({ onNavigate
   const [newRoleName, setNewRoleName] = useState('');
   const [newRoleCode, setNewRoleCode] = useState('');
   const [newRoleDesc, setNewRoleDesc] = useState('');
-  const [newRolePriority, setNewRolePriority] = useState<number>(6);
+
+  // Modal Sửa Vai trò
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editingRole, setEditingRole] = useState<RoleDefinition | null>(null);
+  const [editRoleName, setEditRoleName] = useState('');
+  const [editRoleDesc, setEditRoleDesc] = useState('');
+
+  // Modal Xác nhận Xóa Vai trò
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [deletingRole, setDeletingRole] = useState<RoleDefinition | null>(null);
+
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const loadData = async () => {
@@ -46,32 +58,89 @@ export const RoleCatalogScreen: React.FC<RoleCatalogScreenProps> = ({ onNavigate
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 2500);
+    setTimeout(() => setToastMessage(null), 3000);
   };
 
-  const handleCreateRole = (e: React.FormEvent) => {
+  // ─── 1. CREATE ROLE ────────────────────────────────────────────────────────
+  const handleCreateRole = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newRoleName || !newRoleCode) {
+    if (!newRoleName.trim() || !newRoleCode.trim()) {
       alert('Vui lòng nhập tên và mã vai trò');
       return;
     }
 
-    const createdRole: RoleDefinition = {
-      id: `ROLE-${Date.now()}`,
-      name: newRoleName,
-      code: newRoleCode.toUpperCase().startsWith('ROLE_') ? newRoleCode.toUpperCase() : `ROLE_${newRoleCode.toUpperCase()}`,
-      rank: `Rank #${roles.length + 1}`,
-      isSystem: false,
-      description: newRoleDesc || 'Vai trò phân quyền tùy biến mở rộng theo yêu cầu doanh nghiệp.',
-      staffCount: 0,
-    };
+    const createdRole = await adminService.createRole({
+      name: newRoleName.trim(),
+      code: newRoleCode.trim(),
+      description: newRoleDesc.trim(),
+    });
 
-    setRoles([...roles, createdRole]);
+    setRoles((prev) => [...prev, createdRole]);
     setCreateModalOpen(false);
     setNewRoleName('');
     setNewRoleCode('');
     setNewRoleDesc('');
     showToast(`Đã tạo vai trò mới "${createdRole.name}" thành công!`);
+  };
+
+  // ─── 2. EDIT ROLE ──────────────────────────────────────────────────────────
+  const openEditModal = (role: RoleDefinition) => {
+    setEditingRole(role);
+    setEditRoleName(role.name);
+    setEditRoleDesc(role.description || '');
+    setEditModalOpen(true);
+  };
+
+  const handleUpdateRole = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingRole || !editRoleName.trim()) {
+      alert('Vui lòng nhập tên vai trò');
+      return;
+    }
+
+    const updated = await adminService.updateRole(editingRole.id, {
+      name: editRoleName.trim(),
+      description: editRoleDesc.trim(),
+    });
+
+    if (updated) {
+      setRoles((prev) =>
+        prev.map((r) => (r.id === editingRole.id ? { ...r, name: updated.name, description: updated.description } : r))
+      );
+      showToast(`Đã cập nhật thông tin vai trò "${updated.name}" thành công!`);
+    } else {
+      // Cập nhật local nếu API không trả về
+      setRoles((prev) =>
+        prev.map((r) =>
+          r.id === editingRole.id ? { ...r, name: editRoleName.trim(), description: editRoleDesc.trim() } : r
+        )
+      );
+      showToast(`Đã cập nhật thông tin vai trò "${editRoleName.trim()}"!`);
+    }
+
+    setEditModalOpen(false);
+    setEditingRole(null);
+  };
+
+  // ─── 3. DELETE ROLE ────────────────────────────────────────────────────────
+  const openDeleteModal = (role: RoleDefinition) => {
+    setDeletingRole(role);
+    setDeleteModalOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deletingRole) return;
+    try {
+      await adminService.deleteRole(deletingRole.id);
+      setRoles((prev) => prev.filter((r) => r.id !== deletingRole.id && r.code !== deletingRole.code));
+      showToast(`Đã xóa vai trò "${deletingRole.name}" thành công!`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : `Không thể xóa vai trò "${deletingRole.name}".`;
+      alert(`Không thể xóa: ${msg}`);
+    } finally {
+      setDeleteModalOpen(false);
+      setDeletingRole(null);
+    }
   };
 
   return (
@@ -87,15 +156,9 @@ export const RoleCatalogScreen: React.FC<RoleCatalogScreenProps> = ({ onNavigate
       {/* Screen Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <div className="text-[11px] font-bold text-blue-600 uppercase tracking-wider mb-1">
-            MÀN HÌNH 3.2.1.6 • Danh mục
-          </div>
           <h1 className="text-xl font-bold text-slate-900 tracking-tight">
-            Danh mục vai trò phân quyền (RBAC Roles)
+            Danh mục vai trò phân quyền
           </h1>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Quản lý các cấp bậc phân quyền và ma trận đặc quyền theo tiêu chuẩn hệ thống OIMS
-          </p>
         </div>
 
         <button
@@ -121,15 +184,31 @@ export const RoleCatalogScreen: React.FC<RoleCatalogScreenProps> = ({ onNavigate
                 <div className="w-10 h-10 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
                   <Shield size={20} />
                 </div>
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-2">
                   {role.isSystem && (
                     <span className="text-[10px] font-semibold px-2 py-0.5 rounded-[4px] bg-slate-100 text-slate-600">
                       Hệ thống
                     </span>
                   )}
-                  <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-[4px] bg-slate-100 text-slate-700">
-                    {role.rank}
-                  </span>
+                  {/* Action buttons on card */}
+                  <button
+                    type="button"
+                    title="Chỉnh sửa vai trò"
+                    onClick={() => openEditModal(role)}
+                    className="p-1 rounded text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition cursor-pointer"
+                  >
+                    <Pencil size={14} />
+                  </button>
+                  {!role.isSystem && (
+                    <button
+                      type="button"
+                      title="Xóa vai trò"
+                      onClick={() => openDeleteModal(role)}
+                      className="p-1 rounded text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -167,7 +246,7 @@ export const RoleCatalogScreen: React.FC<RoleCatalogScreenProps> = ({ onNavigate
         ))}
       </div>
 
-      {/* MODAL: Thêm vai trò mới (Khớp 100% Ảnh 1 bên trái - MÀN HÌNH 3.2.1.6) */}
+      {/* MODAL: Thêm vai trò mới (Đã bỏ Priority) */}
       {createModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4 animate-in fade-in">
           <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-lg p-6 relative">
@@ -179,16 +258,13 @@ export const RoleCatalogScreen: React.FC<RoleCatalogScreenProps> = ({ onNavigate
               <X size={18} />
             </button>
 
-            {/* Header: MÀN HÌNH 3.2.1.6 • Tạo vai trò */}
             <div className="flex items-center gap-3 mb-5">
               <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 border border-blue-100 flex items-center justify-center shrink-0">
                 <Shield size={18} />
               </div>
               <div>
-                <div className="text-[11px] font-bold text-blue-600 uppercase tracking-wider">
-                  MÀN HÌNH 3.2.1.6 <span className="text-slate-400 font-normal">• Tạo vai trò</span>
-                </div>
-                <h3 className="text-base font-bold text-slate-900 mt-0.5">Thêm vai trò mới</h3>
+                <h3 className="text-base font-bold text-slate-900">Thêm vai trò mới</h3>
+                <p className="text-xs text-slate-500 mt-0.5">Tạo chức danh vai trò tùy biến để phân quyền</p>
               </div>
             </div>
 
@@ -226,24 +302,6 @@ export const RoleCatalogScreen: React.FC<RoleCatalogScreenProps> = ({ onNavigate
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Mức độ ưu tiên (Priority)
-                </label>
-                <input
-                  type="number"
-                  min={1}
-                  max={99}
-                  value={newRolePriority}
-                  onChange={(e) => setNewRolePriority(Number(e.target.value))}
-                  placeholder="6"
-                  className="w-full h-10 px-3.5 rounded-xl border border-slate-200 text-xs font-mono focus:outline-none focus:border-blue-500 shadow-xs"
-                />
-                <p className="text-[11px] text-slate-400 mt-1">
-                  Thứ bậc ưu tiên trong phân cấp quản lý hệ thống
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
                   Mô tả phạm vi vai trò
                 </label>
                 <textarea
@@ -271,6 +329,141 @@ export const RoleCatalogScreen: React.FC<RoleCatalogScreenProps> = ({ onNavigate
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: Chỉnh sửa vai trò */}
+      {editModalOpen && editingRole && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4 animate-in fade-in">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-lg p-6 relative">
+            <button
+              type="button"
+              onClick={() => {
+                setEditModalOpen(false);
+                setEditingRole(null);
+              }}
+              className="absolute top-5 right-5 text-slate-400 hover:text-slate-600 transition cursor-pointer"
+            >
+              <X size={18} />
+            </button>
+
+            <div className="flex items-center gap-3 mb-5">
+              <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 border border-amber-100 flex items-center justify-center shrink-0">
+                <Pencil size={18} />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900">Chỉnh sửa vai trò</h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Mã vai trò: <span className="font-mono font-bold text-blue-600">{editingRole.code}</span>
+                </p>
+              </div>
+            </div>
+
+            <form onSubmit={handleUpdateRole} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Tên vai trò <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  disabled={editingRole.isSystem}
+                  value={editRoleName}
+                  onChange={(e) => setEditRoleName(e.target.value)}
+                  className={`w-full h-10 px-3.5 rounded-xl border border-slate-200 text-xs focus:outline-none focus:border-blue-500 shadow-xs ${
+                    editingRole.isSystem ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : ''
+                  }`}
+                />
+                {editingRole.isSystem && (
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    Vai trò hệ thống mặc định không thể thay đổi tên.
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Mô tả phạm vi vai trò
+                </label>
+                <textarea
+                  rows={3}
+                  value={editRoleDesc}
+                  onChange={(e) => setEditRoleDesc(e.target.value)}
+                  placeholder="Mô tả trách nhiệm và quyền hạn công việc của vai trò..."
+                  className="w-full p-3 rounded-xl border border-slate-200 text-xs focus:outline-none focus:border-blue-500 shadow-xs resize-none"
+                />
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditModalOpen(false);
+                    setEditingRole(null);
+                  }}
+                  className="px-5 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition cursor-pointer"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2.5 rounded-xl bg-[#1E56A0] hover:bg-[#184580] text-xs font-bold text-white transition shadow-xs cursor-pointer"
+                >
+                  Lưu thay đổi
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: Xác nhận xóa vai trò */}
+      {deleteModalOpen && deletingRole && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4 animate-in fade-in">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-md p-6 relative">
+            <div className="flex items-center gap-3.5 mb-4">
+              <div className="w-10 h-10 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
+                <AlertTriangle size={20} />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900">Xác nhận xóa vai trò</h3>
+                <p className="text-xs text-slate-500 mt-0.5">Hành động này không thể hoàn tác</p>
+              </div>
+            </div>
+
+            <div className="bg-slate-50 rounded-xl p-3.5 mb-5 border border-slate-200/80">
+              <div className="text-xs text-slate-700">
+                Bạn có chắc chắn muốn xóa vai trò{' '}
+                <span className="font-bold text-slate-900 font-mono">"{deletingRole.name}"</span> (
+                <span className="text-blue-600 font-mono">{deletingRole.code}</span>)?
+              </div>
+              {deletingRole.staffCount > 0 && (
+                <div className="mt-2 text-xs text-rose-600 font-medium">
+                  ⚠️ Lưu ý: Vai trò này hiện có {deletingRole.staffCount} nhân sự đang được phân công.
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={() => {
+                  setDeleteModalOpen(false);
+                  setDeletingRole(null);
+                }}
+                className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition cursor-pointer"
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDelete}
+                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-xs font-bold text-white transition shadow-xs cursor-pointer"
+              >
+                Xóa vai trò
+              </button>
+            </div>
           </div>
         </div>
       )}

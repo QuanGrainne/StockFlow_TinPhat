@@ -11,7 +11,8 @@ public record LoginResponse(
     string FullName,
     string Email,
     List<string> Roles,
-    List<WarehouseSummaryDto> Warehouses);
+    List<WarehouseSummaryDto> Warehouses,
+    List<string>? Permissions = null);
 
 public record CurrentUserResponse(
     int UserId,
@@ -21,5 +22,6 @@ public record CurrentUserResponse(
     string? Phone,
     bool IsActive,
     List<string> Roles,
-    List<WarehouseSummaryDto> Warehouses);
+    List<WarehouseSummaryDto> Warehouses,
+    List<string>? Permissions = null);
 

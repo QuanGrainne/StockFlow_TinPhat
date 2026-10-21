@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using StockFlow.Application.Common;
 using StockFlow.Application.Common.Interfaces;
 using StockFlow.Application.Features.Auth.DTOs;
+using StockFlow.Application.Features.Roles.Common;
 
 namespace StockFlow.Application.Features.Auth.Commands;
 
@@ -39,12 +40,31 @@ public class LoginCommandHandler : IRequestHandler<LoginCommand, Result<LoginRes
 
     public async Task<Result<LoginResponse>> Handle(LoginCommand request, CancellationToken cancellationToken)
     {
+        var input = request.Username.Trim();
         var user = await _context.SecUsers
             .Include(u => u.JncUserRoles)
                 .ThenInclude(ur => ur.Role)
             .Include(u => u.JncUserWarehouseAccesses)
                 .ThenInclude(wa => wa.Warehouse)
-            .FirstOrDefaultAsync(u => u.Username == request.Username, cancellationToken);
+            .FirstOrDefaultAsync(u => 
+                (u.Username != null && u.Username.ToLower() == input.ToLower()) || 
+                (u.Email != null && u.Email.ToLower() == input.ToLower()), 
+                cancellationToken);
+
+        // Hỗ trợ đăng nhập bằng Mã nhân viên dạng NV-NV001 hoặc số ID
+        if (user == null && input.StartsWith("NV-NV", StringComparison.OrdinalIgnoreCase))
+        {
+            var idPart = input.Substring(5).TrimStart('0');
+            if (int.TryParse(idPart, out var parsedId))
+            {
+                user = await _context.SecUsers
+                    .Include(u => u.JncUserRoles)
+                        .ThenInclude(ur => ur.Role)
+                    .Include(u => u.JncUserWarehouseAccesses)
+                        .ThenInclude(wa => wa.Warehouse)
+                    .FirstOrDefaultAsync(u => u.UserId == parsedId, cancellationToken);
+            }
+        }
 
         if (user == null || string.IsNullOrEmpty(user.PasswordHash) || !_passwordHasher.Verify(request.Password, user.PasswordHash))
         {
@@ -78,6 +98,25 @@ public class LoginCommandHandler : IRequestHandler<LoginCommand, Result<LoginRes
             roles,
             warehouseIds);
 
+        // Load active permissions for user roles
+        var roleIds = user.JncUserRoles.Select(ur => ur.RoleId).ToList();
+        var permissions = await _context.SecRoles
+            .Where(r => roleIds.Contains(r.RoleId))
+            .SelectMany(r => r.Permissions)
+            .Where(p => !string.IsNullOrEmpty(p.PermissionCode))
+            .Select(p => p.PermissionCode!.ToUpperInvariant())
+            .Distinct()
+            .ToListAsync(cancellationToken);
+
+        if (!permissions.Any())
+        {
+            foreach (var r in roles)
+            {
+                permissions.AddRange(PermissionConstants.GetDefaultPermissionCodes(r));
+            }
+            permissions = permissions.Distinct().ToList();
+        }
+
         var response = new LoginResponse(
             token,
             user.UserId,
@@ -85,7 +124,8 @@ public class LoginCommandHandler : IRequestHandler<LoginCommand, Result<LoginRes
             user.FullName ?? "",
             user.Email ?? "",
             roles,
-            warehouses);
+            warehouses,
+            permissions);
 
         return Result.Success(response);
     }

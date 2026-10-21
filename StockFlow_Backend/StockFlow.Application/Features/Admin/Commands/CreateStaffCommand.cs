@@ -14,12 +14,18 @@ public class CreateStaffCommandValidator : AbstractValidator<CreateStaffCommand>
 {
     public CreateStaffCommandValidator()
     {
+        RuleFor(x => x.Request.Username)
+            .NotEmpty().WithMessage("Tên đăng nhập không được để trống.");
+
         RuleFor(x => x.Request.Name)
             .NotEmpty().WithMessage("Họ và tên nhân viên không được để trống.");
 
+        RuleFor(x => x.Request.Phone)
+            .NotEmpty().WithMessage("Số điện thoại không được để trống.");
+
         RuleFor(x => x.Request.Email)
-            .NotEmpty().WithMessage("Email không được để trống.")
-            .EmailAddress().WithMessage("Email không đúng định dạng.");
+            .EmailAddress().WithMessage("Email không đúng định dạng.")
+            .When(x => !string.IsNullOrWhiteSpace(x.Request.Email));
 
         RuleFor(x => x.Request.Role)
             .NotEmpty().WithMessage("Vai trò không được để trống.");
@@ -41,12 +47,28 @@ public class CreateStaffCommandHandler : IRequestHandler<CreateStaffCommand, Res
     {
         var req = command.Request;
 
-        // 1. Tạo username từ Email (hoặc code)
-        var username = req.Email.Split('@')[0].ToLower().Trim();
-        if (await _context.SecUsers.AnyAsync(u => u.Username == username || u.Email == req.Email, cancellationToken))
+        // 1. Tên đăng nhập: Bắt buộc từ req.Username
+        var username = req.Username?.Trim().ToLower();
+        if (string.IsNullOrWhiteSpace(username))
         {
-            // Nếu username trùng thì nối thêm đuôi ngẫu nhiên
-            username = $"{username}_{Random.Shared.Next(100, 999)}";
+            return Result.Failure<StaffDto>("Tên đăng nhập không được để trống.");
+        }
+
+        var existingUser = await _context.SecUsers.FirstOrDefaultAsync(u => 
+            u.Username == username || 
+            (!string.IsNullOrWhiteSpace(req.Email) && u.Email == req.Email.Trim()), 
+            cancellationToken);
+
+        if (existingUser != null)
+        {
+            if (existingUser.Username == username)
+            {
+                return Result.Failure<StaffDto>($"Tên đăng nhập '{username}' đã tồn tại trong hệ thống. Vui lòng chọn tên đăng nhập khác.");
+            }
+            if (!string.IsNullOrWhiteSpace(req.Email) && existingUser.Email == req.Email.Trim())
+            {
+                return Result.Failure<StaffDto>($"Email '{req.Email}' đã được sử dụng cho một tài khoản khác.");
+            }
         }
 
         // 2. Xác định vai trò
@@ -69,8 +91,9 @@ public class CreateStaffCommandHandler : IRequestHandler<CreateStaffCommand, Res
             return Result.Failure<StaffDto>($"Không tìm thấy vai trò '{req.Role}' trong hệ thống.");
         }
 
-        // 3. Mật khẩu mặc định: StockFlow@123
-        var defaultPasswordHash = _passwordHasher.Hash("StockFlow@123");
+        // 3. Mật khẩu khởi tạo (ưu tiên mật khẩu người dùng nhập trong form, mặc định TinPhat@2026)
+        var passwordToHash = !string.IsNullOrWhiteSpace(req.Password) ? req.Password.Trim() : "TinPhat@2026";
+        var defaultPasswordHash = _passwordHasher.Hash(passwordToHash);
 
         var now = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
 
@@ -78,8 +101,9 @@ public class CreateStaffCommandHandler : IRequestHandler<CreateStaffCommand, Res
         {
             Username = username,
             FullName = req.Name.Trim(),
-            Email = req.Email.Trim(),
+            Email = req.Email?.Trim() ?? "",
             Phone = req.Phone?.Trim() ?? "",
+            Avatar = string.IsNullOrWhiteSpace(req.Avatar) ? null : req.Avatar.Trim(),
             PasswordHash = defaultPasswordHash,
             IsActive = req.Status?.ToUpper() != "LOCKED",
             CreatedAt = now,
@@ -133,17 +157,18 @@ public class CreateStaffCommandHandler : IRequestHandler<CreateStaffCommand, Res
 
         var response = new StaffDto(
             Id: newUser.UserId.ToString(),
-            Code: req.Code ?? $"NV-NV{newUser.UserId:D3}",
+            Code: !string.IsNullOrWhiteSpace(req.Code) ? req.Code.Trim() : $"NV-NV{newUser.UserId:D3}",
             Name: newUser.FullName ?? "",
-            Title: req.Title ?? "Chuyên viên",
+            Title: string.IsNullOrWhiteSpace(req.Title) ? roleTitle : req.Title,
             Email: newUser.Email ?? "",
             Phone: newUser.Phone ?? "",
-            Department: req.Department ?? "Quản trị hệ thống",
+            Department: req.Department ?? "",
             Role: req.Role.ToUpper(),
             RoleTitle: roleTitle,
             AssignedWarehouses: assignedWarehouses,
             Status: newUser.IsActive == false ? "LOCKED" : "ACTIVE",
-            Avatar: null
+            Avatar: newUser.Avatar,
+            Username: newUser.Username
         );
 
         return Result.Success(response);

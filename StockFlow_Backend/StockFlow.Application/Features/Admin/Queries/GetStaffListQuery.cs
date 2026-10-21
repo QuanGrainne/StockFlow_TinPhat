@@ -77,7 +77,8 @@ public class GetStaffListQueryHandler : IRequestHandler<GetStaffListQuery, Resul
                 RoleTitle: roleTitle,
                 AssignedWarehouses: warehouses,
                 Status: u.IsActive == false ? "LOCKED" : "ACTIVE",
-                Avatar: null
+                Avatar: u.Avatar,
+                Username: u.Username
             );
         }).ToList();
 

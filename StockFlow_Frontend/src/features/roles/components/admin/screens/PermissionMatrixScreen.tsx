@@ -58,19 +58,68 @@ const ROLES_LIST: RoleTab[] = [
   },
 ];
 
+import { UserRole } from '../../../types';
+
 interface PermissionMatrixScreenProps {
   initialRoleCode?: string;
+  currentRole?: UserRole;
+  onRoleChange?: (role: UserRole) => void;
 }
 
 export const PermissionMatrixScreen: React.FC<PermissionMatrixScreenProps> = ({
   initialRoleCode = 'ROLE_ADMIN',
+  currentRole,
+  onRoleChange,
 }) => {
+  const [roleList, setRoleList] = useState<RoleTab[]>(ROLES_LIST);
   const [selectedRoleCode, setSelectedRoleCode] = useState(initialRoleCode);
   const [modules, setModules] = useState<PermissionMatrixModule[]>([]);
   const [loading, setLoading] = useState(true);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [toastMessage, setToastMessage] = useState<{
+    text: string;
+    targetRole?: UserRole;
+    targetRoleName?: string;
+  } | null>(null);
 
-  const activeRole = ROLES_LIST.find((r) => r.code === selectedRoleCode) || ROLES_LIST[0];
+  // Tải danh sách vai trò động từ cơ sở dữ liệu để hiển thị cả vai trò tạo mới
+  useEffect(() => {
+    adminService.getRoleDefinitions().then((defs) => {
+      if (defs && defs.length > 0) {
+        const mapped: RoleTab[] = defs.map((d, index) => ({
+          code: d.code,
+          name: d.name,
+          badge: d.code.replace(/^ROLE_/, ''),
+          rankNum: index + 1,
+          desc: d.description || `Cấu hình phân quyền chi tiết cho vai trò ${d.name}`,
+        }));
+        setRoleList(mapped);
+      }
+    }).catch((err) => {
+      console.warn('Lỗi tải danh mục vai trò:', err);
+    });
+  }, []);
+
+  // Đồng bộ role khi bấm Cấu hình quyền từ màn hình Danh mục vai trò
+  useEffect(() => {
+    if (initialRoleCode) {
+      setSelectedRoleCode(initialRoleCode);
+    }
+  }, [initialRoleCode]);
+
+  const activeRole = roleList.find((r) => r.code === selectedRoleCode) || roleList[0] || ROLES_LIST[0];
+
+  const targetUserRole: UserRole | null =
+    selectedRoleCode === 'ROLE_ADMIN'
+      ? 'ADMIN'
+      : selectedRoleCode === 'ROLE_MANAGER'
+      ? 'MANAGER'
+      : selectedRoleCode === 'ROLE_SALES'
+      ? 'SALES'
+      : selectedRoleCode === 'ROLE_WAREHOUSE'
+      ? 'WAREHOUSE'
+      : selectedRoleCode === 'ROLE_PRODUCTION'
+      ? 'PRODUCTION'
+      : null;
 
   const loadData = async (code: string) => {
     setLoading(true);
@@ -86,9 +135,9 @@ export const PermissionMatrixScreen: React.FC<PermissionMatrixScreenProps> = ({
     loadData(selectedRoleCode);
   }, [selectedRoleCode]);
 
-  const showToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 2500);
+  const showToast = (text: string, targetRole?: UserRole, targetRoleName?: string) => {
+    setToastMessage({ text, targetRole, targetRoleName });
+    setTimeout(() => setToastMessage(null), 4000);
   };
 
   const handleToggleModulePerm = (
@@ -119,7 +168,15 @@ export const PermissionMatrixScreen: React.FC<PermissionMatrixScreenProps> = ({
 
   const handleSave = async () => {
     await adminService.savePermissionMatrix(selectedRoleCode, modules);
-    showToast(`Đã lưu cấu hình ma trận phân quyền cho vai trò ${activeRole.name}`);
+    if (currentRole && targetUserRole && targetUserRole !== currentRole) {
+      showToast(
+        `Đã lưu cấu hình ma trận phân quyền cho vai trò ${activeRole.name}.`,
+        targetUserRole,
+        activeRole.name
+      );
+    } else {
+      showToast(`Đã lưu cấu hình ma trận phân quyền cho vai trò ${activeRole.name}. Thanh điều hướng đã cập nhật.`);
+    }
   };
 
   // Tính tổng số quyền được cấp
@@ -139,39 +196,41 @@ export const PermissionMatrixScreen: React.FC<PermissionMatrixScreenProps> = ({
     <div className="space-y-6">
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="fixed top-20 right-8 z-50 bg-slate-900 text-white px-4 py-2.5 rounded-lg shadow-xl text-xs font-semibold flex items-center gap-2 animate-in fade-in">
-          <CheckCircle2 size={16} className="text-emerald-400" />
-          <span>{toastMessage}</span>
+        <div className="fixed top-20 right-8 z-50 bg-slate-900 text-white px-4 py-3 rounded-xl shadow-2xl text-xs font-medium flex items-center gap-3 border border-slate-700 animate-in fade-in slide-in-from-top-2">
+          <CheckCircle2 size={18} className="text-emerald-400 shrink-0" />
+          <div>
+            <div>{toastMessage.text}</div>
+            {toastMessage.targetRole && onRoleChange && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (toastMessage.targetRole) {
+                    onRoleChange(toastMessage.targetRole);
+                    setToastMessage(null);
+                  }
+                }}
+                className="mt-1.5 inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-blue-600 hover:bg-blue-500 text-white text-[11px] font-semibold transition cursor-pointer"
+              >
+                <span>Chuyển sang vai trò {toastMessage.targetRoleName} xem Navbar</span>
+                <span>→</span>
+              </button>
+            )}
+          </div>
         </div>
       )}
 
       {/* Screen Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <div className="text-[11px] font-bold text-blue-600 uppercase tracking-wider mb-1">
-            MÀN HÌNH 3.2.1.7 • Ma trận
-          </div>
           <h1 className="text-xl font-bold text-slate-900 tracking-tight">
-            Cấu hình ma trận phân quyền
+            Phân quyền vai trò
           </h1>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Thiết lập chi tiết quyền Xem, Thêm, Sửa, Xóa, Duyệt cho {modules.length || 9} phân hệ nghiệp vụ
-          </p>
         </div>
-
-        <button
-          type="button"
-          onClick={handleSave}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#1E56A0] hover:bg-[#184580] text-xs font-semibold text-white transition cursor-pointer shadow-xs"
-        >
-          <Save size={14} />
-          <span>Lưu ma trận</span>
-        </button>
       </div>
 
       {/* Role Tabs Selector */}
       <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs p-2 flex flex-wrap items-center gap-2">
-        {ROLES_LIST.map((role) => {
+        {roleList.map((role) => {
           const isSelected = role.code === selectedRoleCode;
           return (
             <button
@@ -344,10 +403,10 @@ export const PermissionMatrixScreen: React.FC<PermissionMatrixScreenProps> = ({
           <button
             type="button"
             onClick={handleSave}
-            className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-[#1E56A0] hover:bg-[#184580] text-xs font-semibold text-white transition cursor-pointer shadow-xs"
+            className="inline-flex items-center justify-center gap-2 px-5 py-2 rounded-lg bg-[#1E56A0] hover:bg-[#184580] text-xs font-semibold text-white transition cursor-pointer shadow-xs"
           >
             <Save size={14} />
-            <span>Lưu ma trận</span>
+            <span>Lưu</span>
           </button>
         </div>
       </div>
