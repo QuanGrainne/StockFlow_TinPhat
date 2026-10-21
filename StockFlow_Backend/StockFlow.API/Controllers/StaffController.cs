@@ -66,6 +66,7 @@ public class StaffController : ControllerBase
     /// Khóa / Mở khóa trạng thái tài khoản nhân viên.
     /// </summary>
     [HttpPatch("{id}/toggle-status")]
+    [HttpPut("{id}/toggle-status")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> ToggleStaffStatus(int id)

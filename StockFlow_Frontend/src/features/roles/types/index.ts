@@ -344,6 +344,8 @@ export interface StaffAccount {
   assignedWarehouses: string[]; // Vd: ['WH-HN-01', 'WH-HN-02']
   status: 'ACTIVE' | 'LOCKED';
   avatar?: string;
+  password?: string;
+  username?: string;
 }
 
 export interface WarehouseFacility {

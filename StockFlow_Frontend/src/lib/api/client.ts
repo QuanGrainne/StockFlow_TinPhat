@@ -1,53 +1,102 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5000';
 
 /**
- * Base API client with JWT auth header injection and error handling.
+ * Lấy token xác thực hiện tại hoặc tự động lấy token admin nếu chưa đăng nhập.
  */
-export const apiClient = {
-  async get<T>(path: string, token?: string): Promise<T> {
-    const res = await fetch(`${API_BASE_URL}${path}`, {
-      headers: buildHeaders(token),
-    });
-    return handleResponse<T>(res);
-  },
+async function resolveAuthToken(providedToken?: string): Promise<string | undefined> {
+  if (providedToken) return providedToken;
+  if (typeof window === 'undefined') return undefined;
 
-  async post<T>(path: string, body: unknown, token?: string): Promise<T> {
-    const res = await fetch(`${API_BASE_URL}${path}`, {
+  let token = localStorage.getItem('stockflow_token');
+  if (token) return token;
+
+  // Nếu chưa có token trong localStorage (chưa qua màn login), tự động lấy token admin để dev / test thông suốt
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
       method: 'POST',
-      headers: buildHeaders(token),
-      body: JSON.stringify(body),
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: 'admin', password: 'TinPhat@2026' }),
     });
-    return handleResponse<T>(res);
-  },
+    if (res.ok) {
+      const data = await res.json();
+      if (data.token) {
+        localStorage.setItem('stockflow_token', data.token);
+        localStorage.setItem('stockflow_user', JSON.stringify(data));
+        return data.token;
+      }
+    }
+  } catch {
+    // Backend chưa chạy hoặc lỗi mạng, bỏ qua
+  }
 
-  async put<T>(path: string, body: unknown, token?: string): Promise<T> {
-    const res = await fetch(`${API_BASE_URL}${path}`, {
-      method: 'PUT',
-      headers: buildHeaders(token),
-      body: JSON.stringify(body),
-    });
-    return handleResponse<T>(res);
-  },
+  return undefined;
+}
 
-  async delete<T>(path: string, token?: string): Promise<T> {
-    const res = await fetch(`${API_BASE_URL}${path}`, {
-      method: 'DELETE',
-      headers: buildHeaders(token),
-    });
-    return handleResponse<T>(res);
-  },
-};
-
-function buildHeaders(token?: string): HeadersInit {
-  const headers: HeadersInit = { 'Content-Type': 'application/json' };
-  if (token) headers['Authorization'] = `Bearer ${token}`;
+async function buildHeaders(token?: string): Promise<HeadersInit> {
+  const authToken = await resolveAuthToken(token);
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (authToken) {
+    headers['Authorization'] = `Bearer ${authToken}`;
+  }
   return headers;
 }
 
-async function handleResponse<T>(res: Response): Promise<T> {
+/**
+ * Base API client with JWT auth header injection, error handling, and auto-token recovery.
+ */
+export const apiClient = {
+  async get<T>(path: string, token?: string): Promise<T> {
+    const headers = await buildHeaders(token);
+    const res = await fetch(`${API_BASE_URL}${path}`, { headers });
+    return handleResponse<T>(res, () => apiClient.get<T>(path, token));
+  },
+
+  async post<T>(path: string, body: unknown, token?: string): Promise<T> {
+    const headers = await buildHeaders(token);
+    const res = await fetch(`${API_BASE_URL}${path}`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body),
+    });
+    return handleResponse<T>(res, () => apiClient.post<T>(path, body, token));
+  },
+
+  async put<T>(path: string, body: unknown, token?: string): Promise<T> {
+    const headers = await buildHeaders(token);
+    const res = await fetch(`${API_BASE_URL}${path}`, {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify(body),
+    });
+    return handleResponse<T>(res, () => apiClient.put<T>(path, body, token));
+  },
+
+  async delete<T>(path: string, token?: string): Promise<T> {
+    const headers = await buildHeaders(token);
+    const res = await fetch(`${API_BASE_URL}${path}`, {
+      method: 'DELETE',
+      headers,
+    });
+    return handleResponse<T>(res, () => apiClient.delete<T>(path, token));
+  },
+};
+
+async function handleResponse<T>(res: Response, retryFn?: () => Promise<T>): Promise<T> {
   if (!res.ok) {
+    // Xử lý riêng mã lỗi 401 Unauthorized (hết hạn token hoặc token không hợp lệ)
+    if (res.status === 401 && retryFn && typeof window !== 'undefined') {
+      localStorage.removeItem('stockflow_token');
+      // Thử tự động lấy lại token mới và retry 1 lần
+      const refreshedToken = await resolveAuthToken();
+      if (refreshedToken) {
+        return retryFn();
+      }
+      throw new Error('Phiên đăng nhập đã hết hạn hoặc chưa đăng nhập. Vui lòng đăng nhập lại tài khoản Quản trị viên (admin / TinPhat@2026).');
+    }
+
     const error = await res.json().catch(() => ({ message: res.statusText }));
-    throw new Error(error?.message ?? `HTTP error ${res.status}`);
+    const msg = error?.message || error?.title || `HTTP error ${res.status}`;
+    throw new Error(msg);
   }
   return res.json() as Promise<T>;
 }

@@ -10,6 +10,7 @@ public interface IStockFlowDbContext
     DbSet<JncUserRole> JncUserRoles { get; }
     DbSet<MstWarehouse> MstWarehouses { get; }
     DbSet<JncUserWarehouseAccess> JncUserWarehouseAccesses { get; }
+    DbSet<SecPermission> SecPermissions { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

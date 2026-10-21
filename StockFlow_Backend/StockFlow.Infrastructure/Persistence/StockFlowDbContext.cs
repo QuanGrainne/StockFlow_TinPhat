@@ -843,6 +843,8 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
             entity.Property(e => e.Phone)
                 .HasMaxLength(20)
                 .HasColumnName("phone");
+            entity.Property(e => e.Avatar)
+                .HasColumnName("avatar");
             entity.Property(e => e.UpdatedAt)
                 .HasColumnType("timestamp without time zone")
                 .HasColumnName("updated_at");
@@ -1624,6 +1626,7 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
             entity.Property(e => e.FullName).HasMaxLength(100).HasColumnName("full_name");
             entity.Property(e => e.Email).HasMaxLength(100).HasColumnName("email");
             entity.Property(e => e.Phone).HasMaxLength(20).HasColumnName("phone");
+            entity.Property(e => e.Avatar).HasColumnName("avatar");
             entity.Property(e => e.IsActive).HasColumnName("is_active");
             entity.Property(e => e.CreatedAt).HasColumnType("timestamp without time zone").HasColumnName("created_at");
             entity.Property(e => e.UpdatedAt).HasColumnType("timestamp without time zone").HasColumnName("updated_at");

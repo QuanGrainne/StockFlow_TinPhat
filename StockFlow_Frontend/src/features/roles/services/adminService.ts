@@ -21,6 +21,9 @@ export const adminService = {
   getWarehouseFacilities: permissionService.getWarehouseFacilities,
   updateWarehousePermissions: permissionService.updateWarehousePermissions,
   getRoleDefinitions: permissionService.getRoleDefinitions,
+  createRole: permissionService.createRole,
+  updateRole: permissionService.updateRole,
+  deleteRole: permissionService.deleteRole,
   getPermissionMatrix: permissionService.getPermissionMatrix,
   savePermissionMatrix: permissionService.savePermissionMatrix,
 };

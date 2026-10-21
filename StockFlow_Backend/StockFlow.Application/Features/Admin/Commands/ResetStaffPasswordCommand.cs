@@ -26,7 +26,7 @@ public class ResetStaffPasswordCommandHandler : IRequestHandler<ResetStaffPasswo
             return Result.Failure<string>("Không tìm thấy thông tin nhân viên.");
         }
 
-        var newPassword = string.IsNullOrWhiteSpace(command.NewPassword) ? "StockFlow@123" : command.NewPassword;
+        var newPassword = string.IsNullOrWhiteSpace(command.NewPassword) ? "TinPhat@2026" : command.NewPassword;
         user.PasswordHash = _passwordHasher.Hash(newPassword);
         user.UpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
 

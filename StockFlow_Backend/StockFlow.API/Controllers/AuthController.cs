@@ -56,4 +56,27 @@ public class AuthController(IMediator mediator) : ControllerBase
 
         return Ok(result.Value);
     }
+
+    /// <summary>
+    /// Lấy danh sách mã quyền phân hệ (Permissions) của tài khoản đang đăng nhập.
+    /// </summary>
+    [HttpGet("permissions")]
+    [Authorize]
+    [ProducesResponseType(typeof(List<string>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetMyPermissions()
+    {
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (string.IsNullOrEmpty(userIdClaim) || !int.TryParse(userIdClaim, out var userId))
+        {
+            return Unauthorized(new { message = "Không xác thực được danh tính người dùng." });
+        }
+
+        var result = await mediator.Send(new GetCurrentUserQuery(userId));
+        if (!result.IsSuccess)
+        {
+            return NotFound(new { message = result.Error });
+        }
+
+        return Ok(result.Value?.Permissions ?? new List<string>());
+    }
 }
