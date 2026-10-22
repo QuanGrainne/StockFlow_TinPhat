@@ -510,9 +510,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
   const [goods, setGoods] = useState<GoodsItem[]>(INITIAL_GOODS_LIST);
   const suggestedProductCode = getNextProductCode(goods);
   const [search, setSearch] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState<'ALL' | 'Thành phẩm' | 'Nguyên vật liệu' | 'LOW_STOCK'>(
-    role === 'SALES' ? 'Thành phẩm' : role === 'PRODUCTION' ? 'Nguyên vật liệu' : 'ALL'
-  );
+  const [categoryFilter, setCategoryFilter] = useState<'ALL' | 'LOW_STOCK'>('ALL');
   const [warehouseFilter, setWarehouseFilter] = useState<string>('ALL');
 
   // Master-Detail Row Expansion (Ảnh 5)
@@ -1242,9 +1240,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
 
     if (!matchSearch) return false;
 
-    if (categoryFilter === 'Thành phẩm' || categoryFilter === 'Nguyên vật liệu') {
-      if (item.category !== categoryFilter) return false;
-    } else if (categoryFilter === 'LOW_STOCK') {
+    if (categoryFilter === 'LOW_STOCK') {
       if (item.stockQuantity >= item.minSafeStock) return false;
     }
 
@@ -1257,11 +1253,9 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
 
   // KPI Metrics
   const totalSku = goods.length;
-  const finishedCount = goods.filter((g) => g.category === 'Thành phẩm').length;
-  const rawCount = goods.filter((g) => g.category === 'Nguyên vật liệu').length;
   const lowStockCount = goods.filter((g) => g.stockQuantity < g.minSafeStock).length;
-  const totalAvailableQty = goods.filter((g) => g.category === 'Thành phẩm').reduce((sum, g) => sum + g.availableQuantity, 0);
-  const totalReservedQty = goods.filter((g) => g.category === 'Thành phẩm').reduce((sum, g) => sum + g.reservedQuantity, 0);
+  const totalAvailableQty = goods.reduce((sum, g) => sum + g.availableQuantity, 0);
+  const totalReservedQty = goods.reduce((sum, g) => sum + g.reservedQuantity, 0);
 
   // Quick tag suggestions for attribute modal
   const getQuickTagOptions = (attrName: string) => {
@@ -1448,31 +1442,13 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
             </button>
             <button
               type="button"
-              onClick={() => setCategoryFilter('Thành phẩm')}
-              className={`px-3 py-1 rounded-md transition cursor-pointer ${
-                categoryFilter === 'Thành phẩm' ? 'bg-white text-blue-700 shadow-2xs font-bold' : 'hover:text-slate-900'
-              }`}
-            >
-              Thành phẩm ({finishedCount})
-            </button>
-            <button
-              type="button"
-              onClick={() => setCategoryFilter('Nguyên vật liệu')}
-              className={`px-3 py-1 rounded-md transition cursor-pointer ${
-                categoryFilter === 'Nguyên vật liệu' ? 'bg-white text-blue-700 shadow-2xs font-bold' : 'hover:text-slate-900'
-              }`}
-            >
-              Nguyên vật liệu ({rawCount})
-            </button>
-            <button
-              type="button"
               onClick={() => setCategoryFilter('LOW_STOCK')}
               className={`px-3 py-1 rounded-md transition cursor-pointer flex items-center gap-1 ${
                 categoryFilter === 'LOW_STOCK' ? 'bg-white text-rose-700 shadow-2xs font-bold' : 'text-rose-600 hover:text-rose-700'
               }`}
             >
               <AlertTriangle size={13} className="text-rose-600" />
-              <span>Tồn thấp ({lowStockCount})</span>
+              <span>Cảnh báo tồn thấp ({lowStockCount})</span>
             </button>
           </div>
         </div>
@@ -2184,39 +2160,25 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                       </div>
 
                       {/* Đơn vị tính cơ bản */}
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <div className="flex items-center justify-between mb-1">
-                            <label className="font-semibold text-slate-700">
-                              Đơn vị tính cơ bản <span className="text-slate-400 font-normal">(Tự nhập / chọn)</span>
-                            </label>
-                            <span className="text-[10px] text-blue-600 font-medium">ĐVT</span>
-                          </div>
-                          <CustomCombobox
-                            value={formUom}
-                            onChange={(val) => {
-                              setFormUom(val);
-                              // Đồng bộ tên đơn vị cơ bản trong units
-                              setFormUnits((prev) =>
-                                prev.map((u) => (u.isBase ? { ...u, name: val } : u))
-                              );
-                            }}
-                            options={DEFAULT_UOM_OPTIONS}
-                            placeholder="Nhập hoặc chọn ĐVT (VD: Hộp, Tấm, Kg...)"
-                          />
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="font-semibold text-slate-700">
+                            Đơn vị tính cơ bản <span className="text-slate-400 font-normal">(Tự nhập / chọn)</span>
+                          </label>
+                          <span className="text-[10px] text-blue-600 font-medium">ĐVT</span>
                         </div>
-
-                        <div>
-                          <label className="block font-semibold text-slate-700 mb-1">Phân loại hàng</label>
-                          <select
-                            value={formCategory}
-                            onChange={(e) => setFormCategory(e.target.value as any)}
-                            className="w-full h-9 px-3 rounded-lg border border-slate-200 text-xs text-slate-800 focus:outline-none focus:border-blue-500 cursor-pointer font-medium bg-white"
-                          >
-                            <option value="Thành phẩm">Thành phẩm xuất bán</option>
-                            <option value="Nguyên vật liệu">Nguyên vật liệu xưởng</option>
-                          </select>
-                        </div>
+                        <CustomCombobox
+                          value={formUom}
+                          onChange={(val) => {
+                            setFormUom(val);
+                            // Đồng bộ tên đơn vị cơ bản trong units
+                            setFormUnits((prev) =>
+                              prev.map((u) => (u.isBase ? { ...u, name: val } : u))
+                            );
+                          }}
+                          options={DEFAULT_UOM_OPTIONS}
+                          placeholder="Nhập hoặc chọn ĐVT (VD: Hộp, Tấm, Kg...)"
+                        />
                       </div>
                     </div>
 
