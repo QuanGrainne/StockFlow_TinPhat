@@ -20,7 +20,7 @@ import {
   Upload,
   Trash2,
 } from 'lucide-react';
-import { StaffAccount, UserRole, RoleDefinition } from '../../../types';
+import { StaffAccount, UserRole, RoleDefinition, WarehouseFacility } from '../../../types';
 import { adminService } from '../../../services/adminService';
 
 const WAREHOUSE_OPTIONS = [
@@ -60,6 +60,20 @@ const getNextStaffCode = (list: StaffAccount[]): string => {
   return `NV-NV${String(maxId + 1).padStart(3, '0')}`;
 };
 
+export const isTargetAdmin = (staff: StaffAccount | null | undefined): boolean => {
+  if (!staff) return false;
+  const username = (staff.username || '').toLowerCase();
+  const code = (staff.code || '').toUpperCase();
+  const role = (staff.role || '').toUpperCase();
+  return (
+    username === 'admin' ||
+    code === 'NV-ADMIN' ||
+    code === 'NV-NV001' ||
+    role === 'ROLE_ADMIN' ||
+    role === 'ADMIN'
+  );
+};
+
 interface StaffAccountsScreenProps {
   initialFilter?: 'ALL' | 'ACTIVE';
 }
@@ -69,6 +83,7 @@ export const StaffAccountsScreen: React.FC<StaffAccountsScreenProps> = ({
 }) => {
   const [staffList, setStaffList] = useState<StaffAccount[]>([]);
   const [availableRoles, setAvailableRoles] = useState<RoleDefinition[]>([]);
+  const [availableWarehouses, setAvailableWarehouses] = useState<WarehouseFacility[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>(
@@ -87,8 +102,67 @@ export const StaffAccountsScreen: React.FC<StaffAccountsScreenProps> = ({
   const [formTitle, setFormTitle] = useState('');
   const [formRole, setFormRole] = useState<UserRole>('ROLE_WAREHOUSE');
   const [formPassword, setFormPassword] = useState('TinPhat@2026');
-  const [formWarehouses, setFormWarehouses] = useState<string[]>(['WH-HN-01']);
+  const [formWarehouses, setFormWarehouses] = useState<string[]>(['K001']);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const warehouseList = availableWarehouses.length > 0
+    ? availableWarehouses.map((w) => ({
+        code: w.code,
+        name: w.name,
+        address: w.address,
+      }))
+    : WAREHOUSE_OPTIONS;
+
+  const normalizeWarehouseCode = (code: string): string => {
+    const upper = code.trim().toUpperCase();
+    const exact = warehouseList.find((w) => w.code.toUpperCase() === upper);
+    if (exact) return exact.code;
+
+    // Mapping bí danh giữa WH-HN-xx và K00x
+    if (upper === 'WH-HN-01' || upper === 'KTP-01') {
+      const match = warehouseList.find((w) => w.code === 'K001' || w.name.includes('Gia Lâm'));
+      if (match) return match.code;
+    }
+    if (upper === 'WH-HN-02' || upper === 'KNVL-01') {
+      const match = warehouseList.find((w) => w.code === 'K002' || w.name.includes('Đông Anh'));
+      if (match) return match.code;
+    }
+    if (upper === 'WH-HN-03') {
+      const match = warehouseList.find((w) => w.code === 'K003' || w.name.includes('Hà Đông'));
+      if (match) return match.code;
+    }
+    if (upper === 'WH-HN-04') {
+      const match = warehouseList.find((w) => w.code === 'K004' || w.name.includes('Hoàn Kiếm'));
+      if (match) return match.code;
+    }
+
+    if (upper === 'K001') {
+      const match = warehouseList.find((w) => w.code === 'WH-HN-01' || w.name.includes('Gia Lâm'));
+      if (match) return match.code;
+    }
+    if (upper === 'K002') {
+      const match = warehouseList.find((w) => w.code === 'WH-HN-02' || w.name.includes('Đông Anh'));
+      if (match) return match.code;
+    }
+    if (upper === 'K003') {
+      const match = warehouseList.find((w) => w.code === 'WH-HN-03' || w.name.includes('Hà Đông'));
+      if (match) return match.code;
+    }
+    if (upper === 'K004') {
+      const match = warehouseList.find((w) => w.code === 'WH-HN-04' || w.name.includes('Hoàn Kiếm'));
+      if (match) return match.code;
+    }
+
+    return code;
+  };
+
+  // Lọc bỏ vai trò ROLE_ADMIN khi tạo hoặc sửa nhân viên khác
+  const selectableRoles = availableRoles.filter(
+    (r) =>
+      r.code.toUpperCase() !== 'ROLE_ADMIN' &&
+      r.code.toUpperCase() !== 'ADMIN' &&
+      !r.name.toLowerCase().includes('quản trị viên')
+  );
 
   const isCodeDuplicate = Boolean(
     formCode.trim() &&
@@ -102,16 +176,20 @@ export const StaffAccountsScreen: React.FC<StaffAccountsScreenProps> = ({
   const loadData = async () => {
     setLoading(true);
     try {
-      const [data, rolesData] = await Promise.all([
+      const [data, rolesData, warehousesData] = await Promise.all([
         adminService.getStaffList(search, statusFilter),
         adminService.getRoleDefinitions(),
+        adminService.getWarehouseFacilities(),
       ]);
       setStaffList(data);
       if (Array.isArray(rolesData) && rolesData.length > 0) {
         setAvailableRoles(rolesData);
       }
+      if (Array.isArray(warehousesData) && warehousesData.length > 0) {
+        setAvailableWarehouses(warehousesData);
+      }
     } catch (err) {
-      console.error('Failed to load staff accounts or roles:', err);
+      console.error('Failed to load staff accounts, roles or warehouses:', err);
     } finally {
       setLoading(false);
     }
@@ -200,10 +278,10 @@ export const StaffAccountsScreen: React.FC<StaffAccountsScreenProps> = ({
     setFormEmail('');
     setFormPhone('');
     setFormTitle('');
-    const defaultRole = availableRoles.find((r) => !r.isSystem)?.code || availableRoles[0]?.code || 'ROLE_WAREHOUSE';
+    const defaultRole = selectableRoles.find((r) => !r.isSystem)?.code || selectableRoles[0]?.code || 'ROLE_WAREHOUSE';
     setFormRole(defaultRole);
     setFormPassword('TinPhat@2026');
-    setFormWarehouses(['WH-HN-01']);
+    setFormWarehouses([warehouseList[0]?.code || 'K001']);
     setEditModalOpen(true);
   };
 
@@ -216,20 +294,22 @@ export const StaffAccountsScreen: React.FC<StaffAccountsScreenProps> = ({
     setFormEmail(staff.email || '');
     setFormPhone(staff.phone || '');
     setFormTitle(staff.title || '');
-    const matched = availableRoles.find(
-      (r) =>
-        r.code.toUpperCase() === (staff.role || '').toUpperCase() ||
-        r.code.toUpperCase() === `ROLE_${(staff.role || '').toUpperCase()}` ||
-        r.name.toLowerCase() === (staff.roleTitle || staff.role || '').toLowerCase()
-    );
-    setFormRole(matched ? matched.code : staff.role || 'ROLE_WAREHOUSE');
+
+    if (isTargetAdmin(staff)) {
+      setFormRole('ROLE_ADMIN');
+    } else {
+      const matched = selectableRoles.find(
+        (r) =>
+          r.code.toUpperCase() === (staff.role || '').toUpperCase() ||
+          r.code.toUpperCase() === `ROLE_${(staff.role || '').toUpperCase()}` ||
+          r.name.toLowerCase() === (staff.roleTitle || staff.role || '').toLowerCase()
+      );
+      setFormRole(matched ? matched.code : staff.role || 'ROLE_WAREHOUSE');
+    }
+
     setFormPassword('');
-    const normalizedWarehouses = (staff.assignedWarehouses || []).map((code) => {
-      if (code === 'KTP-01') return 'WH-HN-01';
-      if (code === 'KNVL-01') return 'WH-HN-02';
-      return code;
-    });
-    setFormWarehouses(normalizedWarehouses);
+    const normalizedWarehouses = (staff.assignedWarehouses || []).map((code) => normalizeWarehouseCode(code));
+    setFormWarehouses(normalizedWarehouses.length > 0 ? normalizedWarehouses : [warehouseList[0]?.code || 'K001']);
     setEditModalOpen(true);
   };
 
@@ -262,11 +342,14 @@ export const StaffAccountsScreen: React.FC<StaffAccountsScreenProps> = ({
       return;
     }
 
+    const isEditingAdmin = isTargetAdmin(editingStaff);
+    const finalRoleToSave = isEditingAdmin ? 'ROLE_ADMIN' : formRole;
+
     const matchedRole = availableRoles.find(
       (r) =>
-        r.code.toUpperCase() === formRole.toUpperCase() ||
-        r.code.toUpperCase() === `ROLE_${formRole.toUpperCase()}` ||
-        r.name.toLowerCase() === formRole.toLowerCase()
+        r.code.toUpperCase() === finalRoleToSave.toUpperCase() ||
+        r.code.toUpperCase() === `ROLE_${finalRoleToSave.toUpperCase()}` ||
+        r.name.toLowerCase() === finalRoleToSave.toLowerCase()
     );
 
     const legacyMap: Record<string, string> = {
@@ -282,7 +365,9 @@ export const StaffAccountsScreen: React.FC<StaffAccountsScreenProps> = ({
       ROLE_PRODUCTION: 'Nhân viên sản xuất',
     };
 
-    const resolvedRoleTitle = matchedRole?.name || legacyMap[formRole] || formTitle || 'Nhân viên';
+    const resolvedRoleTitle = isEditingAdmin
+      ? 'Quản trị viên'
+      : matchedRole?.name || legacyMap[finalRoleToSave] || formTitle || 'Nhân viên';
 
     try {
       if (editingStaff) {
@@ -294,7 +379,7 @@ export const StaffAccountsScreen: React.FC<StaffAccountsScreenProps> = ({
           phone: trimmedPhone,
           title: formTitle.trim() || resolvedRoleTitle,
           department: '',
-          role: formRole,
+          role: finalRoleToSave,
           roleTitle: resolvedRoleTitle,
           assignedWarehouses: formWarehouses,
           avatar: formAvatar.trim() || undefined,
@@ -310,7 +395,7 @@ export const StaffAccountsScreen: React.FC<StaffAccountsScreenProps> = ({
           phone: trimmedPhone,
           title: formTitle.trim() || resolvedRoleTitle,
           department: '',
-          role: formRole,
+          role: finalRoleToSave,
           roleTitle: resolvedRoleTitle,
           assignedWarehouses: formWarehouses,
           avatar: formAvatar.trim() || undefined,
@@ -329,6 +414,11 @@ export const StaffAccountsScreen: React.FC<StaffAccountsScreenProps> = ({
   };
 
   const handleToggleStatus = async (staff: StaffAccount) => {
+    if (isTargetAdmin(staff)) {
+      alert('Không thể khóa tài khoản Quản trị viên hệ thống (Admin).');
+      return;
+    }
+
     const isLocking = staff.status === 'ACTIVE';
     const message = isLocking
       ? `Bạn có chắc chắn muốn khóa tài khoản của ${staff.name} (${staff.code}) không?`
@@ -548,14 +638,21 @@ export const StaffAccountsScreen: React.FC<StaffAccountsScreenProps> = ({
                       <td className="py-3.5 px-4">
                         <div className="flex flex-wrap gap-1 max-w-xs">
                           {staff.assignedWarehouses && staff.assignedWarehouses.length > 0 ? (
-                            staff.assignedWarehouses.map((wh) => (
-                              <span
-                                key={wh}
-                                className="font-mono text-[10px] font-semibold px-1.5 py-0.5 rounded-[4px] bg-slate-100 text-slate-600 border border-slate-200"
-                              >
-                                {wh}
-                              </span>
-                            ))
+                            staff.assignedWarehouses.map((wh) => {
+                              const whObj = warehouseList.find(
+                                (w) => w.code.toUpperCase() === wh.toUpperCase() || normalizeWarehouseCode(wh) === w.code
+                              );
+                              const displayName = whObj ? `${whObj.name} (${whObj.code})` : wh;
+                              return (
+                                <span
+                                  key={wh}
+                                  title={whObj ? whObj.address : wh}
+                                  className="font-mono text-[10px] font-semibold px-1.5 py-0.5 rounded-[4px] bg-slate-100 text-slate-700 border border-slate-200"
+                                >
+                                  {displayName}
+                                </span>
+                              );
+                            })
                           ) : (
                             <span className="text-[11px] text-slate-400 italic">Chưa gán kho</span>
                           )}
@@ -598,19 +695,21 @@ export const StaffAccountsScreen: React.FC<StaffAccountsScreenProps> = ({
                             <KeyRound size={14} />
                           </button>
 
-                          {/* Khóa / Mở khóa */}
-                          <button
-                            type="button"
-                            onClick={() => handleToggleStatus(staff)}
-                            title={isLocked ? 'Mở khóa tài khoản' : 'Khóa tài khoản'}
-                            className={`p-1.5 rounded-md hover:bg-slate-100 transition cursor-pointer ${
-                              isLocked
-                                ? 'text-rose-500 hover:text-emerald-600'
-                                : 'text-slate-400 hover:text-rose-600'
-                            }`}
-                          >
-                            {isLocked ? <Unlock size={14} /> : <Lock size={14} />}
-                          </button>
+                          {/* Khóa / Mở khóa - Ẩn đối với tài khoản Admin */}
+                          {!isTargetAdmin(staff) && (
+                            <button
+                              type="button"
+                              onClick={() => handleToggleStatus(staff)}
+                              title={isLocked ? 'Mở khóa tài khoản' : 'Khóa tài khoản'}
+                              className={`p-1.5 rounded-md hover:bg-slate-100 transition cursor-pointer ${
+                                isLocked
+                                  ? 'text-rose-500 hover:text-emerald-600'
+                                  : 'text-slate-400 hover:text-rose-600'
+                              }`}
+                            >
+                              {isLocked ? <Unlock size={14} /> : <Lock size={14} />}
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -827,7 +926,7 @@ export const StaffAccountsScreen: React.FC<StaffAccountsScreenProps> = ({
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Email công ty
+                    Email
                   </label>
                   <input
                     type="email"
@@ -864,27 +963,33 @@ export const StaffAccountsScreen: React.FC<StaffAccountsScreenProps> = ({
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
                   Vai trò <span className="text-rose-500">*</span>
                 </label>
-                <select
-                  value={formRole}
-                  onChange={(e) => setFormRole(e.target.value)}
-                  className="w-full h-10 px-3.5 rounded-xl border border-slate-200 text-xs focus:outline-none focus:border-blue-500 bg-white shadow-xs font-medium"
-                >
-                  {availableRoles.length > 0 ? (
-                    availableRoles.map((r) => (
-                      <option key={r.id || r.code} value={r.code}>
-                        {r.name} ({r.code})
-                      </option>
-                    ))
-                  ) : (
-                    <>
-                      <option value="ROLE_WAREHOUSE">Nhân viên kho (ROLE_WAREHOUSE)</option>
-                      <option value="ROLE_SALES">Nhân viên bán hàng (ROLE_SALES)</option>
-                      <option value="ROLE_MANAGER">Quản lý (ROLE_MANAGER)</option>
-                      <option value="ROLE_PRODUCTION">Nhân viên sản xuất (ROLE_PRODUCTION)</option>
-                      <option value="ROLE_ADMIN">Quản trị viên (ROLE_ADMIN)</option>
-                    </>
-                  )}
-                </select>
+                {isTargetAdmin(editingStaff) ? (
+                  <div className="w-full h-10 px-3.5 rounded-xl border border-blue-200 bg-blue-50/70 text-xs flex items-center font-semibold text-blue-800">
+                    <Shield size={14} className="mr-1.5 text-blue-600" />
+                    Quản trị viên (ROLE_ADMIN) - Vai trò mặc định của Admin hệ thống
+                  </div>
+                ) : (
+                  <select
+                    value={formRole}
+                    onChange={(e) => setFormRole(e.target.value)}
+                    className="w-full h-10 px-3.5 rounded-xl border border-slate-200 text-xs focus:outline-none focus:border-blue-500 bg-white shadow-xs font-medium"
+                  >
+                    {selectableRoles.length > 0 ? (
+                      selectableRoles.map((r) => (
+                        <option key={r.id || r.code} value={r.code}>
+                          {r.name} ({r.code})
+                        </option>
+                      ))
+                    ) : (
+                      <>
+                        <option value="ROLE_WAREHOUSE">Nhân viên kho (ROLE_WAREHOUSE)</option>
+                        <option value="ROLE_SALES">Nhân viên bán hàng (ROLE_SALES)</option>
+                        <option value="ROLE_MANAGER">Quản lý (ROLE_MANAGER)</option>
+                        <option value="ROLE_PRODUCTION">Nhân viên sản xuất (ROLE_PRODUCTION)</option>
+                      </>
+                    )}
+                  </select>
+                )}
               </div>
 
               {/* Warehouse Selection Box */}
@@ -899,15 +1004,23 @@ export const StaffAccountsScreen: React.FC<StaffAccountsScreenProps> = ({
                   <span className="text-[11px] text-slate-500">
                     Đã chọn:{' '}
                     <strong className="text-blue-600 font-bold">
-                      {formWarehouses.filter((c) => WAREHOUSE_OPTIONS.some((w) => w.code === c)).length}
+                      {
+                        warehouseList.filter((w) =>
+                          formWarehouses.some(
+                            (c) => c === w.code || normalizeWarehouseCode(c) === w.code
+                          )
+                        ).length
+                      }
                     </strong>{' '}
-                    / {WAREHOUSE_OPTIONS.length} kho
+                    / {warehouseList.length} kho
                   </span>
                 </div>
 
                 <div className="grid grid-cols-2 gap-2.5 text-xs">
-                  {WAREHOUSE_OPTIONS.map((w) => {
-                    const isChecked = formWarehouses.includes(w.code);
+                  {warehouseList.map((w) => {
+                    const isChecked = formWarehouses.some(
+                      (c) => c === w.code || normalizeWarehouseCode(c) === w.code
+                    );
                     return (
                       <label
                         key={w.code}
@@ -924,7 +1037,11 @@ export const StaffAccountsScreen: React.FC<StaffAccountsScreenProps> = ({
                             if (e.target.checked) {
                               setFormWarehouses([...formWarehouses, w.code]);
                             } else {
-                              setFormWarehouses(formWarehouses.filter((c) => c !== w.code));
+                              setFormWarehouses(
+                                formWarehouses.filter(
+                                  (c) => c !== w.code && normalizeWarehouseCode(c) !== w.code
+                                )
+                              );
                             }
                           }}
                           className="mt-0.5 rounded text-blue-600 focus:ring-blue-500 cursor-pointer h-4 w-4"

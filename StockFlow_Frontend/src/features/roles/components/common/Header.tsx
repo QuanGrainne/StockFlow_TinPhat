@@ -42,67 +42,96 @@ export const Header: React.FC<HeaderProps> = ({
     role: UserRole;
     initials: string;
     avatarColor: string;
+    avatar?: string | null;
   }>({
     name: 'Quản trị viên',
     code: 'NV-ADMIN',
     title: 'Quản trị hệ thống',
     role: currentRole,
-    initials: 'AD',
+    initials: 'QT',
     avatarColor: 'from-blue-600 to-indigo-700',
+    avatar: null,
   });
   const [staffList, setStaffList] = useState<StaffAccount[]>([]);
 
-  // Đọc thông tin user đăng nhập thực tế từ localStorage
+  // Đọc thông tin user đăng nhập thực tế từ localStorage và đồng bộ avatar
   useEffect(() => {
     const rawUser = typeof window !== 'undefined' ? localStorage.getItem('stockflow_user') : null;
+    let u: any = null;
     if (rawUser) {
       try {
-        const u = JSON.parse(rawUser);
-        const name = u.fullName || u.username || 'Người dùng';
-        const code = u.code || `NV-NV${String(u.userId || 1).padStart(3, '0')}`;
-        const rawRoleStr = currentRole || (Array.isArray(u.roles) && u.roles.length > 0 ? u.roles[0] : (u.role || 'SALES'));
-
-        const mappedRole: UserRole = rawRoleStr.toUpperCase().includes('ADMIN')
-          ? 'ADMIN'
-          : rawRoleStr.toUpperCase().includes('MGR') || rawRoleStr.toUpperCase().includes('MANAGER')
-          ? 'MANAGER'
-          : rawRoleStr.toUpperCase().includes('WAREHOUSE')
-          ? 'WAREHOUSE'
-          : rawRoleStr.toUpperCase().includes('PROD')
-          ? 'PRODUCTION'
-          : 'SALES';
-
-        const words = name.trim().split(/\s+/);
-        const initials = words.length > 1
-          ? (words[0][0] + words[words.length - 1][0]).toUpperCase()
-          : name.slice(0, 2).toUpperCase();
-
-        const roleTitleMap: Record<UserRole, { title: string; color: string }> = {
-          ADMIN: { title: 'Quản trị viên', color: 'from-blue-600 to-indigo-700' },
-          MANAGER: { title: 'Quản lý vận hành', color: 'from-purple-600 to-indigo-500' },
-          SALES: { title: 'Nhân viên bán hàng', color: 'from-amber-600 to-amber-500' },
-          WAREHOUSE: { title: 'Thủ kho', color: 'from-emerald-600 to-teal-500' },
-          PRODUCTION: { title: 'Nhân viên sản xuất', color: 'from-rose-600 to-pink-500' },
-        };
-
-        const { title, color } = roleTitleMap[mappedRole] || roleTitleMap.SALES;
-
-        setCurrentUser({
-          name,
-          code,
-          title,
-          role: mappedRole,
-          initials,
-          avatarColor: color,
-        });
+        u = JSON.parse(rawUser);
       } catch (e) {
         console.error('Failed to parse current user:', e);
       }
     }
 
-    // Tải danh sách nhân viên để phục vụ đổi nhanh
+    if (u) {
+      const name = u.fullName || u.username || 'Người dùng';
+      const code = u.code || `NV-NV${String(u.userId || 1).padStart(3, '0')}`;
+      const userRolesList = Array.isArray(u.roles) ? u.roles : [];
+      const userPrimaryRole = userRolesList.length > 0 ? userRolesList[0] : (u.role || '');
+      const rawRoleStr = currentRole || userPrimaryRole || 'SALES';
+
+      const mappedRole: UserRole = rawRoleStr.toUpperCase().includes('ADMIN')
+        ? 'ADMIN'
+        : rawRoleStr.toUpperCase().includes('MGR') || rawRoleStr.toUpperCase().includes('MANAGER')
+        ? 'MANAGER'
+        : rawRoleStr.toUpperCase().includes('WAREHOUSE') || rawRoleStr.toUpperCase().includes('KHO')
+        ? 'WAREHOUSE'
+        : rawRoleStr.toUpperCase().includes('PROD') || rawRoleStr.toUpperCase().includes('SANXUAT')
+        ? 'PRODUCTION'
+        : 'SALES';
+
+      const words = name.trim().split(/\s+/);
+      const initials = words.length > 1
+        ? (words[0][0] + words[words.length - 1][0]).toUpperCase()
+        : name.slice(0, 2).toUpperCase();
+
+      const roleTitleMap: Record<UserRole, { title: string; color: string }> = {
+        ADMIN: { title: 'Quản trị viên', color: 'from-blue-600 to-indigo-700' },
+        MANAGER: { title: 'Quản lý vận hành', color: 'from-purple-600 to-indigo-500' },
+        SALES: { title: 'Nhân viên bán hàng', color: 'from-amber-600 to-amber-500' },
+        WAREHOUSE: { title: 'Thủ kho', color: 'from-emerald-600 to-teal-500' },
+        PRODUCTION: { title: 'Nhân viên sản xuất', color: 'from-rose-600 to-pink-500' },
+      };
+
+      const { title, color } = roleTitleMap[mappedRole] || roleTitleMap.SALES;
+
+      setCurrentUser({
+        name,
+        code,
+        title: (currentRole && currentRole !== userPrimaryRole) ? title : (u.title || title),
+        role: mappedRole,
+        initials,
+        avatarColor: color,
+        avatar: u.avatar || null,
+      });
+    }
+
+    // Tải danh sách nhân viên để phục vụ đổi nhanh và bổ sung avatar nếu user thiếu
     adminService.getStaffList().then((list) => {
-      if (list && list.length > 0) setStaffList(list);
+      if (list && list.length > 0) {
+        setStaffList(list);
+
+        if (u) {
+          const matched = list.find(
+            (s) =>
+              (s.username && u.username && s.username.toLowerCase() === u.username.toLowerCase()) ||
+              (s.code && u.code && s.code.toUpperCase() === u.code.toUpperCase()) ||
+              (s.email && u.email && s.email.toLowerCase() === u.email.toLowerCase()) ||
+              (s.name && u.fullName && s.name.toLowerCase() === u.fullName.toLowerCase())
+          );
+          if (matched) {
+            setCurrentUser((prev) => ({
+              ...prev,
+              avatar: prev.avatar || matched.avatar || null,
+              code: prev.code || matched.code,
+              title: prev.title || matched.title || matched.roleTitle,
+            }));
+          }
+        }
+      }
     });
   }, [currentRole]);
 
@@ -171,13 +200,16 @@ export const Header: React.FC<HeaderProps> = ({
     const numericId = parseInt(staff.id.replace(/\D/g, ''), 10) || 1;
     const updatedStorage = {
       userId: numericId,
-      username: staff.email.split('@')[0],
+      username: staff.username || (staff.email ? staff.email.split('@')[0] : ''),
       fullName: staff.name,
       code: staff.code,
       email: staff.email,
       roles: [staff.role],
+      title: staff.title || staff.roleTitle,
+      avatar: staff.avatar || null,
     };
     localStorage.setItem('stockflow_user', JSON.stringify(updatedStorage));
+    localStorage.setItem('stockflow_current_role', staff.role);
 
     setCurrentUser({
       name: staff.name,
@@ -186,6 +218,7 @@ export const Header: React.FC<HeaderProps> = ({
       role: staff.role,
       initials,
       avatarColor: color,
+      avatar: staff.avatar || null,
     });
 
     onRoleChange(staff.role);
@@ -195,6 +228,8 @@ export const Header: React.FC<HeaderProps> = ({
   const handleLogout = () => {
     localStorage.removeItem('stockflow_token');
     localStorage.removeItem('stockflow_user');
+    localStorage.removeItem('stockflow_current_role');
+    localStorage.removeItem('stockflow_active_screen');
     router.push('/login');
   };
 
@@ -241,9 +276,17 @@ export const Header: React.FC<HeaderProps> = ({
           title="Click để chuyển đổi phân quyền & tài khoản"
         >
           <div className="relative">
-            <div className={`w-9 h-9 rounded-full bg-gradient-to-tr ${currentUser.avatarColor} text-white flex items-center justify-center font-bold text-xs ring-2 ring-white shadow-xs overflow-hidden`}>
-              <span className="text-white text-xs font-semibold">{currentUser.initials}</span>
-            </div>
+            {currentUser.avatar ? (
+              <img
+                src={currentUser.avatar}
+                alt={currentUser.name}
+                className="w-9 h-9 rounded-full object-cover ring-2 ring-white shadow-xs"
+              />
+            ) : (
+              <div className={`w-9 h-9 rounded-full bg-gradient-to-tr ${currentUser.avatarColor} text-white flex items-center justify-center font-bold text-xs ring-2 ring-white shadow-xs overflow-hidden`}>
+                <span className="text-white text-xs font-semibold">{currentUser.initials}</span>
+              </div>
+            )}
           </div>
           <div className="text-left">
             <div className="flex items-center gap-1.5">
@@ -272,9 +315,17 @@ export const Header: React.FC<HeaderProps> = ({
             <div className="absolute right-0 top-14 w-84 bg-white text-slate-800 rounded-2xl shadow-2xl border border-slate-100 p-3 z-50 animate-in fade-in zoom-in-95 duration-150">
               {/* Header profile inside dropdown */}
               <div className="flex items-center gap-3 p-2 border-b border-slate-100 pb-3">
-                <div className={`w-11 h-11 rounded-full bg-gradient-to-tr ${currentUser.avatarColor} text-white flex items-center justify-center font-bold text-sm ring-2 ring-blue-100 shadow-xs shrink-0`}>
-                  <span>{currentUser.initials}</span>
-                </div>
+                {currentUser.avatar ? (
+                  <img
+                    src={currentUser.avatar}
+                    alt={currentUser.name}
+                    className="w-11 h-11 rounded-full object-cover ring-2 ring-blue-100 shadow-xs shrink-0"
+                  />
+                ) : (
+                  <div className={`w-11 h-11 rounded-full bg-gradient-to-tr ${currentUser.avatarColor} text-white flex items-center justify-center font-bold text-sm ring-2 ring-blue-100 shadow-xs shrink-0`}>
+                    <span>{currentUser.initials}</span>
+                  </div>
+                )}
                 <div className="min-w-0 flex-1">
                   <div className="text-sm font-bold text-slate-900 truncate">{currentUser.name}</div>
                   <div className="text-xs text-slate-500 truncate">{currentUser.title}</div>
@@ -348,8 +399,8 @@ export const Header: React.FC<HeaderProps> = ({
                   <div className="px-2 pt-3 pb-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider border-t border-slate-100 mt-2">
                     ĐỔI NHANH NHÂN VIÊN
                   </div>
-                  <div className="max-h-40 overflow-y-auto space-y-0.5">
-                    {staffList.slice(0, 5).map((staff) => {
+                  <div className="max-h-48 overflow-y-auto space-y-1">
+                    {staffList.slice(0, 10).map((staff) => {
                       const isCurrent = staff.name === currentUser.name || staff.code === currentUser.code;
                       return (
                         <button
@@ -360,7 +411,19 @@ export const Header: React.FC<HeaderProps> = ({
                             isCurrent ? 'bg-blue-50/70 text-blue-700 font-bold' : 'text-slate-700'
                           }`}
                         >
-                          <span className="truncate">{staff.name} ({staff.code})</span>
+                          <div className="flex items-center gap-2 min-w-0">
+                            {staff.avatar ? (
+                              <img src={staff.avatar} alt="" className="w-6 h-6 rounded-full object-cover shrink-0" />
+                            ) : (
+                              <div className="w-6 h-6 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center text-[9px] font-bold shrink-0">
+                                {staff.name.slice(0, 1).toUpperCase()}
+                              </div>
+                            )}
+                            <div className="truncate">
+                              <span className="font-semibold">{staff.name}</span>{' '}
+                              <span className="font-mono text-[10px] text-slate-400">({staff.code})</span>
+                            </div>
+                          </div>
                           {isCurrent && <UserCheck size={14} className="text-blue-600 shrink-0" />}
                         </button>
                       );

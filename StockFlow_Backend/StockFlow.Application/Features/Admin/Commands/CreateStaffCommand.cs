@@ -104,6 +104,12 @@ public class CreateStaffCommandHandler : IRequestHandler<CreateStaffCommand, Res
             return Result.Failure<StaffDto>($"Không tìm thấy vai trò '{req.Role}' trong hệ thống.");
         }
 
+        // Chặn tạo thêm nhân viên với vai trò Quản trị viên (ROLE_ADMIN)
+        if (role.RoleId == 1 || (role.RoleName != null && role.RoleName.Contains("Admin", StringComparison.OrdinalIgnoreCase)) || roleInput.Equals("ROLE_ADMIN", StringComparison.OrdinalIgnoreCase) || roleInput.Equals("ADMIN", StringComparison.OrdinalIgnoreCase))
+        {
+            return Result.Failure<StaffDto>("Không thể tạo tài khoản nhân viên với vai trò Quản trị viên (ROLE_ADMIN). Vai trò này chỉ dành riêng cho tài khoản Admin ban đầu.");
+        }
+
         // 3. Mật khẩu khởi tạo (ưu tiên mật khẩu người dùng nhập trong form, mặc định TinPhat@2026)
         var passwordToHash = !string.IsNullOrWhiteSpace(req.Password) ? req.Password.Trim() : "TinPhat@2026";
         var defaultPasswordHash = _passwordHasher.Hash(passwordToHash);
@@ -139,11 +145,32 @@ public class CreateStaffCommandHandler : IRequestHandler<CreateStaffCommand, Res
         var assignedWarehouses = new List<string>();
         if (req.AssignedWarehouses != null && req.AssignedWarehouses.Count > 0)
         {
-            var warehouses = await _context.MstWarehouses
-                .Where(w => w.WarehouseCode != null && req.AssignedWarehouses.Contains(w.WarehouseCode))
-                .ToListAsync(cancellationToken);
+            var allWarehouses = await _context.MstWarehouses.ToListAsync(cancellationToken);
+            var selectedWarehouses = new List<MstWarehouse>();
 
-            foreach (var wh in warehouses)
+            foreach (var whInput in req.AssignedWarehouses.Where(w => !string.IsNullOrWhiteSpace(w)))
+            {
+                var input = whInput.Trim();
+                var matched = allWarehouses.FirstOrDefault(w =>
+                    string.Equals(w.WarehouseCode, input, StringComparison.OrdinalIgnoreCase) ||
+                    (int.TryParse(input, out var wid) && w.WarehouseId == wid) ||
+                    (input.Equals("WH-HN-01", StringComparison.OrdinalIgnoreCase) && (w.WarehouseCode == "K001" || (w.WarehouseName != null && w.WarehouseName.Contains("Gia Lâm")))) ||
+                    (input.Equals("K001", StringComparison.OrdinalIgnoreCase) && (w.WarehouseCode == "WH-HN-01" || (w.WarehouseName != null && w.WarehouseName.Contains("Gia Lâm")))) ||
+                    (input.Equals("WH-HN-02", StringComparison.OrdinalIgnoreCase) && (w.WarehouseCode == "K002" || (w.WarehouseName != null && w.WarehouseName.Contains("Đông Anh")))) ||
+                    (input.Equals("K002", StringComparison.OrdinalIgnoreCase) && (w.WarehouseCode == "WH-HN-02" || (w.WarehouseName != null && w.WarehouseName.Contains("Đông Anh")))) ||
+                    (input.Equals("WH-HN-03", StringComparison.OrdinalIgnoreCase) && (w.WarehouseCode == "K003" || (w.WarehouseName != null && w.WarehouseName.Contains("Hà Đông")))) ||
+                    (input.Equals("K003", StringComparison.OrdinalIgnoreCase) && (w.WarehouseCode == "WH-HN-03" || (w.WarehouseName != null && w.WarehouseName.Contains("Hà Đông")))) ||
+                    (input.Equals("WH-HN-04", StringComparison.OrdinalIgnoreCase) && (w.WarehouseCode == "K004" || (w.WarehouseName != null && w.WarehouseName.Contains("Hoàn Kiếm")))) ||
+                    (input.Equals("K004", StringComparison.OrdinalIgnoreCase) && (w.WarehouseCode == "WH-HN-04" || (w.WarehouseName != null && w.WarehouseName.Contains("Hoàn Kiếm"))))
+                );
+
+                if (matched != null && !selectedWarehouses.Any(sw => sw.WarehouseId == matched.WarehouseId))
+                {
+                    selectedWarehouses.Add(matched);
+                }
+            }
+
+            foreach (var wh in selectedWarehouses)
             {
                 await _context.JncUserWarehouseAccesses.AddAsync(new JncUserWarehouseAccess
                 {

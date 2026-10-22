@@ -4,6 +4,7 @@ using StockFlow.Application.Common;
 using StockFlow.Application.Common.Interfaces;
 using StockFlow.Application.Features.Admin.DTOs;
 using StockFlow.Application.Features.Roles.Common;
+using StockFlow.Domain.Entities;
 
 namespace StockFlow.Application.Features.Admin.Commands;
 
@@ -114,6 +115,26 @@ public class UpdateStaffCommandHandler : IRequestHandler<UpdateStaffCommand, Res
             (roleInput.Equals("PRODUCTION", StringComparison.OrdinalIgnoreCase) && r.RoleName != null && (r.RoleName.Contains("Production", StringComparison.OrdinalIgnoreCase) || r.RoleName.Contains("Sản xuất", StringComparison.OrdinalIgnoreCase)))
         );
 
+        var isAdminUser = user.UserId == 1 || string.Equals(user.Username, "admin", StringComparison.OrdinalIgnoreCase);
+
+        // Nếu là tài khoản Admin ban đầu: vai trò cố định là Admin, không thể đổi sang vai trò khác
+        if (isAdminUser)
+        {
+            var adminRole = allRoles.FirstOrDefault(r => r.RoleId == 1 || (r.RoleName != null && r.RoleName.Contains("Admin", StringComparison.OrdinalIgnoreCase)));
+            if (adminRole != null)
+            {
+                role = adminRole;
+            }
+        }
+        else
+        {
+            // Nếu không phải admin: không được phép gán vai trò Admin
+            if (role != null && (role.RoleId == 1 || (role.RoleName != null && role.RoleName.Contains("Admin", StringComparison.OrdinalIgnoreCase)) || roleInput.Equals("ROLE_ADMIN", StringComparison.OrdinalIgnoreCase) || roleInput.Equals("ADMIN", StringComparison.OrdinalIgnoreCase)))
+            {
+                return Result.Failure<StaffDto>("Không thể gán vai trò Quản trị viên (ROLE_ADMIN) cho nhân viên khác.");
+            }
+        }
+
         if (role != null)
         {
             _context.JncUserRoles.RemoveRange(user.JncUserRoles);
@@ -130,11 +151,32 @@ public class UpdateStaffCommandHandler : IRequestHandler<UpdateStaffCommand, Res
         var assignedWarehouses = new List<string>();
         if (req.AssignedWarehouses != null && req.AssignedWarehouses.Count > 0)
         {
-            var warehouses = await _context.MstWarehouses
-                .Where(w => w.WarehouseCode != null && req.AssignedWarehouses.Contains(w.WarehouseCode))
-                .ToListAsync(cancellationToken);
+            var allWarehouses = await _context.MstWarehouses.ToListAsync(cancellationToken);
+            var selectedWarehouses = new List<MstWarehouse>();
 
-            foreach (var wh in warehouses)
+            foreach (var whInput in req.AssignedWarehouses.Where(w => !string.IsNullOrWhiteSpace(w)))
+            {
+                var input = whInput.Trim();
+                var matched = allWarehouses.FirstOrDefault(w =>
+                    string.Equals(w.WarehouseCode, input, StringComparison.OrdinalIgnoreCase) ||
+                    (int.TryParse(input, out var wid) && w.WarehouseId == wid) ||
+                    (input.Equals("WH-HN-01", StringComparison.OrdinalIgnoreCase) && (w.WarehouseCode == "K001" || (w.WarehouseName != null && w.WarehouseName.Contains("Gia Lâm")))) ||
+                    (input.Equals("K001", StringComparison.OrdinalIgnoreCase) && (w.WarehouseCode == "WH-HN-01" || (w.WarehouseName != null && w.WarehouseName.Contains("Gia Lâm")))) ||
+                    (input.Equals("WH-HN-02", StringComparison.OrdinalIgnoreCase) && (w.WarehouseCode == "K002" || (w.WarehouseName != null && w.WarehouseName.Contains("Đông Anh")))) ||
+                    (input.Equals("K002", StringComparison.OrdinalIgnoreCase) && (w.WarehouseCode == "WH-HN-02" || (w.WarehouseName != null && w.WarehouseName.Contains("Đông Anh")))) ||
+                    (input.Equals("WH-HN-03", StringComparison.OrdinalIgnoreCase) && (w.WarehouseCode == "K003" || (w.WarehouseName != null && w.WarehouseName.Contains("Hà Đông")))) ||
+                    (input.Equals("K003", StringComparison.OrdinalIgnoreCase) && (w.WarehouseCode == "WH-HN-03" || (w.WarehouseName != null && w.WarehouseName.Contains("Hà Đông")))) ||
+                    (input.Equals("WH-HN-04", StringComparison.OrdinalIgnoreCase) && (w.WarehouseCode == "K004" || (w.WarehouseName != null && w.WarehouseName.Contains("Hoàn Kiếm")))) ||
+                    (input.Equals("K004", StringComparison.OrdinalIgnoreCase) && (w.WarehouseCode == "WH-HN-04" || (w.WarehouseName != null && w.WarehouseName.Contains("Hoàn Kiếm"))))
+                );
+
+                if (matched != null && !selectedWarehouses.Any(sw => sw.WarehouseId == matched.WarehouseId))
+                {
+                    selectedWarehouses.Add(matched);
+                }
+            }
+
+            foreach (var wh in selectedWarehouses)
             {
                 await _context.JncUserWarehouseAccesses.AddAsync(new Domain.Entities.JncUserWarehouseAccess
                 {

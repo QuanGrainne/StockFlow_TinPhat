@@ -10,6 +10,11 @@ async function resolveAuthToken(providedToken?: string): Promise<string | undefi
   let token = localStorage.getItem('stockflow_token');
   if (token) return token;
 
+  // Nếu đang ở màn hình login thì không tự ý lấy token admin ngầm
+  if (typeof window !== 'undefined' && window.location.pathname.includes('/login')) {
+    return undefined;
+  }
+
   // Nếu chưa có token trong localStorage (chưa qua màn login), tự động lấy token admin để dev / test thông suốt
   try {
     const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
