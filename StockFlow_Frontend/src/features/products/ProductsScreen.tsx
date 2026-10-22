@@ -172,25 +172,6 @@ export default function ProductsScreen() {
       ),
     },
     {
-      header: 'Phân loại',
-      accessor: 'type',
-      width: '160px',
-      render: (row) => {
-        if (row.type === 'FINISHED') {
-          return (
-            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-blue-50 text-[#2B6CB0] border border-blue-200">
-              <Package size={12} /> Thành phẩm
-            </span>
-          );
-        }
-        return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
-            <Layers size={12} /> Nguyên vật liệu
-          </span>
-        );
-      },
-    },
-    {
       header: 'Giá bán (VND)',
       accessor: 'standardPrice',
       align: 'right',
@@ -344,33 +325,17 @@ export default function ProductsScreen() {
           </div>
         )}
 
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
-              Phân loại hàng hóa <span className="text-rose-500">*</span>
-            </label>
-            <select
-              value={formType}
-              onChange={(e) => setFormType(e.target.value as any)}
-              className="w-full h-9 px-3 rounded-[6px] border border-slate-300 text-xs bg-white text-slate-800 focus:outline-none focus:border-[#2B6CB0]"
-            >
-              <option value="FINISHED">Thành phẩm (Máng cáp, Khay cáp)</option>
-              <option value="RAW_MATERIAL">Nguyên vật liệu (Tôn cuộn, Bột sơn)</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
-              Mã hàng hóa (SKU) <span className="text-rose-500">*</span>
-            </label>
-            <input
-              type="text"
-              value={formCode}
-              onChange={(e) => setFormCode(e.target.value)}
-              placeholder="Vd: TP-MC-300-ST"
-              className="w-full h-9 px-3 rounded-[6px] border border-slate-300 text-xs text-slate-800 font-mono font-bold focus:outline-none focus:border-[#2B6CB0]"
-            />
-          </div>
+        <div>
+          <label className="block text-xs font-semibold text-slate-700 mb-1">
+            Mã hàng hóa (SKU) <span className="text-rose-500">*</span>
+          </label>
+          <input
+            type="text"
+            value={formCode}
+            onChange={(e) => setFormCode(e.target.value)}
+            placeholder="Vd: TP-MC-300-ST"
+            className="w-full h-9 px-3 rounded-[6px] border border-slate-300 text-xs text-slate-800 font-mono font-bold focus:outline-none focus:border-[#2B6CB0]"
+          />
         </div>
 
         <div>
