@@ -385,7 +385,7 @@ export const WarehousePermissionsScreen: React.FC = () => {
               </div>
               <div>
                 <h3 className="text-base font-bold text-slate-900">
-                  Phân quyền kho (Quy tắc BR-03)
+                  Phân quyền kho cho nhân sự
                 </h3>
                 <p className="text-xs text-slate-500">
                   Nhân sự: <span className="font-bold text-slate-800">{selectedStaff.name}</span> ({selectedStaff.code})
@@ -395,7 +395,7 @@ export const WarehousePermissionsScreen: React.FC = () => {
 
             <div className="space-y-3 mb-6">
               <div className="text-xs text-slate-600 mb-2">
-                Chọn các kho vật lý mà nhân viên này được phép tra cứu tồn kho, lập phiếu và xuất nhập chứng từ:
+                Chọn các cơ sở kho mà nhân viên này được phép truy cập, lập phiếu và xem tồn kho:
               </div>
 
               {facilities.map((fac) => {

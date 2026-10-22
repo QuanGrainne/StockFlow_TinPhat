@@ -157,8 +157,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
         },
         {
           id: 'admin-matrix',
-          title: 'Cấu hình ma trận',
-          desc: 'Quyền hạn theo phân hệ',
+          title: 'Phân quyền chức năng',
+          desc: 'Quyền hạn theo vai trò',
           icon: Sliders,
           requiredModule: 'AUTH',
         },
@@ -174,14 +174,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {
           id: 'admin-warehouse-perms',
           title: 'Danh sách quyền kho',
-          desc: 'Ma trận nhân sự và kho',
+          desc: 'Phân quyền kho cho nhân sự',
           icon: Warehouse,
           requiredModule: 'AUTH',
         },
         {
           id: 'admin-warehouse-facilities',
           title: 'Cơ sở kho',
-          desc: 'Cách ly dữ liệu kho vật lý',
+          desc: 'Danh sách cơ sở kho',
           icon: MapPin,
           requiredModule: 'AUTH',
         },

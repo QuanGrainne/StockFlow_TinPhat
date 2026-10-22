@@ -183,7 +183,7 @@ export const SalesDashboard: React.FC<SalesDashboardProps> = ({ onNavigate }) =>
             </div>
             <div className="text-xs font-bold text-slate-800 pt-1">Tạo đơn chờ</div>
             <div className="text-[11px] text-slate-500 leading-tight">
-              Lưu yêu cầu không trừ tồn kho vật lý (BR-08)
+              Lưu yêu cầu, chưa trừ số lượng tồn kho
             </div>
           </div>
 
@@ -195,7 +195,7 @@ export const SalesDashboard: React.FC<SalesDashboardProps> = ({ onNavigate }) =>
             </div>
             <div className="text-xs font-bold text-slate-800 pt-1">Gộp đơn hàng</div>
             <div className="text-[11px] text-slate-500 leading-tight">
-              Gom nhiều đơn cùng khách vào 1 chuyến xe (BR-09)
+              Gom nhiều đơn cùng khách vào 1 chuyến xe
             </div>
           </div>
 
@@ -207,7 +207,7 @@ export const SalesDashboard: React.FC<SalesDashboardProps> = ({ onNavigate }) =>
             </div>
             <div className="text-xs font-bold text-slate-800 pt-1">Thanh toán VietQR</div>
             <div className="text-[11px] text-slate-500 leading-tight">
-              Kiểm tra trần nợ: Dư nợ + Đơn mới ≤ Hạn mức (BR-10)
+              Kiểm tra trần nợ: Dư nợ + Đơn mới ≤ Hạn mức
             </div>
           </div>
 
@@ -231,7 +231,7 @@ export const SalesDashboard: React.FC<SalesDashboardProps> = ({ onNavigate }) =>
             </div>
             <div className="text-xs font-bold text-slate-800 pt-1">Xử lý trả hàng</div>
             <div className="text-[11px] text-slate-500 leading-tight">
-              Lập phiếu khiếu nại đối chiếu hoá đơn gốc (BR-18)
+              Lập phiếu khiếu nại đối chiếu hoá đơn gốc
             </div>
           </div>
         </div>
@@ -248,7 +248,7 @@ export const SalesDashboard: React.FC<SalesDashboardProps> = ({ onNavigate }) =>
               Kiến trúc nghiệp vụ kết nối MISA & Điều phối đa kho
             </h4>
             <p className="text-[11px] text-blue-100/80 mt-1 leading-relaxed">
-              Toàn bộ đơn hàng ghi nhận theo giá trị thuần Net (chưa VAT) theo quy tắc BR-55. Khi kho xuất thực tế thiếu số lượng, hệ thống tự động chẻ đơn chờ (Auto-split BR-17) đưa ngược lại danh sách để Sales tiếp tục điều phối.
+              Toàn bộ đơn hàng ghi nhận theo giá trị thuần Net (chưa VAT). Khi kho xuất thực tế thiếu số lượng, hệ thống tự động tách đơn chờ đưa ngược lại danh sách để Sales tiếp tục điều phối.
             </p>
           </div>
         </div>
