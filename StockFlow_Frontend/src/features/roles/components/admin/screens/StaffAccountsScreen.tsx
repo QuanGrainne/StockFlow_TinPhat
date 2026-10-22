@@ -90,6 +90,7 @@ export const StaffAccountsScreen: React.FC<StaffAccountsScreenProps> = ({
   const [formWarehouses, setFormWarehouses] = useState<string[]>(['WH-HN-01']);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
+  const autoCode = getNextStaffCode(staffList);
   const isCodeDuplicate = Boolean(
     formCode.trim() &&
     staffList.some(
@@ -737,21 +738,38 @@ export const StaffAccountsScreen: React.FC<StaffAccountsScreenProps> = ({
                     <label className="block text-xs font-semibold text-slate-700">
                       Mã nhân viên <span className="text-rose-500">*</span>
                     </label>
-                    <span
-                      className={`text-[10px] px-1.5 py-0.5 rounded border font-medium transition ${
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!formCode.trim() || formCode.trim().toUpperCase() !== autoCode.toUpperCase()) {
+                          setFormCode(autoCode);
+                        } else {
+                          setFormCode('');
+                        }
+                      }}
+                      title={
+                        formCode.trim()
+                          ? 'Nhấn để xóa về để trống hoặc điền lại mã gợi ý'
+                          : `Nhấn để tự động điền mã ${autoCode}`
+                      }
+                      className={`text-[10px] px-2 py-0.5 rounded border font-semibold transition cursor-pointer active:scale-95 ${
                         isCodeDuplicate
-                          ? 'text-rose-700 bg-rose-50 border-rose-200'
+                          ? 'text-rose-700 bg-rose-50 border-rose-200 hover:bg-rose-100'
+                          : formCode.trim() && formCode.trim().toUpperCase() === autoCode.toUpperCase()
+                          ? 'text-blue-700 bg-blue-100 border-blue-300 hover:bg-blue-200'
                           : formCode.trim()
-                          ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
-                          : 'text-blue-600 bg-blue-50 border-blue-200/60'
+                          ? 'text-emerald-700 bg-emerald-50 border-emerald-200 hover:bg-emerald-100'
+                          : 'text-blue-600 bg-blue-50 border-blue-200/60 hover:bg-blue-100 hover:border-blue-400'
                       }`}
                     >
                       {isCodeDuplicate
                         ? 'Trùng lặp'
+                        : formCode.trim() && formCode.trim().toUpperCase() === autoCode.toUpperCase()
+                        ? '✓ Tự động'
                         : formCode.trim()
                         ? 'Tự nhập'
                         : 'Tự động'}
-                    </span>
+                    </button>
                   </div>
                   <input
                     type="text"
@@ -771,7 +789,9 @@ export const StaffAccountsScreen: React.FC<StaffAccountsScreenProps> = ({
                     </span>
                   ) : (
                     <span className="text-[10px] text-slate-400 mt-1 block">
-                      Để trống hệ thống sẽ tự động tạo mã
+                      {formCode.trim()
+                        ? `Đang dùng mã: ${formCode.trim().toUpperCase()} (Nhấn nút "Tự động" để đổi lại)`
+                        : `Nhấn nút "Tự động" để điền ngay mã ${autoCode}, hoặc để trống hệ thống sẽ tự sinh`}
                     </span>
                   )}
                 </div>

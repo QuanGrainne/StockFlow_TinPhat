@@ -2106,17 +2106,38 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                         <div>
                           <div className="flex items-center justify-between mb-1">
                             <label className="font-semibold text-slate-700">Mã hàng</label>
-                            <span
-                              className={`text-[10px] font-bold px-2 py-0.5 rounded transition ${
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (!formCode.trim() || formCode.trim().toUpperCase() !== suggestedProductCode.toUpperCase()) {
+                                  setFormCode(suggestedProductCode);
+                                } else {
+                                  setFormCode('');
+                                }
+                              }}
+                              title={
+                                formCode.trim()
+                                  ? 'Nhấn để xóa về để trống hoặc điền lại mã gợi ý'
+                                  : `Nhấn để tự động điền mã ${suggestedProductCode}`
+                              }
+                              className={`text-[10px] font-bold px-2 py-0.5 rounded transition cursor-pointer active:scale-95 flex items-center gap-1 ${
                                 isProductCodeDuplicate
-                                  ? 'bg-rose-50 text-rose-600 border border-rose-200'
+                                  ? 'bg-rose-50 text-rose-600 border border-rose-200 hover:bg-rose-100'
+                                  : formCode.trim() && formCode.trim().toUpperCase() === suggestedProductCode.toUpperCase()
+                                  ? 'bg-blue-100 text-blue-700 border border-blue-300 hover:bg-blue-200'
                                   : formCode.trim()
-                                  ? 'bg-amber-50 text-amber-700 border border-amber-200'
-                                  : 'bg-blue-50 text-blue-700 border border-blue-200'
+                                  ? 'bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100'
+                                  : 'bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100'
                               }`}
                             >
-                              {isProductCodeDuplicate ? 'Trùng lặp' : formCode.trim() ? 'Tự nhập' : 'Tự động'}
-                            </span>
+                              {isProductCodeDuplicate
+                                ? 'Trùng lặp'
+                                : formCode.trim() && formCode.trim().toUpperCase() === suggestedProductCode.toUpperCase()
+                                ? '✓ Tự động'
+                                : formCode.trim()
+                                ? 'Tự nhập'
+                                : 'Tự động'}
+                            </button>
                           </div>
                           <input
                             type="text"
@@ -2131,8 +2152,8 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                           />
                           <p className="text-[10px] text-slate-400 mt-1">
                             {formCode.trim()
-                              ? `Đang dùng mã tự nhập: ${formCode.trim().toUpperCase()}`
-                              : `Để trống hệ thống sẽ tự động tạo mã (ví dụ: ${suggestedProductCode})`}
+                              ? `Đang dùng mã: ${formCode.trim().toUpperCase()} (Nhấn nút "Tự động" để đổi lại)`
+                              : `Nhấn nút "Tự động" để điền ngay mã ${suggestedProductCode}, hoặc để trống hệ thống sẽ tự sinh`}
                           </p>
                         </div>
                         <div>
