@@ -22,23 +22,50 @@ public class CreateProductCommandHandler : IRequestHandler<CreateProductCommand,
     {
         var req = command.Request;
 
-        if (string.IsNullOrWhiteSpace(req.Code))
+        string codeNormalized;
+        var rawCode = req.Code?.Trim();
+
+        if (string.IsNullOrWhiteSpace(rawCode) || rawCode.Equals("Tự động", StringComparison.OrdinalIgnoreCase) || rawCode.Equals("AUTO", StringComparison.OrdinalIgnoreCase))
         {
-            return Result.Failure<ProductDto>("Mã hàng hóa không được để trống.");
+            var existingCodes = await _context.MstProducts
+                .Where(p => p.ProductCode != null && p.ProductCode.StartsWith("SP"))
+                .Select(p => p.ProductCode!)
+                .ToListAsync(cancellationToken);
+
+            int maxNum = 0;
+            foreach (var c in existingCodes)
+            {
+                var match = System.Text.RegularExpressions.Regex.Match(c, @"^SP(\d+)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                if (match.Success && int.TryParse(match.Groups[1].Value, out var n))
+                {
+                    if (n > maxNum) maxNum = n;
+                }
+            }
+
+            int nextNum = maxNum > 0 ? maxNum + 1 : 1;
+            codeNormalized = $"SP{nextNum:D6}";
+
+            while (await _context.MstProducts.AnyAsync(p => p.ProductCode == codeNormalized, cancellationToken))
+            {
+                nextNum++;
+                codeNormalized = $"SP{nextNum:D6}";
+            }
+        }
+        else
+        {
+            codeNormalized = rawCode.ToUpper();
+            var exists = await _context.MstProducts
+                .AnyAsync(p => p.ProductCode == codeNormalized, cancellationToken);
+
+            if (exists)
+            {
+                return Result.Failure<ProductDto>($"Mã hàng hóa '{req.Code}' đã tồn tại trong hệ thống.");
+            }
         }
 
         if (string.IsNullOrWhiteSpace(req.Name))
         {
             return Result.Failure<ProductDto>("Tên hàng hóa không được để trống.");
-        }
-
-        var codeNormalized = req.Code.Trim().ToUpper();
-        var exists = await _context.MstProducts
-            .AnyAsync(p => p.ProductCode == codeNormalized, cancellationToken);
-
-        if (exists)
-        {
-            return Result.Failure<ProductDto>($"Mã hàng hóa '{req.Code}' đã tồn tại trong hệ thống.");
         }
 
         // 1. Resolve Category

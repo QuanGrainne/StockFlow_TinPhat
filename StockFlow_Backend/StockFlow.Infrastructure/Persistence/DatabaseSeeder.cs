@@ -49,19 +49,46 @@ public static class DatabaseSeeder
 
         var warehouses = new List<MstWarehouse>
         {
-            new() { WarehouseId = 1, WarehouseCode = "KTP-01", WarehouseName = "Kho Thành Phẩm", IsActive = true, Description = "Kho lưu trữ thành phẩm sẵn sàng xuất bán" },
-            new() { WarehouseId = 2, WarehouseCode = "KNVL-01", WarehouseName = "Kho Nguyên Vật Liệu", IsActive = true, Description = "Kho lưu trữ nguyên vật liệu phục vụ sản xuất" },
-            new() { WarehouseId = 3, WarehouseCode = "WH-HN-01", WarehouseName = "Kho Tổng Gia Lâm", Address = "Số 18 Đường Dệt May, Gia Lâm, Hà Nội", IsActive = true, Description = "Kho trung tâm" },
-            new() { WarehouseId = 4, WarehouseCode = "WH-HN-02", WarehouseName = "Kho Đông Anh", Address = "CCN Nguyên Khê, Đông Anh, Hà Nội", IsActive = true, Description = "Kho phụ trợ" },
-            new() { WarehouseId = 5, WarehouseCode = "WH-HN-03", WarehouseName = "Kho Hà Đông", Address = "Km14 Quốc lộ 6, Yên Nghĩa, Hà Đông, Hà Nội", IsActive = true, Description = "Kho khu vực Tây Hà Nội" },
-            new() { WarehouseId = 6, WarehouseCode = "WH-HN-04", WarehouseName = "Kho Hoàn Kiếm", Address = "42 Phố Trần Hưng Đạo, Hoàn Kiếm, Hà Nội", IsActive = true, Description = "Kho phân phối nội thành" }
+            new() { WarehouseId = 1, WarehouseCode = "KTP-01", WarehouseName = "Kho Thành Phẩm", IsActive = false, Description = "Kho lưu trữ thành phẩm sẵn sàng xuất bán" },
+            new() { WarehouseId = 2, WarehouseCode = "KNVL-01", WarehouseName = "Kho Nguyên Vật Liệu", IsActive = false, Description = "Kho lưu trữ nguyên vật liệu phục vụ sản xuất" },
+            new() { WarehouseId = 3, WarehouseCode = "K001", WarehouseName = "Kho Tổng Gia Lâm", Address = "Số 18 Đường Dệt May, Gia Lâm, Hà Nội", IsActive = true, Description = "8,500 m² - Kho trung tâm thành phẩm và phụ kiện" },
+            new() { WarehouseId = 4, WarehouseCode = "K002", WarehouseName = "Kho Đông Anh", Address = "CCN Nguyên Khê, Đông Anh, Hà Nội", IsActive = true, Description = "4,200 m² - Kho nguyên vật liệu cơ khí và tôn mạ" },
+            new() { WarehouseId = 5, WarehouseCode = "K003", WarehouseName = "Kho Hà Đông", Address = "Km14 Quốc lộ 6, Yên Nghĩa, Hà Đông, Hà Nội", IsActive = true, Description = "3,800 m² - Kho trung chuyển phân phối Tây Hà Nội" },
+            new() { WarehouseId = 6, WarehouseCode = "K004", WarehouseName = "Kho Hoàn Kiếm", Address = "42 Phố Trần Hưng Đạo, Hoàn Kiếm, Hà Nội", IsActive = true, Description = "1,500 m² - Điểm giao hàng nhanh nội đô" }
         };
 
         foreach (var warehouse in warehouses)
         {
-            if (!await context.MstWarehouses.AnyAsync(w => w.WarehouseCode == warehouse.WarehouseCode))
+            var existing = await context.MstWarehouses.FirstOrDefaultAsync(w => w.WarehouseId == warehouse.WarehouseId);
+            if (existing == null)
             {
-                await context.MstWarehouses.AddAsync(warehouse);
+                if (!await context.MstWarehouses.AnyAsync(w => w.WarehouseCode == warehouse.WarehouseCode))
+                {
+                    await context.MstWarehouses.AddAsync(warehouse);
+                }
+            }
+            else
+            {
+                if (existing.WarehouseId == 1 || existing.WarehouseId == 2)
+                {
+                    existing.IsActive = false;
+                }
+                else if (existing.WarehouseId == 3 && (existing.WarehouseCode == "WH-HN-01" || existing.WarehouseCode == "KTP-01"))
+                {
+                    existing.WarehouseCode = "K001";
+                }
+                else if (existing.WarehouseId == 4 && (existing.WarehouseCode == "WH-HN-02" || existing.WarehouseCode == "KNVL-01"))
+                {
+                    existing.WarehouseCode = "K002";
+                }
+                else if (existing.WarehouseId == 5 && existing.WarehouseCode == "WH-HN-03")
+                {
+                    existing.WarehouseCode = "K003";
+                }
+                else if (existing.WarehouseId == 6 && existing.WarehouseCode == "WH-HN-04")
+                {
+                    existing.WarehouseCode = "K004";
+                }
             }
         }
 
@@ -142,10 +169,10 @@ public static class DatabaseSeeder
         }
         var additionalWarehouses = new List<MstWarehouse>
         {
-            new() { WarehouseId = 3, WarehouseCode = "WH-HN-01", WarehouseName = "Kho Tổng Gia Lâm", IsActive = true, Address = "Số 18 Đường Dệt May, Gia Lâm, Hà Nội", Description = "8,500 m² - Kho trung tâm thành phẩm và phụ kiện" },
-            new() { WarehouseId = 4, WarehouseCode = "WH-HN-02", WarehouseName = "Kho Đông Anh", IsActive = true, Address = "CCN Nguyên Khê, Đông Anh, Hà Nội", Description = "4,200 m² - Kho nguyên vật liệu cơ khí và tôn mạ" },
-            new() { WarehouseId = 5, WarehouseCode = "WH-HN-03", WarehouseName = "Kho Hà Đông", IsActive = true, Address = "Km14 Quốc lộ 6, Yên Nghĩa, Hà Đông, Hà Nội", Description = "3,800 m² - Kho trung chuyển phân phối Tây Hà Nội" },
-            new() { WarehouseId = 6, WarehouseCode = "WH-HN-04", WarehouseName = "Kho Hoàn Kiếm", IsActive = true, Address = "42 Phố Trần Hưng Đạo, Hoàn Kiếm, Hà Nội", Description = "1,500 m² - Điểm giao hàng nhanh nội đô" }
+            new() { WarehouseId = 3, WarehouseCode = "K001", WarehouseName = "Kho Tổng Gia Lâm", IsActive = true, Address = "Số 18 Đường Dệt May, Gia Lâm, Hà Nội", Description = "8,500 m² - Kho trung tâm thành phẩm và phụ kiện" },
+            new() { WarehouseId = 4, WarehouseCode = "K002", WarehouseName = "Kho Đông Anh", IsActive = true, Address = "CCN Nguyên Khê, Đông Anh, Hà Nội", Description = "4,200 m² - Kho nguyên vật liệu cơ khí và tôn mạ" },
+            new() { WarehouseId = 5, WarehouseCode = "K003", WarehouseName = "Kho Hà Đông", IsActive = true, Address = "Km14 Quốc lộ 6, Yên Nghĩa, Hà Đông, Hà Nội", Description = "3,800 m² - Kho trung chuyển phân phối Tây Hà Nội" },
+            new() { WarehouseId = 6, WarehouseCode = "K004", WarehouseName = "Kho Hoàn Kiếm", IsActive = true, Address = "42 Phố Trần Hưng Đạo, Hoàn Kiếm, Hà Nội", Description = "1,500 m² - Điểm giao hàng nhanh nội đô" }
         };
 
         foreach (var wh in additionalWarehouses)
@@ -161,10 +188,10 @@ public static class DatabaseSeeder
         var whMap = await context.MstWarehouses.Where(w => w.WarehouseCode != null).ToDictionaryAsync(w => w.WarehouseCode!, w => w.WarehouseId);
         var physicalAccesses = new[]
         {
-            ("admin", "WH-HN-01"), ("manager01", "WH-HN-01"), ("sales01", "WH-HN-01"), ("whstaff01", "WH-HN-01"),
-            ("admin", "WH-HN-02"), ("manager01", "WH-HN-02"), ("whstaff01", "WH-HN-02"), ("prodstaff01", "WH-HN-02"),
-            ("admin", "WH-HN-03"), ("manager01", "WH-HN-03"),
-            ("admin", "WH-HN-04")
+            ("admin", "K001"), ("manager01", "K001"), ("sales01", "K001"), ("whstaff01", "K001"),
+            ("admin", "K002"), ("manager01", "K002"), ("whstaff01", "K002"), ("prodstaff01", "K002"),
+            ("admin", "K003"), ("manager01", "K003"),
+            ("admin", "K004")
         };
         foreach (var (username, whCode) in physicalAccesses)
         {

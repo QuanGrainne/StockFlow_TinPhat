@@ -17,6 +17,28 @@ import {
 import { StaffAccount, WarehouseFacility } from '../../../types';
 import { adminService } from '../../../services/adminService';
 
+export const getNextWarehouseCode = (list: WarehouseFacility[]): string => {
+  let maxNum = 0;
+  for (const f of list) {
+    const kMatch = f.code.match(/^K(\d+)/i);
+    if (kMatch) {
+      const num = parseInt(kMatch[1], 10);
+      if (!isNaN(num) && num > maxNum) {
+        maxNum = num;
+      }
+    } else {
+      const anyMatch = f.code.match(/(\d+)/);
+      if (anyMatch) {
+        const num = parseInt(anyMatch[1], 10);
+        if (!isNaN(num) && num > maxNum) {
+          maxNum = num;
+        }
+      }
+    }
+  }
+  return `K${String(maxNum + 1).padStart(3, '0')}`;
+};
+
 export const WarehousePermissionsScreen: React.FC = () => {
   const [facilities, setFacilities] = useState<WarehouseFacility[]>([]);
   const [staffList, setStaffList] = useState<StaffAccount[]>([]);
@@ -38,6 +60,11 @@ export const WarehousePermissionsScreen: React.FC = () => {
   const [newWhArea, setNewWhArea] = useState('3,500 m²');
   const [isCreatingWh, setIsCreatingWh] = useState(false);
   const [createWhError, setCreateWhError] = useState('');
+
+  const suggestedWhCode = getNextWarehouseCode(facilities);
+  const isWhCodeDuplicate = newWhCode.trim()
+    ? facilities.some((f) => f.code.toUpperCase() === newWhCode.trim().toUpperCase())
+    : false;
 
   const loadData = async () => {
     setLoading(true);
@@ -77,7 +104,7 @@ export const WarehousePermissionsScreen: React.FC = () => {
   };
 
   const handleOpenCreateWhModal = () => {
-    setNewWhCode(`WH-HN-0${facilities.length + 1}`);
+    setNewWhCode('');
     setNewWhName('');
     setNewWhAddress('');
     setNewWhArea('3,500 m²');
@@ -86,8 +113,9 @@ export const WarehousePermissionsScreen: React.FC = () => {
   };
 
   const handleSaveNewWarehouse = async () => {
-    if (!newWhCode.trim()) {
-      setCreateWhError('Vui lòng nhập mã kho');
+    const finalCode = newWhCode.trim() ? newWhCode.trim().toUpperCase() : suggestedWhCode;
+    if (isWhCodeDuplicate) {
+      setCreateWhError('Mã kho đã tồn tại trong hệ thống, vui lòng chọn mã khác');
       return;
     }
     if (!newWhName.trim()) {
@@ -103,13 +131,13 @@ export const WarehousePermissionsScreen: React.FC = () => {
     setCreateWhError('');
     try {
       const created = await adminService.createWarehouseFacility({
-        code: newWhCode.trim(),
+        code: finalCode,
         name: newWhName.trim(),
         address: newWhAddress.trim(),
         area: newWhArea.trim(),
       });
       setFacilities((prev) => [created, ...prev]);
-      showToast(`Đã thêm mới cơ sở kho: ${created.name}`);
+      showToast(`Đã thêm mới cơ sở kho: ${created.name} (${finalCode})`);
       setCreateWhModalOpen(false);
       await loadData();
     } catch (err: any) {
@@ -147,21 +175,15 @@ export const WarehousePermissionsScreen: React.FC = () => {
       {/* Screen Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <div className="text-[11px] font-bold text-blue-600 uppercase tracking-wider mb-1">
-            MÀN HÌNH 3.2.1.9 • Danh sách
-          </div>
           <h1 className="text-xl font-bold text-slate-900 tracking-tight">
-            Danh sách phân quyền kho (Data Isolation)
+            Danh sách phân quyền kho
           </h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Quản trị ma trận phân quyền cơ sở dữ liệu kho vật lý theo quy tắc BR-03
+            Quản trị phân quyền kho cho từng nhân sự
           </p>
         </div>
 
         <div className="flex items-center gap-2.5">
-          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-blue-200 bg-blue-50/70 text-blue-700 text-xs font-semibold">
-            Quy tắc BR-03 Đang áp dụng
-          </span>
           <button
             onClick={handleOpenCreateWhModal}
             className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-[#1E56A0] hover:bg-[#184580] text-white text-xs font-semibold shadow-xs transition cursor-pointer"
@@ -242,10 +264,10 @@ export const WarehousePermissionsScreen: React.FC = () => {
         <div className="p-4 border-b border-slate-200 bg-white flex items-center justify-between">
           <div>
             <h2 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-              MA TRẬN PHÂN QUYỀN NHÂN SỰ - KHO
+              PHÂN QUYỀN NHÂN SỰ - KHO
             </h2>
             <p className="text-[11px] text-slate-400 mt-0.5">
-              Nhân viên chỉ có quyền xem dữ liệu tồn kho và chứng từ của kho được tích chọn
+              Nhân viên chỉ có quyền xem dữ liệu tồn kho và chứng từ của kho được phân quyền
             </p>
           </div>
           <span className="text-xs font-semibold px-2.5 py-1 rounded-[6px] bg-slate-100 text-slate-600">
@@ -260,8 +282,8 @@ export const WarehousePermissionsScreen: React.FC = () => {
                 <th className="py-3 px-4">MÃ NV</th>
                 <th className="py-3 px-4">NHÂN VIÊN</th>
                 <th className="py-3 px-4">PHÒNG BAN</th>
-                <th className="py-3 px-4">VAI TRÒ RBAC</th>
-                <th className="py-3 px-4">KHO ĐƯỢC PHÂN QUYỀN (BR-03)</th>
+                <th className="py-3 px-4">VAI TRÒ</th>
+                <th className="py-3 px-4">KHO ĐƯỢC PHÂN QUYỀN</th>
                 <th className="py-3 px-4 text-center">THAO TÁC</th>
               </tr>
             </thead>
@@ -452,10 +474,10 @@ export const WarehousePermissionsScreen: React.FC = () => {
               </div>
               <div>
                 <h3 className="text-base font-bold text-slate-900">
-                  Thêm cơ sở kho vật lý mới
+                  Thêm cơ sở kho mới
                 </h3>
                 <p className="text-xs text-slate-500">
-                  Cơ sở kho mới sẽ tự động cập nhật vào ma trận phân quyền
+                  Cơ sở kho mới sẽ tự động hiển thị trong danh sách phân quyền
                 </p>
               </div>
             </div>
@@ -468,16 +490,41 @@ export const WarehousePermissionsScreen: React.FC = () => {
 
             <div className="space-y-4 mb-6">
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Mã kho <span className="text-red-500">*</span>
-                </label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-xs font-bold text-slate-700">
+                    Mã kho <span className="text-red-500">*</span>
+                  </label>
+                  <span
+                    className={`text-[10px] font-bold px-2 py-0.5 rounded transition ${
+                      isWhCodeDuplicate
+                        ? 'bg-rose-50 text-rose-600 border border-rose-200'
+                        : newWhCode.trim()
+                        ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                        : 'bg-blue-50 text-blue-700 border border-blue-200'
+                    }`}
+                  >
+                    {isWhCodeDuplicate ? 'Trùng lặp' : newWhCode.trim() ? 'Tự nhập' : 'Tự động'}
+                  </span>
+                </div>
                 <input
                   type="text"
                   value={newWhCode}
-                  onChange={(e) => setNewWhCode(e.target.value)}
-                  placeholder="Vd: WH-HN-05"
-                  className="w-full h-9 px-3 rounded-lg bg-slate-50 border border-slate-200 text-xs font-mono text-slate-800 uppercase focus:outline-none focus:border-blue-500 focus:bg-white transition"
+                  onChange={(e) => {
+                    setNewWhCode(e.target.value);
+                    if (createWhError) setCreateWhError('');
+                  }}
+                  placeholder="Tự động"
+                  className={`w-full h-9 px-3 rounded-lg bg-slate-50 border text-xs font-mono uppercase focus:outline-none focus:bg-white transition ${
+                    isWhCodeDuplicate
+                      ? 'border-rose-400 text-rose-700 focus:border-rose-500'
+                      : 'border-slate-200 text-slate-800 focus:border-blue-500'
+                  }`}
                 />
+                <p className="text-[11px] text-slate-400 mt-1">
+                  {newWhCode.trim()
+                    ? `Đang dùng mã tự nhập: ${newWhCode.trim().toUpperCase()}`
+                    : `Để trống hệ thống sẽ tự động tạo mã (ví dụ: ${suggestedWhCode})`}
+                </p>
               </div>
 
               <div>

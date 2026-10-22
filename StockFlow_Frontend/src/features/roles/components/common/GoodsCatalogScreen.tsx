@@ -472,6 +472,29 @@ const DEFAULT_LOCATION_OPTIONS = [
 // Khóa lưu trữ LocalStorage cho Danh mục Hàng hóa
 export const STOCKFLOW_GOODS_STORAGE_KEY = 'stockflow_goods_catalog_v1';
 
+// Quy tắc sinh mã hàng hóa tự động chuẩn SP + 6 chữ số tuần tự (SP000001, SP000002, ...)
+export const getNextProductCode = (items: GoodsItem[]): string => {
+  let maxNum = 0;
+  for (const item of items) {
+    if (!item.code) continue;
+    const match = item.code.trim().match(/^SP(\d+)$/i);
+    if (match) {
+      const num = parseInt(match[1], 10);
+      if (!isNaN(num) && num > maxNum) {
+        maxNum = num;
+      }
+    }
+  }
+  const nextNum = maxNum > 0 ? maxNum + 1 : 1;
+  let code = `SP${String(nextNum).padStart(6, '0')}`;
+  let counter = nextNum;
+  while (items.some((i) => i.code?.toUpperCase() === code.toUpperCase())) {
+    counter++;
+    code = `SP${String(counter).padStart(6, '0')}`;
+  }
+  return code;
+};
+
 interface GoodsCatalogScreenProps {
   onNavigate?: (screenId: string) => void;
   currentRole?: string;
@@ -485,6 +508,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
   const role = (currentRole || 'WAREHOUSE').toUpperCase();
 
   const [goods, setGoods] = useState<GoodsItem[]>(INITIAL_GOODS_LIST);
+  const suggestedProductCode = getNextProductCode(goods);
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<'ALL' | 'Thành phẩm' | 'Nguyên vật liệu' | 'LOW_STOCK'>(
     role === 'SALES' ? 'Thành phẩm' : role === 'PRODUCTION' ? 'Nguyên vật liệu' : 'ALL'
@@ -507,6 +531,10 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
 
   // Form Fields - Modal 1 (Hỗ trợ TỰ NHẬP tự do hoặc TỰ CHỌN từ danh sách)
   const [formCode, setFormCode] = useState('');
+  const isProductCodeDuplicate =
+    modalMode === 'create' && formCode.trim()
+      ? goods.some((g) => g.code?.toUpperCase() === formCode.trim().toUpperCase())
+      : false;
   const [formBarcode, setFormBarcode] = useState('');
   const [formName, setFormName] = useState('');
   const [formCategory, setFormCategory] = useState<'Thành phẩm' | 'Nguyên vật liệu'>('Thành phẩm');
@@ -805,7 +833,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
     setModalMode('create');
     setEditingItem(null);
     setModalTab('info');
-    setFormCode(`SP${Math.floor(100000 + Math.random() * 900000)}`);
+    setFormCode('');
     setFormBarcode('');
     setFormName('');
     setFormCategory('Thành phẩm');
@@ -1020,7 +1048,11 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
       alert('Vui lòng nhập Tên hàng hóa!');
       return;
     }
-    const finalCode = formCode.trim() || `SP${Math.floor(100000 + Math.random() * 900000)}`;
+    if (isProductCodeDuplicate) {
+      alert(`Mã hàng hóa '${formCode.trim().toUpperCase()}' đã tồn tại trong hệ thống! Vui lòng chọn mã khác.`);
+      return;
+    }
+    const finalCode = formCode.trim() ? formCode.trim().toUpperCase() : suggestedProductCode;
 
     const savedItem: GoodsItem = {
       id: editingItem ? editingItem.id : `G-${Date.now()}`,
@@ -1262,14 +1294,9 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
       {/* 1. Header Màn hình */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-xl font-bold text-slate-900 tracking-tight">
-              Danh mục Hàng hóa &amp; Tồn kho
-            </h1>
-            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
-              Master Data • KiotViet Style
-            </span>
-          </div>
+          <h1 className="text-xl font-bold text-slate-900 tracking-tight">
+            Danh mục Hàng hóa &amp; Tồn kho
+          </h1>
           <p className="text-xs text-slate-500 mt-0.5">
             Quản trị mã sản phẩm, đơn vị tính quy đổi, thuộc tính hương vị/màu sắc và ma trận hàng hóa cùng loại
           </p>
@@ -1334,7 +1361,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
           <div>
             <div className="flex items-center justify-between text-slate-400 mb-2">
               <span className="text-[11px] font-bold tracking-wider uppercase text-emerald-700">
-                TỒN KHẢ DỤNG (ATP)
+                TỒN KHẢ DỤNG
               </span>
               <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
                 <ShieldCheck size={16} />
@@ -1376,7 +1403,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
           <div>
             <div className="flex items-center justify-between text-slate-400 mb-2">
               <span className="text-[11px] font-bold tracking-wider uppercase text-rose-700">
-                CẢNH BÁO TỒN THẤP (MIN)
+                CẢNH BÁO TỒN THẤP
               </span>
               <div className="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center">
                 <AlertTriangle size={16} />
@@ -1584,7 +1611,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                           <button
                             type="button"
                             onClick={() => handleOpenEdit(item)}
-                            title="Chỉnh sửa Master Data"
+                            title="Chỉnh sửa hàng hóa"
                             className="p-1 rounded-md hover:bg-blue-50 text-slate-400 hover:text-blue-600 transition cursor-pointer"
                           >
                             <Edit2 size={13} />
@@ -1910,7 +1937,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                                       </div>
                                       <div>
                                         <div className="text-xs font-bold text-slate-800">{w.warehouseName}</div>
-                                        <div className="text-[11px] text-slate-400">Khả dụng ATP: {w.availableStock} {item.uom}</div>
+                                         <div className="text-[11px] text-slate-400">Khả dụng: {w.availableStock} {item.uom}</div>
                                       </div>
                                     </div>
                                     <div className="text-right">
@@ -2077,14 +2104,36 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                     <div className="md:col-span-8 space-y-3.5">
                       <div className="grid grid-cols-2 gap-3">
                         <div>
-                          <label className="block font-semibold text-slate-700 mb-1">Mã hàng</label>
+                          <div className="flex items-center justify-between mb-1">
+                            <label className="font-semibold text-slate-700">Mã hàng</label>
+                            <span
+                              className={`text-[10px] font-bold px-2 py-0.5 rounded transition ${
+                                isProductCodeDuplicate
+                                  ? 'bg-rose-50 text-rose-600 border border-rose-200'
+                                  : formCode.trim()
+                                  ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                                  : 'bg-blue-50 text-blue-700 border border-blue-200'
+                              }`}
+                            >
+                              {isProductCodeDuplicate ? 'Trùng lặp' : formCode.trim() ? 'Tự nhập' : 'Tự động'}
+                            </span>
+                          </div>
                           <input
                             type="text"
                             value={formCode}
                             onChange={(e) => setFormCode(e.target.value)}
                             placeholder="Tự động"
-                            className="w-full h-9 px-3 rounded-lg border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500 font-mono"
+                            className={`w-full h-9 px-3 rounded-lg border text-xs placeholder-slate-400 focus:outline-none focus:bg-white font-mono uppercase transition ${
+                              isProductCodeDuplicate
+                                ? 'border-rose-400 text-rose-700 focus:border-rose-500 bg-rose-50/20'
+                                : 'border-slate-200 text-slate-800 focus:border-blue-500 bg-slate-50'
+                            }`}
                           />
+                          <p className="text-[10px] text-slate-400 mt-1">
+                            {formCode.trim()
+                              ? `Đang dùng mã tự nhập: ${formCode.trim().toUpperCase()}`
+                              : `Để trống hệ thống sẽ tự động tạo mã (ví dụ: ${suggestedProductCode})`}
+                          </p>
                         </div>
                         <div>
                           <label className="block font-semibold text-slate-700 mb-1">Mã vạch</label>
