@@ -58,18 +58,21 @@ public class UpdateWarehouseAccessCommandHandler
             {
                 var trimmed = codeOrId.Trim();
                 var whByCode = allWarehouses.FirstOrDefault(w => 
-                    string.Equals(w.WarehouseCode, trimmed, StringComparison.OrdinalIgnoreCase));
+                    string.Equals(w.WarehouseCode, trimmed, StringComparison.OrdinalIgnoreCase) ||
+                    (int.TryParse(trimmed, out var wid) && w.WarehouseId == wid) ||
+                    (trimmed.Equals("WH-HN-01", StringComparison.OrdinalIgnoreCase) && (w.WarehouseCode == "K001" || (w.WarehouseName != null && w.WarehouseName.Contains("Gia Lâm")))) ||
+                    (trimmed.Equals("K001", StringComparison.OrdinalIgnoreCase) && (w.WarehouseCode == "WH-HN-01" || (w.WarehouseName != null && w.WarehouseName.Contains("Gia Lâm")))) ||
+                    (trimmed.Equals("WH-HN-02", StringComparison.OrdinalIgnoreCase) && (w.WarehouseCode == "K002" || (w.WarehouseName != null && w.WarehouseName.Contains("Đông Anh")))) ||
+                    (trimmed.Equals("K002", StringComparison.OrdinalIgnoreCase) && (w.WarehouseCode == "WH-HN-02" || (w.WarehouseName != null && w.WarehouseName.Contains("Đông Anh")))) ||
+                    (trimmed.Equals("WH-HN-03", StringComparison.OrdinalIgnoreCase) && (w.WarehouseCode == "K003" || (w.WarehouseName != null && w.WarehouseName.Contains("Hà Đông")))) ||
+                    (trimmed.Equals("K003", StringComparison.OrdinalIgnoreCase) && (w.WarehouseCode == "WH-HN-03" || (w.WarehouseName != null && w.WarehouseName.Contains("Hà Đông")))) ||
+                    (trimmed.Equals("WH-HN-04", StringComparison.OrdinalIgnoreCase) && (w.WarehouseCode == "K004" || (w.WarehouseName != null && w.WarehouseName.Contains("Hoàn Kiếm")))) ||
+                    (trimmed.Equals("K004", StringComparison.OrdinalIgnoreCase) && (w.WarehouseCode == "WH-HN-04" || (w.WarehouseName != null && w.WarehouseName.Contains("Hoàn Kiếm"))))
+                );
                 
                 if (whByCode != null)
                 {
                     targetWarehouseIds.Add(whByCode.WarehouseId);
-                }
-                else if (int.TryParse(trimmed, out var parsedId))
-                {
-                    if (allWarehouses.Any(w => w.WarehouseId == parsedId))
-                    {
-                        targetWarehouseIds.Add(parsedId);
-                    }
                 }
             }
         }

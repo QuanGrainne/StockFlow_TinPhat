@@ -64,6 +64,16 @@ public class GetCurrentUserQueryHandler : IRequestHandler<GetCurrentUserQuery, R
             permissions = permissions.Distinct().ToList();
         }
 
+        var roleEntity = user.JncUserRoles.FirstOrDefault()?.Role;
+        var primaryRoleName = roleEntity?.RoleName ?? (roles.FirstOrDefault() ?? "Nhân viên");
+        var roleTitle = PermissionConstants.ToRoleDisplayName(primaryRoleName);
+        var staffCode = (user.Username?.ToLower() == "admin" || user.UserId == 1)
+            ? "NV-ADMIN"
+            : $"NV-NV{user.UserId:D3}";
+        var avatar = !string.IsNullOrEmpty(user.Avatar)
+            ? user.Avatar
+            : (user.UserId == 1 ? "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80" : null);
+
         var response = new CurrentUserResponse(
             user.UserId,
             user.Username ?? "",
@@ -73,7 +83,10 @@ public class GetCurrentUserQueryHandler : IRequestHandler<GetCurrentUserQuery, R
             user.IsActive ?? true,
             roles,
             warehouses,
-            permissions);
+            permissions,
+            avatar,
+            staffCode,
+            roleTitle);
 
         return Result.Success(response);
     }

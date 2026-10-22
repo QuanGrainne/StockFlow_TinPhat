@@ -39,6 +39,31 @@ export default function LoginPage() {
       const data = await res.json();
       localStorage.setItem('stockflow_token', data.token);
       localStorage.setItem('stockflow_user', JSON.stringify(data));
+
+      // Xác định đúng vai trò của tài khoản nhân viên vừa đăng nhập
+      const rawRole = (Array.isArray(data.roles) && data.roles.length > 0)
+        ? data.roles[0]
+        : (data.role || 'SALES');
+      const upperRole = String(rawRole).toUpperCase();
+
+      let targetRole: 'ADMIN' | 'MANAGER' | 'SALES' | 'WAREHOUSE' | 'PRODUCTION' = 'SALES';
+      if (upperRole.includes('ADMIN')) targetRole = 'ADMIN';
+      else if (upperRole.includes('MGR') || upperRole.includes('MANAGER')) targetRole = 'MANAGER';
+      else if (upperRole.includes('WAREHOUSE') || upperRole.includes('KHO')) targetRole = 'WAREHOUSE';
+      else if (upperRole.includes('PROD') || upperRole.includes('SANXUAT')) targetRole = 'PRODUCTION';
+      else targetRole = 'SALES';
+
+      localStorage.setItem('stockflow_current_role', targetRole);
+
+      const defaultScreens: Record<string, string> = {
+        ADMIN: 'admin-dashboard',
+        MANAGER: 'manager-dashboard',
+        WAREHOUSE: 'warehouse-overview',
+        PRODUCTION: 'production-orders',
+        SALES: 'sales-dashboard',
+      };
+      localStorage.setItem('stockflow_active_screen', defaultScreens[targetRole] || 'sales-dashboard');
+
       router.push('/dashboard');
     } catch {
       setError('Không thể kết nối đến máy chủ. Vui lòng thử lại.');

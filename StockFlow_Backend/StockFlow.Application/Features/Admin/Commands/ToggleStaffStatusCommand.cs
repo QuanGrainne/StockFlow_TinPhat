@@ -24,6 +24,11 @@ public class ToggleStaffStatusCommandHandler : IRequestHandler<ToggleStaffStatus
             return Result.Failure<bool>("Không tìm thấy thông tin nhân viên.");
         }
 
+        if (user.UserId == 1 || string.Equals(user.Username, "admin", StringComparison.OrdinalIgnoreCase))
+        {
+            return Result.Failure<bool>("Không thể khóa tài khoản Quản trị viên Hệ thống (Admin).");
+        }
+
         user.IsActive = !(user.IsActive ?? true);
         user.UpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
 
