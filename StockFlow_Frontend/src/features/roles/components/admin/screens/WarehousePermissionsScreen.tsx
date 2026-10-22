@@ -490,44 +490,9 @@ export const WarehousePermissionsScreen: React.FC = () => {
 
             <div className="space-y-4 mb-6">
               <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="text-xs font-bold text-slate-700">
-                    Mã kho <span className="text-red-500">*</span>
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!newWhCode.trim() || newWhCode.trim().toUpperCase() !== suggestedWhCode.toUpperCase()) {
-                        setNewWhCode(suggestedWhCode);
-                      } else {
-                        setNewWhCode('');
-                      }
-                      if (createWhError) setCreateWhError('');
-                    }}
-                    title={
-                      newWhCode.trim()
-                        ? 'Nhấn để xóa về để trống hoặc điền lại mã gợi ý'
-                        : `Nhấn để tự động điền mã ${suggestedWhCode}`
-                    }
-                    className={`text-[10px] font-bold px-2 py-0.5 rounded transition cursor-pointer active:scale-95 flex items-center gap-1 ${
-                      isWhCodeDuplicate
-                        ? 'bg-rose-50 text-rose-600 border border-rose-200 hover:bg-rose-100'
-                        : newWhCode.trim() && newWhCode.trim().toUpperCase() === suggestedWhCode.toUpperCase()
-                        ? 'bg-blue-100 text-blue-700 border border-blue-300 hover:bg-blue-200'
-                        : newWhCode.trim()
-                        ? 'bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100'
-                        : 'bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100'
-                    }`}
-                  >
-                    {isWhCodeDuplicate
-                      ? 'Trùng lặp'
-                      : newWhCode.trim() && newWhCode.trim().toUpperCase() === suggestedWhCode.toUpperCase()
-                      ? '✓ Tự động'
-                      : newWhCode.trim()
-                      ? 'Tự nhập'
-                      : 'Tự động'}
-                  </button>
-                </div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Mã kho <span className="text-red-500">*</span>
+                </label>
                 <input
                   type="text"
                   value={newWhCode}
@@ -543,9 +508,11 @@ export const WarehousePermissionsScreen: React.FC = () => {
                   }`}
                 />
                 <p className="text-[11px] text-slate-400 mt-1">
-                  {newWhCode.trim()
-                    ? `Đang dùng mã: ${newWhCode.trim().toUpperCase()} (Nhấn nút "Tự động" để đổi lại)`
-                    : `Nhấn nút "Tự động" để điền ngay mã ${suggestedWhCode}, hoặc để trống hệ thống sẽ tự sinh`}
+                  {isWhCodeDuplicate ? (
+                    <span className="text-rose-500 font-semibold">Mã kho đã tồn tại trong hệ thống, vui lòng chọn mã khác</span>
+                  ) : (
+                    'Để trống hệ thống sẽ tự động tạo mã'
+                  )}
                 </p>
               </div>
 
