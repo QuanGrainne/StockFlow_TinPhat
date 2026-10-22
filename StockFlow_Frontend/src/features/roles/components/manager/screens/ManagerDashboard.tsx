@@ -170,7 +170,7 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ onNavigate }
           <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
             <span className="text-slate-500">Bình quân di động</span>
             <span className="font-semibold text-emerald-700 px-1.5 py-0.5 rounded bg-emerald-50 text-[11px]">
-              Chuẩn BR-29
+              Chuẩn VAS / IFRS
             </span>
           </div>
         </div>

@@ -267,11 +267,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
               <span className="text-3xl font-extrabold text-slate-900 tracking-tight">
                 {stats.loading ? '...' : stats.totalWarehouses}
               </span>
-              <span className="text-xs font-medium text-slate-600">Kho vật lý</span>
+              <span className="text-xs font-medium text-slate-600">Cơ sở kho</span>
             </div>
           </div>
           <div className="mt-5 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
-            <span className="text-slate-500">Cách ly theo BR-03</span>
+            <span className="text-slate-500">Phân quyền chi tiết</span>
             <button
               type="button"
               onClick={() => onNavigate('admin-warehouse-perms')}

@@ -122,7 +122,7 @@ export const WarehouseReturnsScreen: React.FC = () => {
     );
 
     showToast(
-      `[BR-16] Đã lưu cập nhật tiếp nhận hàng trả: "${currentProfile.paperCode}"`
+      `Đã lưu cập nhật tiếp nhận hàng trả: "${currentProfile.paperCode}"`
     );
     setEditModalOpen(false);
   };

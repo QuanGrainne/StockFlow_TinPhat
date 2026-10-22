@@ -733,26 +733,9 @@ export const StaffAccountsScreen: React.FC<StaffAccountsScreenProps> = ({
               {/* Row 1: Mã NV & Họ tên */}
               <div className="grid grid-cols-2 gap-3.5">
                 <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="block text-xs font-semibold text-slate-700">
-                      Mã nhân viên <span className="text-rose-500">*</span>
-                    </label>
-                    <span
-                      className={`text-[10px] px-1.5 py-0.5 rounded border font-medium transition ${
-                        isCodeDuplicate
-                          ? 'text-rose-700 bg-rose-50 border-rose-200'
-                          : formCode.trim()
-                          ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
-                          : 'text-blue-600 bg-blue-50 border-blue-200/60'
-                      }`}
-                    >
-                      {isCodeDuplicate
-                        ? 'Trùng lặp'
-                        : formCode.trim()
-                        ? 'Tự nhập'
-                        : 'Tự động'}
-                    </span>
-                  </div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Mã nhân viên <span className="text-rose-500">*</span>
+                  </label>
                   <input
                     type="text"
                     value={formCode}

@@ -21,9 +21,51 @@ public class CreateWarehouseCommandHandler : IRequestHandler<CreateWarehouseComm
     public async Task<Result<WarehouseFacilityDto>> Handle(CreateWarehouseCommand command, CancellationToken cancellationToken)
     {
         var req = command.Request;
-        if (string.IsNullOrWhiteSpace(req.WarehouseCode))
+        var rawCode = (!string.IsNullOrWhiteSpace(req.WarehouseCode) ? req.WarehouseCode : req.Code)?.Trim();
+        string finalCode;
+
+        if (string.IsNullOrWhiteSpace(rawCode) || rawCode.Equals("Tự động", StringComparison.OrdinalIgnoreCase) || rawCode.Equals("AUTO", StringComparison.OrdinalIgnoreCase))
         {
-            return Result.Failure<WarehouseFacilityDto>("Mã kho không được để trống.");
+            var existingCodes = await _context.MstWarehouses
+                .Where(w => w.WarehouseCode != null)
+                .Select(w => w.WarehouseCode!)
+                .ToListAsync(cancellationToken);
+
+            int maxNum = 0;
+            foreach (var c in existingCodes)
+            {
+                var kMatch = System.Text.RegularExpressions.Regex.Match(c, @"^K(\d+)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                if (kMatch.Success && int.TryParse(kMatch.Groups[1].Value, out var n1))
+                {
+                    if (n1 > maxNum) maxNum = n1;
+                }
+                else
+                {
+                    var anyMatch = System.Text.RegularExpressions.Regex.Match(c, @"(\d+)");
+                    if (anyMatch.Success && int.TryParse(anyMatch.Groups[1].Value, out var n2))
+                    {
+                        if (n2 > maxNum) maxNum = n2;
+                    }
+                }
+            }
+
+            finalCode = $"K{maxNum + 1:D3}";
+            while (await _context.MstWarehouses.AnyAsync(w => w.WarehouseCode == finalCode, cancellationToken))
+            {
+                maxNum++;
+                finalCode = $"K{maxNum + 1:D3}";
+            }
+        }
+        else
+        {
+            finalCode = rawCode.ToUpper();
+            var codeExists = await _context.MstWarehouses
+                .AnyAsync(w => w.WarehouseCode == finalCode, cancellationToken);
+
+            if (codeExists)
+            {
+                return Result.Failure<WarehouseFacilityDto>($"Mã kho '{finalCode}' đã tồn tại trong hệ thống.");
+            }
         }
 
         if (string.IsNullOrWhiteSpace(req.WarehouseName))
@@ -31,17 +73,9 @@ public class CreateWarehouseCommandHandler : IRequestHandler<CreateWarehouseComm
             return Result.Failure<WarehouseFacilityDto>("Tên kho không được để trống.");
         }
 
-        var codeExists = await _context.MstWarehouses
-            .AnyAsync(w => w.WarehouseCode == req.WarehouseCode.Trim().ToUpper(), cancellationToken);
-
-        if (codeExists)
-        {
-            return Result.Failure<WarehouseFacilityDto>($"Mã kho '{req.WarehouseCode}' đã tồn tại trong hệ thống.");
-        }
-
         var warehouse = new MstWarehouse
         {
-            WarehouseCode = req.WarehouseCode.Trim().ToUpper(),
+            WarehouseCode = finalCode,
             WarehouseName = req.WarehouseName.Trim(),
             Address = req.Address?.Trim(),
             Description = req.Description?.Trim(),
