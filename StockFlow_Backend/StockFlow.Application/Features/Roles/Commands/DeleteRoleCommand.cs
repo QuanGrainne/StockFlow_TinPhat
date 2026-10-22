@@ -38,6 +38,7 @@ public class DeleteRoleCommandHandler : IRequestHandler<DeleteRoleCommand, Resul
         var role = roles.FirstOrDefault(r => 
             (parsedId.HasValue && r.RoleId == parsedId.Value) ||
             (r.RoleName != null && r.RoleName.Equals(key, StringComparison.OrdinalIgnoreCase)) ||
+            (r.Description != null && r.Description.Contains($"[CODE:{key}]", StringComparison.OrdinalIgnoreCase)) ||
             PermissionConstants.ToRoleCode(r.RoleName ?? "").Equals(key, StringComparison.OrdinalIgnoreCase));
 
         if (role == null)
@@ -45,9 +46,10 @@ public class DeleteRoleCommandHandler : IRequestHandler<DeleteRoleCommand, Resul
             return Result.Failure<bool>($"Không tìm thấy vai trò '{key}'.");
         }
 
-        if (role.RoleId <= 5)
+        var isSystem = role.RoleId == 1 || (role.RoleName != null && (role.RoleName.Equals("Admin", StringComparison.OrdinalIgnoreCase) || role.RoleName.Equals("ROLE_ADMIN", StringComparison.OrdinalIgnoreCase)));
+        if (isSystem)
         {
-            return Result.Failure<bool>("Không thể xóa vai trò hệ thống mặc định (Quản trị viên, Quản lý, Bán hàng, Kho, Sản xuất).");
+            return Result.Failure<bool>("Không thể xóa vai trò Quản trị viên (Admin) mặc định của hệ thống.");
         }
 
         if (role.JncUserRoles.Any())

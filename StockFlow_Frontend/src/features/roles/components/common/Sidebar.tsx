@@ -72,15 +72,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
   const [allowedModules, setAllowedModules] = useState<Set<string> | null>(null);
+  const [allowedFeatures, setAllowedFeatures] = useState<Set<string> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const fetchAllowedModules = async () => {
     const roleCode = `ROLE_${currentRole}`;
     try {
       const keys = await permissionService.getAllowedModuleKeys(roleCode);
+      const featKeys = await permissionService.getAllowedFeatures(roleCode);
       setAllowedModules(keys);
+      setAllowedFeatures(featKeys);
     } catch {
       setAllowedModules(null);
+      setAllowedFeatures(null);
     }
   };
 
@@ -719,18 +723,27 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   // Lọc tab theo quyền hạn cấu hình ma trận (tích quyền nào thì hiện mục đó)
   const filterTabByPermission = (tab: TabConfig): TabConfig | null => {
-    if (!allowedModules) return tab;
+    if (!allowedModules && !allowedFeatures) return tab;
 
     // 1. Kiểm tra quyền của chính Tab cha trước: Nếu bị bỏ tích thì ẩn ngay
-    if (tab.requiredModule && !allowedModules.has(tab.requiredModule)) {
-      return null;
+    if (tab.requiredModule) {
+      if (allowedFeatures && allowedFeatures.size > 0) {
+        const hasFeature = allowedFeatures.has(tab.id) || allowedFeatures.has(tab.requiredModule);
+        if (!hasFeature) return null;
+      } else if (allowedModules && !allowedModules.has(tab.requiredModule)) {
+        return null;
+      }
     }
 
     // 2. Nếu có dropdown, lọc các mục con theo quyền
     if (tab.dropdownItems && tab.dropdownItems.length > 0) {
-      const allowedChildren = tab.dropdownItems.filter(
-        (child) => !child.requiredModule || allowedModules.has(child.requiredModule)
-      );
+      const allowedChildren = tab.dropdownItems.filter((child) => {
+        if (!child.requiredModule) return true;
+        if (allowedFeatures && allowedFeatures.size > 0) {
+          return allowedFeatures.has(child.id) || allowedFeatures.has(child.requiredModule);
+        }
+        return allowedModules ? allowedModules.has(child.requiredModule) : true;
+      });
       if (allowedChildren.length === 0) return null;
       return { ...tab, dropdownItems: allowedChildren };
     }

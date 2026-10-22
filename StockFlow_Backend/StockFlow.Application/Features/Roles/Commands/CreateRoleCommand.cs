@@ -47,12 +47,15 @@ public class CreateRoleCommandHandler : IRequestHandler<CreateRoleCommand, Resul
             return Result.Failure<RoleDto>($"Vai trò '{roleName}' hoặc mã '{roleCode}' đã tồn tại trong hệ thống.");
         }
 
+        var rawDesc = string.IsNullOrWhiteSpace(req.Description) 
+            ? "Vai trò phân quyền tùy biến mở rộng theo yêu cầu doanh nghiệp." 
+            : req.Description.Trim();
+        var fullDesc = $"[CODE:{roleCode}] {rawDesc}";
+
         var newRole = new SecRole
         {
             RoleName = roleName,
-            Description = string.IsNullOrWhiteSpace(req.Description) 
-                ? "Vai trò phân quyền tùy biến mở rộng theo yêu cầu doanh nghiệp." 
-                : req.Description.Trim()
+            Description = fullDesc.Length > 255 ? fullDesc[..255] : fullDesc
         };
 
         await _context.SecRoles.AddAsync(newRole, cancellationToken);

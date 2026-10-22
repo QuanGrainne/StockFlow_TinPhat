@@ -28,11 +28,20 @@ public class GetRolesQueryHandler : IRequestHandler<GetRolesQuery, Result<List<R
 
         var result = roles.Select((r, index) =>
         {
-            var roleCode = PermissionConstants.ToRoleCode(r.RoleName ?? $"ROLE_{r.RoleId}");
-            var displayName = PermissionConstants.ToRoleDisplayName(r.RoleName ?? $"Vai trò {r.RoleId}");
+            var isSystem = r.RoleId == 1 || (r.RoleName != null && (r.RoleName.Equals("Admin", StringComparison.OrdinalIgnoreCase) || r.RoleName.Equals("ROLE_ADMIN", StringComparison.OrdinalIgnoreCase)));
+            var displayName = isSystem ? "Quản trị viên" : PermissionConstants.ToRoleDisplayName(r.RoleName ?? $"Vai trò {r.RoleId}");
             var rank = $"Rank #{index + 1}";
-            var isSystem = r.RoleId <= 5;
+            var roleCode = PermissionConstants.ToRoleCode(r.RoleName ?? $"ROLE_{r.RoleId}");
             var desc = r.Description ?? $"Mô tả cho vai trò {displayName}";
+            if (!string.IsNullOrWhiteSpace(r.Description))
+            {
+                var match = System.Text.RegularExpressions.Regex.Match(r.Description, @"\[CODE:([^\]]+)\]");
+                if (match.Success)
+                {
+                    roleCode = match.Groups[1].Value.Trim();
+                    desc = r.Description.Replace(match.Value, "").Trim();
+                }
+            }
 
             return new RoleDto(
                 Id: $"ROLE-{r.RoleId:D2}",

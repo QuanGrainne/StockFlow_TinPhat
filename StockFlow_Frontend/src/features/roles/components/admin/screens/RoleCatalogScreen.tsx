@@ -438,9 +438,13 @@ export const RoleCatalogScreen: React.FC<RoleCatalogScreenProps> = ({ onNavigate
                 <span className="font-bold text-slate-900 font-mono">"{deletingRole.name}"</span> (
                 <span className="text-blue-600 font-mono">{deletingRole.code}</span>)?
               </div>
-              {deletingRole.staffCount > 0 && (
-                <div className="mt-2 text-xs text-rose-600 font-medium">
-                  ⚠️ Lưu ý: Vai trò này hiện có {deletingRole.staffCount} nhân sự đang được phân công.
+              {deletingRole.staffCount > 0 ? (
+                <div className="mt-2.5 p-3 rounded-lg bg-rose-50 border border-rose-200 text-xs text-rose-700 font-medium leading-relaxed">
+                  ⚠️ <strong>Không thể xóa:</strong> Vai trò này hiện có <strong>{deletingRole.staffCount}</strong> nhân sự đang được phân công. Vui lòng chuyển các nhân sự sang vai trò khác tại trang <em>Tài khoản nhân viên</em> trước khi xóa vai trò này.
+                </div>
+              ) : (
+                <div className="mt-2.5 p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-xs text-emerald-700 font-medium">
+                  ✓ Vai trò này hiện không có nhân sự nào. Bạn có thể xóa ngay lập tức.
                 </div>
               )}
             </div>
@@ -458,8 +462,13 @@ export const RoleCatalogScreen: React.FC<RoleCatalogScreenProps> = ({ onNavigate
               </button>
               <button
                 type="button"
+                disabled={deletingRole.staffCount > 0}
                 onClick={handleConfirmDelete}
-                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-xs font-bold text-white transition shadow-xs cursor-pointer"
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition shadow-xs ${
+                  deletingRole.staffCount > 0
+                    ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                    : 'bg-rose-600 hover:bg-rose-700 text-white cursor-pointer'
+                }`}
               >
                 Xóa vai trò
               </button>

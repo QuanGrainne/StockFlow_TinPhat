@@ -1,7 +1,7 @@
 // src/types/index.ts
 // Các kiểu dữ liệu cốt lõi cho hệ thống StockFlow OIMS (Phân quyền Sales & Manager)
 
-export type UserRole = 'SALES' | 'MANAGER' | 'ADMIN' | 'WAREHOUSE' | 'PRODUCTION';
+export type UserRole = 'SALES' | 'MANAGER' | 'ADMIN' | 'WAREHOUSE' | 'PRODUCTION' | string;
 
 export interface UserProfile {
   id: string;
