@@ -327,4 +327,205 @@ export const permissionService = {
     }
     return keys;
   },
+
+  // ─── 3. Navbar Feature Matrix (Phân quyền theo chức năng Navbar) ───────────
+  async getFeatureMatrix(): Promise<Record<string, string[]>> {
+    let matrix: Record<string, string[]> = {};
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('stockflow_feature_matrix');
+      if (saved) {
+        try {
+          matrix = JSON.parse(saved);
+        } catch {}
+      }
+    }
+    for (const [role, feats] of Object.entries(DEFAULT_ROLE_FEATURE_PERMS)) {
+      if (!matrix[role]) {
+        matrix[role] = [...feats];
+      }
+    }
+    return matrix;
+  },
+
+  async saveFeatureMatrix(matrix: Record<string, string[]>): Promise<boolean> {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('stockflow_feature_matrix', JSON.stringify(matrix));
+    }
+
+    // Đồng bộ sang từng Role cho Backend & localStorage
+    for (const [roleCode, featureIds] of Object.entries(matrix)) {
+      const permittedModuleKeys = new Set(
+        NAVBAR_FEATURES
+          .filter(f => featureIds.includes(f.id))
+          .map(f => f.moduleKey)
+      );
+
+      const modules: PermissionMatrixModule[] = INITIAL_PERMISSION_MODULES.map(m => {
+        const key = m.code.replace(/[\[\]]/g, '').toUpperCase();
+        const isPermitted = permittedModuleKeys.has(key);
+        return {
+          ...m,
+          read: isPermitted,
+          create: isPermitted,
+          update: isPermitted,
+          delete: isPermitted,
+          approve: isPermitted,
+        };
+      });
+
+      await this.savePermissionMatrix(roleCode, modules);
+    }
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('stockflow_permissions_updated'));
+    }
+    return true;
+  },
+
+  async getAllowedFeatures(roleCode: string): Promise<Set<string>> {
+    const matrix = await this.getFeatureMatrix();
+    const feats = matrix[roleCode] || DEFAULT_ROLE_FEATURE_PERMS[roleCode] || [];
+    const allowed = new Set<string>();
+
+    for (const fid of feats) {
+      allowed.add(fid);
+      const featConfig = NAVBAR_FEATURES.find(f => f.id === fid);
+      if (featConfig) {
+        allowed.add(featConfig.moduleKey);
+        featConfig.tabIds.forEach(tid => allowed.add(tid));
+      }
+    }
+    return allowed;
+  },
+};
+
+export interface NavFeatureConfig {
+  id: string;
+  name: string;
+  desc: string;
+  moduleKey: string;
+  tabIds: string[];
+}
+
+export const NAVBAR_FEATURES: NavFeatureConfig[] = [
+  {
+    id: 'feat-staff',
+    name: 'Tài khoản nhân viên',
+    desc: 'Hồ sơ nhân viên, phân công phòng ban và tài khoản',
+    moduleKey: 'AUTH',
+    tabIds: ['admin-staff', 'admin-staff-active'],
+  },
+  {
+    id: 'feat-roles',
+    name: 'Danh mục vai trò & Phân quyền',
+    desc: 'Thiết lập danh mục vai trò và ma trận quyền hạn hệ thống',
+    moduleKey: 'AUTH',
+    tabIds: ['admin-roles', 'admin-matrix'],
+  },
+  {
+    id: 'feat-warehouse-perms',
+    name: 'Phân quyền kho & Cơ sở kho',
+    desc: 'Ma trận phân quyền nhân sự vào kho vật lý và cách ly dữ liệu',
+    moduleKey: 'AUTH',
+    tabIds: ['admin-warehouse-perms', 'admin-warehouse-facilities'],
+  },
+  {
+    id: 'feat-goods',
+    name: 'Danh mục hàng hóa',
+    desc: 'Quản trị Master Data sản phẩm, vật tư, đơn vị tính và thẻ kho',
+    moduleKey: 'GOODS',
+    tabIds: ['admin-goods', 'warehouse-goods', 'production-goods', 'goods-catalog'],
+  },
+  {
+    id: 'feat-sales',
+    name: 'Quản lý bán hàng',
+    desc: 'Đơn hàng chờ xử lý, gộp đơn B2B và quản lý hàng trả',
+    moduleKey: 'SALES',
+    tabIds: ['sales-orders', 'sales-dashboard', 'sales-consolidate', 'sales-returns', 'warehouse-outbound'],
+  },
+  {
+    id: 'feat-purchase',
+    name: 'Quản lý mua hàng & Nhập kho',
+    desc: 'Tiếp nhận đơn mua hàng PO và chi phí Landed Cost',
+    moduleKey: 'PURCHASE',
+    tabIds: ['warehouse-inbound', 'manager-landed-cost'],
+  },
+  {
+    id: 'feat-stock',
+    name: 'Quản trị kho & Tồn kho',
+    desc: 'Tổng quan tồn kho thực tế, xuất kho, điều chuyển và kiểm kê',
+    moduleKey: 'STOCK',
+    tabIds: ['warehouse-overview', 'warehouse-transfer', 'warehouse-audit', 'warehouse-returns'],
+  },
+  {
+    id: 'feat-prod',
+    name: 'Quản trị sản xuất',
+    desc: 'Theo dõi lệnh sản xuất, nhận kế hoạch gia công và nhật ký',
+    moduleKey: 'PROD',
+    tabIds: ['production-orders', 'production-import', 'production-logs'],
+  },
+  {
+    id: 'feat-bom',
+    name: 'Định mức nguyên liệu (BOM)',
+    desc: 'Quản lý định mức BOM vật tư và công thức phối liệu',
+    moduleKey: 'BOM',
+    tabIds: ['manager-bom'],
+  },
+  {
+    id: 'feat-partner',
+    name: 'Đối tác & Hạn mức công nợ',
+    desc: 'Quản lý khách hàng B2B, NCC và xét duyệt ngoại lệ công nợ',
+    moduleKey: 'PARTNER',
+    tabIds: ['manager-partners', 'sales-credit-limits'],
+  },
+  {
+    id: 'feat-fin',
+    name: 'Tài chính & Báo cáo',
+    desc: 'Quản lý phiếu thu, chi dòng tiền và báo cáo quản trị tổng hợp',
+    moduleKey: 'FIN',
+    tabIds: ['manager-cashflow', 'manager-reports'],
+  },
+];
+
+export const DEFAULT_ROLE_FEATURE_PERMS: Record<string, string[]> = {
+  ROLE_ADMIN: [
+    'feat-staff',
+    'feat-roles',
+    'feat-warehouse-perms',
+    'feat-goods',
+    'feat-sales',
+    'feat-purchase',
+    'feat-stock',
+    'feat-prod',
+    'feat-bom',
+    'feat-partner',
+    'feat-fin',
+  ],
+  ROLE_MANAGER: [
+    'feat-goods',
+    'feat-sales',
+    'feat-purchase',
+    'feat-stock',
+    'feat-prod',
+    'feat-bom',
+    'feat-partner',
+    'feat-fin',
+  ],
+  ROLE_SALES: [
+    'feat-goods',
+    'feat-sales',
+    'feat-partner',
+  ],
+  ROLE_WAREHOUSE: [
+    'feat-goods',
+    'feat-purchase',
+    'feat-stock',
+    'feat-bom',
+  ],
+  ROLE_PRODUCTION: [
+    'feat-goods',
+    'feat-stock',
+    'feat-prod',
+    'feat-bom',
+  ],
 };

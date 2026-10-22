@@ -48,6 +48,7 @@ public class UpdateRoleCommandHandler : IRequestHandler<UpdateRoleCommand, Resul
         var role = roles.FirstOrDefault(r => 
             (parsedId.HasValue && r.RoleId == parsedId.Value) ||
             (r.RoleName != null && r.RoleName.Equals(key, StringComparison.OrdinalIgnoreCase)) ||
+            (r.Description != null && r.Description.Contains($"[CODE:{key}]", StringComparison.OrdinalIgnoreCase)) ||
             PermissionConstants.ToRoleCode(r.RoleName ?? "").Equals(key, StringComparison.OrdinalIgnoreCase));
 
         if (role == null)
@@ -55,10 +56,10 @@ public class UpdateRoleCommandHandler : IRequestHandler<UpdateRoleCommand, Resul
             return Result.Failure<RoleDto>($"Không tìm thấy vai trò '{key}'.");
         }
 
-        var isSystem = role.RoleId <= 5;
+        var isSystem = role.RoleId == 1 || (role.RoleName != null && (role.RoleName.Equals("Admin", StringComparison.OrdinalIgnoreCase) || role.RoleName.Equals("ROLE_ADMIN", StringComparison.OrdinalIgnoreCase)));
         var req = command.Request;
 
-        // Chỉ cập nhật tên nếu không phải vai trò cốt lõi hoặc cập nhật phần hiển thị
+        // Chỉ cập nhật tên nếu không phải Admin
         if (!isSystem && !string.IsNullOrWhiteSpace(req.Name))
         {
             role.RoleName = req.Name.Trim();
@@ -66,18 +67,33 @@ public class UpdateRoleCommandHandler : IRequestHandler<UpdateRoleCommand, Resul
 
         if (req.Description != null)
         {
-            role.Description = req.Description.Trim();
+            var match = System.Text.RegularExpressions.Regex.Match(role.Description ?? "", @"\[CODE:([^\]]+)\]");
+            var prefix = match.Success ? match.Value + " " : "";
+            var updatedDesc = $"{prefix}{req.Description.Trim()}".Trim();
+            role.Description = updatedDesc.Length > 255 ? updatedDesc[..255] : updatedDesc;
         }
 
         await _context.SaveChangesAsync(cancellationToken);
 
+        var roleCode = PermissionConstants.ToRoleCode(role.RoleName ?? $"ROLE_{role.RoleId}");
+        var cleanDesc = role.Description ?? "";
+        if (!string.IsNullOrWhiteSpace(role.Description))
+        {
+            var match = System.Text.RegularExpressions.Regex.Match(role.Description, @"\[CODE:([^\]]+)\]");
+            if (match.Success)
+            {
+                roleCode = match.Groups[1].Value.Trim();
+                cleanDesc = role.Description.Replace(match.Value, "").Trim();
+            }
+        }
+
         var response = new RoleDto(
             Id: $"ROLE-{role.RoleId:D2}",
-            Name: isSystem ? PermissionConstants.ToRoleDisplayName(role.RoleName ?? "") : (role.RoleName ?? ""),
-            Code: PermissionConstants.ToRoleCode(role.RoleName ?? $"ROLE_{role.RoleId}"),
+            Name: isSystem ? "Quản trị viên" : PermissionConstants.ToRoleDisplayName(role.RoleName ?? ""),
+            Code: roleCode,
             Rank: $"Rank #{role.RoleId}",
             IsSystem: isSystem,
-            Description: role.Description ?? "",
+            Description: cleanDesc,
             StaffCount: role.JncUserRoles.Count
         );
 
