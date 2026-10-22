@@ -712,9 +712,19 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("ProductId"));
 
+                    b.Property<string>("Barcode")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("barcode");
+
                     b.Property<int>("BaseUnitId")
                         .HasColumnType("integer")
                         .HasColumnName("base_unit_id");
+
+                    b.Property<string>("Brand")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("brand");
 
                     b.Property<int>("CategoryId")
                         .HasColumnType("integer")
@@ -729,9 +739,41 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(500)")
                         .HasColumnName("description");
 
+                    b.Property<string>("Dimensions")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("dimensions");
+
+                    b.Property<bool?>("HasRewardPoints")
+                        .HasColumnType("boolean")
+                        .HasColumnName("has_reward_points");
+
+                    b.Property<string>("ImageUrl")
+                        .HasColumnType("text")
+                        .HasColumnName("image_url");
+
                     b.Property<bool?>("IsActive")
                         .HasColumnType("boolean")
                         .HasColumnName("is_active");
+
+                    b.Property<bool?>("IsDirectSale")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_direct_sale");
+
+                    b.Property<string>("LocationName")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("location_name");
+
+                    b.Property<decimal?>("MaxSafeStock")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("max_safe_stock");
+
+                    b.Property<decimal?>("MinSafeStock")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("min_safe_stock");
 
                     b.Property<decimal?>("MovingAverageCost")
                         .HasPrecision(18, 4)
@@ -757,6 +799,20 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)")
                         .HasColumnName("reorder_point");
+
+                    b.Property<decimal?>("StandardPrice")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("standard_price");
+
+                    b.Property<string>("VariantsJson")
+                        .HasColumnType("text")
+                        .HasColumnName("variants_json");
+
+                    b.Property<decimal?>("Weight")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("weight");
 
                     b.HasKey("ProductId")
                         .HasName("mst_products_pkey");
@@ -1052,6 +1108,10 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                         .HasColumnName("user_id");
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("UserId"));
+
+                    b.Property<string>("Avatar")
+                        .HasColumnType("text")
+                        .HasColumnName("avatar");
 
                     b.Property<DateTime?>("CreatedAt")
                         .HasColumnType("timestamp without time zone")
