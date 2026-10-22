@@ -897,7 +897,7 @@ export const ReportsScreen: React.FC<ReportsScreenProps> = () => {
                     </div>
                     <div>
                       <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-                        Công thức Giá vốn Bình quân Di động (BR-29)
+                        Công thức Giá vốn Bình quân Di động
                       </h3>
                       <p className="text-[10px] text-slate-400">Tự động cấu thành chi phí mua hàng Landed Cost</p>
                     </div>
@@ -2438,7 +2438,7 @@ export const ReportsScreen: React.FC<ReportsScreenProps> = () => {
               <div className="flex items-center justify-between font-bold text-slate-800">
                 <span className="flex items-center gap-1.5 text-teal-800">
                   <Sparkles size={14} className="text-teal-600" />
-                  <span>Giải trình công thức chốt giá vốn kỳ gần nhất (BR-29):</span>
+                  <span>Giải trình công thức chốt giá vốn kỳ gần nhất:</span>
                 </span>
                 <span className="text-slate-500 font-mono text-[11px] font-normal">
                   Kho: {selectedMacItem.warehouse}

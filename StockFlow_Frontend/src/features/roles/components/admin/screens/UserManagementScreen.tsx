@@ -257,10 +257,10 @@ export const UserManagementScreen: React.FC = () => {
         <div>
           <h2 className="text-xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
             <Shield className="text-[#2B6CB0]" size={22} />
-            <span>Quản trị Tài khoản & Phân quyền Kho (Admin)</span>
+            <span>Quản trị tài khoản & Phân quyền kho</span>
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
-            Quản lý tài khoản truy cập hệ thống StockFlow OIMS và gán quyền hạn truy cập kho vật lý
+            Quản lý tài khoản truy cập hệ thống và phân quyền truy cập kho cho nhân sự
           </p>
         </div>
 

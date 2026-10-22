@@ -82,14 +82,12 @@ export const ConsolidateOrdersScreen: React.FC<ConsolidateOrdersScreenProps> = (
         <div>
           <div className="text-xs font-semibold text-[#2B6CB0] flex items-center gap-1.5 uppercase tracking-wide">
             <span>QUY TRÌNH GOM ĐƠN</span>
-            <span className="text-slate-300">•</span>
-            <span className="text-slate-400 normal-case font-normal">Màn hình 3.2.4.4</span>
           </div>
           <h1 className="text-xl font-bold text-slate-900 tracking-tight mt-1">
-            Gộp đơn hàng xuất kho (Consolidate Orders)
+            Gộp đơn hàng xuất kho
           </h1>
           <p className="text-xs text-slate-500 mt-1">
-            Gộp nhiều đơn hàng của cùng khách hàng để xuất cùng 1 chuyến xe và kiểm soát hạn mức tín dụng (BR-09)
+            Gộp nhiều đơn hàng của cùng khách hàng để xuất cùng 1 chuyến xe và kiểm soát hạn mức tín dụng
           </p>
         </div>
 
@@ -337,7 +335,7 @@ export const ConsolidateOrdersScreen: React.FC<ConsolidateOrdersScreenProps> = (
 
           {/* Footer of Right Column */}
           <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
-            <span className="text-[11px] text-slate-400">Gộp đơn theo quy tắc BR-09</span>
+            <span className="text-[11px] text-slate-400">Gộp đơn theo khách hàng</span>
             <button
               type="button"
               onClick={() => setPaymentModalOpen(true)}

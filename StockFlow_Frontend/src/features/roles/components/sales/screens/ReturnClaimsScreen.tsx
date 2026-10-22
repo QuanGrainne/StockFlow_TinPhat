@@ -125,14 +125,12 @@ export const ReturnClaimsScreen: React.FC = () => {
         <div>
           <div className="text-xs font-semibold text-[#2B6CB0] flex items-center gap-1.5 uppercase tracking-wide">
             <span>KHIẾU NẠI & TRẢ HÀNG</span>
-            <span className="text-slate-300">•</span>
-            <span className="text-slate-400 normal-case font-normal">Màn hình 3.2.4.7</span>
           </div>
           <h1 className="text-xl font-bold text-slate-900 tracking-tight mt-1">
-            Quản lý hàng trả lại (Return Claims)
+            Quản lý hàng trả lại
           </h1>
           <p className="text-xs text-slate-500 mt-1">
-            Tiếp nhận yêu cầu khiếu nại của khách hàng, đối chiếu phiếu xuất kho PXK gốc và theo dõi kết quả kiểm định kho (BR-18)
+            Tiếp nhận yêu cầu khiếu nại của khách hàng, đối chiếu phiếu xuất kho gốc và theo dõi kết quả kiểm định kho
           </p>
         </div>
 
@@ -258,8 +256,6 @@ export const ReturnClaimsScreen: React.FC = () => {
               <div>
                 <div className="text-[11px] font-bold text-[#2B6CB0] uppercase tracking-wider flex items-center gap-1.5">
                   <span>TIẾP NHẬN KHIẾU NẠI</span>
-                  <span className="text-slate-300">•</span>
-                  <span className="text-slate-400 normal-case font-normal">Màn hình 3.2.4.8</span>
                 </div>
                 <h3 className="text-base font-bold text-slate-900 mt-0.5">
                   Lập phiếu đề nghị trả hàng
@@ -290,7 +286,7 @@ export const ReturnClaimsScreen: React.FC = () => {
                     placeholder="Vd: PXK-2026-088"
                   />
                   <span className="text-[10px] text-slate-400 mt-0.5 block">
-                    Đối chiếu hóa đơn xuất gốc (BR-18)
+                    Đối chiếu hóa đơn xuất gốc
                   </span>
                 </div>
 

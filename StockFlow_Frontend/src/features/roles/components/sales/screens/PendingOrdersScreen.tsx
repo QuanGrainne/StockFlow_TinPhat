@@ -86,14 +86,12 @@ export const PendingOrdersScreen: React.FC<PendingOrdersScreenProps> = ({ onNavi
         <div>
           <div className="text-xs font-semibold text-[#2B6CB0] flex items-center gap-1.5 uppercase tracking-wide">
             <span>QUẢN LÝ KINH DOANH</span>
-            <span className="text-slate-300">•</span>
-            <span className="text-slate-400 normal-case font-normal">Màn hình 3.2.4.2</span>
           </div>
           <h1 className="text-xl font-bold text-slate-900 tracking-tight mt-1">
             Danh sách đơn chờ xử lý
           </h1>
           <p className="text-xs text-slate-500 mt-1">
-            Đơn hàng lưu tạm từ các kênh tư vấn, chưa trừ số lượng tồn kho vật lý (Quy tắc nghiệp vụ BR-08)
+            Đơn hàng lưu tạm từ các kênh tư vấn, chưa trừ số lượng tồn kho
           </p>
         </div>
 
