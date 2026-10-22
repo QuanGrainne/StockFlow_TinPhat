@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace StockFlow.Domain.Entities;
@@ -16,6 +16,8 @@ public partial class SecUser
     public string? Email { get; set; }
 
     public string? Phone { get; set; }
+
+    public string? Avatar { get; set; }
 
     public bool? IsActive { get; set; }
 

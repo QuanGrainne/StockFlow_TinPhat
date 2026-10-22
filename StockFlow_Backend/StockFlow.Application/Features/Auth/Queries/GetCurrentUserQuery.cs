@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using StockFlow.Application.Common;
 using StockFlow.Application.Common.Interfaces;
 using StockFlow.Application.Features.Auth.DTOs;
+using StockFlow.Application.Features.Roles.Common;
 
 namespace StockFlow.Application.Features.Auth.Queries;
 
@@ -44,6 +45,25 @@ public class GetCurrentUserQueryHandler : IRequestHandler<GetCurrentUserQuery, R
                 w.Warehouse.WarehouseName ?? ""))
             .ToList();
 
+        // Load active permissions for user roles
+        var roleIds = user.JncUserRoles.Select(ur => ur.RoleId).ToList();
+        var permissions = await _context.SecRoles
+            .Where(r => roleIds.Contains(r.RoleId))
+            .SelectMany(r => r.Permissions)
+            .Where(p => !string.IsNullOrEmpty(p.PermissionCode))
+            .Select(p => p.PermissionCode!.ToUpperInvariant())
+            .Distinct()
+            .ToListAsync(cancellationToken);
+
+        if (!permissions.Any())
+        {
+            foreach (var r in roles)
+            {
+                permissions.AddRange(PermissionConstants.GetDefaultPermissionCodes(r));
+            }
+            permissions = permissions.Distinct().ToList();
+        }
+
         var response = new CurrentUserResponse(
             user.UserId,
             user.Username ?? "",
@@ -52,7 +72,8 @@ public class GetCurrentUserQueryHandler : IRequestHandler<GetCurrentUserQuery, R
             user.Phone,
             user.IsActive ?? true,
             roles,
-            warehouses);
+            warehouses,
+            permissions);
 
         return Result.Success(response);
     }

@@ -6,6 +6,35 @@ import { UserRole } from '../types';
 import { Header } from './common/Header';
 import { Sidebar } from './common/Sidebar';
 import { GoodsCatalogScreen } from './common/GoodsCatalogScreen';
+import { permissionService } from '../services/permissionService';
+
+const SCREEN_MODULE_MAP: Record<string, string> = {
+  'admin-staff': 'AUTH',
+  'admin-staff-active': 'AUTH',
+  'admin-roles': 'AUTH',
+  'admin-matrix': 'AUTH',
+  'admin-warehouse-perms': 'AUTH',
+  'admin-warehouse-facilities': 'AUTH',
+  'admin-goods': 'GOODS',
+  'manager-bom': 'BOM',
+  'manager-partners': 'PARTNER',
+  'manager-cashflow': 'FIN',
+  'manager-landed-cost': 'PURCHASE',
+  'manager-reports': 'FIN',
+  'manager-production': 'PROD',
+  'sales-orders': 'SALES',
+  'sales-consolidate': 'SALES',
+  'sales-credit-limits': 'PARTNER',
+  'sales-returns': 'SALES',
+  'warehouse-inbound': 'PURCHASE',
+  'warehouse-outbound': 'SALES',
+  'warehouse-transfer': 'STOCK',
+  'warehouse-audit': 'STOCK',
+  'warehouse-returns': 'STOCK',
+  'production-import': 'PROD',
+  'production-logs': 'PROD',
+  'goods-catalog': 'GOODS',
+};
 
 // Sales Screens
 import { SalesDashboard } from './sales/screens/SalesDashboard';
@@ -46,6 +75,45 @@ import { WarehousePermissionsScreen } from './admin/screens/WarehousePermissions
 import { PermissionMatrixScreen } from './admin/screens/PermissionMatrixScreen';
 import { UserManagementScreen } from './admin/screens/UserManagementScreen';
 
+const getStoredRole = (): UserRole => {
+  if (typeof window === 'undefined') return 'SALES';
+  const savedRole = localStorage.getItem('stockflow_current_role') as UserRole | null;
+  if (savedRole && ['ADMIN', 'MANAGER', 'SALES', 'WAREHOUSE', 'PRODUCTION'].includes(savedRole)) {
+    return savedRole;
+  }
+  const userStr = localStorage.getItem('stockflow_user');
+  if (userStr) {
+    try {
+      const u = JSON.parse(userStr);
+      const primaryRoleStr = Array.isArray(u.roles) && u.roles.length > 0 ? u.roles[0] : (u.role || '');
+      const upper = String(primaryRoleStr).toUpperCase();
+      if (upper.includes('ADMIN')) return 'ADMIN';
+      if (upper.includes('MGR') || upper.includes('MANAGER')) return 'MANAGER';
+      if (upper.includes('WAREHOUSE')) return 'WAREHOUSE';
+      if (upper.includes('PROD')) return 'PRODUCTION';
+      if (upper.includes('SALES')) return 'SALES';
+    } catch {}
+  }
+  return 'SALES';
+};
+
+const getDefaultScreenForRole = (role: UserRole): string => {
+  switch (role) {
+    case 'ADMIN': return 'admin-dashboard';
+    case 'MANAGER': return 'manager-dashboard';
+    case 'WAREHOUSE': return 'warehouse-overview';
+    case 'PRODUCTION': return 'production-orders';
+    default: return 'sales-dashboard';
+  }
+};
+
+const getStoredScreen = (role: UserRole): string => {
+  if (typeof window === 'undefined') return getDefaultScreenForRole(role);
+  const savedScreen = localStorage.getItem('stockflow_active_screen');
+  if (savedScreen) return savedScreen;
+  return getDefaultScreenForRole(role);
+};
+
 export const AppLayout: React.FC = () => {
   const [currentRole, setCurrentRole] = useState<UserRole>('SALES');
   const [activeScreen, setActiveScreen] = useState<string>('sales-dashboard');
@@ -53,19 +121,55 @@ export const AppLayout: React.FC = () => {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [hasImportedProductionPlan, setHasImportedProductionPlan] = useState(false);
 
+  // Khôi phục role và screen từ localStorage khi reload trang
+  React.useEffect(() => {
+    const role = getStoredRole();
+    const screen = getStoredScreen(role);
+    setCurrentRole(role);
+    setActiveScreen(screen);
+  }, []);
+
+  // Lắng nghe cập nhật quyền từ Ma trận phân quyền để tự động chuyển trang nếu màn hình hiện tại bị bỏ quyền
+  React.useEffect(() => {
+    const handlePermissionsUpdated = async () => {
+      const roleCode = `ROLE_${currentRole}`;
+      const allowed = await permissionService.getAllowedModuleKeys(roleCode);
+      const reqMod = SCREEN_MODULE_MAP[activeScreen];
+      if (reqMod && !allowed.has(reqMod)) {
+        const fallback = getDefaultScreenForRole(currentRole);
+        setActiveScreen(fallback);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('stockflow_active_screen', fallback);
+        }
+      }
+    };
+    window.addEventListener('stockflow_permissions_updated', handlePermissionsUpdated);
+    return () => window.removeEventListener('stockflow_permissions_updated', handlePermissionsUpdated);
+  }, [currentRole, activeScreen]);
+
+  const handleNavigate = (newScreen: string) => {
+    setActiveScreen(newScreen);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('stockflow_active_screen', newScreen);
+    }
+  };
+
   // Xử lý chuyển đổi vai trò (RBAC Switcher)
   const handleRoleChange = (newRole: UserRole) => {
     setCurrentRole(newRole);
-    if (newRole === 'SALES') {
-      setActiveScreen('sales-dashboard');
-    } else if (newRole === 'MANAGER') {
-      setActiveScreen('manager-dashboard');
-    } else if (newRole === 'WAREHOUSE') {
-      setActiveScreen('warehouse-overview');
-    } else if (newRole === 'PRODUCTION') {
-      setActiveScreen('production-orders');
-    } else if (newRole === 'ADMIN') {
-      setActiveScreen('admin-dashboard');
+    const defaultScreen = getDefaultScreenForRole(newRole);
+    setActiveScreen(defaultScreen);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('stockflow_current_role', newRole);
+      localStorage.setItem('stockflow_active_screen', defaultScreen);
+      const userStr = localStorage.getItem('stockflow_user');
+      if (userStr) {
+        try {
+          const u = JSON.parse(userStr);
+          u.roles = [newRole];
+          localStorage.setItem('stockflow_user', JSON.stringify(u));
+        } catch {}
+      }
     }
   };
 
@@ -73,40 +177,40 @@ export const AppLayout: React.FC = () => {
     switch (activeScreen) {
       // ─── Sales Screens ───
       case 'sales-dashboard':
-        return <SalesDashboard onNavigate={setActiveScreen} />;
+        return <SalesDashboard onNavigate={handleNavigate} />;
       case 'sales-orders':
-        return <PendingOrdersScreen onNavigate={setActiveScreen} />;
+        return <PendingOrdersScreen onNavigate={handleNavigate} />;
       case 'sales-consolidate':
-        return <ConsolidateOrdersScreen onNavigate={setActiveScreen} />;
+        return <ConsolidateOrdersScreen onNavigate={handleNavigate} />;
       case 'sales-credit-limits':
-        return <CreditLimitExceptionsScreen onNavigate={setActiveScreen} />;
+        return <CreditLimitExceptionsScreen onNavigate={handleNavigate} />;
       case 'sales-returns':
         return <ReturnClaimsScreen />;
 
       // ─── Manager Screens ───
       case 'manager-dashboard':
-        return <ManagerDashboard onNavigate={setActiveScreen} />;
+        return <ManagerDashboard onNavigate={handleNavigate} />;
       case 'manager-approvals':
       case 'manager-inbox':
         return <ApprovalInboxScreen />;
       case 'manager-bom':
         return <BomManagementScreen />;
       case 'manager-partners':
-        return <PartnerCreditLimitScreen onNavigate={setActiveScreen} />;
+        return <PartnerCreditLimitScreen onNavigate={handleNavigate} />;
       case 'manager-cashflow':
         return <CashFlowScreen />;
       case 'manager-production':
-        return <ProductionOrdersScreen onNavigate={setActiveScreen} />;
+        return <ProductionOrdersScreen onNavigate={handleNavigate} />;
       case 'manager-landed-cost':
       case 'manager-purchases':
         return <LandedCostScreen />;
       case 'manager-reports':
-        return <ReportsScreen onNavigate={setActiveScreen} />;
+        return <ReportsScreen onNavigate={handleNavigate} />;
 
 
       // ─── Warehouse Screens (Đã bỏ Vị trí ô kệ) ───
       case 'warehouse-overview':
-        return <WarehouseOverviewScreen onNavigate={setActiveScreen} />;
+        return <WarehouseOverviewScreen onNavigate={handleNavigate} />;
       case 'warehouse-inbound':
         return <WarehouseInboundScreen />;
       case 'warehouse-outbound':
@@ -122,14 +226,14 @@ export const AppLayout: React.FC = () => {
       case 'production-orders':
         return (
           <ProductionTrackingScreen
-            onNavigate={setActiveScreen}
+            onNavigate={handleNavigate}
             isImportedPlan={hasImportedProductionPlan}
           />
         );
       case 'production-open-report-modal':
         return (
           <ProductionTrackingScreen
-            onNavigate={setActiveScreen}
+            onNavigate={handleNavigate}
             isImportedPlan={hasImportedProductionPlan}
             initialOpenDetail={true}
           />
@@ -137,10 +241,10 @@ export const AppLayout: React.FC = () => {
       case 'production-import':
         return (
           <ProductionPlanImportScreen
-            onNavigate={setActiveScreen}
+            onNavigate={handleNavigate}
             onApprovePlan={() => {
               setHasImportedProductionPlan(true);
-              setActiveScreen('production-orders');
+              handleNavigate('production-orders');
             }}
           />
         );
@@ -149,7 +253,7 @@ export const AppLayout: React.FC = () => {
 
       // ─── Admin Screens ───
       case 'admin-dashboard':
-        return <AdminDashboard onNavigate={setActiveScreen} />;
+        return <AdminDashboard onNavigate={handleNavigate} />;
       case 'admin-staff':
         return <StaffAccountsScreen initialFilter="ALL" />;
       case 'admin-staff-active':
@@ -159,12 +263,18 @@ export const AppLayout: React.FC = () => {
           <RoleCatalogScreen
             onNavigate={(screen, roleCode) => {
               if (roleCode) setSelectedMatrixRole(roleCode);
-              setActiveScreen(screen);
+              handleNavigate(screen);
             }}
           />
         );
       case 'admin-matrix':
-        return <PermissionMatrixScreen initialRoleCode={selectedMatrixRole} />;
+        return (
+          <PermissionMatrixScreen
+            initialRoleCode={selectedMatrixRole}
+            currentRole={currentRole}
+            onRoleChange={handleRoleChange}
+          />
+        );
       case 'admin-warehouse-perms':
       case 'admin-warehouse-facilities':
         return <WarehousePermissionsScreen />;
@@ -179,21 +289,21 @@ export const AppLayout: React.FC = () => {
       case 'warehouse-goods':
       case 'production-goods':
       case 'products':
-        return <GoodsCatalogScreen onNavigate={setActiveScreen} currentRole={currentRole} />;
+        return <GoodsCatalogScreen onNavigate={handleNavigate} currentRole={currentRole} />;
 
       default:
-        if (currentRole === 'SALES') return <SalesDashboard onNavigate={setActiveScreen} />;
-        if (currentRole === 'MANAGER') return <ManagerDashboard onNavigate={setActiveScreen} />;
-        if (currentRole === 'WAREHOUSE') return <WarehouseOverviewScreen onNavigate={setActiveScreen} />;
+        if (currentRole === 'SALES') return <SalesDashboard onNavigate={handleNavigate} />;
+        if (currentRole === 'MANAGER') return <ManagerDashboard onNavigate={handleNavigate} />;
+        if (currentRole === 'WAREHOUSE') return <WarehouseOverviewScreen onNavigate={handleNavigate} />;
         if (currentRole === 'PRODUCTION')
           return (
             <ProductionTrackingScreen
-              onNavigate={setActiveScreen}
+              onNavigate={handleNavigate}
               isImportedPlan={hasImportedProductionPlan}
             />
           );
-        if (currentRole === 'ADMIN') return <AdminDashboard onNavigate={setActiveScreen} />;
-        return <SalesDashboard onNavigate={setActiveScreen} />;
+        if (currentRole === 'ADMIN') return <AdminDashboard onNavigate={handleNavigate} />;
+        return <SalesDashboard onNavigate={handleNavigate} />;
     }
   };
 
@@ -209,7 +319,7 @@ export const AppLayout: React.FC = () => {
       <Sidebar
         currentRole={currentRole}
         activeScreen={activeScreen}
-        onNavigate={setActiveScreen}
+        onNavigate={handleNavigate}
         productionBadge={hasImportedProductionPlan ? '10' : '4'}
       />
 

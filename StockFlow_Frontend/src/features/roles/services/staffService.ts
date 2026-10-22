@@ -18,7 +18,7 @@ export const staffService = {
 
       const qs = params.toString() ? `?${params.toString()}` : '';
       const data = await apiClient.get<StaffAccount[]>(`/api/Staff${qs}`, token);
-      if (Array.isArray(data) && data.length > 0) {
+      if (Array.isArray(data)) {
         return data;
       }
     } catch (e) {
@@ -72,13 +72,29 @@ export const staffService = {
         return updated;
       }
     } catch (e) {
-      console.warn('API updateStaff failed, fallback to local state:', e);
+      console.error('API updateStaff failed:', e);
+      throw e;
     }
 
     const idx = staffAccounts.findIndex((s) => s.id === id);
-    if (idx === -1) throw new Error('Không tìm thấy tài khoản nhân viên');
-    staffAccounts[idx] = { ...staffAccounts[idx], ...updates };
-    return staffAccounts[idx];
+    if (idx !== -1) {
+      staffAccounts[idx] = { ...staffAccounts[idx], ...updates };
+      return staffAccounts[idx];
+    }
+    return {
+      id,
+      code: id,
+      name: updates.name || '',
+      title: updates.title || '',
+      email: updates.email || '',
+      phone: updates.phone || '',
+      department: updates.department || '',
+      role: updates.role || 'SALES',
+      roleTitle: updates.roleTitle || '',
+      assignedWarehouses: updates.assignedWarehouses || [],
+      status: updates.status || 'ACTIVE',
+      ...updates,
+    };
   },
 
   async toggleStaffStatus(id: string): Promise<StaffAccount> {
@@ -86,19 +102,55 @@ export const staffService = {
       const token = typeof window !== 'undefined' ? localStorage.getItem('stockflow_token') ?? undefined : undefined;
       const numericId = parseInt(id.replace(/\D/g, ''), 10);
       if (!isNaN(numericId)) {
-        await apiClient.put(`/api/Staff/${numericId}/toggle-status`, {}, token);
+        const res = await apiClient.put<{ isActive: boolean }>(`/api/Staff/${numericId}/toggle-status`, {}, token);
+        const idx = staffAccounts.findIndex((s) => s.id === id);
+        if (idx !== -1) {
+          staffAccounts[idx] = {
+            ...staffAccounts[idx],
+            status: res.isActive ? 'ACTIVE' : 'LOCKED',
+          };
+          return staffAccounts[idx];
+        }
+        return {
+          id,
+          code: `NV-NV${numericId.toString().padStart(3, '0')}`,
+          name: '',
+          title: '',
+          email: '',
+          phone: '',
+          department: '',
+          role: 'SALES',
+          roleTitle: '',
+          assignedWarehouses: [],
+          status: res.isActive ? 'ACTIVE' : 'LOCKED',
+        };
       }
     } catch (e) {
       console.warn('API toggleStaffStatus failed, fallback to local state:', e);
     }
 
     const idx = staffAccounts.findIndex((s) => s.id === id);
-    if (idx === -1) throw new Error('Không tìm thấy tài khoản nhân viên');
-    staffAccounts[idx] = {
-      ...staffAccounts[idx],
-      status: staffAccounts[idx].status === 'ACTIVE' ? 'LOCKED' : 'ACTIVE',
+    if (idx !== -1) {
+      staffAccounts[idx] = {
+        ...staffAccounts[idx],
+        status: staffAccounts[idx].status === 'ACTIVE' ? 'LOCKED' : 'ACTIVE',
+      };
+      return staffAccounts[idx];
+    }
+
+    return {
+      id,
+      code: id,
+      name: '',
+      title: '',
+      email: '',
+      phone: '',
+      department: '',
+      role: 'SALES',
+      roleTitle: '',
+      assignedWarehouses: [],
+      status: 'LOCKED',
     };
-    return staffAccounts[idx];
   },
 
   async resetStaffPassword(id: string): Promise<string> {
@@ -112,7 +164,7 @@ export const staffService = {
     } catch (e) {
       console.warn('API resetStaffPassword failed, fallback to default:', e);
     }
-    return 'StockFlow@123';
+    return 'TinPhat@2026';
   },
 
   // Legacy user compatibility

@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using StockFlow.Application.Common;
 using StockFlow.Application.Common.Interfaces;
 using StockFlow.Application.Features.Admin.DTOs;
+using StockFlow.Application.Features.Roles.Common;
 
 namespace StockFlow.Application.Features.Admin.Queries;
 
@@ -57,8 +58,21 @@ public class GetStaffListQueryHandler : IRequestHandler<GetStaffListQuery, Resul
 
         var result = users.Select(u =>
         {
-            var primaryRole = u.JncUserRoles.FirstOrDefault()?.Role?.RoleName ?? "SalesStaff";
-            var (roleCode, roleTitle, defaultDept) = roleMap.GetValueOrDefault(primaryRole, ("SALES", "Nhân viên", "Phòng Kinh doanh"));
+            var roleEntity = u.JncUserRoles.FirstOrDefault()?.Role;
+            var primaryRole = roleEntity?.RoleName ?? "Nhân viên";
+            var roleCode = PermissionConstants.ToRoleCode(primaryRole);
+            if (roleEntity?.Description != null)
+            {
+                var match = System.Text.RegularExpressions.Regex.Match(roleEntity.Description, @"\[CODE:([^\]]+)\]");
+                if (match.Success)
+                {
+                    roleCode = match.Groups[1].Value.Trim();
+                }
+            }
+            var roleTitle = PermissionConstants.ToRoleDisplayName(primaryRole);
+            var defaultDept = roleMap.ContainsKey(primaryRole) 
+                ? roleMap[primaryRole].Department 
+                : "Khối Nghiệp vụ";
 
             var warehouses = u.JncUserWarehouseAccesses
                 .Where(w => w.Warehouse?.WarehouseCode != null)
@@ -77,7 +91,8 @@ public class GetStaffListQueryHandler : IRequestHandler<GetStaffListQuery, Resul
                 RoleTitle: roleTitle,
                 AssignedWarehouses: warehouses,
                 Status: u.IsActive == false ? "LOCKED" : "ACTIVE",
-                Avatar: null
+                Avatar: u.Avatar,
+                Username: u.Username
             );
         }).ToList();
 

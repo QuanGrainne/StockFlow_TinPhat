@@ -60,15 +60,15 @@ export const Header: React.FC<HeaderProps> = ({
         const u = JSON.parse(rawUser);
         const name = u.fullName || u.username || 'Người dùng';
         const code = u.code || `NV-NV${String(u.userId || 1).padStart(3, '0')}`;
-        const primaryRoleStr = Array.isArray(u.roles) && u.roles.length > 0 ? u.roles[0] : (u.role || currentRole);
+        const rawRoleStr = currentRole || (Array.isArray(u.roles) && u.roles.length > 0 ? u.roles[0] : (u.role || 'SALES'));
 
-        const mappedRole: UserRole = primaryRoleStr.toUpperCase().includes('ADMIN')
+        const mappedRole: UserRole = rawRoleStr.toUpperCase().includes('ADMIN')
           ? 'ADMIN'
-          : primaryRoleStr.toUpperCase().includes('MGR') || primaryRoleStr.toUpperCase().includes('MANAGER')
+          : rawRoleStr.toUpperCase().includes('MGR') || rawRoleStr.toUpperCase().includes('MANAGER')
           ? 'MANAGER'
-          : primaryRoleStr.toUpperCase().includes('WAREHOUSE')
+          : rawRoleStr.toUpperCase().includes('WAREHOUSE')
           ? 'WAREHOUSE'
-          : primaryRoleStr.toUpperCase().includes('PROD')
+          : rawRoleStr.toUpperCase().includes('PROD')
           ? 'PRODUCTION'
           : 'SALES';
 

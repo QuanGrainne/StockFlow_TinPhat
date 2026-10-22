@@ -198,18 +198,334 @@ export const permissionService = {
 
   // ─── 2. Roles & RBAC Matrix (Danh mục vai trò & Ma trận quyền) ───────────
   async getRoleDefinitions(): Promise<RoleDefinition[]> {
-    await new Promise((r) => setTimeout(r, 100));
+    try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('stockflow_token') ?? undefined : undefined;
+      const data = await apiClient.get<RoleDefinition[]>('/api/Roles', token);
+      if (Array.isArray(data) && data.length > 0) {
+        roleDefinitions = data;
+        return data;
+      }
+    } catch (e) {
+      console.warn('API getRoleDefinitions failed, fallback to local data:', e);
+    }
     return [...roleDefinitions];
   },
 
+  async createRole(payload: { name: string; code: string; description?: string; rank?: string }): Promise<RoleDefinition> {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('stockflow_token') ?? undefined : undefined;
+    try {
+      const created = await apiClient.post<RoleDefinition>('/api/Roles', payload, token);
+      roleDefinitions.push(created);
+      return created;
+    } catch (e) {
+      console.warn('API createRole failed, fallback to local state:', e);
+      const fallbackRole: RoleDefinition = {
+        id: `ROLE-${Date.now()}`,
+        name: payload.name,
+        code: payload.code.toUpperCase().startsWith('ROLE_') ? payload.code.toUpperCase() : `ROLE_${payload.code.toUpperCase()}`,
+        rank: payload.rank || `Rank #${roleDefinitions.length + 1}`,
+        isSystem: false,
+        description: payload.description || 'Vai trò tùy biến mở rộng.',
+        staffCount: 0,
+      };
+      roleDefinitions.push(fallbackRole);
+      return fallbackRole;
+    }
+  },
+
+  async updateRole(idOrCode: string, payload: { name: string; description?: string }): Promise<RoleDefinition | null> {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('stockflow_token') ?? undefined : undefined;
+    try {
+      const updated = await apiClient.put<RoleDefinition>(`/api/Roles/${encodeURIComponent(idOrCode)}`, payload, token);
+      const idx = roleDefinitions.findIndex(r => r.id === idOrCode || r.code === idOrCode);
+      if (idx !== -1 && updated) {
+        roleDefinitions[idx] = updated;
+      }
+      return updated;
+    } catch (e) {
+      console.warn('API updateRole failed, fallback to local state:', e);
+      const idx = roleDefinitions.findIndex(r => r.id === idOrCode || r.code === idOrCode);
+      if (idx !== -1) {
+        roleDefinitions[idx] = {
+          ...roleDefinitions[idx],
+          name: payload.name,
+          description: payload.description || roleDefinitions[idx].description,
+        };
+        return roleDefinitions[idx];
+      }
+      return null;
+    }
+  },
+
+  async deleteRole(idOrCode: string): Promise<boolean> {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('stockflow_token') ?? undefined : undefined;
+    try {
+      await apiClient.delete(`/api/Roles/${encodeURIComponent(idOrCode)}`, token);
+      roleDefinitions = roleDefinitions.filter(r => r.id !== idOrCode && r.code !== idOrCode);
+      return true;
+    } catch (e) {
+      console.error('API deleteRole failed:', e);
+      throw e;
+    }
+  },
+
   async getPermissionMatrix(roleCode: string): Promise<PermissionMatrixModule[]> {
-    await new Promise((r) => setTimeout(r, 100));
+    try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('stockflow_token') ?? undefined : undefined;
+      const data = await apiClient.get<PermissionMatrixModule[]>(`/api/Roles/${encodeURIComponent(roleCode)}/permissions`, token);
+      if (Array.isArray(data) && data.length > 0) {
+        permissionMatrices[roleCode] = data;
+        if (typeof window !== 'undefined') {
+          localStorage.setItem(`stockflow_perms_${roleCode}`, JSON.stringify(data));
+        }
+        return data;
+      }
+    } catch (e) {
+      console.warn(`API getPermissionMatrix for ${roleCode} failed, fallback to local data:`, e);
+    }
+
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem(`stockflow_perms_${roleCode}`);
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            permissionMatrices[roleCode] = parsed;
+            return parsed;
+          }
+        } catch {}
+      }
+    }
+
     return permissionMatrices[roleCode] || JSON.parse(JSON.stringify(INITIAL_PERMISSION_MODULES));
   },
 
   async savePermissionMatrix(roleCode: string, modules: PermissionMatrixModule[]): Promise<boolean> {
-    await new Promise((r) => setTimeout(r, 200));
     permissionMatrices[roleCode] = JSON.parse(JSON.stringify(modules));
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(`stockflow_perms_${roleCode}`, JSON.stringify(modules));
+      window.dispatchEvent(new CustomEvent('stockflow_permissions_updated', { detail: { roleCode, modules } }));
+    }
+    try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('stockflow_token') ?? undefined : undefined;
+      await apiClient.put(`/api/Roles/${encodeURIComponent(roleCode)}/permissions`, modules, token);
+      return true;
+    } catch (e) {
+      console.warn(`API savePermissionMatrix for ${roleCode} failed, fallback to local cache:`, e);
+      return true;
+    }
+  },
+
+  async getAllowedModuleKeys(roleCode: string): Promise<Set<string>> {
+    const modules = await this.getPermissionMatrix(roleCode);
+    const keys = new Set<string>();
+    for (const m of modules) {
+      if (m.read) {
+        const key = m.code.replace(/[\[\]]/g, '').toUpperCase();
+        keys.add(key);
+      }
+    }
+    return keys;
+  },
+
+  // ─── 3. Navbar Feature Matrix (Phân quyền theo chức năng Navbar) ───────────
+  async getFeatureMatrix(): Promise<Record<string, string[]>> {
+    let matrix: Record<string, string[]> = {};
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('stockflow_feature_matrix');
+      if (saved) {
+        try {
+          matrix = JSON.parse(saved);
+        } catch {}
+      }
+    }
+    for (const [role, feats] of Object.entries(DEFAULT_ROLE_FEATURE_PERMS)) {
+      if (!matrix[role]) {
+        matrix[role] = [...feats];
+      }
+    }
+    return matrix;
+  },
+
+  async saveFeatureMatrix(matrix: Record<string, string[]>): Promise<boolean> {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('stockflow_feature_matrix', JSON.stringify(matrix));
+    }
+
+    // Đồng bộ sang từng Role cho Backend & localStorage
+    for (const [roleCode, featureIds] of Object.entries(matrix)) {
+      const permittedModuleKeys = new Set(
+        NAVBAR_FEATURES
+          .filter(f => featureIds.includes(f.id))
+          .map(f => f.moduleKey)
+      );
+
+      const modules: PermissionMatrixModule[] = INITIAL_PERMISSION_MODULES.map(m => {
+        const key = m.code.replace(/[\[\]]/g, '').toUpperCase();
+        const isPermitted = permittedModuleKeys.has(key);
+        return {
+          ...m,
+          read: isPermitted,
+          create: isPermitted,
+          update: isPermitted,
+          delete: isPermitted,
+          approve: isPermitted,
+        };
+      });
+
+      await this.savePermissionMatrix(roleCode, modules);
+    }
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('stockflow_permissions_updated'));
+    }
     return true;
   },
+
+  async getAllowedFeatures(roleCode: string): Promise<Set<string>> {
+    const matrix = await this.getFeatureMatrix();
+    const feats = matrix[roleCode] || DEFAULT_ROLE_FEATURE_PERMS[roleCode] || [];
+    const allowed = new Set<string>();
+
+    for (const fid of feats) {
+      allowed.add(fid);
+      const featConfig = NAVBAR_FEATURES.find(f => f.id === fid);
+      if (featConfig) {
+        allowed.add(featConfig.moduleKey);
+        featConfig.tabIds.forEach(tid => allowed.add(tid));
+      }
+    }
+    return allowed;
+  },
+};
+
+export interface NavFeatureConfig {
+  id: string;
+  name: string;
+  desc: string;
+  moduleKey: string;
+  tabIds: string[];
+}
+
+export const NAVBAR_FEATURES: NavFeatureConfig[] = [
+  {
+    id: 'feat-staff',
+    name: 'Tài khoản nhân viên',
+    desc: 'Hồ sơ nhân viên, phân công phòng ban và tài khoản',
+    moduleKey: 'AUTH',
+    tabIds: ['admin-staff', 'admin-staff-active'],
+  },
+  {
+    id: 'feat-roles',
+    name: 'Danh mục vai trò & Phân quyền',
+    desc: 'Thiết lập danh mục vai trò và ma trận quyền hạn hệ thống',
+    moduleKey: 'AUTH',
+    tabIds: ['admin-roles', 'admin-matrix'],
+  },
+  {
+    id: 'feat-warehouse-perms',
+    name: 'Phân quyền kho & Cơ sở kho',
+    desc: 'Ma trận phân quyền nhân sự vào kho vật lý và cách ly dữ liệu',
+    moduleKey: 'AUTH',
+    tabIds: ['admin-warehouse-perms', 'admin-warehouse-facilities'],
+  },
+  {
+    id: 'feat-goods',
+    name: 'Danh mục hàng hóa',
+    desc: 'Quản trị Master Data sản phẩm, vật tư, đơn vị tính và thẻ kho',
+    moduleKey: 'GOODS',
+    tabIds: ['admin-goods', 'warehouse-goods', 'production-goods', 'goods-catalog'],
+  },
+  {
+    id: 'feat-sales',
+    name: 'Quản lý bán hàng',
+    desc: 'Đơn hàng chờ xử lý, gộp đơn B2B và quản lý hàng trả',
+    moduleKey: 'SALES',
+    tabIds: ['sales-orders', 'sales-dashboard', 'sales-consolidate', 'sales-returns', 'warehouse-outbound'],
+  },
+  {
+    id: 'feat-purchase',
+    name: 'Quản lý mua hàng & Nhập kho',
+    desc: 'Tiếp nhận đơn mua hàng PO và chi phí Landed Cost',
+    moduleKey: 'PURCHASE',
+    tabIds: ['warehouse-inbound', 'manager-landed-cost'],
+  },
+  {
+    id: 'feat-stock',
+    name: 'Quản trị kho & Tồn kho',
+    desc: 'Tổng quan tồn kho thực tế, xuất kho, điều chuyển và kiểm kê',
+    moduleKey: 'STOCK',
+    tabIds: ['warehouse-overview', 'warehouse-transfer', 'warehouse-audit', 'warehouse-returns'],
+  },
+  {
+    id: 'feat-prod',
+    name: 'Quản trị sản xuất',
+    desc: 'Theo dõi lệnh sản xuất, nhận kế hoạch gia công và nhật ký',
+    moduleKey: 'PROD',
+    tabIds: ['production-orders', 'production-import', 'production-logs'],
+  },
+  {
+    id: 'feat-bom',
+    name: 'Định mức nguyên liệu (BOM)',
+    desc: 'Quản lý định mức BOM vật tư và công thức phối liệu',
+    moduleKey: 'BOM',
+    tabIds: ['manager-bom'],
+  },
+  {
+    id: 'feat-partner',
+    name: 'Đối tác & Hạn mức công nợ',
+    desc: 'Quản lý khách hàng B2B, NCC và xét duyệt ngoại lệ công nợ',
+    moduleKey: 'PARTNER',
+    tabIds: ['manager-partners', 'sales-credit-limits'],
+  },
+  {
+    id: 'feat-fin',
+    name: 'Tài chính & Báo cáo',
+    desc: 'Quản lý phiếu thu, chi dòng tiền và báo cáo quản trị tổng hợp',
+    moduleKey: 'FIN',
+    tabIds: ['manager-cashflow', 'manager-reports'],
+  },
+];
+
+export const DEFAULT_ROLE_FEATURE_PERMS: Record<string, string[]> = {
+  ROLE_ADMIN: [
+    'feat-staff',
+    'feat-roles',
+    'feat-warehouse-perms',
+    'feat-goods',
+    'feat-sales',
+    'feat-purchase',
+    'feat-stock',
+    'feat-prod',
+    'feat-bom',
+    'feat-partner',
+    'feat-fin',
+  ],
+  ROLE_MANAGER: [
+    'feat-goods',
+    'feat-sales',
+    'feat-purchase',
+    'feat-stock',
+    'feat-prod',
+    'feat-bom',
+    'feat-partner',
+    'feat-fin',
+  ],
+  ROLE_SALES: [
+    'feat-goods',
+    'feat-sales',
+    'feat-partner',
+  ],
+  ROLE_WAREHOUSE: [
+    'feat-goods',
+    'feat-purchase',
+    'feat-stock',
+    'feat-bom',
+  ],
+  ROLE_PRODUCTION: [
+    'feat-goods',
+    'feat-stock',
+    'feat-prod',
+    'feat-bom',
+  ],
 };

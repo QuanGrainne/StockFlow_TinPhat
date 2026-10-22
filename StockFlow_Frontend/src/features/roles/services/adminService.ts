@@ -22,8 +22,15 @@ export const adminService = {
   createWarehouseFacility: permissionService.createWarehouseFacility,
   updateWarehousePermissions: permissionService.updateWarehousePermissions,
   getRoleDefinitions: permissionService.getRoleDefinitions,
+  createRole: permissionService.createRole,
+  updateRole: permissionService.updateRole,
+  deleteRole: permissionService.deleteRole,
   getPermissionMatrix: permissionService.getPermissionMatrix,
   savePermissionMatrix: permissionService.savePermissionMatrix,
+  getFeatureMatrix: permissionService.getFeatureMatrix,
+  saveFeatureMatrix: permissionService.saveFeatureMatrix,
+  getAllowedFeatures: permissionService.getAllowedFeatures,
 };
 
 export { staffService, permissionService };
+export { NAVBAR_FEATURES } from './permissionService';

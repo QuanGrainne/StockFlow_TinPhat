@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using StockFlow.Application.Common;
 using StockFlow.Application.Common.Interfaces;
 using StockFlow.Application.Features.Admin.DTOs;
+using StockFlow.Application.Features.Roles.Common;
 
 namespace StockFlow.Application.Features.Admin.Commands;
 
@@ -11,10 +12,12 @@ public record UpdateStaffCommand(int UserId, UpdateStaffRequest Request) : IRequ
 public class UpdateStaffCommandHandler : IRequestHandler<UpdateStaffCommand, Result<StaffDto>>
 {
     private readonly IStockFlowDbContext _context;
+    private readonly IPasswordHasher _passwordHasher;
 
-    public UpdateStaffCommandHandler(IStockFlowDbContext context)
+    public UpdateStaffCommandHandler(IStockFlowDbContext context, IPasswordHasher passwordHasher)
     {
         _context = context;
+        _passwordHasher = passwordHasher;
     }
 
     public async Task<Result<StaffDto>> Handle(UpdateStaffCommand command, CancellationToken cancellationToken)
@@ -32,25 +35,84 @@ public class UpdateStaffCommandHandler : IRequestHandler<UpdateStaffCommand, Res
         }
 
         var req = command.Request;
+
+        if (string.IsNullOrWhiteSpace(req.Name))
+        {
+            return Result.Failure<StaffDto>("Họ và tên nhân viên không được để trống.");
+        }
+
+        if (string.IsNullOrWhiteSpace(req.Phone))
+        {
+            return Result.Failure<StaffDto>("Số điện thoại không được để trống.");
+        }
+
         user.FullName = req.Name.Trim();
-        user.Email = req.Email.Trim();
-        user.Phone = req.Phone?.Trim() ?? "";
+        user.Email = req.Email?.Trim() ?? "";
+        user.Phone = req.Phone.Trim();
+        if (req.Avatar != null)
+        {
+            user.Avatar = string.IsNullOrWhiteSpace(req.Avatar) ? null : req.Avatar.Trim();
+        }
         user.UpdatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
 
-        // Cập nhật vai trò
-        var targetRoleName = req.Role.ToUpper() switch
+        // Kiểm tra trùng email nếu có nhập email
+        if (!string.IsNullOrWhiteSpace(req.Email))
         {
-            "ADMIN" or "ROLE_ADMIN" => "Admin",
-            "MANAGER" or "ROLE_MANAGER" => "Manager",
-            "SALES" or "ROLE_SALES" => "SalesStaff",
-            "WAREHOUSE" or "ROLE_WAREHOUSE" => "WarehouseStaff",
-            "PRODUCTION" or "ROLE_PRODUCTION" => "ProductionStaff",
-            _ => req.Role
-        };
+            var emailClean = req.Email.Trim();
+            var emailExists = await _context.SecUsers.AnyAsync(u => u.UserId != user.UserId && u.Email == emailClean, cancellationToken);
+            if (emailExists)
+            {
+                return Result.Failure<StaffDto>($"Email '{emailClean}' đã được sử dụng cho một tài khoản khác.");
+            }
+        }
 
-        var role = await _context.SecRoles.FirstOrDefaultAsync(r =>
-            r.RoleName != null && (r.RoleName.ToLower() == targetRoleName.ToLower() || r.RoleName.ToLower() == req.Role.ToLower()),
-            cancellationToken);
+        // Cập nhật tên đăng nhập nếu có truyền vào
+        if (!string.IsNullOrWhiteSpace(req.Username))
+        {
+            var newUsername = req.Username.Trim().ToLower();
+            if (newUsername != user.Username?.ToLower())
+            {
+                var usernameExists = await _context.SecUsers.AnyAsync(u => u.UserId != user.UserId && u.Username == newUsername, cancellationToken);
+                if (usernameExists)
+                {
+                    return Result.Failure<StaffDto>($"Tên đăng nhập '{newUsername}' đã tồn tại trong hệ thống. Vui lòng chọn tên đăng nhập khác.");
+                }
+                user.Username = newUsername;
+            }
+        }
+
+        // Cập nhật mật khẩu nếu có truyền vào từ form
+        if (!string.IsNullOrWhiteSpace(req.Password))
+        {
+            user.PasswordHash = _passwordHasher.Hash(req.Password.Trim());
+        }
+
+        // Cập nhật vai trò linh hoạt theo ID, Mã hoặc Tên vai trò
+        var roleInput = (req.Role ?? "").Trim();
+        int? parsedRoleId = null;
+        if (roleInput.StartsWith("ROLE-", StringComparison.OrdinalIgnoreCase) && int.TryParse(roleInput[5..], out var rNum))
+        {
+            parsedRoleId = rNum;
+        }
+        else if (int.TryParse(roleInput, out var directRid))
+        {
+            parsedRoleId = directRid;
+        }
+
+        var allRoles = await _context.SecRoles.ToListAsync(cancellationToken);
+        var role = allRoles.FirstOrDefault(r =>
+            (parsedRoleId.HasValue && r.RoleId == parsedRoleId.Value) ||
+            string.Equals(r.RoleName, roleInput, StringComparison.OrdinalIgnoreCase) ||
+            (r.Description != null && r.Description.Contains($"[CODE:{roleInput}]", StringComparison.OrdinalIgnoreCase)) ||
+            string.Equals(PermissionConstants.ToRoleCode(r.RoleName ?? ""), PermissionConstants.ToRoleCode(roleInput), StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(PermissionConstants.ToRoleCode(r.RoleName ?? ""), roleInput, StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(r.RoleName, PermissionConstants.ToRoleDisplayName(roleInput), StringComparison.OrdinalIgnoreCase) ||
+            (roleInput.Equals("ADMIN", StringComparison.OrdinalIgnoreCase) && r.RoleName != null && r.RoleName.Contains("Admin", StringComparison.OrdinalIgnoreCase)) ||
+            (roleInput.Equals("MANAGER", StringComparison.OrdinalIgnoreCase) && r.RoleName != null && r.RoleName.Contains("Manager", StringComparison.OrdinalIgnoreCase)) ||
+            (roleInput.Equals("SALES", StringComparison.OrdinalIgnoreCase) && r.RoleName != null && (r.RoleName.Contains("Sales", StringComparison.OrdinalIgnoreCase) || r.RoleName.Contains("Bán hàng", StringComparison.OrdinalIgnoreCase))) ||
+            (roleInput.Equals("WAREHOUSE", StringComparison.OrdinalIgnoreCase) && r.RoleName != null && (r.RoleName.Contains("Warehouse", StringComparison.OrdinalIgnoreCase) || r.RoleName.Contains("Kho", StringComparison.OrdinalIgnoreCase))) ||
+            (roleInput.Equals("PRODUCTION", StringComparison.OrdinalIgnoreCase) && r.RoleName != null && (r.RoleName.Contains("Production", StringComparison.OrdinalIgnoreCase) || r.RoleName.Contains("Sản xuất", StringComparison.OrdinalIgnoreCase)))
+        );
 
         if (role != null)
         {
@@ -86,30 +148,36 @@ public class UpdateStaffCommandHandler : IRequestHandler<UpdateStaffCommand, Res
 
         await _context.SaveChangesAsync(cancellationToken);
 
-        var roleTitleMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        var finalRoleEntity = role ?? user.JncUserRoles.FirstOrDefault()?.Role;
+        var finalRoleCode = finalRoleEntity != null 
+            ? PermissionConstants.ToRoleCode(finalRoleEntity.RoleName ?? $"ROLE_{finalRoleEntity.RoleId}") 
+            : PermissionConstants.ToRoleCode(req.Role ?? "ROLE_STAFF");
+        if (finalRoleEntity?.Description != null)
         {
-            { "Admin", "Quản trị viên" },
-            { "Manager", "Quản lý" },
-            { "SalesStaff", "Nhân viên bán hàng" },
-            { "WarehouseStaff", "Nhân viên kho" },
-            { "ProductionStaff", "Nhân viên sản xuất" }
-        };
-
-        var roleTitle = roleTitleMap.GetValueOrDefault(role?.RoleName ?? "", "Nhân viên");
+            var match = System.Text.RegularExpressions.Regex.Match(finalRoleEntity.Description, @"\[CODE:([^\]]+)\]");
+            if (match.Success)
+            {
+                finalRoleCode = match.Groups[1].Value.Trim();
+            }
+        }
+        var finalRoleTitle = finalRoleEntity != null 
+            ? PermissionConstants.ToRoleDisplayName(finalRoleEntity.RoleName ?? "Nhân viên") 
+            : "Nhân viên";
 
         var response = new StaffDto(
             Id: user.UserId.ToString(),
             Code: $"NV-NV{user.UserId:D3}",
             Name: user.FullName ?? "",
-            Title: req.Title ?? "Chuyên viên",
+            Title: string.IsNullOrWhiteSpace(req.Title) ? finalRoleTitle : req.Title,
             Email: user.Email ?? "",
             Phone: user.Phone ?? "",
-            Department: req.Department ?? "Quản trị hệ thống",
-            Role: req.Role.ToUpper(),
-            RoleTitle: roleTitle,
+            Department: req.Department ?? "",
+            Role: finalRoleCode,
+            RoleTitle: finalRoleTitle,
             AssignedWarehouses: assignedWarehouses,
             Status: user.IsActive == false ? "LOCKED" : "ACTIVE",
-            Avatar: null
+            Avatar: user.Avatar,
+            Username: user.Username
         );
 
         return Result.Success(response);
