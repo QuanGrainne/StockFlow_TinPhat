@@ -9,6 +9,7 @@ import {
   Sliders,
   DollarSign,
   Building,
+  Building2,
   CheckCircle2,
   X,
   CreditCard,
@@ -96,14 +97,25 @@ export const PartnerCreditLimitScreen: React.FC<PartnerCreditLimitScreenProps> =
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={() => onNavigate && onNavigate('manager-cashflow')}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#1E56A0] hover:bg-[#184580] text-xs font-semibold text-white transition cursor-pointer shadow-xs"
-        >
-          <Wallet size={14} />
-          <span>Sổ quỹ thu chi</span>
-        </button>
+        <div className="flex items-center gap-2.5">
+          <button
+            type="button"
+            onClick={() => onNavigate && onNavigate('suppliers')}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#0071BA] hover:bg-[#005f9d] text-xs font-semibold text-white transition cursor-pointer shadow-xs"
+          >
+            <Building2 size={14} />
+            <span>Quản lý Nhà cung cấp</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => onNavigate && onNavigate('manager-cashflow')}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#1E56A0] hover:bg-[#184580] text-xs font-semibold text-white transition cursor-pointer shadow-xs"
+          >
+            <Wallet size={14} />
+            <span>Sổ quỹ thu chi</span>
+          </button>
+        </div>
       </div>
 
       {/* 3 Metric Cards */}
@@ -124,17 +136,24 @@ export const PartnerCreditLimitScreen: React.FC<PartnerCreditLimitScreenProps> =
         </div>
 
         {/* Card 2: Phải trả nhà cung cấp (AP) */}
-        <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs p-5 flex flex-col justify-between">
+        <div
+          onClick={() => onNavigate && onNavigate('suppliers')}
+          className="bg-white rounded-xl border border-slate-200/90 shadow-2xs p-5 flex flex-col justify-between cursor-pointer hover:border-[#0071BA] hover:shadow-md transition group"
+          title="Xem danh sách chi tiết Nhà cung cấp & Công nợ"
+        >
           <div>
-            <span className="text-[11px] font-bold tracking-wider uppercase text-slate-500">
+            <span className="text-[11px] font-bold tracking-wider uppercase text-slate-500 group-hover:text-[#0071BA] transition">
               Phải trả nhà cung cấp (AP)
             </span>
             <div className="text-2xl font-extrabold text-slate-900 mt-2">
               605.000.000 đ
             </div>
           </div>
-          <div className="mt-4 pt-3 border-t border-slate-100 text-xs text-slate-500">
-            2 nhà cung ứng
+          <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+            <span className="text-slate-500">2 nhà cung ứng</span>
+            <span className="text-[#0071BA] font-semibold group-hover:underline flex items-center gap-1">
+              Xem NCC &rarr;
+            </span>
           </div>
         </div>
 

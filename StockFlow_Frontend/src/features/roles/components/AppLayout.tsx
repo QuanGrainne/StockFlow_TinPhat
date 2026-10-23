@@ -1,12 +1,15 @@
-// src/components/AppLayout.tsx
-// Layout chính: Tích hợp Header (Role Switcher), Sidebar Collapsible, và Render Màn hình tương ứng
-
 import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { UserRole } from '../types';
 import { Header } from './common/Header';
 import { Sidebar } from './common/Sidebar';
 import { GoodsCatalogScreen } from './common/GoodsCatalogScreen';
+import SuppliersClient from '@/app/(dashboard)/suppliers/SuppliersClient';
 import { permissionService } from '../services/permissionService';
+
+interface AppLayoutProps {
+  initialScreen?: string;
+}
 
 const SCREEN_MODULE_MAP: Record<string, string> = {
   'admin-staff': 'AUTH',
@@ -114,9 +117,10 @@ const getStoredScreen = (role: UserRole): string => {
   return getDefaultScreenForRole(role);
 };
 
-export const AppLayout: React.FC = () => {
+export const AppLayout: React.FC<AppLayoutProps> = ({ initialScreen }) => {
+  const router = useRouter();
   const [currentRole, setCurrentRole] = useState<UserRole>('SALES');
-  const [activeScreen, setActiveScreen] = useState<string>('sales-dashboard');
+  const [activeScreen, setActiveScreen] = useState<string>(initialScreen || 'sales-dashboard');
   const [selectedMatrixRole, setSelectedMatrixRole] = useState<string>('ROLE_ADMIN');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [hasImportedProductionPlan, setHasImportedProductionPlan] = useState(false);
@@ -124,10 +128,10 @@ export const AppLayout: React.FC = () => {
   // Khôi phục role và screen từ localStorage khi reload trang
   React.useEffect(() => {
     const role = getStoredRole();
-    const screen = getStoredScreen(role);
+    const screen = initialScreen || getStoredScreen(role);
     setCurrentRole(role);
     setActiveScreen(screen);
-  }, []);
+  }, [initialScreen]);
 
   // Lắng nghe cập nhật quyền từ Ma trận phân quyền để tự động chuyển trang nếu màn hình hiện tại bị bỏ quyền
   React.useEffect(() => {
@@ -151,6 +155,11 @@ export const AppLayout: React.FC = () => {
     setActiveScreen(newScreen);
     if (typeof window !== 'undefined') {
       localStorage.setItem('stockflow_active_screen', newScreen);
+      if (newScreen === 'suppliers' || newScreen === '/suppliers') {
+        window.history.pushState(null, '', '/suppliers');
+      } else if (window.location.pathname.includes('/suppliers')) {
+        window.history.pushState(null, '', '/dashboard');
+      }
     }
   };
 
@@ -281,7 +290,12 @@ export const AppLayout: React.FC = () => {
       case 'admin-users':
         return <StaffAccountsScreen initialFilter="ALL" />;
 
-      // ─── Common / Goods Catalog Screens (Tất cả Role) ───
+      // ─── Common / Goods Catalog / Suppliers Screens (Tất cả Role) ───
+      case 'suppliers':
+      case 'manager-suppliers':
+      case 'admin-suppliers':
+        return <SuppliersClient onNavigate={handleNavigate} />;
+
       case 'goods-catalog':
       case 'admin-goods':
       case 'manager-goods':
@@ -308,25 +322,31 @@ export const AppLayout: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] text-slate-800 flex flex-col font-sans">
-      {/* 1. Header (SF Logo, Badge Role, Search input, User Profile) */}
-      <Header
-        currentRole={currentRole}
-        onRoleChange={handleRoleChange}
-      />
+    <div className="h-screen bg-[#F8FAFC] text-slate-800 flex flex-col font-sans overflow-hidden">
+      {/* 1. Header & Top Navigation Tabs Bar (Cố định ở đỉnh, không bị cuộn trôi) */}
+      <div className="shrink-0 z-40 bg-white shadow-2xs">
+        <Header
+          currentRole={currentRole}
+          onRoleChange={handleRoleChange}
+        />
+        <Sidebar
+          currentRole={currentRole}
+          activeScreen={activeScreen}
+          onNavigate={handleNavigate}
+          productionBadge={hasImportedProductionPlan ? '10' : '4'}
+        />
+      </div>
 
-      {/* 2. Top Navigation Tabs Bar */}
-      <Sidebar
-        currentRole={currentRole}
-        activeScreen={activeScreen}
-        onNavigate={handleNavigate}
-        productionBadge={hasImportedProductionPlan ? '10' : '4'}
-      />
-
-      {/* 3. Main Workspace Content */}
-      <main className="flex-1 min-w-0 overflow-y-auto p-6 lg:p-8 bg-[#F8FAFC]">
-        <div className="max-w-7xl mx-auto">{renderActiveScreen()}</div>
-      </main>
+      {/* 2. Main Workspace Content (Chỉ cuộn vùng nội dung) */}
+      {activeScreen === 'suppliers' || activeScreen.includes('suppliers') ? (
+        <main className="flex-1 min-w-0 flex flex-col overflow-y-auto bg-[#F8FAFC]">
+          {renderActiveScreen()}
+        </main>
+      ) : (
+        <main className="flex-1 min-w-0 overflow-y-auto p-6 lg:p-8 bg-[#F8FAFC]">
+          <div className="max-w-7xl mx-auto">{renderActiveScreen()}</div>
+        </main>
+      )}
     </div>
   );
 };

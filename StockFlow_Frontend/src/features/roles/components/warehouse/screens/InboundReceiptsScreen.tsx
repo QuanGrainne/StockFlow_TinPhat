@@ -31,7 +31,13 @@ export const InboundReceiptsScreen: React.FC = () => {
   // Form State
   const [formPoCode, setFormPoCode] = useState('PO-2026-090');
   const [formSupplierName, setFormSupplierName] = useState('Tập đoàn Thép Hòa Phát');
-  const [formWarehouseName, setFormWarehouseName] = useState('Kho Nguyên Liệu Tín Phát - Cụm A');
+  const [formWarehouseName, setFormWarehouseName] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('stockflow_selected_branch');
+      if (stored && stored !== 'ALL') return stored;
+    }
+    return 'Kho Tổng Gia Lâm';
+  });
   const [formProductName, setFormProductName] = useState('Tôn cuộn mạ kẽm Z12 (Dày 1.5mm)');
   const [formUom, setFormUom] = useState('Cuộn');
   const [formOrderedQty, setFormOrderedQty] = useState(10);
@@ -56,10 +62,22 @@ export const InboundReceiptsScreen: React.FC = () => {
     loadData();
   }, [search, statusFilter]);
 
+  // Lắng nghe sự kiện đổi chi nhánh kho làm việc
+  useEffect(() => {
+    const handleBranchSync = (e: any) => {
+      if (e.detail?.branch && e.detail.branch !== 'ALL') {
+        setFormWarehouseName(e.detail.branch);
+      }
+    };
+    window.addEventListener('stockflow_branch_changed', handleBranchSync);
+    return () => window.removeEventListener('stockflow_branch_changed', handleBranchSync);
+  }, []);
+
   const handleOpenCreate = () => {
+    const curBranch = typeof window !== 'undefined' ? localStorage.getItem('stockflow_selected_branch') : null;
     setFormPoCode(`PO-2026-0${Math.floor(Math.random() * 90 + 10)}`);
     setFormSupplierName('Tập đoàn Thép Hòa Phát');
-    setFormWarehouseName('Kho Nguyên Liệu Tín Phát - Cụm A');
+    setFormWarehouseName(curBranch && curBranch !== 'ALL' ? curBranch : 'Kho Tổng Gia Lâm');
     setFormProductName('Tôn cuộn mạ kẽm Z12 (Dày 1.5mm)');
     setFormUom('Cuộn');
     setFormOrderedQty(10);
@@ -308,12 +326,11 @@ export const InboundReceiptsScreen: React.FC = () => {
             <label className="block text-xs font-semibold text-slate-700 mb-1">
               Kho tiếp nhận
             </label>
-            <input
-              type="text"
-              value={formWarehouseName}
-              onChange={(e) => setFormWarehouseName(e.target.value)}
-              className="w-full h-9 px-3 rounded-[8px] border border-slate-300 text-xs focus:outline-none focus:border-[#2B6CB0]"
-            />
+            <div className="w-full h-9 px-3 rounded-[8px] border border-slate-200 bg-slate-50 text-xs text-slate-800 font-bold flex items-center gap-2 select-none">
+              <span className="text-blue-600">📍</span>
+              <span className="truncate">{formWarehouseName}</span>
+              <span className="text-[10px] text-slate-400 font-normal ml-auto">(Kho làm việc hiện tại)</span>
+            </div>
           </div>
 
           <div>

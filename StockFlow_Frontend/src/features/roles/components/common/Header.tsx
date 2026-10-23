@@ -1,7 +1,7 @@
 // src/features/roles/components/common/Header.tsx
 // Header giao diện: Topbar chuẩn theo thiết kế AI Studio (Logo SF, Badge Role, Search input, User profile avatar & Switch Role dropdown khớp Ảnh 4)
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { UserRole, StaffAccount, WarehouseFacility } from '../../types';
 import {
   Shield,
@@ -18,6 +18,7 @@ import {
   Factory,
   MapPin,
   Building2,
+  AlertTriangle,
 } from 'lucide-react';
 import { adminService } from '../../services/adminService';
 import { useRouter } from 'next/navigation';
@@ -38,6 +39,7 @@ export const Header: React.FC<HeaderProps> = ({
   const [roleDropdownOpen, setRoleDropdownOpen] = useState(false);
   const [globalSearch, setGlobalSearch] = useState('');
   const [facilities, setFacilities] = useState<WarehouseFacility[]>([]);
+  const [userWarehouseAccess, setUserWarehouseAccess] = useState<string[]>([]);
   const [selectedBranch, setSelectedBranch] = useState<string>(() => {
     if (typeof window !== 'undefined') {
       const stored = localStorage.getItem('stockflow_selected_branch');
@@ -65,6 +67,30 @@ export const Header: React.FC<HeaderProps> = ({
     avatar: null,
   });
   const [staffList, setStaffList] = useState<StaffAccount[]>([]);
+
+  // Helper trích xuất danh sách mã/tên kho được phân quyền từ user storage hoặc staff
+  const extractUserWarehouses = (userObj: any): string[] => {
+    if (!userObj) return [];
+    const list: string[] = [];
+    if (Array.isArray(userObj.warehouses)) {
+      userObj.warehouses.forEach((w: any) => {
+        if (typeof w === 'string') list.push(w);
+        else {
+          if (w.warehouseName) list.push(w.warehouseName);
+          if (w.warehouseCode) list.push(w.warehouseCode);
+          if (w.name) list.push(w.name);
+          if (w.code) list.push(w.code);
+          if (w.warehouseId) list.push(String(w.warehouseId));
+        }
+      });
+    }
+    if (Array.isArray(userObj.assignedWarehouses)) {
+      userObj.assignedWarehouses.forEach((w: any) => {
+        if (typeof w === 'string') list.push(w);
+      });
+    }
+    return Array.from(new Set(list));
+  };
 
   // Đọc thông tin user đăng nhập thực tế từ localStorage và đồng bộ avatar
   useEffect(() => {
@@ -119,9 +145,13 @@ export const Header: React.FC<HeaderProps> = ({
         avatarColor: color,
         avatar: u.avatar || null,
       });
+
+      // Lấy quyền kho ban đầu từ stockflow_user
+      const initialWhs = extractUserWarehouses(u);
+      setUserWarehouseAccess(initialWhs);
     }
 
-    // Tải danh sách nhân viên để phục vụ đổi nhanh và bổ sung avatar nếu user thiếu
+    // Tải danh sách nhân viên để phục vụ đổi nhanh và bổ sung avatar/kho nếu user thiếu
     adminService.getStaffList().then((list) => {
       if (list && list.length > 0) {
         setStaffList(list);
@@ -141,23 +171,22 @@ export const Header: React.FC<HeaderProps> = ({
               code: prev.code || matched.code,
               title: prev.title || matched.title || matched.roleTitle,
             }));
+
+            // Bổ sung danh sách kho được gán từ staff profile nếu có
+            if (matched.assignedWarehouses && matched.assignedWarehouses.length > 0) {
+              setUserWarehouseAccess((prev) =>
+                Array.from(new Set([...prev, ...matched.assignedWarehouses]))
+              );
+            }
           }
         }
       }
     });
 
-    // Tải danh sách cơ sở kho thực tế từ DB/Cache (tự động có cả kho mới tạo)
+    // Tải danh sách cơ sở kho thực tế từ DB/Cache
     adminService.getWarehouseFacilities().then((facs) => {
       if (facs && facs.length > 0) {
         setFacilities(facs);
-        setSelectedBranch((prev) => {
-          if (!prev || prev === 'ALL' || !facs.some((f) => f.name === prev || f.code === prev)) {
-            const first = facs[0].name;
-            localStorage.setItem('stockflow_selected_branch', first);
-            return first;
-          }
-          return prev;
-        });
       }
     });
 
@@ -177,8 +206,73 @@ export const Header: React.FC<HeaderProps> = ({
     };
   }, [currentRole]);
 
+  // Kiểm tra quyền Admin (Admin được xem 100% kho trong hệ thống)
+  const isAdmin =
+    currentUser.role === 'ADMIN' ||
+    currentRole === 'ADMIN' ||
+    (typeof window !== 'undefined' && localStorage.getItem('stockflow_current_role')?.toUpperCase() === 'ADMIN') ||
+    currentUser.code === 'NV-ADMIN';
+
+  // Danh sách kho ĐƯỢC PHÂN QUYỀN (Data Isolation)
+  const permittedFacilities = useMemo(() => {
+    if (facilities.length === 0) return [];
+    if (isAdmin) return facilities;
+
+    const allowed = userWarehouseAccess.map((s) => s.trim().toLowerCase());
+    if (allowed.length === 0) {
+      return [];
+    }
+
+    return facilities.filter((fac) => {
+      const nameMatch = allowed.includes(fac.name.trim().toLowerCase());
+      const codeMatch = allowed.includes(fac.code.trim().toLowerCase());
+      const idMatch = fac.id ? allowed.includes(fac.id.trim().toLowerCase()) : false;
+      return nameMatch || codeMatch || idMatch;
+    });
+  }, [facilities, isAdmin, userWarehouseAccess]);
+
+  // Auto-validate và tự động đồng bộ stockflow_selected_branch theo quyền kho
+  useEffect(() => {
+    if (facilities.length === 0) return;
+
+    if (permittedFacilities.length === 0) {
+      // Trường hợp tài khoản chưa được gán kho nào
+      if (selectedBranch !== '') {
+        setSelectedBranch('');
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('stockflow_selected_branch');
+          window.dispatchEvent(
+            new CustomEvent('stockflow_branch_changed', {
+              detail: { branch: '', branchName: '' },
+            })
+          );
+        }
+      }
+      return;
+    }
+
+    // Kiểm tra xem kho hiện tại có nằm trong danh sách kho được phân quyền không
+    const isValid = permittedFacilities.some(
+      (f) => f.name === selectedBranch || f.code === selectedBranch
+    );
+
+    if (!isValid) {
+      // Tự động chuyển về kho đầu tiên được phân quyền
+      const firstBranch = permittedFacilities[0].name;
+      setSelectedBranch(firstBranch);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('stockflow_selected_branch', firstBranch);
+        window.dispatchEvent(
+          new CustomEvent('stockflow_branch_changed', {
+            detail: { branch: firstBranch, branchName: firstBranch },
+          })
+        );
+      }
+    }
+  }, [permittedFacilities, facilities.length, selectedBranch]);
+
   const handleSelectBranch = (codeOrName: string) => {
-    const fac = facilities.find((f) => f.code === codeOrName || f.name === codeOrName);
+    const fac = permittedFacilities.find((f) => f.code === codeOrName || f.name === codeOrName);
     const branchName = fac ? fac.name : codeOrName;
     setSelectedBranch(branchName);
     if (typeof window !== 'undefined') {
@@ -258,6 +352,7 @@ export const Header: React.FC<HeaderProps> = ({
     const color = roleTitleMap[staff.role]?.color || 'from-blue-600 to-indigo-700';
 
     const numericId = parseInt(staff.id.replace(/\D/g, ''), 10) || 1;
+    const staffWarehouses = staff.assignedWarehouses || [];
     const updatedStorage = {
       userId: numericId,
       username: staff.username || (staff.email ? staff.email.split('@')[0] : ''),
@@ -267,9 +362,17 @@ export const Header: React.FC<HeaderProps> = ({
       roles: [staff.role],
       title: staff.title || staff.roleTitle,
       avatar: staff.avatar || null,
+      assignedWarehouses: staffWarehouses,
+      warehouses: staffWarehouses.map((w) => ({
+        warehouseCode: w,
+        warehouseName: w,
+      })),
     };
     localStorage.setItem('stockflow_user', JSON.stringify(updatedStorage));
     localStorage.setItem('stockflow_current_role', staff.role);
+
+    // Cập nhật ngay danh sách quyền kho cho nhân viên vừa chọn
+    setUserWarehouseAccess(staffWarehouses);
 
     setCurrentUser({
       name: staff.name,
@@ -329,100 +432,135 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* Right: Branch Selector (Khớp Ảnh 1 KiotViet) & User Profile */}
       <div className="flex items-center gap-3 relative">
-        {/* Dropdown Chọn Chi Nhánh Kho */}
-        <div className="relative">
-          <button
-            type="button"
-            onClick={() => {
-              setBranchDropdownOpen(!branchDropdownOpen);
-              setRoleDropdownOpen(false);
-            }}
-            className="h-9 px-3 rounded-lg border border-slate-200 bg-slate-50/90 hover:bg-white hover:border-blue-400 text-xs text-slate-800 flex items-center gap-2 transition cursor-pointer shadow-2xs"
-            title="Click để chọn chi nhánh kho làm việc"
+        {/* Bộ chọn Chi Nhánh Kho theo Phân Quyền (Data Isolation) */}
+        {permittedFacilities.length === 0 ? (
+          <div
+            className="h-9 px-3 rounded-lg border border-amber-300 bg-amber-50 text-xs text-amber-800 flex items-center gap-2 shadow-2xs select-none cursor-not-allowed"
+            title="Tài khoản chưa được phân quyền kho làm việc. Vui lòng liên hệ Quản trị viên."
+          >
+            <div className="w-5 h-5 rounded-md bg-amber-200 text-amber-800 flex items-center justify-center shrink-0">
+              <AlertTriangle size={12} />
+            </div>
+            <div className="text-left font-semibold text-amber-800 truncate">
+              Chưa gán kho làm việc
+            </div>
+          </div>
+        ) : permittedFacilities.length === 1 ? (
+          <div
+            className="h-9 px-3 rounded-lg border border-slate-200 bg-slate-50/90 text-xs text-slate-800 flex items-center gap-2 shadow-2xs select-none"
+            title={`Kho làm việc cố định: ${permittedFacilities[0].name}`}
           >
             <div className="w-5 h-5 rounded-md bg-blue-100 text-blue-700 flex items-center justify-center shrink-0">
               <Warehouse size={12} />
             </div>
-            <div className="text-left max-w-[130px] sm:max-w-[160px] truncate">
+            <div className="text-left max-w-[130px] sm:max-w-[170px] truncate">
+              <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider leading-none">
+                Kho làm việc
+              </div>
               <div className="font-bold text-slate-800 truncate leading-tight">
-                {facilities.find((f) => f.code === selectedBranch || f.name === selectedBranch)?.name ||
-                  selectedBranch ||
-                  'Kho Tổng Gia Lâm'}
+                {permittedFacilities[0].name}
               </div>
             </div>
-            <ChevronDown
-              size={13}
-              className={`text-slate-400 transition-transform duration-200 ${
-                branchDropdownOpen ? 'rotate-180 text-blue-600' : ''
-              }`}
-            />
-          </button>
-
-          {/* Popup Dropdown Chọn Chi Nhánh Kho */}
-          {branchDropdownOpen && (
-            <>
-              <div className="fixed inset-0 z-40" onClick={() => setBranchDropdownOpen(false)} />
-              <div className="absolute right-0 top-11 w-80 bg-white text-slate-800 rounded-2xl shadow-2xl border border-slate-200/90 p-3 z-50 animate-in fade-in zoom-in-95 duration-150">
-                <div className="px-2 pb-2 text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center justify-between border-b border-slate-100">
-                  <span>Chi nhánh kho làm việc</span>
-                  <span className="text-[10px] text-blue-600 font-semibold bg-blue-50 px-2 py-0.5 rounded-full">
-                    {facilities.length} cơ sở kho
-                  </span>
+          </div>
+        ) : (
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => {
+                setBranchDropdownOpen(!branchDropdownOpen);
+                setRoleDropdownOpen(false);
+              }}
+              className="h-9 px-3 rounded-lg border border-slate-200 bg-slate-50/90 hover:bg-white hover:border-blue-400 text-xs text-slate-800 flex items-center gap-2 transition cursor-pointer shadow-2xs"
+              title="Click để chọn chi nhánh kho làm việc"
+            >
+              <div className="w-5 h-5 rounded-md bg-blue-100 text-blue-700 flex items-center justify-center shrink-0">
+                <Warehouse size={12} />
+              </div>
+              <div className="text-left max-w-[130px] sm:max-w-[160px] truncate">
+                <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider leading-none">
+                  Kho làm việc
                 </div>
-
-                {/* Ô tìm kiếm kho */}
-                <div className="relative my-2">
-                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input
-                    type="text"
-                    value={branchSearch}
-                    onChange={(e) => setBranchSearch(e.target.value)}
-                    placeholder="Tìm theo tên kho, mã kho..."
-                    className="w-full h-8 pl-8 pr-3 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-700 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:bg-white"
-                    autoFocus
-                  />
-                </div>
-
-                {/* Danh sách các kho */}
-                <div className="max-h-64 overflow-y-auto space-y-1 pr-1">
-                  {/* Từng cơ sở kho (lấy động từ API/DB/Cache) */}
-                  {facilities
-                    .filter(
-                      (f) =>
-                        f.name.toLowerCase().includes(branchSearch.toLowerCase()) ||
-                        f.code.toLowerCase().includes(branchSearch.toLowerCase())
-                    )
-                    .map((fac) => {
-                      const isSelected = selectedBranch === fac.name || selectedBranch === fac.code;
-                      return (
-                        <button
-                          key={fac.id || fac.code}
-                          type="button"
-                          onClick={() => handleSelectBranch(fac.name)}
-                          className={`w-full text-left p-2 rounded-xl flex items-center justify-between transition cursor-pointer ${
-                            isSelected
-                              ? 'bg-blue-50 border border-blue-200 text-blue-900 font-bold'
-                              : 'border border-transparent hover:bg-slate-50 text-slate-700'
-                          }`}
-                        >
-                          <div className="flex items-center gap-2.5 min-w-0">
-                            <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 font-mono text-[10px] font-bold">
-                              {fac.code.slice(0, 4)}
-                            </div>
-                            <div className="truncate">
-                              <div className="text-xs font-bold truncate">{fac.name}</div>
-                              <div className="text-[10px] text-slate-400 truncate">{fac.address}</div>
-                            </div>
-                          </div>
-                          {isSelected && <Check size={15} className="text-blue-600 stroke-[2.5]" />}
-                        </button>
-                      );
-                    })}
+                <div className="font-bold text-slate-800 truncate leading-tight">
+                  {permittedFacilities.find((f) => f.code === selectedBranch || f.name === selectedBranch)?.name ||
+                    selectedBranch ||
+                    permittedFacilities[0].name}
                 </div>
               </div>
-            </>
-          )}
-        </div>
+              <ChevronDown
+                size={13}
+                className={`text-slate-400 transition-transform duration-200 ${
+                  branchDropdownOpen ? 'rotate-180 text-blue-600' : ''
+                }`}
+              />
+            </button>
+
+            {/* Popup Dropdown Chọn Chi Nhánh Kho */}
+            {branchDropdownOpen && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setBranchDropdownOpen(false)} />
+                <div className="absolute right-0 top-11 w-80 bg-white text-slate-800 rounded-2xl shadow-2xl border border-slate-200/90 p-3 z-50 animate-in fade-in zoom-in-95 duration-150">
+                  <div className="px-2 pb-2 text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center justify-between border-b border-slate-100">
+                    <span>Chi nhánh kho làm việc</span>
+                    <span className="text-[10px] text-blue-600 font-semibold bg-blue-50 px-2 py-0.5 rounded-full">
+                      {permittedFacilities.length} cơ sở kho khả dụng
+                    </span>
+                  </div>
+
+                  {/* Ô tìm kiếm kho (nếu > 3 kho) */}
+                  {permittedFacilities.length > 3 && (
+                    <div className="relative my-2">
+                      <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <input
+                        type="text"
+                        value={branchSearch}
+                        onChange={(e) => setBranchSearch(e.target.value)}
+                        placeholder="Tìm theo tên kho, mã kho..."
+                        className="w-full h-8 pl-8 pr-3 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-700 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:bg-white"
+                        autoFocus
+                      />
+                    </div>
+                  )}
+
+                  {/* Danh sách các kho ĐƯỢC PHÂN QUYỀN (Ẩn toàn bộ kho không có quyền) */}
+                  <div className="max-h-64 overflow-y-auto space-y-1 pr-1 mt-1">
+                    {permittedFacilities
+                      .filter(
+                        (f) =>
+                          f.name.toLowerCase().includes(branchSearch.toLowerCase()) ||
+                          f.code.toLowerCase().includes(branchSearch.toLowerCase())
+                      )
+                      .map((fac) => {
+                        const isSelected = selectedBranch === fac.name || selectedBranch === fac.code;
+                        return (
+                          <button
+                            key={fac.id || fac.code}
+                            type="button"
+                            onClick={() => handleSelectBranch(fac.name)}
+                            className={`w-full text-left p-2 rounded-xl flex items-center justify-between transition cursor-pointer ${
+                              isSelected
+                                ? 'bg-blue-50 border border-blue-200 text-blue-900 font-bold'
+                                : 'border border-transparent hover:bg-slate-50 text-slate-700'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 font-mono text-[10px] font-bold">
+                                {fac.code.slice(0, 4)}
+                              </div>
+                              <div className="truncate">
+                                <div className="text-xs font-bold truncate">{fac.name}</div>
+                                <div className="text-[10px] text-slate-400 truncate">{fac.address}</div>
+                              </div>
+                            </div>
+                            {isSelected && <Check size={15} className="text-blue-600 stroke-[2.5]" />}
+                          </button>
+                        );
+                      })}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        )}
 
         <button
           type="button"

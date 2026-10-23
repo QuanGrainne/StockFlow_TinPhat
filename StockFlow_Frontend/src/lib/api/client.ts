@@ -84,6 +84,16 @@ export const apiClient = {
     });
     return handleResponse<T>(res, () => apiClient.delete<T>(path, token));
   },
+
+  async patch<T>(path: string, body?: unknown, token?: string): Promise<T> {
+    const headers = await buildHeaders(token);
+    const res = await fetch(`${API_BASE_URL}${path}`, {
+      method: 'PATCH',
+      headers,
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+    });
+    return handleResponse<T>(res, () => apiClient.patch<T>(path, body, token));
+  },
 };
 
 async function handleResponse<T>(res: Response, retryFn?: () => Promise<T>): Promise<T> {
