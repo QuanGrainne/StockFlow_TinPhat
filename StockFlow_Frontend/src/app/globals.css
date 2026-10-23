@@ -47,3 +47,30 @@ body {
 .stockflow-purchases-table .ant-table-thead > tr > th::before {
   display: none;
 }
+
+/* Custom smooth hover dropdown for navigation tabs */
+.tab-dropdown-menu {
+  display: none;
+}
+
+.tab-dropdown-group:hover .tab-dropdown-menu,
+.tab-dropdown-menu.is-open {
+  display: block !important;
+  animation: dropdownFadeIn 0.12s ease-out;
+}
+
+.tab-dropdown-group:hover .tab-chevron,
+.tab-chevron.is-open {
+  transform: rotate(180deg);
+}
+
+@keyframes dropdownFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

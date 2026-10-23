@@ -16,14 +16,23 @@ public class UpdateWarehouseAccessCommandHandler
     : IRequestHandler<UpdateWarehouseAccessCommand, Result<WarehouseStaffAccessDto>>
 {
     private readonly IStockFlowDbContext _context;
+    private readonly ICurrentUserService _currentUserService;
 
-    public UpdateWarehouseAccessCommandHandler(IStockFlowDbContext context)
+    public UpdateWarehouseAccessCommandHandler(
+        IStockFlowDbContext context,
+        ICurrentUserService currentUserService)
     {
         _context = context;
+        _currentUserService = currentUserService;
     }
 
     public async Task<Result<WarehouseStaffAccessDto>> Handle(UpdateWarehouseAccessCommand command, CancellationToken cancellationToken)
     {
+        if (_currentUserService.IsAuthenticated && !_currentUserService.IsAdmin)
+        {
+            return Result.Failure<WarehouseStaffAccessDto>("Chỉ có Quản trị viên (Admin) mới có quyền phân bổ kho làm việc cho nhân sự.");
+        }
+
         var user = await _context.SecUsers
             .Include(u => u.JncUserRoles)
                 .ThenInclude(ur => ur.Role)

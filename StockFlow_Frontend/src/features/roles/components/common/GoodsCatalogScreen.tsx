@@ -3,7 +3,7 @@
 // Hỗ trợ thiết kế Tạo hàng hóa KiotViet chuẩn với Đơn vị tính, Thuộc tính và Ma trận biến thể
 // Hỗ trợ cả TỰ NHẬP (free text) và TỰ CHỌN (dropdown suggestions) cho tất cả các trường dữ liệu
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
   Package,
   Boxes,
@@ -624,6 +624,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
 
   // Danh sách các cơ sở kho thực tế (lấy động từ Database qua adminService)
   const [facilities, setFacilities] = useState<WarehouseFacility[]>([]);
+  const [userWarehouseAccess, setUserWarehouseAccess] = useState<string[]>([]);
 
   // Modal Nhập kho / Điều chỉnh tồn kho theo chi nhánh (Ảnh 1 & 4)
   const [inboundModalOpen, setInboundModalOpen] = useState(false);
@@ -1000,20 +1001,44 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
 
     fetchApiProducts();
 
+    // Trích xuất danh sách kho được phân quyền của user từ storage
+    const extractUserWarehouses = (userObj: any): string[] => {
+      if (!userObj) return [];
+      const list: string[] = [];
+      if (Array.isArray(userObj.warehouses)) {
+        userObj.warehouses.forEach((w: any) => {
+          if (typeof w === 'string') list.push(w);
+          else {
+            if (w.warehouseName) list.push(w.warehouseName);
+            if (w.warehouseCode) list.push(w.warehouseCode);
+            if (w.name) list.push(w.name);
+            if (w.code) list.push(w.code);
+            if (w.warehouseId) list.push(String(w.warehouseId));
+          }
+        });
+      }
+      if (Array.isArray(userObj.assignedWarehouses)) {
+        userObj.assignedWarehouses.forEach((w: any) => {
+          if (typeof w === 'string') list.push(w);
+        });
+      }
+      return Array.from(new Set(list));
+    };
+
+    const rawUser = typeof window !== 'undefined' ? localStorage.getItem('stockflow_user') : null;
+    if (rawUser) {
+      try {
+        const u = JSON.parse(rawUser);
+        setUserWarehouseAccess(extractUserWarehouses(u));
+      } catch (e) {
+        console.error('Failed to parse user in GoodsCatalogScreen:', e);
+      }
+    }
+
     // Tải danh sách cơ sở kho thực tế từ DB/Cache
     adminService.getWarehouseFacilities().then((facs) => {
       if (facs && facs.length > 0) {
         setFacilities(facs);
-        setWarehouseFilter((prev) => {
-          if (!prev || prev === 'ALL' || !facs.some((f) => f.name === prev || f.code === prev)) {
-            const first = facs[0].name;
-            if (typeof window !== 'undefined') {
-              localStorage.setItem('stockflow_selected_branch', first);
-            }
-            return first;
-          }
-          return prev;
-        });
       }
     });
 
@@ -1021,6 +1046,13 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
     const handleBranchSync = (e: any) => {
       if (e.detail?.branch && e.detail.branch !== 'ALL') {
         setWarehouseFilter(e.detail.branch);
+      }
+      const curUserRaw = typeof window !== 'undefined' ? localStorage.getItem('stockflow_user') : null;
+      if (curUserRaw) {
+        try {
+          const curU = JSON.parse(curUserRaw);
+          setUserWarehouseAccess(extractUserWarehouses(curU));
+        } catch {}
       }
     };
     window.addEventListener('stockflow_branch_changed', handleBranchSync);
@@ -1030,6 +1062,53 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
       window.removeEventListener('stockflow_branch_changed', handleBranchSync);
     };
   }, []);
+
+  // Xác định quyền Admin
+  const rawRole = typeof window !== 'undefined' ? localStorage.getItem('stockflow_current_role') : null;
+  const rawUserStr = typeof window !== 'undefined' ? localStorage.getItem('stockflow_user') : null;
+  let parsedUser: any = null;
+  try {
+    if (rawUserStr) parsedUser = JSON.parse(rawUserStr);
+  } catch {}
+
+  const isAdmin =
+    rawRole?.toUpperCase() === 'ADMIN' ||
+    parsedUser?.roles?.some((r: string) => String(r).toUpperCase().includes('ADMIN')) ||
+    parsedUser?.code === 'NV-ADMIN' ||
+    parsedUser?.username?.toLowerCase() === 'admin';
+
+  // Danh sách kho ĐƯỢC PHÂN QUYỀN (Data Isolation)
+  const permittedFacilities = useMemo(() => {
+    if (facilities.length === 0) return [];
+    if (isAdmin) return facilities;
+
+    const allowed = userWarehouseAccess.map((s) => s.trim().toLowerCase());
+    if (allowed.length === 0) return [];
+
+    return facilities.filter((fac) => {
+      const nameMatch = allowed.includes(fac.name.trim().toLowerCase());
+      const codeMatch = allowed.includes(fac.code.trim().toLowerCase());
+      const idMatch = fac.id ? allowed.includes(fac.id.trim().toLowerCase()) : false;
+      return nameMatch || codeMatch || idMatch;
+    });
+  }, [facilities, isAdmin, userWarehouseAccess]);
+
+  // Auto-validate và đồng bộ warehouseFilter theo danh sách kho có quyền
+  useEffect(() => {
+    if (facilities.length === 0 || permittedFacilities.length === 0) return;
+
+    const isValid = permittedFacilities.some(
+      (f) => f.name === warehouseFilter || f.code === warehouseFilter
+    );
+
+    if (!isValid) {
+      const firstBranch = permittedFacilities[0].name;
+      setWarehouseFilter(firstBranch);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('stockflow_selected_branch', firstBranch);
+      }
+    }
+  }, [permittedFacilities, facilities.length, warehouseFilter]);
 
   // Đóng dropdown chọn nhiều chi nhánh khi bấm ra ngoài
   useEffect(() => {
@@ -1094,7 +1173,9 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
     setWarehouseFilter(val);
     if (typeof window !== 'undefined') {
       localStorage.setItem('stockflow_selected_branch', val);
-      const fac = facilities.find((f) => f.code === val || f.name === val);
+      const fac = (permittedFacilities.length > 0 ? permittedFacilities : facilities).find(
+        (f) => f.code === val || f.name === val
+      );
       window.dispatchEvent(
         new CustomEvent('stockflow_branch_changed', {
           detail: {
@@ -1109,9 +1190,14 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
   // Mở modal nhập hàng nhanh vào 1 kho cụ thể
   const handleOpenInboundModal = (item: GoodsItem, whName?: string) => {
     setInboundItem(item);
-    setInboundTargetWarehouse(
-      whName || (warehouseFilter !== 'ALL' ? warehouseFilter : facilities[0]?.name || 'Kho Tổng Gia Lâm')
-    );
+    const validFacs = permittedFacilities.length > 0 ? permittedFacilities : facilities;
+    const isTargetValid = whName && validFacs.some((f) => f.name === whName || f.code === whName);
+    const isFilterValid = warehouseFilter && warehouseFilter !== 'ALL' && validFacs.some((f) => f.name === warehouseFilter || f.code === warehouseFilter);
+    const defaultWh = isTargetValid
+      ? whName
+      : (isFilterValid ? warehouseFilter : (validFacs[0]?.name || 'Kho Tổng Gia Lâm'));
+
+    setInboundTargetWarehouse(defaultWh);
     setInboundQty(50);
     setInboundType('ADD');
     setInboundNote('Nhập bổ sung hàng vào kho');
@@ -1285,9 +1371,10 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
     setFormBrand('Ba Vì Milk');
     setFormUom('Hộp');
     setFormSpec('');
-    const activeWh = warehouseFilter && warehouseFilter !== 'ALL'
+    const validFacs = permittedFacilities.length > 0 ? permittedFacilities : facilities;
+    const activeWh = warehouseFilter && warehouseFilter !== 'ALL' && validFacs.some((f) => f.name === warehouseFilter || f.code === warehouseFilter)
       ? warehouseFilter
-      : (facilities[0]?.name || 'Kho Tổng Gia Lâm');
+      : (validFacs[0]?.name || 'Kho Tổng Gia Lâm');
     setFormWarehouse(activeWh);
     setFormStandardPrice(0);
     setFormCostPrice(0);
@@ -1309,15 +1396,9 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
     setFormAttributes([]);
     setFormVariants([]);
 
-    // Khởi tạo phân bổ tồn kho ban đầu cho từng kho = 0
+    // Khởi tạo phân bổ tồn kho ban đầu cho từng kho có quyền = 0
     const initialStocks: Record<string, number> = {};
-    (facilities.length > 0
-      ? facilities
-      : [
-          { code: 'K001', name: 'Kho Tổng Gia Lâm' },
-          { code: 'K002', name: 'Kho Đông Anh' },
-        ]
-    ).forEach((f) => {
+    validFacs.forEach((f) => {
       initialStocks[f.name] = 0;
     });
     setFormWarehouseStocks(initialStocks);
@@ -1398,15 +1479,10 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
     setFormAttributes(item.attributes || []);
     setFormVariants(item.variants || []);
 
-    // Điền số lượng tồn kho từng kho vào form
+    // Điền số lượng tồn kho từng kho vào form (chỉ kho có quyền)
     const currentStocks: Record<string, number> = {};
-    (facilities.length > 0
-      ? facilities
-      : [
-          { code: 'K001', name: 'Kho Tổng Gia Lâm' },
-          { code: 'K002', name: 'Kho Đông Anh' },
-        ]
-    ).forEach((f) => {
+    const validFacs = permittedFacilities.length > 0 ? permittedFacilities : facilities;
+    validFacs.forEach((f) => {
       const whMatch = item.stockByWarehouse?.find(
         (w) =>
           w.warehouseName.toLowerCase() === f.name.toLowerCase() ||
@@ -1667,12 +1743,14 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
     const numEnteredMinSafe = Math.max(0, Number(formMinSafe) || 0);
     const numEnteredMaxSafe = Math.max(0, Number(formMaxSafe) || 999999999);
 
-    const targetFacilities = facilities.length > 0
-      ? facilities
-      : [
-          { code: 'K001', name: 'Kho Tổng Gia Lâm' },
-          { code: 'K002', name: 'Kho Đông Anh' },
-        ];
+    const targetFacilities = permittedFacilities.length > 0
+      ? permittedFacilities
+      : (facilities.length > 0
+        ? facilities
+        : [
+            { code: 'K001', name: 'Kho Tổng Gia Lâm', address: 'Số 18 Đường Dệt May, Gia Lâm' },
+            { code: 'K002', name: 'Kho Đông Anh', address: 'CCN Nguyên Khê, Đông Anh' },
+          ]);
 
     const builtStockByWarehouse = targetFacilities.map((fac) => {
       const isCurrentActive =
@@ -2198,23 +2276,30 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
         </div>
 
         <div className="relative w-full sm:w-64 shrink-0">
-          <select
-            value={warehouseFilter}
-            onChange={(e) => handleWarehouseFilterChange(e.target.value)}
-            className="w-full h-9 px-3 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-700 focus:outline-none focus:border-blue-500 cursor-pointer font-medium"
-          >
-            {(facilities.length > 0
-              ? facilities
-              : [
-                  { id: '1', code: 'K001', name: 'Kho Tổng Gia Lâm' },
-                  { id: '2', code: 'K002', name: 'Kho Đông Anh' },
-                ]
-            ).map((fac) => (
-              <option key={fac.id || fac.code} value={fac.name}>
-                📍 {fac.name} ({fac.code})
-              </option>
-            ))}
-          </select>
+          {permittedFacilities.length <= 1 ? (
+            <div
+              className="w-full h-9 px-3 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-800 font-bold flex items-center justify-between select-none"
+              title={`Kho làm việc cố định: ${permittedFacilities[0]?.name || warehouseFilter}`}
+            >
+              <div className="flex items-center gap-2 truncate">
+                <span className="text-blue-600">📍</span>
+                <span className="truncate">{permittedFacilities[0]?.name || warehouseFilter || 'Kho Tổng Gia Lâm'}</span>
+              </div>
+              <span className="text-[10px] text-slate-400 font-normal shrink-0">(Cố định)</span>
+            </div>
+          ) : (
+            <select
+              value={warehouseFilter}
+              onChange={(e) => handleWarehouseFilterChange(e.target.value)}
+              className="w-full h-9 px-3 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-700 focus:outline-none focus:border-blue-500 cursor-pointer font-medium"
+            >
+              {permittedFacilities.map((fac) => (
+                <option key={fac.id || fac.code} value={fac.name}>
+                  📍 {fac.name} ({fac.code})
+                </option>
+              ))}
+            </select>
+          )}
         </div>
       </div>
 
@@ -2745,7 +2830,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                                         Tổng tồn toàn hệ thống: <span className="font-mono text-sm text-blue-700">{item.stockQuantity.toLocaleString('vi-VN')} {item.uom}</span>
                                       </div>
                                       <div className="text-[11px] text-blue-700/80">
-                                        Phân bổ trên {facilities.length > 0 ? facilities.length : (item.stockByWarehouse?.length || 1)} chi nhánh kho
+                                        Phân bổ trên {(permittedFacilities.length > 0 ? permittedFacilities : facilities).length} chi nhánh kho được phân quyền
                                       </div>
                                     </div>
                                   </div>
@@ -2760,9 +2845,12 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                                 </div>
 
                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                                  {(facilities.length > 0
-                                    ? facilities
-                                    : (item.stockByWarehouse?.map((w) => ({ code: w.warehouseCode || 'WH', name: w.warehouseName, address: '' })) || [])
+                                  {(permittedFacilities.length > 0
+                                    ? permittedFacilities
+                                    : (facilities.length > 0
+                                      ? facilities
+                                      : (item.stockByWarehouse?.map((w) => ({ code: w.warehouseCode || 'WH', name: w.warehouseName, address: '' })) || [])
+                                    )
                                   ).map((fac) => {
                                     const entry = item.stockByWarehouse?.find(
                                       (w) =>
@@ -3509,18 +3597,20 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                     <div className="text-right shrink-0">
                       <div className="text-[10px] text-slate-400 font-medium">Tổng tồn các kho:</div>
                       <div className="font-mono font-extrabold text-blue-700 text-sm">
-                        {facilities.reduce((sum, f) => sum + (Number(formWarehouseStocks[f.name]) || 0), 0).toLocaleString('vi-VN')} {formUom}
+                        {(permittedFacilities.length > 0 ? permittedFacilities : facilities).reduce((sum, f) => sum + (Number(formWarehouseStocks[f.name]) || 0), 0).toLocaleString('vi-VN')} {formUom}
                       </div>
                     </div>
                   </div>
 
                   <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
-                    {(facilities.length > 0
-                      ? facilities
-                      : [
-                          { code: 'K001', name: 'Kho Tổng Gia Lâm', address: 'Số 18 Đường Dệt May, Gia Lâm' },
-                          { code: 'K002', name: 'Kho Đông Anh', address: 'CCN Nguyên Khê, Đông Anh' },
-                        ]
+                    {(permittedFacilities.length > 0
+                      ? permittedFacilities
+                      : (facilities.length > 0
+                        ? facilities
+                        : [
+                            { code: 'K001', name: 'Kho Tổng Gia Lâm', address: 'Số 18 Đường Dệt May, Gia Lâm' },
+                            { code: 'K002', name: 'Kho Đông Anh', address: 'CCN Nguyên Khê, Đông Anh' },
+                          ])
                     ).map((fac) => {
                       const curQty = formWarehouseStocks[fac.name] ?? 0;
                       return (
@@ -3623,13 +3713,15 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
 
       {/* 5b. MODAL XÁC NHẬN PHẠM VI ÁP DỤNG GIÁ VỐN (PHIÊN BẢN MỚI RỘNG RÃI & CHUYÊN NGHIỆP) */}
       {costConfirmModalOpen && (() => {
-        const allFacilitiesList = facilities.length > 0
-          ? facilities
-          : [
-              { code: 'K001', name: 'Kho Tổng Gia Lâm', address: 'Số 18 Đường Dệt May, Gia Lâm' },
-              { code: 'K002', name: 'Kho Đông Anh', address: 'CCN Nguyên Khê, Đông Anh' },
-              { code: 'K003', name: 'Kho Ninh Bình', address: 'KCN Gián Khẩu, Ninh Bình' },
-            ];
+        const allFacilitiesList = permittedFacilities.length > 0
+          ? permittedFacilities
+          : (facilities.length > 0
+            ? facilities
+            : [
+                { code: 'K001', name: 'Kho Tổng Gia Lâm', address: 'Số 18 Đường Dệt May, Gia Lâm' },
+                { code: 'K002', name: 'Kho Đông Anh', address: 'CCN Nguyên Khê, Đông Anh' },
+                { code: 'K003', name: 'Kho Ninh Bình', address: 'KCN Gián Khẩu, Ninh Bình' },
+              ]);
 
         const filteredFacilities = allFacilitiesList.filter(
           (fac) =>
@@ -4327,23 +4419,27 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                 <label className="block font-semibold text-slate-700 mb-1.5">
                   Chi nhánh kho nhận hàng / cân chỉnh <span className="text-rose-500">*</span>
                 </label>
-                <select
-                  value={inboundTargetWarehouse}
-                  onChange={(e) => setInboundTargetWarehouse(e.target.value)}
-                  className="w-full h-9 px-3 rounded-lg border border-slate-200 bg-white font-medium text-xs text-slate-800 focus:outline-none focus:border-blue-500 cursor-pointer"
-                >
-                  {(facilities.length > 0
-                    ? facilities
-                    : [
-                        { code: 'K001', name: 'Kho Tổng Gia Lâm' },
-                        { code: 'K002', name: 'Kho Đông Anh' },
-                      ]
-                  ).map((fac) => (
-                    <option key={fac.code || fac.name} value={fac.name}>
-                      📍 {fac.name} ({fac.code})
-                    </option>
-                  ))}
-                </select>
+                {(permittedFacilities.length > 0 ? permittedFacilities : facilities).length <= 1 ? (
+                  <div className="w-full h-9 px-3 rounded-lg border border-slate-200 bg-slate-50 font-bold text-xs text-slate-800 flex items-center justify-between select-none">
+                    <div className="flex items-center gap-2 truncate">
+                      <span className="text-blue-600">📍</span>
+                      <span className="truncate">{(permittedFacilities[0] || facilities[0])?.name || inboundTargetWarehouse}</span>
+                    </div>
+                    <span className="text-[10px] text-slate-400 font-normal shrink-0">(Kho làm việc cố định)</span>
+                  </div>
+                ) : (
+                  <select
+                    value={inboundTargetWarehouse}
+                    onChange={(e) => setInboundTargetWarehouse(e.target.value)}
+                    className="w-full h-9 px-3 rounded-lg border border-slate-200 bg-white font-medium text-xs text-slate-800 focus:outline-none focus:border-blue-500 cursor-pointer"
+                  >
+                    {permittedFacilities.map((fac) => (
+                      <option key={fac.code || fac.name} value={fac.name}>
+                        📍 {fac.name} ({fac.code})
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
 
               {/* Hình thức: Nhập thêm hoặc Đặt lại số tồn */}

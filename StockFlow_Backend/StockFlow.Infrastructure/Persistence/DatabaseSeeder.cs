@@ -340,5 +340,133 @@ public static class DatabaseSeeder
                 }
             }
         }
+
+        // 8. Seed initial Suppliers into mst_business_partners
+        var initialSuppliers = new List<MstBusinessPartner>
+        {
+            new()
+            {
+                PartnerCode = "NCC000001",
+                PartnerName = "Công ty Cổ phần Nhựa Tiền Phong",
+                PartnerType = "SUPPLIER",
+                Phone = "024 3823 4567",
+                Email = "kinhdoanh@tienphongplastic.vn",
+                Address = "Số 2 An Dương Vương, Tây Hồ, Hà Nội",
+                CreditLimit = 300000000m,
+                CurrentDebt = 0m,
+                CurrentPayable = 120000000m,
+                IsActive = true
+            },
+            new()
+            {
+                PartnerCode = "NCC000002",
+                PartnerName = "Công ty Nhôm Tân Á",
+                PartnerType = "SUPPLIER",
+                Phone = "024 3756 8899",
+                Email = "sales@nhomtana.vn",
+                Address = "Lô B4, KCN Từ Liêm, Bắc Từ Liêm, Hà Nội",
+                CreditLimit = 150000000m,
+                CurrentDebt = 0m,
+                CurrentPayable = 45000000m,
+                IsActive = true
+            },
+            new()
+            {
+                PartnerCode = "NCC000003",
+                PartnerName = "Phân xưởng Bao bì Đông Anh",
+                PartnerType = "SUPPLIER",
+                Phone = "0912 345 678",
+                Email = "baobidonganh@gmail.com",
+                Address = "Cụm Công nghiệp Nguyên Khê, Đông Anh, Hà Nội",
+                CreditLimit = 100000000m,
+                CurrentDebt = 0m,
+                CurrentPayable = 0m,
+                IsActive = true
+            },
+            new()
+            {
+                PartnerCode = "NCC000004",
+                PartnerName = "Công ty TNHH Nhựa Hà Nội",
+                PartnerType = "SUPPLIER",
+                Phone = "024 3875 1234",
+                Email = "contact@hanoiplastic.com.vn",
+                Address = "Khu Công nghiệp Sài Đồng B, Long Biên, Hà Nội",
+                CreditLimit = 250000000m,
+                CurrentDebt = 0m,
+                CurrentPayable = 86500000m,
+                IsActive = true
+            },
+            new()
+            {
+                PartnerCode = "NCC000005",
+                PartnerName = "Tập đoàn Thép Hòa Phát",
+                PartnerType = "SUPPLIER",
+                Phone = "024 3974 7755",
+                Email = "thep@hoaphat.com.vn",
+                Address = "66 Nguyễn Du, Hai Bà Trưng, Hà Nội",
+                CreditLimit = 500000000m,
+                CurrentDebt = 0m,
+                CurrentPayable = 310000000m,
+                IsActive = true
+            },
+            new()
+            {
+                PartnerCode = "NCC000006",
+                PartnerName = "Tổng Công ty Hóa chất Việt Nhật",
+                PartnerType = "SUPPLIER",
+                Phone = "024 3688 9900",
+                Email = "info@vietnhatchemical.vn",
+                Address = "Đường TS5, KCN Tiên Sơn, Từ Sơn, Bắc Ninh",
+                CreditLimit = 100000000m,
+                CurrentDebt = 0m,
+                CurrentPayable = 18200000m,
+                IsActive = true
+            },
+            new()
+            {
+                PartnerCode = "NCC000007",
+                PartnerName = "NCC Khoáng sản & Bột đá Yên Bái",
+                PartnerType = "SUPPLIER",
+                Phone = "0216 385 2211",
+                Email = "sales@yenbaipowder.com",
+                Address = "KCN Phía Nam, Xã Văn Phú, TP. Yên Bái",
+                CreditLimit = 80000000m,
+                CurrentDebt = 0m,
+                CurrentPayable = 0m,
+                IsActive = true
+            },
+            new()
+            {
+                PartnerCode = "NCC000008",
+                PartnerName = "NCC Vật liệu Trang trí Đài Loan",
+                PartnerType = "SUPPLIER",
+                Phone = "+886 2 2700 1234",
+                Email = "overseas@tw-decor.com.tw",
+                Address = "Số 108 Đường Nam Kinh Đông, Đài Bắc (Nhập khẩu)",
+                CreditLimit = 200000000m,
+                CurrentDebt = 0m,
+                CurrentPayable = 64000000m,
+                IsActive = true
+            }
+        };
+
+        var hasNewSuppliers = false;
+        foreach (var supplier in initialSuppliers)
+        {
+            var exists = await context.MstBusinessPartners
+                .AnyAsync(bp => bp.PartnerCode == supplier.PartnerCode);
+
+            if (!exists)
+            {
+                await context.MstBusinessPartners.AddAsync(supplier);
+                hasNewSuppliers = true;
+            }
+        }
+
+        if (hasNewSuppliers)
+        {
+            await context.SaveChangesAsync();
+            await context.Database.ExecuteSqlRawAsync("SELECT setval(pg_get_serial_sequence('stockflow.mst_business_partners', 'partner_id'), COALESCE(MAX(partner_id), 1)) FROM stockflow.mst_business_partners;");
+        }
     }
 }

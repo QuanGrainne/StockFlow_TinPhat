@@ -11,10 +11,14 @@ public record GetProductByIdQuery(int ProductId) : IRequest<Result<ProductDetail
 public class GetProductByIdQueryHandler : IRequestHandler<GetProductByIdQuery, Result<ProductDetailDto>>
 {
     private readonly IStockFlowDbContext _context;
+    private readonly ICurrentUserService _currentUserService;
 
-    public GetProductByIdQueryHandler(IStockFlowDbContext context)
+    public GetProductByIdQueryHandler(
+        IStockFlowDbContext context,
+        ICurrentUserService currentUserService)
     {
         _context = context;
+        _currentUserService = currentUserService;
     }
 
     public async Task<Result<ProductDetailDto>> Handle(GetProductByIdQuery request, CancellationToken cancellationToken)
@@ -34,7 +38,6 @@ public class GetProductByIdQueryHandler : IRequestHandler<GetProductByIdQuery, R
 
         var costPrice = product.MovingAverageCost ?? 0;
         var standardPrice = product.StandardPrice ?? (costPrice > 0 ? Math.Round(costPrice * 1.35m, 0) : 0);
-        var totalStock = product.TrxInventoryBalances.Sum(b => b.Quantity ?? 0);
 
         var warehouses = product.TrxInventoryBalances
             .GroupBy(b => b.WarehouseId)
@@ -49,6 +52,15 @@ public class GetProductByIdQueryHandler : IRequestHandler<GetProductByIdQuery, R
                     UnitCost: g.Average(x => x.UnitCost ?? costPrice)
                 );
             }).ToList();
+
+        // Data Isolation: Nếu là tài khoản nhân viên (không phải Admin), ẩn các kho không có quyền
+        if (_currentUserService.IsAuthenticated && !_currentUserService.IsAdmin)
+        {
+            var authorizedIds = await _currentUserService.GetAuthorizedWarehouseIdsAsync(cancellationToken);
+            warehouses = warehouses.Where(w => authorizedIds.Contains(w.WarehouseId)).ToList();
+        }
+
+        var totalStock = warehouses.Sum(w => w.Quantity);
 
         List<ProductConversionUnitDto>? units = null;
         List<ProductAttributeDto>? attributes = null;

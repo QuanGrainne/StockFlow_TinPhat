@@ -31,6 +31,22 @@ public class WarehousesController : ControllerBase
     }
 
     /// <summary>
+    /// Lấy danh sách các kho vật lý mà tài khoản hiện tại được phân quyền (Data Isolation).
+    /// </summary>
+    [HttpGet("my-warehouses")]
+    [ProducesResponseType(typeof(List<WarehouseFacilityDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetMyWarehouses()
+    {
+        var result = await _mediator.Send(new GetMyWarehousesQuery());
+        if (!result.IsSuccess)
+        {
+            return Unauthorized(new { message = result.Error });
+        }
+        return Ok(result.Value);
+    }
+
+    /// <summary>
     /// Lấy chi tiết thông tin một kho vật lý (kèm danh sách nhân sự được phân quyền và số lượng tồn).
     /// </summary>
     [HttpGet("{id}")]
