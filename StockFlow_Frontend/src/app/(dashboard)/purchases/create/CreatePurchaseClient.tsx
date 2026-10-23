@@ -20,7 +20,9 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { message, Modal, Tooltip } from 'antd';
+import { message, Modal, Tooltip, Spin } from 'antd';
+import { supplierService } from '@/features/suppliers/services/supplierService';
+import { Supplier } from '@/features/suppliers/types';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -44,7 +46,8 @@ interface ProductCatalogItem {
 interface SupplierItem {
   code: string;
   name: string;
-  phone: string;
+  phone?: string;
+  currentPayable?: number;
 }
 
 // ─── Mock Catalogs ────────────────────────────────────────────────────────────
@@ -107,6 +110,9 @@ export default function CreatePurchaseClient() {
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
 
   // Supplier state
+  const [suppliersList, setSuppliersList] = useState<Supplier[]>([]);
+  const [loadingSuppliers, setLoadingSuppliers] = useState(false);
+  const [isSubmittingSupplier, setIsSubmittingSupplier] = useState(false);
   const [selectedSupplier, setSelectedSupplier] = useState<SupplierItem | null>(null);
   const [supplierSearch, setSupplierSearch] = useState('');
   const [supplierDropdownOpen, setSupplierDropdownOpen] = useState(false);
@@ -129,6 +135,28 @@ export default function CreatePurchaseClient() {
   const [showAddSupplierModal, setShowAddSupplierModal] = useState(false);
   const [newSupplierName, setNewSupplierName] = useState('');
   const [newSupplierPhone, setNewSupplierPhone] = useState('');
+
+  // Load active suppliers from PostgreSQL database
+  useEffect(() => {
+    let isMounted = true;
+    async function loadSuppliers() {
+      try {
+        setLoadingSuppliers(true);
+        const data = await supplierService.getSuppliers({ status: 'ACTIVE' });
+        if (isMounted && data && data.length > 0) {
+          setSuppliersList(data);
+        }
+      } catch (err) {
+        console.warn('Không thể tải danh sách NCC từ API, chuyển sang mẫu dự phòng:', err);
+      } finally {
+        if (isMounted) setLoadingSuppliers(false);
+      }
+    }
+    loadSuppliers();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // ─── Initialization & Listeners ─────────────────────────────────────────────
   useEffect(() => {
@@ -290,21 +318,43 @@ export default function CreatePurchaseClient() {
     message.success(`Đã tạo và thêm hàng hóa: ${newItem.name}`);
   }
 
-  function handleCreateQuickSupplier() {
+  async function handleCreateQuickSupplier() {
     if (!newSupplierName.trim()) {
       message.error('Vui lòng nhập tên nhà cung cấp');
       return;
     }
-    const newSupplier: SupplierItem = {
-      code: `NCC${String(Math.floor(100000 + Math.random() * 900000))}`,
-      name: newSupplierName.trim(),
-      phone: newSupplierPhone.trim() || 'Chưa có',
-    };
-    setSelectedSupplier(newSupplier);
-    setShowAddSupplierModal(false);
-    setNewSupplierName('');
-    setNewSupplierPhone('');
-    message.success(`Đã thêm và chọn nhà cung cấp: ${newSupplier.name}`);
+    try {
+      setIsSubmittingSupplier(true);
+      const created = await supplierService.createSupplier({
+        name: newSupplierName.trim(),
+        phone: newSupplierPhone.trim() || undefined,
+      });
+      setSuppliersList((prev) => [created, ...prev]);
+      setSelectedSupplier({
+        code: created.code,
+        name: created.name,
+        phone: created.phone || '',
+        currentPayable: created.currentPayable,
+      });
+      setShowAddSupplierModal(false);
+      setNewSupplierName('');
+      setNewSupplierPhone('');
+      message.success(`Đã lưu và chọn nhà cung cấp: ${created.name} (${created.code})`);
+    } catch (err: any) {
+      console.warn('Lỗi lưu NCC lên hệ thống, tạo tạm tại chỗ:', err);
+      const fallbackSupplier: SupplierItem = {
+        code: `NCC${String(Math.floor(100000 + Math.random() * 900000))}`,
+        name: newSupplierName.trim(),
+        phone: newSupplierPhone.trim() || 'Chưa có',
+      };
+      setSelectedSupplier(fallbackSupplier);
+      setShowAddSupplierModal(false);
+      setNewSupplierName('');
+      setNewSupplierPhone('');
+      message.warning(`Đã tạo tạm NCC: ${fallbackSupplier.name}`);
+    } finally {
+      setIsSubmittingSupplier(false);
+    }
   }
 
   const filteredCatalog = useMemo(() => {
@@ -316,12 +366,16 @@ export default function CreatePurchaseClient() {
   }, [productSearch]);
 
   const filteredSuppliers = useMemo(() => {
-    if (!supplierSearch.trim()) return SAMPLE_SUPPLIERS;
+    const source: SupplierItem[] = suppliersList.length > 0 ? suppliersList : SAMPLE_SUPPLIERS;
+    if (!supplierSearch.trim()) return source;
     const q = supplierSearch.toLowerCase();
-    return SAMPLE_SUPPLIERS.filter(
-      (s) => s.code.toLowerCase().includes(q) || s.name.toLowerCase().includes(q) || s.phone.includes(q)
+    return source.filter(
+      (s) =>
+        s.code.toLowerCase().includes(q) ||
+        s.name.toLowerCase().includes(q) ||
+        (s.phone && s.phone.toLowerCase().includes(q))
     );
-  }, [supplierSearch]);
+  }, [suppliersList, supplierSearch]);
 
   return (
     <div className="flex-1 flex flex-col bg-[#f4f6f8] min-h-[calc(100vh-56px)] select-none">
@@ -764,8 +818,9 @@ export default function CreatePurchaseClient() {
               {/* Supplier Dropdown */}
               {supplierDropdownOpen && (
                 <div className="absolute top-full left-0 mt-1 w-full bg-white rounded-lg border border-slate-200 shadow-xl py-1 z-40 max-h-[260px] overflow-y-auto">
-                  <div className="px-3 py-1 text-[11px] font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-100">
-                    Nhà cung cấp ({filteredSuppliers.length})
+                  <div className="px-3 py-1 text-[11px] font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-100 flex items-center justify-between">
+                    <span>Nhà cung cấp ({filteredSuppliers.length})</span>
+                    {loadingSuppliers && <span className="text-[10px] text-blue-500 font-normal">Đang tải...</span>}
                   </div>
                   {filteredSuppliers.length === 0 ? (
                     <div className="p-3 text-center text-xs text-slate-500">
@@ -791,10 +846,17 @@ export default function CreatePurchaseClient() {
                         }}
                         className="px-3 py-1.5 hover:bg-blue-50 cursor-pointer flex items-center justify-between border-b border-slate-50 last:border-b-0"
                       >
-                        <div>
-                          <div className="text-xs font-medium text-slate-800">{supp.name}</div>
-                          <div className="text-[10px] text-slate-400 font-mono">{supp.code} - {supp.phone}</div>
+                        <div className="min-w-0 pr-2">
+                          <div className="text-xs font-medium text-slate-800 truncate">{supp.name}</div>
+                          <div className="text-[10px] text-slate-400 font-mono">
+                            {supp.code} {supp.phone ? ` - ${supp.phone}` : ''}
+                          </div>
                         </div>
+                        {typeof supp.currentPayable === 'number' && supp.currentPayable > 0 && (
+                          <span className="text-[10px] font-medium text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded font-mono shrink-0">
+                            Nợ: {supp.currentPayable.toLocaleString('vi-VN')} đ
+                          </span>
+                        )}
                       </div>
                     ))
                   )}
@@ -962,7 +1024,8 @@ export default function CreatePurchaseClient() {
         open={showAddSupplierModal}
         onCancel={() => setShowAddSupplierModal(false)}
         onOk={handleCreateQuickSupplier}
-        okText="Chọn NCC"
+        confirmLoading={isSubmittingSupplier}
+        okText="Lưu & Chọn NCC"
         cancelText="Hủy"
         okButtonProps={{ style: { backgroundColor: '#0071BA' } }}
       >
