@@ -17,6 +17,7 @@ public interface IStockFlowDbContext
     DbSet<MstUnit> MstUnits { get; }
     DbSet<TrxInventoryBalance> TrxInventoryBalances { get; }
     DbSet<TrxInventoryTransaction> TrxInventoryTransactions { get; }
+    DbSet<TrxGoodsReceipt> TrxGoodsReceipts { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }
