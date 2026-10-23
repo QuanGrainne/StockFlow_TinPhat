@@ -1,16 +1,9 @@
+// src/app/(dashboard)/suppliers/page.tsx
 'use client';
 
-import dynamic from 'next/dynamic';
-
-const SuppliersClient = dynamic(() => import('./SuppliersClient'), {
-  ssr: false,
-  loading: () => (
-    <div className="flex min-h-[calc(100vh-56px)] items-center justify-center bg-[#f7f9fa] text-sm text-[#8c8c8c]">
-      Đang tải danh sách nhà cung cấp...
-    </div>
-  ),
-});
+import React from 'react';
+import { AppLayout } from '@/features/roles/components/AppLayout';
 
 export default function SuppliersPage() {
-  return <SuppliersClient />;
+  return <AppLayout initialScreen="suppliers" />;
 }

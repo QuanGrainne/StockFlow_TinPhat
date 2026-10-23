@@ -19,7 +19,6 @@ import {
   Building2,
   ExternalLink,
 } from 'lucide-react';
-import Navbar from '@/components/Navbar';
 import SupplierFilterSidebar from '@/components/SupplierFilterSidebar';
 import SupplierFormModal from '@/features/suppliers/components/SupplierFormModal';
 import SupplierDetailDrawer from '@/features/suppliers/components/SupplierDetailDrawer';
@@ -33,7 +32,11 @@ import {
 
 const currencyFormatter = new Intl.NumberFormat('vi-VN');
 
-export default function SuppliersClient() {
+interface SuppliersClientProps {
+  onNavigate?: (screenId: string) => void;
+}
+
+export default function SuppliersClient({ onNavigate }: SuppliersClientProps = {}) {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false);
@@ -264,11 +267,8 @@ export default function SuppliersClient() {
   ];
 
   return (
-    <div className="flex-1 w-full min-h-screen bg-[#f7f9fa] flex flex-col text-[#262626]">
-      {/* ── Global Top Navbar ── */}
-      <Navbar />
-
-      <div className="flex-1 flex min-h-[calc(100vh-56px)]">
+    <div className="flex-1 w-full flex flex-col text-[#262626] bg-[#f7f9fa]">
+      <div className="flex-1 flex min-h-[calc(100vh-104px)]">
         {/* ── Desktop Left Sidebar (260px) ── */}
         <div className="hidden lg:flex relative shrink-0">
           <SupplierFilterSidebar

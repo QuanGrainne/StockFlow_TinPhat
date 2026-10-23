@@ -76,6 +76,32 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [allowedModules, setAllowedModules] = useState<Set<string> | null>(null);
   const [allowedFeatures, setAllowedFeatures] = useState<Set<string> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleMouseEnter = (tabId: string) => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+      hoverTimeoutRef.current = null;
+    }
+    setOpenDropdownId(tabId);
+  };
+
+  const handleMouseLeave = () => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+    }
+    hoverTimeoutRef.current = setTimeout(() => {
+      setOpenDropdownId(null);
+    }, 180);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (hoverTimeoutRef.current) {
+        clearTimeout(hoverTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const fetchAllowedModules = async () => {
     const roleCode = `ROLE_${currentRole}`;
@@ -832,28 +858,36 @@ export const Sidebar: React.FC<SidebarProps> = ({
   };
 
   return (
-    <div ref={containerRef} className="bg-white border-b border-slate-200 px-6 py-2 flex items-center justify-between gap-2 select-none relative z-30">
-      <div className="flex items-center gap-2 overflow-x-auto">
+    <div ref={containerRef} className="bg-white border-b border-slate-200 px-6 py-2 flex items-center justify-between gap-2 select-none relative z-30 overflow-visible">
+      <div className="flex items-center gap-1.5 overflow-visible">
         {visibleTabs.map((tab) => {
           const active = isTabActive(tab);
           const Icon = tab.icon;
           const isOpen = openDropdownId === tab.id;
 
           return (
-            <div key={tab.id} className="relative shrink-0">
+            <div
+              key={tab.id}
+              className="relative shrink-0 tab-dropdown-group group"
+              onMouseEnter={() => {
+                if (tab.hasDropdown && tab.dropdownItems && tab.dropdownItems.length > 0) {
+                  handleMouseEnter(tab.id);
+                }
+              }}
+              onMouseLeave={() => {
+                if (tab.hasDropdown) {
+                  handleMouseLeave();
+                }
+              }}
+            >
               <button
                 type="button"
                 onClick={() => {
-                  if (tab.id === 'suppliers') {
-                    router.push('/suppliers');
-                    return;
-                  }
                   if (tab.hasDropdown && tab.dropdownItems && tab.dropdownItems.length > 0) {
                     if (isOpen) {
                       setOpenDropdownId(null);
                     } else {
                       setOpenDropdownId(tab.id);
-                      onNavigate(tab.id);
                     }
                   } else {
                     setOpenDropdownId(null);
@@ -883,46 +917,50 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 {tab.hasDropdown && (
                   <ChevronDown
                     size={12}
-                    className={`transition-transform duration-150 ${active ? 'text-[#2B6CB0]' : 'text-slate-400'} ${
-                      isOpen ? 'rotate-180' : ''
+                    className={`tab-chevron transition-transform duration-150 ${active ? 'text-[#2B6CB0]' : 'text-slate-400'} ${
+                      isOpen ? 'is-open' : ''
                     }`}
                   />
                 )}
               </button>
 
 
-            {/* Dropdown Menu Modal */}
-            {isOpen && tab.dropdownItems && (
-              <div className="absolute top-full left-0 mt-1.5 w-64 bg-white rounded-[10px] shadow-xl border border-slate-200 py-1.5 z-50 animate-in fade-in duration-100">
-                {tab.dropdownItems.map((item) => {
-                  const ItemIcon = item.icon;
-                  const isItemActive = activeScreen === item.id;
-                  return (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() => {
-                        setOpenDropdownId(null);
-                        if (item.id === 'suppliers') {
-                          router.push('/suppliers');
-                          return;
-                        }
-                        onNavigate(item.id);
-                      }}
-                      className={`w-full text-left px-3.5 py-2.5 flex items-start gap-3 transition cursor-pointer hover:bg-blue-50/70 ${
-                        isItemActive ? 'bg-blue-50 text-[#2B6CB0]' : 'text-slate-700'
-                      }`}
-                    >
-                      <div className={`mt-0.5 p-1 rounded-[6px] shrink-0 ${isItemActive ? 'text-[#2B6CB0]' : 'text-slate-400'}`}>
-                        <ItemIcon size={16} />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="text-xs font-bold leading-tight">{item.title}</div>
-                        <div className="text-[11px] text-slate-400 mt-0.5 leading-tight">{item.desc}</div>
-                      </div>
-                    </button>
-                  );
-                })}
+            {/* Dropdown Menu Modal (Hiện mượt mà khi hover chuột) */}
+            {tab.hasDropdown && tab.dropdownItems && (
+              <div
+                onMouseEnter={() => handleMouseEnter(tab.id)}
+                onMouseLeave={handleMouseLeave}
+                className={`tab-dropdown-menu absolute top-full left-0 pt-1.5 w-64 z-50 ${
+                  isOpen ? 'is-open' : ''
+                }`}
+              >
+                <div className="bg-white rounded-[10px] shadow-xl border border-slate-200 py-1.5 overflow-hidden">
+                  {tab.dropdownItems.map((item) => {
+                    const ItemIcon = item.icon;
+                    const isItemActive = activeScreen === item.id;
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => {
+                          setOpenDropdownId(null);
+                          onNavigate(item.id);
+                        }}
+                        className={`w-full text-left px-3.5 py-2.5 flex items-start gap-3 transition cursor-pointer hover:bg-blue-50/70 ${
+                          isItemActive ? 'bg-blue-50 text-[#2B6CB0]' : 'text-slate-700'
+                        }`}
+                      >
+                        <div className={`mt-0.5 p-1 rounded-[6px] shrink-0 ${isItemActive ? 'text-[#2B6CB0]' : 'text-slate-400'}`}>
+                          <ItemIcon size={16} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-xs font-bold leading-tight">{item.title}</div>
+                          <div className="text-[11px] text-slate-400 mt-0.5 leading-tight">{item.desc}</div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             )}
           </div>
