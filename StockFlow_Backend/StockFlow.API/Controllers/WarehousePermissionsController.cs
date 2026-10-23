@@ -47,11 +47,16 @@ public class WarehousePermissionsController : ControllerBase
     [HttpPut("{userId}")]
     [ProducesResponseType(typeof(WarehouseStaffAccessDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> UpdateWarehouseAccess(int userId, [FromBody] UpdateWarehouseAccessRequest request)
     {
         var result = await _mediator.Send(new UpdateWarehouseAccessCommand(userId, request));
         if (!result.IsSuccess)
         {
+            if (result.Error?.Contains("Quản trị viên") == true || result.Error?.Contains("không có quyền") == true)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, new { message = result.Error });
+            }
             return BadRequest(new { message = result.Error });
         }
         return Ok(result.Value);
