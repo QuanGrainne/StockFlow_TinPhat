@@ -4,6 +4,7 @@
 // Admin: [Tổng quan] [Tài khoản nhân viên v] [Phân quyền vai trò v] [Phân quyền kho v]
 
 import React, { useState, useRef, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { UserRole } from '../../types';
 import {
   LayoutGrid,
@@ -70,6 +71,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onNavigate,
   productionBadge,
 }) => {
+  const router = useRouter();
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
   const [allowedModules, setAllowedModules] = useState<Set<string> | null>(null);
   const [allowedFeatures, setAllowedFeatures] = useState<Set<string> | null>(null);
@@ -195,6 +197,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
       requiredModule: 'GOODS',
     },
     {
+      id: 'suppliers',
+      label: 'Nhà cung cấp',
+      icon: Building2,
+      hasDropdown: false,
+    },
+    {
       id: 'sales-orders',
       label: 'Bán hàng',
       icon: ShoppingBag,
@@ -243,6 +251,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
           title: 'Nhập kho từ chứng từ',
           desc: 'Tiếp nhận đơn mua PO',
           icon: ArrowDownToLine,
+          requiredModule: 'PURCHASE',
+        },
+        {
+          id: 'suppliers',
+          title: 'Nhà cung cấp',
+          desc: 'Quản lý thông tin & công nợ NCC',
+          icon: Building2,
           requiredModule: 'PURCHASE',
         },
         {
@@ -347,6 +362,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
           title: 'Đối tác và hạn mức tín dụng',
           desc: 'Quản trị công nợ khách hàng B2B & NCC',
           icon: Users,
+          requiredModule: 'PARTNER',
+        },
+        {
+          id: 'suppliers',
+          title: 'Danh mục Nhà cung cấp',
+          desc: 'Hồ sơ nhà cung cấp & công nợ phải trả',
+          icon: Building2,
           requiredModule: 'PARTNER',
         },
         {
@@ -471,6 +493,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
           requiredModule: 'PARTNER',
         },
         {
+          id: 'suppliers',
+          title: 'Nhà cung cấp',
+          desc: 'Quản lý thông tin & công nợ NCC',
+          icon: Building2,
+        },
+        {
           id: 'manager-cashflow',
           title: 'Sổ quỹ thu chi',
           desc: 'Quản lý phiếu thu, chi dòng tiền',
@@ -492,6 +520,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
           desc: 'Phân bổ chi phí cấu thành giá vốn MAC',
           icon: ShoppingBag,
           requiredModule: 'PURCHASE',
+        },
+        {
+          id: 'suppliers',
+          title: 'Nhà cung cấp',
+          desc: 'Danh mục hồ sơ nhà cung cấp',
+          icon: Building2,
         },
       ],
     },
@@ -539,6 +573,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
       hasDropdown: false,
       requiredModule: 'GOODS',
     },
+    {
+      id: 'suppliers',
+      label: 'Nhà cung cấp',
+      icon: Building2,
+      hasDropdown: false,
+    },
   ];
 
   const salesTabs: TabConfig[] = [
@@ -555,6 +595,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
       icon: Package,
       hasDropdown: false,
       requiredModule: 'GOODS',
+    },
+    {
+      id: 'suppliers',
+      label: 'Nhà cung cấp',
+      icon: Building2,
+      hasDropdown: false,
     },
     {
       id: 'sales-orders',
@@ -614,6 +660,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
       icon: Package,
       hasDropdown: false,
       requiredModule: 'GOODS',
+    },
+    {
+      id: 'suppliers',
+      label: 'Nhà cung cấp',
+      icon: Building2,
+      hasDropdown: false,
     },
     {
       id: 'warehouse-inbound',
@@ -679,6 +731,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
       icon: Package,
       hasDropdown: false,
       requiredModule: 'GOODS',
+    },
+    {
+      id: 'suppliers',
+      label: 'Nhà cung cấp',
+      icon: Building2,
+      hasDropdown: false,
     },
     {
       id: 'production-import',
@@ -756,6 +814,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     .filter((t): t is TabConfig => t !== null);
 
   const isTabActive = (tab: TabConfig) => {
+    if (tab.id === 'suppliers' && (activeScreen === 'suppliers' || activeScreen.includes('suppliers'))) return true;
     if (tab.id === activeScreen) return true;
     if (tab.dropdownItems?.some((sub) => sub.id === activeScreen)) return true;
     if (tab.id === 'admin-staff' && activeScreen === 'admin-staff-active') return true;
@@ -785,6 +844,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <button
                 type="button"
                 onClick={() => {
+                  if (tab.id === 'suppliers') {
+                    router.push('/suppliers');
+                    return;
+                  }
                   if (tab.hasDropdown && tab.dropdownItems && tab.dropdownItems.length > 0) {
                     if (isOpen) {
                       setOpenDropdownId(null);
@@ -840,6 +903,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       type="button"
                       onClick={() => {
                         setOpenDropdownId(null);
+                        if (item.id === 'suppliers') {
+                          router.push('/suppliers');
+                          return;
+                        }
                         onNavigate(item.id);
                       }}
                       className={`w-full text-left px-3.5 py-2.5 flex items-start gap-3 transition cursor-pointer hover:bg-blue-50/70 ${

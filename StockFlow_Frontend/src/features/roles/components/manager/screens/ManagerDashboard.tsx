@@ -15,6 +15,7 @@ import {
   Plus,
   CheckCircle2,
   X,
+  Building2,
 } from 'lucide-react';
 import { managerService } from '../../../services/managerService';
 import { ManagerInventoryProduct } from '../../../types';
@@ -132,13 +133,17 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ onNavigate }
         </div>
 
         {/* Card 2: Khoản phải trả (AP) */}
-        <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs p-5 flex flex-col justify-between">
+        <div
+          onClick={() => onNavigate('suppliers')}
+          className="bg-white rounded-xl border border-slate-200/90 shadow-2xs p-5 flex flex-col justify-between cursor-pointer hover:border-[#0071BA] hover:shadow-md transition group"
+          title="Nhấn để xem chi tiết danh sách Nhà cung cấp & Công nợ"
+        >
           <div>
             <div className="flex items-center justify-between text-slate-400 mb-2.5">
-              <span className="text-[11px] font-bold tracking-wider uppercase text-slate-500">
+              <span className="text-[11px] font-bold tracking-wider uppercase text-slate-500 group-hover:text-[#0071BA] transition">
                 Khoản phải trả (AP)
               </span>
-              <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
+              <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center group-hover:bg-blue-50 group-hover:text-[#0071BA] transition">
                 <Briefcase size={16} />
               </div>
             </div>
@@ -148,7 +153,9 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ onNavigate }
           </div>
           <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
             <span className="text-slate-500">Nợ nhà cung cấp</span>
-            <span className="text-slate-500 font-medium">5 đối tác</span>
+            <span className="text-[#0071BA] font-semibold flex items-center gap-1 group-hover:underline">
+              Xem NCC &rarr;
+            </span>
           </div>
         </div>
 
@@ -216,6 +223,15 @@ export const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ onNavigate }
         </div>
 
         <div className="flex items-center gap-2.5">
+          <button
+            type="button"
+            onClick={() => onNavigate('suppliers')}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg border border-blue-200 bg-blue-50/70 hover:bg-blue-100/80 text-xs font-semibold text-[#0071BA] transition cursor-pointer shadow-2xs"
+            title="Xem danh sách hồ sơ Nhà cung cấp và quản lý công nợ"
+          >
+            <Building2 size={14} className="text-[#0071BA]" />
+            <span>Nhà cung cấp</span>
+          </button>
           <button
             type="button"
             onClick={() => onNavigate('manager-bom')}

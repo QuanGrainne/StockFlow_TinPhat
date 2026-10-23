@@ -1,7 +1,5 @@
-// src/components/AppLayout.tsx
-// Layout chính: Tích hợp Header (Role Switcher), Sidebar Collapsible, và Render Màn hình tương ứng
-
 import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { UserRole } from '../types';
 import { Header } from './common/Header';
 import { Sidebar } from './common/Sidebar';
@@ -115,6 +113,7 @@ const getStoredScreen = (role: UserRole): string => {
 };
 
 export const AppLayout: React.FC = () => {
+  const router = useRouter();
   const [currentRole, setCurrentRole] = useState<UserRole>('SALES');
   const [activeScreen, setActiveScreen] = useState<string>('sales-dashboard');
   const [selectedMatrixRole, setSelectedMatrixRole] = useState<string>('ROLE_ADMIN');
@@ -148,6 +147,10 @@ export const AppLayout: React.FC = () => {
   }, [currentRole, activeScreen]);
 
   const handleNavigate = (newScreen: string) => {
+    if (newScreen === 'suppliers' || newScreen === '/suppliers') {
+      router.push('/suppliers');
+      return;
+    }
     setActiveScreen(newScreen);
     if (typeof window !== 'undefined') {
       localStorage.setItem('stockflow_active_screen', newScreen);
@@ -282,6 +285,12 @@ export const AppLayout: React.FC = () => {
         return <StaffAccountsScreen initialFilter="ALL" />;
 
       // ─── Common / Goods Catalog Screens (Tất cả Role) ───
+      case 'suppliers':
+      case 'manager-suppliers':
+      case 'admin-suppliers':
+        router.push('/suppliers');
+        return null;
+
       case 'goods-catalog':
       case 'admin-goods':
       case 'manager-goods':
