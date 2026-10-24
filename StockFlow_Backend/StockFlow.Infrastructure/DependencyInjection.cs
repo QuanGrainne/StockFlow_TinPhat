@@ -34,9 +34,11 @@ public static class DependencyInjection
         services.AddScoped<StockFlow.Application.Common.Interfaces.IStockFlowDbContext>(sp =>
             sp.GetRequiredService<StockFlowDbContext>());
 
-        // Auth services
+        // Auth & Identity services
+        services.AddHttpContextAccessor();
         services.AddScoped<StockFlow.Application.Common.Interfaces.IPasswordHasher, Services.BcryptPasswordHasher>();
         services.AddScoped<StockFlow.Application.Common.Interfaces.IJwtTokenGenerator, Services.JwtTokenGenerator>();
+        services.AddScoped<StockFlow.Application.Common.Interfaces.ICurrentUserService, Services.CurrentUserService>();
 
         // Unit of Work
         services.AddScoped<IUnitOfWork, UnitOfWork>();

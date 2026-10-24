@@ -12,10 +12,14 @@ public record CreateProductCommand(CreateProductRequest Request) : IRequest<Resu
 public class CreateProductCommandHandler : IRequestHandler<CreateProductCommand, Result<ProductDto>>
 {
     private readonly IStockFlowDbContext _context;
+    private readonly ICurrentUserService _currentUserService;
 
-    public CreateProductCommandHandler(IStockFlowDbContext context)
+    public CreateProductCommandHandler(
+        IStockFlowDbContext context,
+        ICurrentUserService currentUserService)
     {
         _context = context;
+        _currentUserService = currentUserService;
     }
 
     public async Task<Result<ProductDto>> Handle(CreateProductCommand command, CancellationToken cancellationToken)
@@ -169,6 +173,16 @@ public class CreateProductCommandHandler : IRequestHandler<CreateProductCommand,
             {
                 var firstWarehouse = await _context.MstWarehouses.FirstOrDefaultAsync(cancellationToken);
                 warehouseId = firstWarehouse?.WarehouseId ?? 1;
+            }
+
+            // Kiểm tra phân quyền truy cập kho đối với tài khoản nhân sự
+            if (_currentUserService.IsAuthenticated && !_currentUserService.IsAdmin)
+            {
+                var hasAccess = await _currentUserService.HasWarehouseAccessAsync(warehouseId, cancellationToken);
+                if (!hasAccess)
+                {
+                    return Result.Failure<ProductDto>($"Bạn không có quyền nhập tồn kho ban đầu vào kho ID {warehouseId}.");
+                }
             }
 
             var balance = new TrxInventoryBalance

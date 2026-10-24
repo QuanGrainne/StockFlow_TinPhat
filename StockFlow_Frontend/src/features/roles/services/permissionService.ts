@@ -106,6 +106,29 @@ export const permissionService = {
     return [...warehouseFacilities];
   },
 
+  async getMyWarehouseFacilities(): Promise<WarehouseFacility[]> {
+    try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('stockflow_token') ?? undefined : undefined;
+      const apiData = await apiClient.get<any[]>('/api/warehouses/my-warehouses', token);
+      if (Array.isArray(apiData) && apiData.length > 0) {
+        return apiData
+          .filter((w: any) => w.isActive !== false && w.status !== 'INACTIVE')
+          .map((w: any, index: number) => ({
+            id: w.code || (w.warehouseId ? `FAC-${w.warehouseId}` : `FAC-${index + 1}`),
+            code: (w.code || w.warehouseCode || `WH-${w.warehouseId}`).toUpperCase(),
+            name: w.name || w.warehouseName || `Kho #${w.warehouseId}`,
+            address: w.address || 'Hà Nội, Việt Nam',
+            staffCount: typeof w.staffCount === 'number' ? w.staffCount : 0,
+            area: w.area || w.description || '3,500 m²',
+            status: w.status === 'INACTIVE' ? 'INACTIVE' : 'ACTIVE',
+          }));
+      }
+    } catch (err) {
+      console.warn('API getMyWarehouseFacilities failed, falling back to full list/cache:', err);
+    }
+    return this.getWarehouseFacilities();
+  },
+
   async createWarehouseFacility(payload: {
     code: string;
     name: string;

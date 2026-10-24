@@ -24,6 +24,7 @@ public class ProductsController : ControllerBase
     /// </summary>
     [HttpGet]
     [ProducesResponseType(typeof(List<ProductDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> GetProducts(
         [FromQuery] string? search,
         [FromQuery] string? type,
@@ -33,6 +34,14 @@ public class ProductsController : ControllerBase
         [FromQuery] string? status)
     {
         var result = await _mediator.Send(new GetProductsQuery(search, type, categoryId, warehouseId, lowStockOnly, status));
+        if (!result.IsSuccess)
+        {
+            if (result.Error?.Contains("không có quyền") == true)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, new { message = result.Error });
+            }
+            return BadRequest(new { message = result.Error });
+        }
         return Ok(result.Value);
     }
 
@@ -58,11 +67,16 @@ public class ProductsController : ControllerBase
     [HttpPost]
     [ProducesResponseType(typeof(ProductDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> CreateProduct([FromBody] CreateProductRequest request)
     {
         var result = await _mediator.Send(new CreateProductCommand(request));
         if (!result.IsSuccess)
         {
+            if (result.Error?.Contains("không có quyền") == true)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, new { message = result.Error });
+            }
             return BadRequest(new { message = result.Error });
         }
         return Ok(result.Value);

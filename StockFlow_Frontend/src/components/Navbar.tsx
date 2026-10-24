@@ -19,14 +19,16 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { label: 'Tổng quan', href: '/dashboard' },
   { label: 'Hàng hóa', href: '/products' },
+  { label: 'Nhà cung cấp', href: '/suppliers' },
   {
     label: 'Mua hàng',
     children: [
       { label: 'Nhập hàng', href: '/purchases' },
+      { label: 'Nhà cung cấp', href: '/suppliers' },
     ],
   },
   { label: 'Đơn hàng', href: '/orders' },
-  { label: 'Khách hàng', href: '/suppliers' },
+  { label: 'Khách hàng', href: '/customers' },
   { label: 'Báo cáo', href: '/reports' },
   { label: 'Bán online', href: '/orders' },
 ];

@@ -11,6 +11,7 @@ import {
   Plus,
   Shield,
   ArrowRight,
+  Building2,
 } from 'lucide-react';
 
 interface SalesDashboardProps {
@@ -37,6 +38,15 @@ export const SalesDashboard: React.FC<SalesDashboardProps> = ({ onNavigate }) =>
         </div>
 
         <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => onNavigate('suppliers')}
+            className="h-9 px-3.5 rounded-[8px] bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer shadow-2xs"
+          >
+            <Building2 size={15} className="text-[#2B6CB0]" />
+            <span>Nhà cung cấp</span>
+          </button>
+
           <button
             type="button"
             onClick={() => onNavigate('sales-consolidate')}

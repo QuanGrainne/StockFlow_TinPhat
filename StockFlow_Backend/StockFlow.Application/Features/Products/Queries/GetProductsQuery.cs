@@ -18,14 +18,31 @@ public record GetProductsQuery(
 public class GetProductsQueryHandler : IRequestHandler<GetProductsQuery, Result<List<ProductDto>>>
 {
     private readonly IStockFlowDbContext _context;
+    private readonly ICurrentUserService _currentUserService;
 
-    public GetProductsQueryHandler(IStockFlowDbContext context)
+    public GetProductsQueryHandler(
+        IStockFlowDbContext context,
+        ICurrentUserService currentUserService)
     {
         _context = context;
+        _currentUserService = currentUserService;
     }
 
     public async Task<Result<List<ProductDto>>> Handle(GetProductsQuery query, CancellationToken cancellationToken)
     {
+        // Kiểm tra phân quyền truy cập kho nếu query chỉ định WarehouseId cụ thể
+        if (query.WarehouseId.HasValue && query.WarehouseId.Value > 0)
+        {
+            if (_currentUserService.IsAuthenticated && !_currentUserService.IsAdmin)
+            {
+                var hasAccess = await _currentUserService.HasWarehouseAccessAsync(query.WarehouseId.Value, cancellationToken);
+                if (!hasAccess)
+                {
+                    return Result.Failure<List<ProductDto>>("Bạn không có quyền truy cập dữ liệu của kho này.");
+                }
+            }
+        }
+
         var productsQuery = _context.MstProducts
             .Include(p => p.Category)
             .Include(p => p.BaseUnit)
@@ -61,6 +78,13 @@ public class GetProductsQueryHandler : IRequestHandler<GetProductsQuery, Result<
 
         var products = await productsQuery.OrderBy(p => p.ProductId).ToListAsync(cancellationToken);
 
+        // Lấy danh sách ID kho được cấp quyền nếu là tài khoản nhân sự
+        IReadOnlyList<int>? authorizedWarehouseIds = null;
+        if (_currentUserService.IsAuthenticated && !_currentUserService.IsAdmin)
+        {
+            authorizedWarehouseIds = await _currentUserService.GetAuthorizedWarehouseIdsAsync(cancellationToken);
+        }
+
         var result = products.Select(p =>
         {
             decimal stockQty;
@@ -68,6 +92,13 @@ public class GetProductsQueryHandler : IRequestHandler<GetProductsQuery, Result<
             {
                 stockQty = p.TrxInventoryBalances
                     .Where(b => b.WarehouseId == query.WarehouseId.Value)
+                    .Sum(b => b.Quantity ?? 0);
+            }
+            else if (authorizedWarehouseIds != null)
+            {
+                // Cách ly dữ liệu: Nhân viên chỉ nhìn thấy tổng tồn trên các kho được phân quyền
+                stockQty = p.TrxInventoryBalances
+                    .Where(b => authorizedWarehouseIds.Contains(b.WarehouseId))
                     .Sum(b => b.Quantity ?? 0);
             }
             else
