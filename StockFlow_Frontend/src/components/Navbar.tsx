@@ -21,11 +21,11 @@ const NAV_ITEMS: NavItem[] = [
   {
     label: 'Hàng hóa',
     children: [
-      { label: 'Danh mục hàng hóa', href: '/products' },
+      { label: 'Danh mục', href: '/products' },
       { label: 'Thiết lập giá', href: '/products/price-books' },
+      { label: 'Kiểm kho', href: '/inventory' },
     ],
   },
-  { label: 'Nhà cung cấp', href: '/suppliers' },
   {
     label: 'Mua hàng',
     children: [
@@ -65,6 +65,18 @@ export default function Navbar() {
   const router = useRouter();
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const navRef = useRef<HTMLDivElement>(null);
+  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleMouseEnter = (label: string) => {
+    if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+    setOpenMenu(label);
+  };
+
+  const handleMouseLeave = () => {
+    hoverTimeoutRef.current = setTimeout(() => {
+      setOpenMenu(null);
+    }, 150);
+  };
 
   // Get username safely using useSyncExternalStore
   const username = useSyncExternalStore(subscribeUser, getUserSnapshot, getServerUserSnapshot);
@@ -109,7 +121,12 @@ export default function Navbar() {
 
             if (item.children) {
               return (
-                <div key={item.label} className="relative shrink-0">
+                <div
+                  key={item.label}
+                  className="relative shrink-0"
+                  onMouseEnter={() => handleMouseEnter(item.label)}
+                  onMouseLeave={handleMouseLeave}
+                >
                   <button
                     id={`nav-${item.label}`}
                     onClick={() => setOpenMenu(isOpen ? null : item.label)}
@@ -134,16 +151,20 @@ export default function Navbar() {
 
                   {/* Dropdown */}
                   {isOpen && (
-                    <div className="absolute top-full left-0 mt-1.5 w-52 bg-white rounded-xl shadow-lg border border-slate-200 py-1.5 z-50">
+                    <div
+                      onMouseEnter={() => handleMouseEnter(item.label)}
+                      onMouseLeave={handleMouseLeave}
+                      className="absolute top-full left-0 mt-1 w-48 bg-white rounded-xl shadow-xl border border-slate-200 py-1.5 z-50 animate-in fade-in zoom-in-95 duration-100"
+                    >
                       {item.children.map((child) => (
                         <Link
                           key={child.href}
                           href={child.href}
                           onClick={() => setOpenMenu(null)}
-                          className={`flex items-center px-4 py-2.5 text-sm transition ${
+                          className={`flex items-center px-4 py-2.5 text-xs transition ${
                             pathname === child.href
-                              ? 'bg-blue-50 text-blue-700 font-semibold'
-                              : 'text-slate-700 hover:bg-slate-50 hover:text-slate-900'
+                              ? 'bg-blue-50 text-[#0071BA] font-bold'
+                              : 'text-slate-700 hover:bg-slate-50 hover:text-slate-900 font-medium'
                           }`}
                         >
                           {child.label}
