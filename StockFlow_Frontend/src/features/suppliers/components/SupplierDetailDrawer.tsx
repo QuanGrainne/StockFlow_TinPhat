@@ -79,7 +79,7 @@ export default function SupplierDetailDrawer({
     <Drawer
       open={isOpen}
       onClose={onClose}
-      width={680}
+      size={680}
       title={
         <div className="flex items-center justify-between pr-4">
           <div className="flex items-center gap-2">

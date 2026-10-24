@@ -6,6 +6,9 @@ import {
   Search,
   Plus,
   FileDown,
+  FileSpreadsheet,
+  PowerOff,
+  CheckCircle2,
   SlidersHorizontal,
   RefreshCcw,
   Pencil,
@@ -23,6 +26,7 @@ import SupplierFilterSidebar from '@/components/SupplierFilterSidebar';
 import SupplierFormModal from '@/features/suppliers/components/SupplierFormModal';
 import SupplierDetailDrawer from '@/features/suppliers/components/SupplierDetailDrawer';
 import { supplierService } from '@/features/suppliers/services/supplierService';
+import { exportSuppliersToXLSX } from '@/features/suppliers/utils/exportExcel';
 import {
   Supplier,
   SupplierFilterState,
@@ -223,44 +227,74 @@ export default function SuppliersClient({ onNavigate }: SuppliersClientProps = {
     });
   };
 
-  const handleExportCSV = () => {
+  const handleExportExcel = () => {
     if (filteredSuppliers.length === 0) {
-      message.warning('Không có dữ liệu để xuất file.');
+      message.warning('Không có dữ liệu nhà cung cấp để xuất file.');
+      return;
+    }
+    exportSuppliersToXLSX(
+      filteredSuppliers,
+      undefined,
+      selectedWarehouse ? selectedWarehouse.name : undefined
+    );
+    message.success(`Đã xuất thành công file Excel (${filteredSuppliers.length} nhà cung cấp)!`);
+  };
+
+  const handleBulkExportExcel = () => {
+    const selectedSuppliers = suppliers.filter((s) => selectedRowKeys.includes(s.id));
+    if (selectedSuppliers.length === 0) return;
+    exportSuppliersToXLSX(
+      selectedSuppliers,
+      `danh_sach_${selectedSuppliers.length}_ncc_da_chon.xlsx`,
+      selectedWarehouse ? selectedWarehouse.name : undefined
+    );
+    message.success(`Đã xuất file Excel cho ${selectedSuppliers.length} nhà cung cấp đã chọn!`);
+  };
+
+  const handleBulkChangeStatus = (targetStatus: 'ACTIVE' | 'INACTIVE') => {
+    const isDeactivating = targetStatus === 'INACTIVE';
+    const selectedSuppliers = suppliers.filter((s) => selectedRowKeys.includes(s.id));
+    const toUpdate = selectedSuppliers.filter((s) => s.status !== targetStatus);
+
+    if (toUpdate.length === 0) {
+      message.info(
+        `Tất cả ${selectedSuppliers.length} nhà cung cấp được chọn đã ở trạng thái ${
+          isDeactivating ? 'Ngừng giao dịch' : 'Đang giao dịch'
+        }.`
+      );
       return;
     }
 
-    const headers = [
-      'Mã NCC',
-      'Tên nhà cung cấp',
-      'Số điện thoại',
-      'Email',
-      'Địa chỉ',
-      'Hạn mức nợ',
-      'Nợ cần trả',
-      'Trạng thái',
-    ];
-    const rows = filteredSuppliers.map((s) => [
-      `"${s.code}"`,
-      `"${s.name}"`,
-      `"${s.phone || ''}"`,
-      `"${s.email || ''}"`,
-      `"${(s.address || '').replace(/"/g, '""')}"`,
-      s.creditLimit,
-      s.currentPayable,
-      `"${s.status === 'ACTIVE' ? 'Đang giao dịch' : 'Ngừng giao dịch'}"`,
-    ]);
-
-    const csvContent =
-      '\uFEFF' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\r\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.setAttribute('href', url);
-    link.setAttribute('download', `danh_sach_nha_cung_cap_${Date.now()}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    message.success('Đã xuất file dữ liệu Nhà cung cấp thành công!');
+    Modal.confirm({
+      title: isDeactivating
+        ? 'Xác nhận ngừng giao dịch hàng loạt'
+        : 'Xác nhận kích hoạt lại hàng loạt',
+      content: `Bạn có chắc chắn muốn chuyển trạng thái của ${toUpdate.length} nhà cung cấp đã chọn sang "${
+        isDeactivating ? 'Ngừng giao dịch' : 'Đang giao dịch'
+      }"?`,
+      okText: 'Xác nhận',
+      cancelText: 'Hủy',
+      okButtonProps: { danger: isDeactivating },
+      onOk: async () => {
+        try {
+          for (const sup of toUpdate) {
+            await supplierService.updateSupplier(sup.partnerId, {
+              name: sup.name,
+              isActive: !isDeactivating,
+            });
+          }
+          message.success(
+            `Đã chuyển trạng thái ${toUpdate.length} nhà cung cấp sang "${
+              isDeactivating ? 'Ngừng giao dịch' : 'Đang giao dịch'
+            }" thành công!`
+          );
+          setSelectedRowKeys([]);
+          loadSuppliers();
+        } catch (e: any) {
+          message.error(e?.message || 'Có lỗi xảy ra khi cập nhật trạng thái hàng loạt.');
+        }
+      },
+    });
   };
 
   const getActionMenuItems = (record: Supplier): MenuProps['items'] => [
@@ -314,10 +348,14 @@ export default function SuppliersClient({ onNavigate }: SuppliersClientProps = {
           <button
             type="button"
             onClick={() => setSidebarCollapsed((v) => !v)}
-            className="absolute right-0 top-1/2 z-20 flex h-5 w-5 translate-x-1/2 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full border border-slate-300 bg-white text-slate-500 shadow-sm transition hover:border-slate-400 hover:text-slate-800"
+            className={`absolute z-30 flex items-center justify-center cursor-pointer transition-all duration-200 shadow-md ${
+              sidebarCollapsed
+                ? 'left-0 top-1/2 -translate-y-1/2 h-16 w-5 bg-white border border-l-0 border-slate-300 rounded-r-md text-slate-500 hover:text-[#0071BA] hover:bg-blue-50/80 hover:w-6'
+                : 'right-0 top-1/2 translate-x-1/2 -translate-y-1/2 h-6 w-6 rounded-full border border-slate-300 bg-white text-slate-500 hover:border-[#0071BA] hover:text-[#0071BA]'
+            }`}
             title={sidebarCollapsed ? 'Mở rộng bộ lọc' : 'Thu gọn bộ lọc'}
           >
-            {sidebarCollapsed ? <ChevronRight size={12} /> : <ChevronLeft size={12} />}
+            {sidebarCollapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
           </button>
         </div>
 
@@ -348,6 +386,20 @@ export default function SuppliersClient({ onNavigate }: SuppliersClientProps = {
             <div className="flex flex-wrap items-center justify-between gap-4">
               {/* Search Bar */}
               <div className="flex items-center gap-2 flex-1 max-w-[480px]">
+                {/* Desktop Toggle Button when collapsed */}
+                {sidebarCollapsed && (
+                  <button
+                    type="button"
+                    onClick={() => setSidebarCollapsed(false)}
+                    className="hidden lg:flex h-9 px-3 rounded-[6px] border border-blue-200 bg-blue-50/60 text-sm font-semibold text-[#0071BA] hover:bg-blue-100/70 items-center gap-1.5 shrink-0 shadow-xs transition cursor-pointer"
+                    title="Mở bảng bộ lọc"
+                  >
+                    <Filter size={15} />
+                    <span>Bộ lọc</span>
+                    <ChevronRight size={14} />
+                  </button>
+                )}
+
                 <button
                   type="button"
                   onClick={() => setMobileFilterOpen(true)}
@@ -395,12 +447,12 @@ export default function SuppliersClient({ onNavigate }: SuppliersClientProps = {
 
                 <button
                   type="button"
-                  onClick={handleExportCSV}
-                  title="Xuất file danh sách"
+                  onClick={handleExportExcel}
+                  title="Xuất danh sách ra file Excel (.xlsx)"
                   className="h-9 px-3.5 rounded-[6px] border border-slate-300 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50 hover:border-slate-400 flex items-center gap-1.5 transition cursor-pointer"
                 >
-                  <FileDown size={16} className="text-slate-500" />
-                  <span className="hidden sm:inline">Xuất file</span>
+                  <FileSpreadsheet size={16} className="text-emerald-600" />
+                  <span className="hidden sm:inline">Xuất Excel</span>
                 </button>
 
                 <button
@@ -649,15 +701,75 @@ export default function SuppliersClient({ onNavigate }: SuppliersClientProps = {
         </main>
       </div>
 
+      {/* ── Floating Bulk Action Bar (Thanh tác vụ hàng loạt nổi) ── */}
+      {selectedRowKeys.length > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-3 px-4 py-2.5 bg-slate-900/95 backdrop-blur-md text-white rounded-xl shadow-2xl border border-slate-700 animate-in fade-in slide-in-from-bottom-5 duration-200">
+          <div className="flex items-center gap-2 pr-2 border-r border-slate-700 text-xs sm:text-sm font-medium">
+            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#0071BA] text-[11px] font-bold text-white">
+              {selectedRowKeys.length}
+            </span>
+            <span>
+              Đã chọn <strong className="text-white">{selectedRowKeys.length}</strong> NCC
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleBulkExportExcel}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-xs font-semibold text-white shadow-xs cursor-pointer transition"
+              title="Xuất file Excel (.xlsx) cho các nhà cung cấp đã chọn"
+            >
+              <FileSpreadsheet size={14} />
+              <span>Xuất Excel ({selectedRowKeys.length})</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleBulkChangeStatus('INACTIVE')}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-600/90 hover:bg-amber-600 text-xs font-semibold text-white shadow-xs cursor-pointer transition"
+              title="Chuyển các nhà cung cấp đã chọn sang Ngừng giao dịch"
+            >
+              <PowerOff size={13} />
+              <span>Ngừng giao dịch</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleBulkChangeStatus('ACTIVE')}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-xs font-semibold text-white shadow-xs cursor-pointer transition"
+              title="Kích hoạt lại các nhà cung cấp đã chọn"
+            >
+              <CheckCircle2 size={13} />
+              <span>Kích hoạt lại</span>
+            </button>
+          </div>
+
+          <div className="pl-2 border-l border-slate-700">
+            <button
+              type="button"
+              onClick={() => setSelectedRowKeys([])}
+              className="flex items-center gap-1 text-xs text-slate-400 hover:text-white px-1.5 py-1 rounded hover:bg-slate-800 transition cursor-pointer"
+              title="Bỏ chọn tất cả"
+            >
+              <X size={13} />
+              <span className="hidden sm:inline">Bỏ chọn</span>
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* ── Modal Thêm / Cập nhật NCC ── */}
-      <SupplierFormModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onSuccess={loadSuppliers}
-        supplier={editingSupplier}
-        onSaveCreate={supplierService.createSupplier}
-        onSaveUpdate={supplierService.updateSupplier}
-      />
+      {isModalOpen && (
+        <SupplierFormModal
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          onSuccess={loadSuppliers}
+          supplier={editingSupplier}
+          onSaveCreate={supplierService.createSupplier}
+          onSaveUpdate={supplierService.updateSupplier}
+        />
+      )}
 
       {/* ── Drawer Master-Detail Xem chi tiết & Lịch sử phiếu nhập ── */}
       <SupplierDetailDrawer
