@@ -5,6 +5,9 @@ using StockFlow.Application.Features.Suppliers.Commands;
 using StockFlow.Application.Features.Suppliers.DTOs;
 using StockFlow.Application.Features.Suppliers.Queries;
 
+using StockFlow.Application.Features.WarehousePermissions.DTOs;
+using StockFlow.Application.Features.WarehousePermissions.Queries;
+
 namespace StockFlow.API.Controllers;
 
 [ApiController]
@@ -20,21 +23,36 @@ public class SuppliersController : ControllerBase
     }
 
     /// <summary>
-    /// Lấy danh sách Nhà cung cấp (hỗ trợ tìm kiếm từ khóa và lọc theo tình trạng nợ, trạng thái hoạt động).
+    /// Lấy danh sách Nhà cung cấp (hỗ trợ tìm kiếm từ khóa, lọc theo tình trạng nợ, trạng thái hoạt động và theo Chi nhánh/Kho nhập hàng).
     /// </summary>
     [HttpGet]
     [ProducesResponseType(typeof(List<SupplierDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetSuppliers(
         [FromQuery] string? search,
         [FromQuery] string? debtStatus,
-        [FromQuery] string? status)
+        [FromQuery] string? status,
+        [FromQuery] int? warehouseId)
     {
-        var result = await _mediator.Send(new GetSuppliersQuery(search, debtStatus, status));
+        var result = await _mediator.Send(new GetSuppliersQuery(search, debtStatus, status, warehouseId));
         if (!result.IsSuccess)
         {
             return BadRequest(new { message = result.Error });
         }
         return Ok(result.Value);
+    }
+
+    /// <summary>
+    /// Lấy danh sách các Chi nhánh / Kho nhập hàng khả dụng trong hệ thống.
+    /// </summary>
+    [HttpGet("warehouses")]
+    public async Task<IActionResult> GetWarehouses()
+    {
+        var result = await _mediator.Send(new GetWarehouseFacilitiesQuery());
+        if (!result.IsSuccess)
+        {
+            return BadRequest(new { message = result.Error });
+        }
+        return Ok(result.Value.Where(w => w.Status == "ACTIVE"));
     }
 
     /// <summary>

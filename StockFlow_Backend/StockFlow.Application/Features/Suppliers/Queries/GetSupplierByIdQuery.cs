@@ -44,18 +44,42 @@ public class GetSupplierByIdQueryHandler : IRequestHandler<GetSupplierByIdQuery,
         decimal totalAmount = receipts.Sum(r =>
             r.DtlGoodsReceiptItems.Sum(item => (item.ReceivedQty ?? 0) * (item.UnitLandedCost ?? 0)));
 
-        var recentReceiptDtos = receipts.Take(5).Select(r =>
+        var recentReceiptDtos = receipts.Take(10).Select(r =>
         {
             var receiptTotal = r.DtlGoodsReceiptItems.Sum(item => (item.ReceivedQty ?? 0) * (item.UnitLandedCost ?? 0));
             return new SupplierRecentReceiptDto(
                 ReceiptId: r.GrId,
                 ReceiptNumber: r.GrCode ?? r.ExternalPoNumber ?? $"PNK-{r.GrId:D6}",
                 ReceiptDate: r.ReceivedDate,
+                WarehouseId: r.WarehouseId,
                 WarehouseName: r.Warehouse?.WarehouseName ?? $"Kho #{r.WarehouseId}",
                 TotalAmount: receiptTotal,
                 Status: r.Status ?? "COMPLETED"
             );
         }).ToList();
+
+        // Tính phân bổ công nợ và tổng tiền mua theo từng Kho / Chi nhánh
+        var warehouseBreakdown = receipts
+            .GroupBy(r => new { r.WarehouseId, Code = r.Warehouse?.WarehouseCode, Name = r.Warehouse?.WarehouseName })
+            .Select(g =>
+            {
+                var whPurchased = g.Sum(r => r.DtlGoodsReceiptItems.Sum(item => (item.ReceivedQty ?? 0) * (item.UnitLandedCost ?? 0)));
+                var currentTotalPayable = partner.CurrentPayable ?? 0m;
+                decimal branchDebt = totalAmount > 0 
+                    ? Math.Round(currentTotalPayable * (whPurchased / totalAmount), 0)
+                    : 0m;
+
+                return new WarehouseDebtBreakdownDto(
+                    WarehouseId: g.Key.WarehouseId,
+                    WarehouseCode: g.Key.Code ?? $"K{g.Key.WarehouseId:D3}",
+                    WarehouseName: g.Key.Name ?? $"Kho #{g.Key.WarehouseId}",
+                    TotalPurchasedAmount: whPurchased,
+                    BranchPayableAmount: branchDebt > 0 ? branchDebt : (currentTotalPayable > 0 ? currentTotalPayable : whPurchased),
+                    ReceiptsCount: g.Count()
+                );
+            })
+            .OrderByDescending(b => b.TotalPurchasedAmount)
+            .ToList();
 
         var detailDto = new SupplierDetailDto(
             Id: partner.PartnerId.ToString(),
@@ -72,7 +96,8 @@ public class GetSupplierByIdQueryHandler : IRequestHandler<GetSupplierByIdQuery,
             Status: partner.IsActive != false ? "ACTIVE" : "INACTIVE",
             TotalReceiptsCount: totalCount,
             TotalPurchasedAmount: totalAmount,
-            RecentReceipts: recentReceiptDtos
+            RecentReceipts: recentReceiptDtos,
+            WarehouseBreakdown: warehouseBreakdown
         );
 
         return Result.Success(detailDto);
