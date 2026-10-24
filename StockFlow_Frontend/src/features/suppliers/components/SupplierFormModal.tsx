@@ -113,6 +113,8 @@ export default function SupplierFormModal({
     }
   };
 
+  if (!isOpen) return null;
+
   return (
     <Modal
       open={isOpen}
@@ -144,7 +146,7 @@ export default function SupplierFormModal({
         </div>
       }
       width={640}
-      destroyOnClose
+      destroyOnHidden
       centered
     >
       <form onSubmit={handleSubmit} className="space-y-4 py-3 text-slate-800">
