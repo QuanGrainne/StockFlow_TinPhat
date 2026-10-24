@@ -18,7 +18,13 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { label: 'Tổng quan', href: '/dashboard' },
-  { label: 'Hàng hóa', href: '/products' },
+  {
+    label: 'Hàng hóa',
+    children: [
+      { label: 'Danh mục hàng hóa', href: '/products' },
+      { label: 'Thiết lập giá', href: '/products/price-books' },
+    ],
+  },
   { label: 'Nhà cung cấp', href: '/suppliers' },
   {
     label: 'Mua hàng',
@@ -107,11 +113,10 @@ export default function Navbar() {
                   <button
                     id={`nav-${item.label}`}
                     onClick={() => setOpenMenu(isOpen ? null : item.label)}
-                    className={`flex shrink-0 items-center gap-1.5 whitespace-nowrap px-3 py-2 rounded-lg text-sm font-medium transition select-none ${
-                      isActive || isOpen
+                    className={`flex shrink-0 items-center gap-1.5 whitespace-nowrap px-3 py-2 rounded-lg text-sm font-medium transition select-none ${isActive || isOpen
                         ? 'bg-[#005f9d] text-white'
                         : 'text-white/85 hover:bg-white/15 hover:text-white'
-                    }`}
+                      }`}
                   >
                     {item.label}
                     {/* Chevron */}
@@ -134,11 +139,10 @@ export default function Navbar() {
                           key={child.href}
                           href={child.href}
                           onClick={() => setOpenMenu(null)}
-                          className={`flex items-center px-4 py-2.5 text-sm transition ${
-                            pathname === child.href
+                          className={`flex items-center px-4 py-2.5 text-sm transition ${pathname === child.href
                               ? 'bg-blue-50 text-blue-700 font-semibold'
                               : 'text-slate-700 hover:bg-slate-50 hover:text-slate-900'
-                          }`}
+                            }`}
                         >
                           {child.label}
                         </Link>
@@ -153,11 +157,10 @@ export default function Navbar() {
               <Link
                 key={item.label}
                 href={item.href!}
-                className={`shrink-0 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium transition ${
-                  isActive
+                className={`shrink-0 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium transition ${isActive
                     ? 'bg-[#005f9d] text-white'
                     : 'text-white/85 hover:bg-white/15 hover:text-white'
-                }`}
+                  }`}
               >
                 {item.label}
               </Link>

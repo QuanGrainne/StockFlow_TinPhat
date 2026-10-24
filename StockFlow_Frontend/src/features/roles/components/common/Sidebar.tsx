@@ -33,6 +33,7 @@ import {
   RefreshCw,
   FileText,
   BookOpen,
+  DollarSign,
 } from 'lucide-react';
 import { permissionService } from '../../services/permissionService';
 
@@ -216,11 +217,27 @@ export const Sidebar: React.FC<SidebarProps> = ({
       ],
     },
     {
-      id: 'admin-goods',
-      label: 'Danh mục hàng hóa',
+      id: 'admin-goods-group',
+      label: 'Hàng hóa',
       icon: Package,
-      hasDropdown: false,
+      hasDropdown: true,
       requiredModule: 'GOODS',
+      dropdownItems: [
+        {
+          id: 'admin-goods',
+          title: 'Danh mục hàng hóa',
+          desc: 'Quản lý mã hàng, tồn kho và danh mục',
+          icon: Package,
+          requiredModule: 'GOODS',
+        },
+        {
+          id: 'admin-price-books',
+          title: 'Thiết lập bảng giá',
+          desc: 'Bảng giá bán, công thức giá động đa kho',
+          icon: DollarSign,
+          requiredModule: 'GOODS',
+        },
+      ],
     },
     {
       id: 'suppliers',
@@ -593,11 +610,27 @@ export const Sidebar: React.FC<SidebarProps> = ({
       requiredModule: 'FIN',
     },
     {
-      id: 'manager-goods',
-      label: 'Danh mục hàng hóa',
+      id: 'manager-goods-group',
+      label: 'Hàng hóa',
       icon: Package,
-      hasDropdown: false,
+      hasDropdown: true,
       requiredModule: 'GOODS',
+      dropdownItems: [
+        {
+          id: 'manager-goods',
+          title: 'Danh mục hàng hóa',
+          desc: 'Quản lý mã hàng và tồn kho',
+          icon: Package,
+          requiredModule: 'GOODS',
+        },
+        {
+          id: 'admin-price-books',
+          title: 'Thiết lập bảng giá',
+          desc: 'Bảng giá bán và công thức giá',
+          icon: DollarSign,
+          requiredModule: 'GOODS',
+        },
+      ],
     },
     {
       id: 'suppliers',
@@ -616,11 +649,27 @@ export const Sidebar: React.FC<SidebarProps> = ({
       requiredModule: 'SALES',
     },
     {
-      id: 'sales-goods',
-      label: 'Danh mục hàng hóa',
+      id: 'sales-goods-group',
+      label: 'Hàng hóa',
       icon: Package,
-      hasDropdown: false,
+      hasDropdown: true,
       requiredModule: 'GOODS',
+      dropdownItems: [
+        {
+          id: 'sales-goods',
+          title: 'Danh mục hàng hóa',
+          desc: 'Xem mã hàng, quy cách và tồn kho',
+          icon: Package,
+          requiredModule: 'GOODS',
+        },
+        {
+          id: 'admin-price-books',
+          title: 'Thiết lập bảng giá',
+          desc: 'Bảng giá bán và chính sách giá',
+          icon: DollarSign,
+          requiredModule: 'GOODS',
+        },
+      ],
     },
     {
       id: 'suppliers',
