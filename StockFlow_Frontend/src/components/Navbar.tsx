@@ -21,11 +21,11 @@ const NAV_ITEMS: NavItem[] = [
   {
     label: 'Hàng hóa',
     children: [
-      { label: 'Danh mục', href: '/products' },
+      { label: 'Danh mục hàng hóa', href: '/products' },
       { label: 'Thiết lập giá', href: '/products/price-books' },
-      { label: 'Kiểm kho', href: '/inventory' },
     ],
   },
+  { label: 'Nhà cung cấp', href: '/suppliers' },
   {
     label: 'Mua hàng',
     children: [
@@ -65,18 +65,6 @@ export default function Navbar() {
   const router = useRouter();
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const navRef = useRef<HTMLDivElement>(null);
-  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  const handleMouseEnter = (label: string) => {
-    if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
-    setOpenMenu(label);
-  };
-
-  const handleMouseLeave = () => {
-    hoverTimeoutRef.current = setTimeout(() => {
-      setOpenMenu(null);
-    }, 150);
-  };
 
   // Get username safely using useSyncExternalStore
   const username = useSyncExternalStore(subscribeUser, getUserSnapshot, getServerUserSnapshot);
@@ -121,20 +109,14 @@ export default function Navbar() {
 
             if (item.children) {
               return (
-                <div
-                  key={item.label}
-                  className="relative shrink-0"
-                  onMouseEnter={() => handleMouseEnter(item.label)}
-                  onMouseLeave={handleMouseLeave}
-                >
+                <div key={item.label} className="relative shrink-0">
                   <button
                     id={`nav-${item.label}`}
                     onClick={() => setOpenMenu(isOpen ? null : item.label)}
-                    className={`flex shrink-0 items-center gap-1.5 whitespace-nowrap px-3 py-2 rounded-lg text-sm font-medium transition select-none ${
-                      isActive || isOpen
+                    className={`flex shrink-0 items-center gap-1.5 whitespace-nowrap px-3 py-2 rounded-lg text-sm font-medium transition select-none ${isActive || isOpen
                         ? 'bg-[#005f9d] text-white'
                         : 'text-white/85 hover:bg-white/15 hover:text-white'
-                    }`}
+                      }`}
                   >
                     {item.label}
                     {/* Chevron */}
@@ -151,21 +133,16 @@ export default function Navbar() {
 
                   {/* Dropdown */}
                   {isOpen && (
-                    <div
-                      onMouseEnter={() => handleMouseEnter(item.label)}
-                      onMouseLeave={handleMouseLeave}
-                      className="absolute top-full left-0 mt-1 w-48 bg-white rounded-xl shadow-xl border border-slate-200 py-1.5 z-50 animate-in fade-in zoom-in-95 duration-100"
-                    >
+                    <div className="absolute top-full left-0 mt-1.5 w-52 bg-white rounded-xl shadow-lg border border-slate-200 py-1.5 z-50">
                       {item.children.map((child) => (
                         <Link
                           key={child.href}
                           href={child.href}
                           onClick={() => setOpenMenu(null)}
-                          className={`flex items-center px-4 py-2.5 text-xs transition ${
-                            pathname === child.href
-                              ? 'bg-blue-50 text-[#0071BA] font-bold'
-                              : 'text-slate-700 hover:bg-slate-50 hover:text-slate-900 font-medium'
-                          }`}
+                          className={`flex items-center px-4 py-2.5 text-sm transition ${pathname === child.href
+                              ? 'bg-blue-50 text-blue-700 font-semibold'
+                              : 'text-slate-700 hover:bg-slate-50 hover:text-slate-900'
+                            }`}
                         >
                           {child.label}
                         </Link>
@@ -180,11 +157,10 @@ export default function Navbar() {
               <Link
                 key={item.label}
                 href={item.href!}
-                className={`shrink-0 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium transition ${
-                  isActive
+                className={`shrink-0 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium transition ${isActive
                     ? 'bg-[#005f9d] text-white'
                     : 'text-white/85 hover:bg-white/15 hover:text-white'
-                }`}
+                  }`}
               >
                 {item.label}
               </Link>
