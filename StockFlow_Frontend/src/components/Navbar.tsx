@@ -18,7 +18,13 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { label: 'Tổng quan', href: '/dashboard' },
-  { label: 'Hàng hóa', href: '/products' },
+  {
+    label: 'Hàng hóa',
+    children: [
+      { label: 'Danh mục hàng hóa', href: '/products' },
+      { label: 'Thiết lập giá', href: '/products/price-books' },
+    ],
+  },
   { label: 'Nhà cung cấp', href: '/suppliers' },
   {
     label: 'Mua hàng',
