@@ -459,7 +459,7 @@ export const Header: React.FC<HeaderProps> = ({
               </div>
               <div className="font-bold text-slate-800 truncate leading-tight" suppressHydrationWarning>
                 {permittedFacilities[0].name}
-              </div>              </div>
+              </div>
             </div>
           </div>
         ) : (
