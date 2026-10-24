@@ -11,12 +11,13 @@ import {
 
 export const supplierService = {
   /**
-   * Lấy danh sách Nhà cung cấp kèm tìm kiếm và bộ lọc công nợ, trạng thái
+   * Lấy danh sách Nhà cung cấp kèm tìm kiếm và bộ lọc công nợ, trạng thái, chi nhánh/kho
    */
   async getSuppliers(params?: {
     search?: string;
     debtStatus?: string;
     status?: string;
+    warehouseId?: number | string;
   }): Promise<Supplier[]> {
     try {
       const query = new URLSearchParams();
@@ -29,6 +30,9 @@ export const supplierService = {
       if (params?.status && params.status !== 'ALL') {
         query.append('status', params.status);
       }
+      if (params?.warehouseId && params.warehouseId !== 'ALL' && Number(params.warehouseId) > 0) {
+        query.append('warehouseId', String(params.warehouseId));
+      }
 
       const qs = query.toString() ? `?${query.toString()}` : '';
       const data = await apiClient.get<Supplier[]>(`/api/Suppliers${qs}`);
@@ -39,6 +43,31 @@ export const supplierService = {
     } catch (e) {
       console.error('Lỗi khi tải danh sách Nhà cung cấp:', e);
       throw e;
+    }
+  },
+
+  /**
+   * Lấy danh sách các Chi nhánh / Kho nhập hàng hoạt động
+   */
+  async getWarehouses(): Promise<{ warehouseId: number; code: string; name: string }[]> {
+    try {
+      const data = await apiClient.get<any[]>('/api/Suppliers/warehouses');
+      if (Array.isArray(data)) {
+        return data.map((w) => ({
+          warehouseId: w.warehouseId,
+          code: w.code || `K${w.warehouseId}`,
+          name: w.name || `Kho #${w.warehouseId}`,
+        }));
+      }
+      return [];
+    } catch (e) {
+      console.warn('Không thể tải danh sách kho từ API, dùng danh sách kho mặc định Tín Phát:', e);
+      return [
+        { warehouseId: 3, code: 'K001', name: 'Kho Tổng Gia Lâm' },
+        { warehouseId: 4, code: 'K002', name: 'Kho Đông Anh' },
+        { warehouseId: 5, code: 'K003', name: 'Kho Hà Đông' },
+        { warehouseId: 6, code: 'K004', name: 'Kho Hoàn Kiếm' },
+      ];
     }
   },
 

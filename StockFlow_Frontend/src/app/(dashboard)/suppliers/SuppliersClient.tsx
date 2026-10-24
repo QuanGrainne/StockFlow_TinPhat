@@ -47,8 +47,10 @@ export default function SuppliersClient({ onNavigate }: SuppliersClientProps = {
     search: '',
     debtStatus: 'ALL',
     status: 'ALL',
+    warehouseId: 'ALL',
   });
   const [selectedLocation, setSelectedLocation] = useState<string>('ALL');
+  const [warehousesList, setWarehousesList] = useState<{ warehouseId: number; code: string; name: string }[]>([]);
 
   // Selection & Pagination State
   const [selectedRowKeys, setSelectedRowKeys] = useState<string[]>([]);
@@ -61,6 +63,19 @@ export default function SuppliersClient({ onNavigate }: SuppliersClientProps = {
   const [drawerSupplierId, setDrawerSupplierId] = useState<number | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState<boolean>(false);
 
+  // Load warehouses on mount
+  useEffect(() => {
+    async function loadWhs() {
+      try {
+        const whs = await supplierService.getWarehouses();
+        setWarehousesList(whs);
+      } catch (err) {
+        console.warn('Lỗi tải danh sách kho:', err);
+      }
+    }
+    loadWhs();
+  }, []);
+
   // Load suppliers from API
   const loadSuppliers = async () => {
     setLoading(true);
@@ -69,6 +84,7 @@ export default function SuppliersClient({ onNavigate }: SuppliersClientProps = {
         search: filterState.search,
         debtStatus: filterState.debtStatus,
         status: filterState.status,
+        warehouseId: filterState.warehouseId,
       });
       setSuppliers(data);
     } catch (e: any) {
@@ -80,7 +96,7 @@ export default function SuppliersClient({ onNavigate }: SuppliersClientProps = {
 
   useEffect(() => {
     loadSuppliers();
-  }, [filterState.debtStatus, filterState.status]);
+  }, [filterState.debtStatus, filterState.status, filterState.warehouseId]);
 
   // Client-side filtering by Location (Address contains location string)
   const filteredSuppliers = useMemo(() => {
@@ -107,10 +123,21 @@ export default function SuppliersClient({ onNavigate }: SuppliersClientProps = {
     return result;
   }, [suppliers, selectedLocation, filterState.search]);
 
+  const selectedWarehouse = useMemo(() => {
+    if (filterState.warehouseId === 'ALL') return null;
+    return warehousesList.find((w) => w.warehouseId === filterState.warehouseId);
+  }, [filterState.warehouseId, warehousesList]);
+
   // Calculate Summary metrics
   const totalPayableDebt = useMemo(() => {
+    if (selectedWarehouse) {
+      return filteredSuppliers.reduce(
+        (sum, s) => sum + (s.branchPayable !== undefined ? s.branchPayable : (s.currentPayable || 0)),
+        0
+      );
+    }
     return filteredSuppliers.reduce((sum, s) => sum + (s.currentPayable || 0), 0);
-  }, [filteredSuppliers]);
+  }, [filteredSuppliers, selectedWarehouse]);
 
   // Pagination calculation
   const pagedItems = useMemo(() => {
@@ -133,6 +160,7 @@ export default function SuppliersClient({ onNavigate }: SuppliersClientProps = {
       search: '',
       debtStatus: 'ALL',
       status: 'ALL',
+      warehouseId: 'ALL',
     });
     setSelectedLocation('ALL');
     setPage(1);
@@ -274,6 +302,7 @@ export default function SuppliersClient({ onNavigate }: SuppliersClientProps = {
           <SupplierFilterSidebar
             state={filterState}
             selectedLocation={selectedLocation}
+            warehousesList={warehousesList}
             onChange={handleFilterChange}
             onLocationChange={(loc) => {
               setSelectedLocation(loc);
@@ -299,6 +328,7 @@ export default function SuppliersClient({ onNavigate }: SuppliersClientProps = {
               <SupplierFilterSidebar
                 state={filterState}
                 selectedLocation={selectedLocation}
+                warehousesList={warehousesList}
                 onChange={handleFilterChange}
                 onLocationChange={(loc) => {
                   setSelectedLocation(loc);
@@ -389,12 +419,27 @@ export default function SuppliersClient({ onNavigate }: SuppliersClientProps = {
           <div className="p-5 flex-1 flex flex-col bg-[#f8fafc]">
             {/* Header stats bar */}
             <div className="mb-2.5 flex items-center justify-between text-xs sm:text-sm text-slate-600">
-              <div>
-                Danh sách Nhà cung cấp (
-                <strong className="text-slate-900">{filteredSuppliers.length}</strong> đối tác)
+              <div className="flex items-center gap-2">
+                <span>
+                  Danh sách Nhà cung cấp (
+                  <strong className="text-slate-900">{filteredSuppliers.length}</strong> đối tác)
+                </span>
+                {selectedWarehouse && (
+                  <span className="text-xs bg-blue-50 text-[#0071BA] border border-blue-200 px-2 py-0.5 rounded-full font-medium flex items-center gap-1">
+                    <span>Kho: {selectedWarehouse.name}</span>
+                    <button
+                      type="button"
+                      onClick={() => handleFilterChange({ warehouseId: 'ALL' })}
+                      className="hover:text-red-500 ml-0.5"
+                      title="Bỏ lọc kho"
+                    >
+                      <X size={12} />
+                    </button>
+                  </span>
+                )}
               </div>
               <div className="flex items-center gap-2">
-                <span>Tổng nợ cần trả NCC:</span>
+                <span>{selectedWarehouse ? `Tổng nợ phát sinh tại ${selectedWarehouse.name}:` : 'Tổng nợ cần trả NCC:'}</span>
                 <span
                   className={`font-mono font-bold ${
                     totalPayableDebt > 0 ? 'text-rose-600' : 'text-slate-800'
@@ -429,7 +474,9 @@ export default function SuppliersClient({ onNavigate }: SuppliersClientProps = {
                       <th className="w-44 px-3 py-2.5">Email</th>
                       <th className="px-3 py-2.5 min-w-[180px]">Địa chỉ</th>
                       <th className="w-32 px-3 py-2.5 text-right">Hạn mức nợ</th>
-                      <th className="w-36 px-3 py-2.5 text-right font-semibold">Nợ cần trả</th>
+                      <th className="w-40 px-3 py-2.5 text-right font-semibold">
+                        {selectedWarehouse ? `Nợ tại ${selectedWarehouse.code}` : 'Nợ cần trả'}
+                      </th>
                       <th className="w-36 px-3 py-2.5 text-center">Trạng thái</th>
                       <th className="w-16 px-3 py-2.5 text-center">Thao tác</th>
                     </tr>
@@ -493,10 +540,20 @@ export default function SuppliersClient({ onNavigate }: SuppliersClientProps = {
                             </td>
                             <td
                               className={`px-3 py-3 text-right font-mono text-xs font-bold ${
-                                (sup.currentPayable || 0) > 0 ? 'text-rose-600' : 'text-slate-800'
+                                ((selectedWarehouse && sup.branchPayable !== undefined ? sup.branchPayable : sup.currentPayable) || 0) > 0 ? 'text-rose-600' : 'text-slate-800'
                               }`}
                             >
-                              {currencyFormatter.format(sup.currentPayable || 0)} đ
+                              <div>
+                                {currencyFormatter.format(
+                                  (selectedWarehouse && sup.branchPayable !== undefined ? sup.branchPayable : sup.currentPayable) || 0
+                                )}{' '}
+                                đ
+                              </div>
+                              {selectedWarehouse && (
+                                <div className="text-[10px] text-slate-400 font-normal">
+                                  {sup.branchReceiptsCount !== undefined ? `${sup.branchReceiptsCount} phiếu • ` : ''}Tổng: {currencyFormatter.format(sup.currentPayable || 0)} đ
+                                </div>
+                              )}
                             </td>
                             <td className="px-3 py-3 text-center">
                               <Tag color={sup.status === 'ACTIVE' ? 'success' : 'default'}>
