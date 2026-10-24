@@ -468,5 +468,44 @@ public static class DatabaseSeeder
             await context.SaveChangesAsync();
             await context.Database.ExecuteSqlRawAsync("SELECT setval(pg_get_serial_sequence('stockflow.mst_business_partners', 'partner_id'), COALESCE(MAX(partner_id), 1)) FROM stockflow.mst_business_partners;");
         }
+
+        // 9. Seed default price book "Bảng giá chung"
+        var defaultPriceBook = await context.MstPriceBooks.FirstOrDefaultAsync(pb => pb.IsDefault);
+        if (defaultPriceBook == null)
+        {
+            defaultPriceBook = new MstPriceBook
+            {
+                PriceBookCode = "BG000001",
+                PriceBookName = "Bảng giá chung",
+                IsActive = true,
+                IsDefault = true,
+                EffectiveFrom = DateTime.UtcNow.AddMonths(-1),
+                AllowUnlistedProducts = true,
+                WarnUnlistedProducts = false,
+                ScopeBranchType = "ALL",
+                ScopeCustomerType = "ALL",
+                ScopeUserType = "ALL",
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+            await context.MstPriceBooks.AddAsync(defaultPriceBook);
+            await context.SaveChangesAsync();
+
+            // Populate initial product prices from MstProducts.StandardPrice
+            var allProducts = await context.MstProducts.ToListAsync();
+            var priceItems = allProducts.Select(p => new DtlPriceBookItem
+            {
+                PriceBookId = defaultPriceBook.PriceBookId,
+                ProductId = p.ProductId,
+                Price = p.StandardPrice ?? (p.MovingAverageCost > 0 ? Math.Round(p.MovingAverageCost.Value * 1.35m, 0) : 0),
+                UpdatedAt = DateTime.UtcNow
+            }).ToList();
+
+            if (priceItems.Any())
+            {
+                await context.DtlPriceBookItems.AddRangeAsync(priceItems);
+                await context.SaveChangesAsync();
+            }
+        }
     }
 }
