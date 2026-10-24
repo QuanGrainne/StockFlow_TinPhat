@@ -344,7 +344,7 @@ export const Header: React.FC<HeaderProps> = ({
               <Warehouse size={12} />
             </div>
             <div className="text-left max-w-[130px] sm:max-w-[160px] truncate">
-              <div className="font-bold text-slate-800 truncate leading-tight">
+              <div className="font-bold text-slate-800 truncate leading-tight" suppressHydrationWarning>
                 {facilities.find((f) => f.code === selectedBranch || f.name === selectedBranch)?.name ||
                   selectedBranch ||
                   'Kho Tổng Gia Lâm'}

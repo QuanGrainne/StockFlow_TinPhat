@@ -40,6 +40,8 @@ import {
   Camera,
   RefreshCw,
   Star,
+  Minus,
+  MoreHorizontal,
   ExternalLink,
   MapPin,
   Store,
@@ -49,6 +51,7 @@ import {
 import { productService } from '../../services/productService';
 import { adminService } from '../../services/adminService';
 import { WarehouseFacility } from '../../types';
+import { SkuAnalyticsModal } from './SkuAnalyticsModal';
 
 // ─── Component Combobox Đa Năng (Vừa Tự Nhập Vừa Tự Chọn) ──────────────────────
 interface CustomComboboxProps {
@@ -181,6 +184,8 @@ export interface GoodsItem {
   barcode: string;
   status: 'ACTIVE' | 'DISCONTINUED';
   createdAt?: string;
+  isStarred?: boolean;
+  supplier?: string;
   weight?: number;
   dimensions?: { width: number; length: number; unit: string };
   locationName?: string;
@@ -220,6 +225,7 @@ const INITIAL_GOODS_LIST: GoodsItem[] = [
     category: 'Thành phẩm',
     subCategory: 'Sữa',
     brand: 'Ba Vì Milk',
+    supplier: 'xưởng sỉ',
     uom: 'Hộp',
     specification: 'Hộp tiệt trùng 180ml hương vị tự nhiên',
     warehouse: 'Kho Tổng Gia Lâm',
@@ -518,6 +524,19 @@ const DEFAULT_LOCATION_OPTIONS = [
   'Xưởng sản xuất số 1',
 ];
 
+export const DEFAULT_SUPPLIER_OPTIONS = [
+  'xưởng sỉ',
+  'Ba Vì Milk',
+  'Tập đoàn Tôn Hoa Sen',
+  'Nhà máy Posco',
+  'Formosa Plastics',
+  'Công ty Cổ phần Nhựa Tiền Phong',
+  'Tổng kho Tân Bình',
+  'Xưởng may Kim Động',
+  'Nhà máy Giấy Bãi Bằng',
+  'Công ty TNHH Cơ Khí & Vật Tư Xây Dựng Hà Nội',
+];
+
 // Khóa lưu trữ LocalStorage cho Danh mục Hàng hóa
 export const STOCKFLOW_GOODS_STORAGE_KEY = 'stockflow_goods_catalog_v1';
 
@@ -554,7 +573,21 @@ export const formatRealDateTime = (dateInput?: string | Date | null): string => 
     return dateInput;
   }
   try {
-    const d = typeof dateInput === 'string' ? new Date(dateInput) : dateInput;
+    let d: Date;
+    if (typeof dateInput === 'string') {
+      let isoStr = dateInput.trim();
+      // Nếu là ISO string (e.g. "2026-10-22T20:48:04.69192") từ C# UTC nhưng không có 'Z',
+      // bổ sung 'Z' để Date() chuyển đổi chính xác sang múi giờ địa phương của client (GMT+7 Việt Nam).
+      if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(isoStr) && !isoStr.endsWith('Z') && !/[+-]\d{2}(:\d{2})?$/.test(isoStr)) {
+        isoStr += 'Z';
+      }
+      d = new Date(isoStr);
+      if (isNaN(d.getTime())) {
+        d = new Date(dateInput);
+      }
+    } else {
+      d = dateInput;
+    }
     if (isNaN(d.getTime())) return String(dateInput);
     return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
   } catch {
@@ -562,18 +595,23 @@ export const formatRealDateTime = (dateInput?: string | Date | null): string => 
   }
 };
 
-// Lấy thời gian tạo chuẩn: từ item.createdAt, hoặc suy từ timestamp của ID, hoặc mặc định mẫu
+// Lấy thời gian tạo chuẩn: từ item.createdAt, hoặc suy từ timestamp của ID, hoặc thời gian thực hiện tại
 export const getItemCreatedTime = (item: GoodsItem): string => {
-  if (item.createdAt) {
+  if (item.createdAt && item.createdAt !== '23/09/2026 10:28') {
     return formatRealDateTime(item.createdAt);
   }
   if (item.id && /^G-\d{10,}$/.test(item.id)) {
     const ts = parseInt(item.id.replace('G-', ''), 10);
     if (!isNaN(ts)) {
-      return formatRealDateTime(new Date(ts));
+      const formatted = formatRealDateTime(new Date(ts));
+      item.createdAt = formatted;
+      return formatted;
     }
   }
-  return '23/09/2026 10:28';
+  // Nếu là mặt hàng mới tạo hoặc chưa lưu thời gian tạo, gán thời gian thực ngay tại thời điểm này
+  const nowTime = formatRealDateTime(new Date());
+  item.createdAt = nowTime;
+  return nowTime;
 };
 
 interface GoodsCatalogScreenProps {
@@ -611,7 +649,11 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
   });
   const suggestedProductCode = getNextProductCode(goods);
   const [search, setSearch] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState<'ALL' | 'LOW_STOCK'>('ALL');
+  const [categoryFilter, setCategoryFilter] = useState<'ALL' | 'LOW_STOCK' | 'STARRED'>('ALL');
+  // Quản lý tích ô vuông các mặt hàng được chọn
+  const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
+  // Menu thao tác hàng loạt
+  const [bulkActionMenuOpen, setBulkActionMenuOpen] = useState(false);
   
   // Đồng bộ chi nhánh kho từ Header / localStorage (Mặc định kho vật lý cụ thể, KHÔNG dùng "ALL")
   const [warehouseFilter, setWarehouseFilter] = useState<string>(() => {
@@ -690,6 +732,8 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
   const [formDimensionUnit, setFormDimensionUnit] = useState<string>('m');
   const [formImageUrl, setFormImageUrl] = useState('');
   const [formImages, setFormImages] = useState<string[]>([]);
+  const [formSupplier, setFormSupplier] = useState<string>('xưởng sỉ');
+  const [analyticsItem, setAnalyticsItem] = useState<GoodsItem | null>(null);
   const [isDraggingImage, setIsDraggingImage] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -793,9 +837,13 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
           let parsedUnits = p.units;
           let parsedAttributes = p.attributes;
           let parsedVariants = p.variants;
+          let parsedSupplier = p.supplier;
           if (p.variantsJson) {
             try {
               const vObj = JSON.parse(p.variantsJson);
+              if (vObj.supplier) {
+                parsedSupplier = vObj.supplier;
+              }
               if (vObj.units) {
                 parsedUnits = vObj.units.map((u: any) => ({
                   name: u.Name || u.name,
@@ -855,6 +903,8 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
             costPrice: Number(p.costPrice) || 0,
             barcode: p.barcode || '',
             status: p.status === 'INACTIVE' ? 'DISCONTINUED' : 'ACTIVE',
+            createdAt: p.createdAt ? formatRealDateTime(p.createdAt) : undefined,
+            supplier: p.supplier || parsedSupplier,
             weight: Number(p.weight) || 0,
             dimensions: parsedDims,
             locationName: p.locationName || undefined,
@@ -933,15 +983,22 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
             } catch {}
           }
 
-          const mergedDbItems = dbItems.map((dbItem) => {
+          const mergedDbItems: GoodsItem[] = dbItems.map((dbItem): GoodsItem => {
             const localMatch =
               localItemsMap.get(dbItem.code.toUpperCase()) ||
               localItemsMap.get(String(dbItem.id)) ||
               (dbItem.productId ? localItemsMap.get(String(dbItem.productId)) : undefined);
 
+            const finalCreatedAt = dbItem.createdAt || (localMatch?.createdAt && localMatch.createdAt !== '23/09/2026 10:28' ? localMatch.createdAt : undefined);
+            const isStarred = localMatch?.isStarred ?? dbItem.isStarred ?? false;
+            const finalSupplier = dbItem.supplier || localMatch?.supplier;
+
             if (localMatch) {
               return {
                 ...dbItem,
+                supplier: finalSupplier,
+                createdAt: finalCreatedAt || dbItem.createdAt,
+                isStarred,
                 stockByWarehouse: localMatch.stockByWarehouse && localMatch.stockByWarehouse.length > 0
                   ? localMatch.stockByWarehouse
                   : dbItem.stockByWarehouse,
@@ -951,7 +1008,12 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                 availableQuantity: localMatch.availableQuantity || dbItem.availableQuantity,
               };
             }
-            return dbItem;
+            return {
+              ...dbItem,
+              supplier: finalSupplier,
+              createdAt: finalCreatedAt || dbItem.createdAt,
+              isStarred,
+            };
           });
 
           // Giữ lại các sản phẩm được lưu ở localStorage mà database backend chưa kịp trả về
@@ -1302,6 +1364,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
     setFormWidth('');
     setFormLength('');
     setFormDimensionUnit('m');
+    setFormSupplier('xưởng sỉ');
     setFormImageUrl('');
     setFormImages([]);
     setFormDescription('');
@@ -1390,6 +1453,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
     setFormWidth(item.dimensions?.width ?? '');
     setFormLength(item.dimensions?.length ?? '');
     setFormDimensionUnit((item.dimensions?.unit as any) || 'm');
+    setFormSupplier(item.supplier || 'xưởng sỉ');
     setFormImageUrl(item.imageUrl || '');
     setFormImages(item.imageUrl ? [item.imageUrl] : []);
     setFormDescription(item.description || '');
@@ -1425,6 +1489,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
       category: item.category,
       subCategory: item.subCategory,
       brand: item.brand || '',
+      supplier: item.supplier || 'xưởng sỉ',
       uom: item.uom,
       spec: item.specification,
       standardPrice: item.standardPrice || 0,
@@ -1614,6 +1679,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
         formCategory !== editInitialSnapshot.category ||
         formSubCategory.trim() !== editInitialSnapshot.subCategory ||
         formBrand.trim() !== editInitialSnapshot.brand ||
+        formSupplier.trim() !== (editInitialSnapshot.supplier || '') ||
         formUom.trim() !== editInitialSnapshot.uom ||
         formSpec.trim() !== editInitialSnapshot.spec ||
         Number(formStandardPrice) !== Number(editInitialSnapshot.standardPrice) ||
@@ -1776,6 +1842,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
       barcode: formBarcode.trim() || `893600${Math.floor(1000000 + Math.random() * 9000000)}`,
       status: 'ACTIVE',
       createdAt: editingItem ? getItemCreatedTime(editingItem) : nowFormatted,
+      supplier: formSupplier.trim() || undefined,
       weight: Number(formWeight) || 0,
       dimensions: {
         width: Number(formWidth) || 0,
@@ -1824,6 +1891,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
       type: savedItem.category === 'Nguyên vật liệu' ? 'RAW_MATERIAL' : 'FINISHED',
       categoryName: savedItem.subCategory || savedItem.category,
       uom: savedItem.uom,
+      supplier: savedItem.supplier,
       standardPrice: savedItem.standardPrice,
       costPrice: savedItem.costPrice,
       minSafeStock: savedItem.minSafeStock,
@@ -1838,6 +1906,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
       imageUrl: savedItem.imageUrl,
       description: savedItem.description,
       initialStock: savedItem.stockQuantity,
+      createdAt: new Date().toISOString(),
       units: savedItem.units?.map((u) => ({
         name: u.name,
         conversionRate: u.conversionRate,
@@ -1880,6 +1949,9 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
           if (createRes) {
             savedItem.id = String(createRes.id || (createRes as any).productId || savedItem.id);
             savedItem.productId = (createRes as any).productId || (Number(createRes.id) ? Number(createRes.id) : Date.now());
+            if ((createRes as any).createdAt) {
+              savedItem.createdAt = formatRealDateTime((createRes as any).createdAt);
+            }
           }
           showToast(`Tạo mới hàng hóa thành công: ${savedItem.name}`);
         } catch (apiErr) {
@@ -1975,6 +2047,10 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
       if (stockInfo.minSafe <= 0 || stockInfo.actual >= stockInfo.minSafe) return false;
     }
 
+    if (categoryFilter === 'STARRED') {
+      if (!item.isStarred) return false;
+    }
+
     // Các mặt hàng hiển thị thì ở tất cả các kho đều giống nhau,
     // số lượng tồn kho sẽ thay đổi tương ứng theo chi nhánh được chọn.
     return true;
@@ -1982,6 +2058,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
 
   // KPI Metrics (Tính toán theo chi nhánh kho đang chọn)
   const totalSku = goods.length;
+  const starredCount = goods.filter((g) => g.isStarred).length;
   const lowStockCount = goods.filter((g) => {
     const stockInfo = getProductStockForWarehouse(g, warehouseFilter);
     return stockInfo.minSafe > 0 && stockInfo.actual < stockInfo.minSafe;
@@ -1994,6 +2071,107 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
     const stockInfo = getProductStockForWarehouse(g, warehouseFilter);
     return sum + stockInfo.reserved;
   }, 0);
+
+  // ─── Tích ô vuông (Checkbox Selection) ──────────────────────────────────
+  const handleToggleSelectItem = (id: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setSelectedItemIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  };
+
+  const handleToggleSelectAll = () => {
+    if (selectedItemIds.length === filteredGoods.length && filteredGoods.length > 0) {
+      setSelectedItemIds([]);
+    } else {
+      setSelectedItemIds(filteredGoods.map((g) => g.id));
+    }
+  };
+
+  const handleClearSelection = () => {
+    setSelectedItemIds([]);
+  };
+
+  // ─── Đánh dấu sao vàng / cam (Star / Bookmark) ──────────────────────────
+  const handleToggleStar = (itemId: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setGoods((prevGoods) => {
+      let isNowStarred = false;
+      const updated = prevGoods.map((g) => {
+        if (g.id === itemId) {
+          isNowStarred = !g.isStarred;
+          return { ...g, isStarred: isNowStarred };
+        }
+        return g;
+      });
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem(STOCKFLOW_GOODS_STORAGE_KEY, JSON.stringify(updated));
+        } catch {}
+      }
+      showToast(isNowStarred ? 'Đã đánh dấu sao mặt hàng (Quan tâm)' : 'Đã bỏ đánh dấu sao mặt hàng');
+      return updated;
+    });
+  };
+
+  // Bulk actions cho các mặt hàng được tích chọn
+  const handleBulkStar = (starVal: boolean) => {
+    if (selectedItemIds.length === 0) return;
+    setGoods((prevGoods) => {
+      const updated = prevGoods.map((g) => {
+        if (selectedItemIds.includes(g.id)) {
+          return { ...g, isStarred: starVal };
+        }
+        return g;
+      });
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem(STOCKFLOW_GOODS_STORAGE_KEY, JSON.stringify(updated));
+        } catch {}
+      }
+      return updated;
+    });
+    setBulkActionMenuOpen(false);
+    showToast(starVal ? `Đã gắn sao cho ${selectedItemIds.length} mặt hàng` : `Đã bỏ gắn sao cho ${selectedItemIds.length} mặt hàng`);
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedItemIds.length === 0) return;
+    if (!window.confirm(`Bạn có chắc chắn muốn xóa ${selectedItemIds.length} mặt hàng đã chọn khỏi cơ sở dữ liệu?`)) return;
+
+    for (const id of selectedItemIds) {
+      const it = goods.find((g) => g.id === id);
+      const numId = it?.productId || (Number(it?.id) ? Number(it?.id) : undefined);
+      if (numId) {
+        try {
+          await productService.deleteProduct(numId);
+        } catch {}
+      }
+    }
+
+    setGoods((prev) => {
+      const updated = prev.filter((g) => !selectedItemIds.includes(g.id));
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem(STOCKFLOW_GOODS_STORAGE_KEY, JSON.stringify(updated));
+        } catch {}
+      }
+      return updated;
+    });
+    setSelectedItemIds([]);
+    setBulkActionMenuOpen(false);
+    showToast(`Đã xóa ${selectedItemIds.length} mặt hàng thành công!`);
+  };
+
+  const handleBulkPrintBarcode = () => {
+    if (selectedItemIds.length === 0) return;
+    showToast(`Đang kết xuất và gửi lệnh in tem mã vạch cho ${selectedItemIds.length} mặt hàng...`);
+  };
+
+  const handleBulkExportExcel = () => {
+    if (selectedItemIds.length === 0) return;
+    showToast(`Đang kết xuất tệp Excel cho ${selectedItemIds.length} mặt hàng đã chọn...`);
+  };
 
   // Quick tag suggestions for attribute modal
   const getQuickTagOptions = (attrName: string) => {
@@ -2174,27 +2352,130 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
             />
           </div>
 
-          <div className="flex items-center p-1 bg-slate-100 rounded-lg text-xs font-medium text-slate-600">
-            <button
-              type="button"
-              onClick={() => setCategoryFilter('ALL')}
-              className={`px-3 py-1 rounded-md transition cursor-pointer ${
-                categoryFilter === 'ALL' ? 'bg-white text-blue-700 shadow-2xs font-bold' : 'hover:text-slate-900'
-              }`}
-            >
-              Tất cả ({totalSku})
-            </button>
-            <button
-              type="button"
-              onClick={() => setCategoryFilter('LOW_STOCK')}
-              className={`px-3 py-1 rounded-md transition cursor-pointer flex items-center gap-1 ${
-                categoryFilter === 'LOW_STOCK' ? 'bg-white text-rose-700 shadow-2xs font-bold' : 'text-rose-600 hover:text-rose-700'
-              }`}
-            >
-              <AlertTriangle size={13} className="text-rose-600" />
-              <span>Cảnh báo tồn thấp ({lowStockCount})</span>
-            </button>
-          </div>
+          {selectedItemIds.length > 0 ? (
+            /* Thanh Thao Tác Hàng Loạt Chuẩn KiotViet Khi Tích Chọn Ô Vuông (Ảnh 2) */
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-700 border border-blue-200 rounded-lg text-xs font-bold animate-in fade-in">
+                <span>Đã chọn {selectedItemIds.length}</span>
+                <button
+                  type="button"
+                  onClick={handleClearSelection}
+                  className="hover:text-blue-900 transition ml-0.5 cursor-pointer p-0.5 rounded hover:bg-blue-100"
+                  title="Bỏ chọn tất cả"
+                >
+                  <X size={13} />
+                </button>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleBulkExportExcel}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 transition cursor-pointer shadow-2xs"
+                title="Xuất Excel các mặt hàng đã chọn"
+              >
+                <FileSpreadsheet size={14} className="text-emerald-600" />
+                <span>Xuất file</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleBulkPrintBarcode}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 transition cursor-pointer shadow-2xs"
+                title="In tem mã vạch các mặt hàng đã chọn"
+              >
+                <Printer size={14} className="text-slate-600" />
+                <span>In tem mã</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  const first = goods.find((g) => selectedItemIds.includes(g.id));
+                  if (first) handleOpenInboundModal(first);
+                }}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 transition cursor-pointer shadow-2xs"
+                title="Nhập hàng cho các mặt hàng đã chọn"
+              >
+                <ArrowDownToLine size={14} className="text-blue-600" />
+                <span>Nhập hàng</span>
+              </button>
+
+              {/* Menu Thao Tác Khác (...) */}
+              <div className="relative inline-block text-left">
+                <button
+                  type="button"
+                  onClick={() => setBulkActionMenuOpen(!bulkActionMenuOpen)}
+                  className="h-8 w-8 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 flex items-center justify-center transition cursor-pointer shadow-2xs"
+                  title="Thao tác khác"
+                >
+                  <MoreHorizontal size={15} />
+                </button>
+
+                {bulkActionMenuOpen && (
+                  <div className="absolute left-0 mt-1.5 w-52 bg-white rounded-xl shadow-lg border border-slate-200 py-1.5 z-40 text-xs animate-in fade-in">
+                    <button
+                      type="button"
+                      onClick={() => handleBulkStar(true)}
+                      className="w-full text-left px-3.5 py-2 hover:bg-amber-50 text-slate-700 flex items-center gap-2 transition"
+                    >
+                      <Star size={14} className="text-amber-500 fill-amber-400" />
+                      <span>Đánh dấu sao đã chọn</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleBulkStar(false)}
+                      className="w-full text-left px-3.5 py-2 hover:bg-slate-50 text-slate-700 flex items-center gap-2 transition"
+                    >
+                      <Star size={14} className="text-slate-400" />
+                      <span>Bỏ đánh dấu sao đã chọn</span>
+                    </button>
+                    <div className="my-1 border-t border-slate-100" />
+                    <button
+                      type="button"
+                      onClick={handleBulkDelete}
+                      className="w-full text-left px-3.5 py-2 hover:bg-rose-50 text-rose-600 flex items-center gap-2 transition font-medium"
+                    >
+                      <Trash2 size={14} className="text-rose-500" />
+                      <span>Xóa các mục đã chọn</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center p-1 bg-slate-100 rounded-lg text-xs font-medium text-slate-600">
+              <button
+                type="button"
+                onClick={() => setCategoryFilter('ALL')}
+                className={`px-3 py-1 rounded-md transition cursor-pointer ${
+                  categoryFilter === 'ALL' ? 'bg-white text-blue-700 shadow-2xs font-bold' : 'hover:text-slate-900'
+                }`}
+              >
+                Tất cả ({totalSku})
+              </button>
+              <button
+                type="button"
+                onClick={() => setCategoryFilter(categoryFilter === 'STARRED' ? 'ALL' : 'STARRED')}
+                className={`px-3 py-1 rounded-md transition cursor-pointer flex items-center gap-1.5 ${
+                  categoryFilter === 'STARRED' ? 'bg-white text-amber-700 shadow-2xs font-bold' : 'text-slate-600 hover:text-amber-600'
+                }`}
+                title="Lọc các mặt hàng quan tâm được đánh dấu sao"
+              >
+                <Star size={13} className={categoryFilter === 'STARRED' ? 'text-amber-500 fill-amber-400' : 'text-slate-400'} />
+                <span>Đã gắn sao ({starredCount})</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setCategoryFilter('LOW_STOCK')}
+                className={`px-3 py-1 rounded-md transition cursor-pointer flex items-center gap-1 ${
+                  categoryFilter === 'LOW_STOCK' ? 'bg-white text-rose-700 shadow-2xs font-bold' : 'text-rose-600 hover:text-rose-700'
+                }`}
+              >
+                <AlertTriangle size={13} className="text-rose-600" />
+                <span>Cảnh báo tồn thấp ({lowStockCount})</span>
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="relative w-full sm:w-64 shrink-0">
@@ -2218,16 +2499,57 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
         </div>
       </div>
 
-      {/* 4. Bảng Danh Sách Hàng Hóa Chuẩn KiotViet Master-Detail (Ảnh 5) */}
+      {/* 4. Bảng Danh Sách Hàng Hóa Chuẩn KiotViet Master-Detail (Ảnh 1 & Ảnh 2) */}
       <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50/80 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                <th className="py-3 px-3 w-10 text-center">
-                  <input type="checkbox" className="rounded border-slate-300 text-blue-600 cursor-pointer" />
+                {/* 1. Tích ô vuông Header (Checkbox All / Indeterminate) */}
+                <th className="py-3 px-3 w-10 text-center select-none">
+                  {selectedItemIds.length > 0 && selectedItemIds.length < filteredGoods.length ? (
+                    <div
+                      onClick={handleToggleSelectAll}
+                      className="w-4 h-4 rounded bg-blue-600 border border-blue-600 text-white mx-auto cursor-pointer flex items-center justify-center shadow-2xs transition"
+                      title="Bỏ chọn tất cả"
+                    >
+                      <Minus size={12} strokeWidth={3} />
+                    </div>
+                  ) : selectedItemIds.length > 0 && selectedItemIds.length === filteredGoods.length ? (
+                    <div
+                      onClick={handleToggleSelectAll}
+                      className="w-4 h-4 rounded bg-blue-600 border border-blue-600 text-white mx-auto cursor-pointer flex items-center justify-center shadow-2xs transition"
+                      title="Bỏ chọn tất cả"
+                    >
+                      <Check size={12} strokeWidth={3} />
+                    </div>
+                  ) : (
+                    <div
+                      onClick={handleToggleSelectAll}
+                      className="w-4 h-4 rounded border border-slate-300 hover:border-blue-500 bg-white mx-auto cursor-pointer transition"
+                      title="Chọn tất cả"
+                    />
+                  )}
                 </th>
-                <th className="py-3 px-2 w-8 text-center"></th>
+
+                {/* 2. Dấu sao Header (☆ ▾) - Filter / Toggle Starred items */}
+                <th className="py-3 px-2 w-10 text-center select-none">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCategoryFilter(categoryFilter === 'STARRED' ? 'ALL' : 'STARRED');
+                    }}
+                    className="inline-flex items-center gap-0.5 text-slate-400 hover:text-amber-500 transition cursor-pointer p-0.5 rounded"
+                    title={categoryFilter === 'STARRED' ? "Hiển thị tất cả hàng hóa" : "Chỉ lọc hàng hóa đã đánh dấu sao quan tâm"}
+                  >
+                    <Star
+                      size={15}
+                      className={categoryFilter === 'STARRED' ? "text-amber-500 fill-amber-400" : "text-slate-400 hover:text-amber-400"}
+                    />
+                    <ChevronDown size={11} className={categoryFilter === 'STARRED' ? "text-amber-600" : "text-slate-400"} />
+                  </button>
+                </th>
+
                 <th className="py-3 px-2 w-12 text-center" title="Hình ảnh sản phẩm"></th>
                 <th className="py-3 px-4 min-w-[200px]">MÃ HÀNG</th>
                 <th className="py-3 px-4 min-w-[240px]">TÊN HÀNG</th>
@@ -2243,6 +2565,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
             <tbody className="divide-y divide-slate-100 text-xs">
               {filteredGoods.map((item) => {
                 const isExpanded = expandedRowId === item.id;
+                const isSelected = selectedItemIds.includes(item.id);
                 const hasVariants = item.variants && item.variants.length > 0;
                 const variantCount = hasVariants ? item.variants!.length : 0;
                 const itemStock = getProductStockForWarehouse(item, warehouseFilter);
@@ -2252,18 +2575,39 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                     {/* Dòng Hàng Hóa Chính */}
                     <tr
                       className={`hover:bg-blue-50/40 transition cursor-pointer select-none ${
+                        isSelected ? 'bg-blue-50/50 hover:bg-blue-50/70 border-l-2 border-l-blue-600' : ''
+                      } ${
                         isExpanded ? 'bg-blue-50/25 border-b border-blue-200/60' : ''
                       }`}
                       onClick={() => setExpandedRowId(isExpanded ? null : item.id)}
                     >
-                      {/* Checkbox */}
-                      <td className="py-3 px-3 text-center" onClick={(e) => e.stopPropagation()}>
-                        <input type="checkbox" className="rounded border-slate-300 text-blue-600 cursor-pointer" />
+                      {/* Checkbox dòng */}
+                      <td className="py-3 px-3 text-center" onClick={(e) => handleToggleSelectItem(item.id, e)}>
+                        {isSelected ? (
+                          <div className="w-4 h-4 rounded bg-blue-600 border border-blue-600 text-white mx-auto cursor-pointer flex items-center justify-center shadow-2xs">
+                            <Check size={12} strokeWidth={3} />
+                          </div>
+                        ) : (
+                          <div className="w-4 h-4 rounded border border-slate-300 hover:border-blue-500 bg-white mx-auto cursor-pointer transition" />
+                        )}
                       </td>
 
-                      {/* Icon Ngôi sao / Bookmark */}
-                      <td className="py-3 px-2 text-center" onClick={(e) => e.stopPropagation()}>
-                        <Star size={14} className="text-slate-300 hover:text-amber-400 transition cursor-pointer" />
+                      {/* Icon Ngôi sao / Bookmark vàng */}
+                      <td className="py-3 px-2 text-center" onClick={(e) => handleToggleStar(item.id, e)}>
+                        <button
+                          type="button"
+                          title={item.isStarred ? "Bỏ đánh dấu sao quan tâm" : "Đánh dấu sao quan tâm / yêu thích"}
+                          className="p-1 rounded hover:bg-amber-50/80 transition cursor-pointer"
+                        >
+                          <Star
+                            size={16}
+                            className={
+                              item.isStarred
+                                ? "text-amber-500 fill-amber-400 hover:text-amber-600 transition scale-110 drop-shadow-xs"
+                                : "text-slate-300 hover:text-amber-400 transition"
+                            }
+                          />
+                        </button>
                       </td>
 
                       {/* Ảnh Thumbnail Nhỏ Cạnh Tên / Mã Hàng (Chuẩn 100% Ảnh Chụp KiotViet) */}
@@ -2546,7 +2890,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                                       )}
                                       <button
                                         type="button"
-                                        onClick={() => showToast('Mở biểu đồ phân tích tiêu thụ SKU...')}
+                                        onClick={() => setAnalyticsItem(item)}
                                         className="text-blue-600 hover:text-blue-800 font-semibold inline-flex items-center gap-1 text-[11px] cursor-pointer"
                                       >
                                         <TrendingUp size={12} />
@@ -2614,6 +2958,14 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                                             ? `${item.dimensions.width} × ${item.dimensions.length} ${item.dimensions.unit}`
                                             : 'Chưa có'}
                                         </div>
+                                      </div>
+                                    </div>
+
+                                    {/* Khối Nhà cung cấp chuẩn theo ảnh thiết kế người dùng yêu cầu (Ảnh 1) */}
+                                    <div className="mt-3 p-3 rounded-lg bg-slate-50 border border-slate-200/80">
+                                      <div className="text-[11px] font-semibold text-slate-700">Nhà cung cấp</div>
+                                      <div className="text-sm font-medium text-slate-800 mt-1">
+                                        {item.supplier || 'xưởng sỉ'}
                                       </div>
                                     </div>
                                   </div>
@@ -3095,26 +3447,43 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                         </div>
                       </div>
 
-                      {/* Đơn vị tính cơ bản */}
-                      <div>
-                        <div className="flex items-center justify-between mb-1">
-                          <label className="font-semibold text-slate-700">
-                            Đơn vị tính cơ bản <span className="text-slate-400 font-normal">(Tự nhập / chọn)</span>
-                          </label>
-                          <span className="text-[10px] text-blue-600 font-medium">ĐVT</span>
+                      {/* Đơn vị tính cơ bản & Nhà cung cấp */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <div className="flex items-center justify-between mb-1">
+                            <label className="font-semibold text-slate-700">
+                              Đơn vị tính cơ bản <span className="text-slate-400 font-normal">(Tự nhập / chọn)</span>
+                            </label>
+                            <span className="text-[10px] text-blue-600 font-medium">ĐVT</span>
+                          </div>
+                          <CustomCombobox
+                            value={formUom}
+                            onChange={(val) => {
+                              setFormUom(val);
+                              // Đồng bộ tên đơn vị cơ bản trong units
+                              setFormUnits((prev) =>
+                                prev.map((u) => (u.isBase ? { ...u, name: val } : u))
+                              );
+                            }}
+                            options={DEFAULT_UOM_OPTIONS}
+                            placeholder="Nhập hoặc chọn ĐVT (VD: Hộp, Tấm, Kg...)"
+                          />
                         </div>
-                        <CustomCombobox
-                          value={formUom}
-                          onChange={(val) => {
-                            setFormUom(val);
-                            // Đồng bộ tên đơn vị cơ bản trong units
-                            setFormUnits((prev) =>
-                              prev.map((u) => (u.isBase ? { ...u, name: val } : u))
-                            );
-                          }}
-                          options={DEFAULT_UOM_OPTIONS}
-                          placeholder="Nhập hoặc chọn ĐVT (VD: Hộp, Tấm, Kg...)"
-                        />
+
+                        <div>
+                          <div className="flex items-center justify-between mb-1">
+                            <label className="font-semibold text-slate-700">
+                              Nhà cung cấp <span className="text-slate-400 font-normal">(Tự nhập / chọn)</span>
+                            </label>
+                            <span className="text-[10px] text-blue-600 font-medium">NCC</span>
+                          </div>
+                          <CustomCombobox
+                            value={formSupplier}
+                            onChange={setFormSupplier}
+                            options={DEFAULT_SUPPLIER_OPTIONS}
+                            placeholder="Nhập hoặc chọn NCC (VD: xưởng sỉ)..."
+                          />
+                        </div>
                       </div>
                     </div>
 
@@ -4472,6 +4841,17 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Modal Biểu Đồ Phân Tích Chuyên Sâu SKU Hàng Hóa */}
+      {analyticsItem && (
+        <SkuAnalyticsModal
+          item={analyticsItem}
+          isOpen={!!analyticsItem}
+          onClose={() => setAnalyticsItem(null)}
+          selectedWarehouse={warehouseFilter !== 'ALL' ? warehouseFilter : 'Toàn hệ thống'}
+          canViewCostPrice={canViewCostPrice}
+        />
       )}
     </div>
   );

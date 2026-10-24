@@ -78,6 +78,20 @@ public class GetProductsQueryHandler : IRequestHandler<GetProductsQuery, Result<
             var costPrice = p.MovingAverageCost ?? 0;
             var standardPrice = p.StandardPrice ?? (costPrice > 0 ? Math.Round(costPrice * 1.35m, 0) : 0);
 
+            string? supplier = null;
+            if (!string.IsNullOrEmpty(p.VariantsJson) && p.VariantsJson.Contains("supplier", StringComparison.OrdinalIgnoreCase))
+            {
+                try
+                {
+                    using var doc = System.Text.Json.JsonDocument.Parse(p.VariantsJson);
+                    if (doc.RootElement.TryGetProperty("supplier", out var supEl))
+                    {
+                        supplier = supEl.GetString();
+                    }
+                }
+                catch {}
+            }
+
             return new ProductDto(
                 Id: p.ProductId.ToString(),
                 ProductId: p.ProductId,
@@ -105,7 +119,8 @@ public class GetProductsQueryHandler : IRequestHandler<GetProductsQuery, Result<
                 ImageUrl: p.ImageUrl,
                 VariantsJson: p.VariantsJson,
                 Description: p.Description,
-                CreatedAt: p.CreatedAt
+                CreatedAt: p.CreatedAt,
+                Supplier: supplier
             );
         }).ToList();
 
