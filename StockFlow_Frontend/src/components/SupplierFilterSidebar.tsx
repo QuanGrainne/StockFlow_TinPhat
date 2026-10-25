@@ -1,12 +1,11 @@
-'use client';
-
 import React from 'react';
-import { RotateCcw, Building2, Wallet, Activity, MapPin } from 'lucide-react';
+import { RotateCcw, Building2, Wallet, Activity, MapPin, Warehouse } from 'lucide-react';
 import { SupplierFilterState } from '@/features/suppliers/types';
 
 interface SupplierFilterSidebarProps {
   state: SupplierFilterState;
   selectedLocation: string;
+  warehousesList?: { warehouseId: number; code: string; name: string }[];
   onChange: (patch: Partial<SupplierFilterState>) => void;
   onLocationChange: (loc: string) => void;
   onResetFilters: () => void;
@@ -25,6 +24,13 @@ const STATUS_OPTIONS: { label: string; value: SupplierFilterState['status'] }[] 
   { label: 'Ngừng giao dịch', value: 'INACTIVE' },
 ];
 
+const DEFAULT_WAREHOUSES = [
+  { warehouseId: 3, code: 'K001', name: 'Kho Tổng Gia Lâm' },
+  { warehouseId: 4, code: 'K002', name: 'Kho Đông Anh' },
+  { warehouseId: 5, code: 'K003', name: 'Kho Hà Đông' },
+  { warehouseId: 6, code: 'K004', name: 'Kho Hoàn Kiếm' },
+];
+
 const LOCATION_OPTIONS: { label: string; value: string }[] = [
   { label: 'Tất cả khu vực', value: 'ALL' },
   { label: 'Hà Nội', value: 'Hà Nội' },
@@ -36,13 +42,18 @@ const LOCATION_OPTIONS: { label: string; value: string }[] = [
 export default function SupplierFilterSidebar({
   state,
   selectedLocation,
+  warehousesList,
   onChange,
   onLocationChange,
   onResetFilters,
   isCollapsed = false,
 }: SupplierFilterSidebarProps) {
   const hasActiveFilter =
-    state.debtStatus !== 'ALL' || state.status !== 'ALL' || selectedLocation !== 'ALL' || state.search !== '';
+    state.debtStatus !== 'ALL' ||
+    state.status !== 'ALL' ||
+    state.warehouseId !== 'ALL' ||
+    selectedLocation !== 'ALL' ||
+    state.search !== '';
 
   return (
     <aside
@@ -126,7 +137,57 @@ export default function SupplierFilterSidebar({
           </div>
         </div>
 
-        {/* ── 3. Khu vực / Địa bàn ── */}
+        {/* ── 3. Chi nhánh / Kho nhập hàng ── */}
+        <div>
+          <div className="text-[13px] font-semibold text-slate-800 mb-2.5 flex items-center justify-between">
+            <span className="flex items-center gap-1.5">
+              <Warehouse size={15} className="text-slate-500" />
+              <span>Kho / Chi nhánh nhận</span>
+            </span>
+            {state.warehouseId !== 'ALL' && (
+              <span className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded font-medium">
+                Đang lọc
+              </span>
+            )}
+          </div>
+          <div className="space-y-2">
+            <label className="flex items-center gap-2.5 cursor-pointer group text-sm text-slate-700 hover:text-slate-900">
+              <input
+                type="radio"
+                name="warehouseFilter"
+                checked={state.warehouseId === 'ALL'}
+                onChange={() => onChange({ warehouseId: 'ALL' })}
+                className="accent-[#0071BA] h-4 w-4 cursor-pointer"
+              />
+              <span className={state.warehouseId === 'ALL' ? 'font-medium text-[#0071BA]' : ''}>
+                Tất cả chi nhánh (Toàn công ty)
+              </span>
+            </label>
+            {(warehousesList && warehousesList.length > 0 ? warehousesList : DEFAULT_WAREHOUSES).map((wh) => {
+              const checked = state.warehouseId === wh.warehouseId;
+              return (
+                <label
+                  key={wh.warehouseId}
+                  className="flex items-center gap-2.5 cursor-pointer group text-sm text-slate-700 hover:text-slate-900"
+                >
+                  <input
+                    type="radio"
+                    name="warehouseFilter"
+                    checked={checked}
+                    onChange={() => onChange({ warehouseId: wh.warehouseId })}
+                    className="accent-[#0071BA] h-4 w-4 cursor-pointer"
+                  />
+                  <div className="flex items-center justify-between flex-1">
+                    <span className={checked ? 'font-medium text-[#0071BA]' : ''}>{wh.name}</span>
+                    <span className="text-[10px] text-slate-400 font-mono bg-slate-100 px-1 rounded">{wh.code}</span>
+                  </div>
+                </label>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* ── 4. Khu vực / Địa bàn ── */}
         <div>
           <div className="text-[13px] font-semibold text-slate-800 mb-2.5 flex items-center gap-1.5">
             <MapPin size={15} className="text-slate-500" />

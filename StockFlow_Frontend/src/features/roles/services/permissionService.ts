@@ -454,10 +454,10 @@ export const NAVBAR_FEATURES: NavFeatureConfig[] = [
   },
   {
     id: 'feat-goods',
-    name: 'Danh mục hàng hóa',
-    desc: 'Quản trị danh mục sản phẩm, vật tư, đơn vị tính và thẻ kho',
+    name: 'Danh mục hàng hóa & Bảng giá',
+    desc: 'Quản trị danh mục sản phẩm, vật tư, đơn vị tính, thẻ kho và thiết lập bảng giá',
     moduleKey: 'GOODS',
-    tabIds: ['admin-goods', 'warehouse-goods', 'production-goods', 'goods-catalog'],
+    tabIds: ['admin-goods', 'admin-price-books', 'price-books', 'warehouse-goods', 'production-goods', 'goods-catalog'],
   },
   {
     id: 'feat-sales',

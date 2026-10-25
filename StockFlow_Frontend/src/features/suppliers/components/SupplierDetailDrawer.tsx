@@ -38,10 +38,12 @@ export default function SupplierDetailDrawer({
   const [detail, setDetail] = useState<SupplierDetail | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<string>('info');
+  const [receiptWarehouseFilter, setReceiptWarehouseFilter] = useState<number | 'ALL'>('ALL');
 
   useEffect(() => {
     if (isOpen && supplierId) {
       loadDetail(supplierId);
+      setReceiptWarehouseFilter('ALL');
     } else {
       setDetail(null);
     }
@@ -65,13 +67,19 @@ export default function SupplierDetailDrawer({
     await loadDetail(detail.partnerId);
   };
 
+  const filteredReceipts = React.useMemo(() => {
+    if (!detail) return [];
+    if (receiptWarehouseFilter === 'ALL') return detail.recentReceipts;
+    return detail.recentReceipts.filter((r) => r.warehouseId === receiptWarehouseFilter);
+  }, [detail, receiptWarehouseFilter]);
+
   if (!isOpen) return null;
 
   return (
     <Drawer
       open={isOpen}
       onClose={onClose}
-      width={680}
+      size={680}
       title={
         <div className="flex items-center justify-between pr-4">
           <div className="flex items-center gap-2">
@@ -232,6 +240,70 @@ export default function SupplierDetailDrawer({
                           {detail.address || <em className="text-slate-400 font-normal">Chưa cập nhật</em>}
                         </span>
                       </div>
+
+                      {/* ── Phân bổ Công nợ theo Chi nhánh / Kho ── */}
+                      {detail.warehouseBreakdown && detail.warehouseBreakdown.length > 0 && (
+                        <div className="pt-3 border-t border-slate-100">
+                          <div className="text-xs font-semibold text-slate-800 mb-2.5 flex items-center justify-between">
+                            <span className="flex items-center gap-1.5">
+                              <Warehouse size={14} className="text-[#0071BA]" />
+                              <span>Phân bổ Công nợ theo Chi nhánh / Kho ({detail.warehouseBreakdown.length} kho)</span>
+                            </span>
+                            <span className="text-[11px] font-normal text-slate-400">
+                              (Từ phiếu nhập phát sinh)
+                            </span>
+                          </div>
+                          <div className="space-y-2">
+                            {detail.warehouseBreakdown.map((wh) => {
+                              const percent =
+                                detail.totalPurchasedAmount > 0
+                                  ? Math.round((wh.totalPurchasedAmount / detail.totalPurchasedAmount) * 100)
+                                  : 0;
+                              return (
+                                <div
+                                  key={wh.warehouseId}
+                                  className="bg-slate-50 hover:bg-blue-50/30 border border-slate-200/80 rounded-lg p-2.5 text-xs transition"
+                                >
+                                  <div className="flex items-center justify-between mb-1">
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="font-semibold text-slate-800">{wh.warehouseName}</span>
+                                      <span className="font-mono text-[10px] text-slate-500 bg-white border border-slate-200 px-1 rounded">
+                                        {wh.warehouseCode}
+                                      </span>
+                                    </div>
+                                    <div className="text-right">
+                                      <span className="font-mono font-bold text-rose-600">
+                                        Nợ tại kho: {currencyFormatter.format(wh.branchPayableAmount)} đ
+                                      </span>
+                                    </div>
+                                  </div>
+                                  <div className="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden mb-1">
+                                    <div
+                                      className="bg-[#0071BA] h-1.5 rounded-full"
+                                      style={{ width: `${Math.min(100, Math.max(5, percent))}%` }}
+                                    />
+                                  </div>
+                                  <div className="flex items-center justify-between text-[11px] text-slate-500">
+                                    <span>
+                                      Tổng nhập hàng: {currencyFormatter.format(wh.totalPurchasedAmount)} đ ({percent}%)
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setReceiptWarehouseFilter(wh.warehouseId);
+                                        setActiveTab('receipts');
+                                      }}
+                                      className="text-[#0071BA] hover:underline cursor-pointer"
+                                    >
+                                      Xem {wh.receiptsCount} phiếu nhập →
+                                    </button>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ),
                 },
@@ -244,11 +316,43 @@ export default function SupplierDetailDrawer({
                     </span>
                   ),
                   children: (
-                    <div className="pt-2">
-                      {detail.recentReceipts.length === 0 ? (
+                    <div className="pt-2 space-y-2.5">
+                      {/* Filter by warehouse chips */}
+                      {detail.warehouseBreakdown && detail.warehouseBreakdown.length > 1 && (
+                        <div className="flex items-center gap-1.5 flex-wrap pb-1">
+                          <span className="text-xs text-slate-500 mr-1">Kho nhận:</span>
+                          <button
+                            type="button"
+                            onClick={() => setReceiptWarehouseFilter('ALL')}
+                            className={`px-2 py-0.5 rounded text-xs transition cursor-pointer ${
+                              receiptWarehouseFilter === 'ALL'
+                                ? 'bg-[#0071BA] text-white font-medium'
+                                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                            }`}
+                          >
+                            Tất cả ({detail.recentReceipts.length})
+                          </button>
+                          {detail.warehouseBreakdown.map((wh) => (
+                            <button
+                              key={wh.warehouseId}
+                              type="button"
+                              onClick={() => setReceiptWarehouseFilter(wh.warehouseId)}
+                              className={`px-2 py-0.5 rounded text-xs transition cursor-pointer ${
+                                receiptWarehouseFilter === wh.warehouseId
+                                  ? 'bg-[#0071BA] text-white font-medium'
+                                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                              }`}
+                            >
+                              {wh.warehouseName} ({wh.receiptsCount})
+                            </button>
+                          ))}
+                        </div>
+                      )}
+
+                      {filteredReceipts.length === 0 ? (
                         <div className="py-12 text-center text-xs text-slate-400 flex flex-col items-center gap-1.5">
                           <AlertCircle size={20} className="text-slate-300" />
-                          <span>Chưa có phát sinh phiếu nhập hàng nào từ nhà cung cấp này.</span>
+                          <span>Không tìm thấy phiếu nhập nào tại kho được chọn.</span>
                         </div>
                       ) : (
                         <div className="overflow-x-auto border border-slate-200 rounded-lg">
@@ -263,7 +367,7 @@ export default function SupplierDetailDrawer({
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
-                              {detail.recentReceipts.map((r) => (
+                              {filteredReceipts.map((r) => (
                                 <tr key={r.receiptId} className="hover:bg-blue-50/30">
                                   <td className="px-3 py-2 font-mono font-semibold text-[#0071BA]">
                                     {r.receiptNumber}
@@ -274,7 +378,10 @@ export default function SupplierDetailDrawer({
                                       : '—'}
                                   </td>
                                   <td className="px-3 py-2 text-slate-600">
-                                    {r.warehouseName || 'Kho Tổng'}
+                                    <span className="inline-flex items-center gap-1">
+                                      <Warehouse size={12} className="text-slate-400" />
+                                      <span>{r.warehouseName || 'Kho Tổng'}</span>
+                                    </span>
                                   </td>
                                   <td className="px-3 py-2 text-right font-mono font-semibold text-slate-900">
                                     {currencyFormatter.format(r.totalAmount)} đ

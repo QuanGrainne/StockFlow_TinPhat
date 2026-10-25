@@ -468,5 +468,177 @@ public static class DatabaseSeeder
             await context.SaveChangesAsync();
             await context.Database.ExecuteSqlRawAsync("SELECT setval(pg_get_serial_sequence('stockflow.mst_business_partners', 'partner_id'), COALESCE(MAX(partner_id), 1)) FROM stockflow.mst_business_partners;");
         }
+
+        // 9. Seed default price book "Bảng giá chung"
+        var defaultPriceBook = await context.MstPriceBooks.FirstOrDefaultAsync(pb => pb.IsDefault);
+        if (defaultPriceBook == null)
+        {
+            defaultPriceBook = new MstPriceBook
+            {
+                PriceBookCode = "BG000001",
+                PriceBookName = "Bảng giá chung",
+                IsActive = true,
+                IsDefault = true,
+                EffectiveFrom = DateTime.UtcNow.AddMonths(-1),
+                AllowUnlistedProducts = true,
+                WarnUnlistedProducts = false,
+                ScopeBranchType = "ALL",
+                ScopeCustomerType = "ALL",
+                ScopeUserType = "ALL",
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+            await context.MstPriceBooks.AddAsync(defaultPriceBook);
+            await context.SaveChangesAsync();
+
+            // Populate initial product prices from MstProducts.StandardPrice
+            var allProducts = await context.MstProducts.ToListAsync();
+            var priceItems = allProducts.Select(p => new DtlPriceBookItem
+            {
+                PriceBookId = defaultPriceBook.PriceBookId,
+                ProductId = p.ProductId,
+                Price = p.StandardPrice ?? (p.MovingAverageCost > 0 ? Math.Round(p.MovingAverageCost.Value * 1.35m, 0) : 0),
+                UpdatedAt = DateTime.UtcNow
+            }).ToList();
+
+            if (priceItems.Any())
+            {
+                await context.DtlPriceBookItems.AddRangeAsync(priceItems);
+                await context.SaveChangesAsync();
+            }
+        }
+
+        // Seed Initial Goods Receipts to reflect multi-branch debt breakdown
+        if (!await context.TrxGoodsReceipts.AnyAsync())
+        {
+            var initialReceipts = new List<TrxGoodsReceipt>
+            {
+                new()
+                {
+                    GrCode = "PNK-2026-001",
+                    ExternalPoNumber = "PO-NCC-001",
+                    PartnerId = 1,
+                    WarehouseId = 3,
+                    ReceivedBy = 4,
+                    ReceivedDate = seedTimestamp.AddDays(-5),
+                    Status = "COMPLETED",
+                    Notes = "Nhập tấm ốp Nano PVC đợt 1 về Kho Tổng Gia Lâm",
+                    DtlGoodsReceiptItems = new List<DtlGoodsReceiptItem>
+                    {
+                        new() { ProductId = 1, OrderedQty = 500, ReceivedQty = 500, AcceptedQty = 500, UnitLandedCost = 140000m }
+                    }
+                },
+                new()
+                {
+                    GrCode = "PNK-2026-002",
+                    ExternalPoNumber = "PO-NCC-002",
+                    PartnerId = 1,
+                    WarehouseId = 3,
+                    ReceivedBy = 4,
+                    ReceivedDate = seedTimestamp.AddDays(-3),
+                    Status = "COMPLETED",
+                    Notes = "Nhập bổ sung tấm ốp về Kho Tổng Gia Lâm",
+                    DtlGoodsReceiptItems = new List<DtlGoodsReceiptItem>
+                    {
+                        new() { ProductId = 1, OrderedQty = 200, ReceivedQty = 200, AcceptedQty = 200, UnitLandedCost = 150000m }
+                    }
+                },
+                new()
+                {
+                    GrCode = "PNK-2026-003",
+                    ExternalPoNumber = "PO-NCC-003",
+                    PartnerId = 1,
+                    WarehouseId = 4,
+                    ReceivedBy = 4,
+                    ReceivedDate = seedTimestamp.AddDays(-2),
+                    Status = "COMPLETED",
+                    Notes = "Giao hàng trực tiếp về Kho Đông Anh",
+                    DtlGoodsReceiptItems = new List<DtlGoodsReceiptItem>
+                    {
+                        new() { ProductId = 1, OrderedQty = 150, ReceivedQty = 150, AcceptedQty = 150, UnitLandedCost = 133333.33m }
+                    }
+                },
+                new()
+                {
+                    GrCode = "PNK-2026-004",
+                    ExternalPoNumber = "PO-NCC-004",
+                    PartnerId = 5,
+                    WarehouseId = 4,
+                    ReceivedBy = 4,
+                    ReceivedDate = seedTimestamp.AddDays(-7),
+                    Status = "COMPLETED",
+                    Notes = "Nhập tôn mạ kẽm cuộn tại Kho Đông Anh",
+                    DtlGoodsReceiptItems = new List<DtlGoodsReceiptItem>
+                    {
+                        new() { ProductId = 1, OrderedQty = 2000, ReceivedQty = 2000, AcceptedQty = 2000, UnitLandedCost = 100000m }
+                    }
+                },
+                new()
+                {
+                    GrCode = "PNK-2026-005",
+                    ExternalPoNumber = "PO-NCC-005",
+                    PartnerId = 5,
+                    WarehouseId = 4,
+                    ReceivedBy = 4,
+                    ReceivedDate = seedTimestamp.AddDays(-1),
+                    Status = "COMPLETED",
+                    Notes = "Đợt nhập thép thứ 2",
+                    DtlGoodsReceiptItems = new List<DtlGoodsReceiptItem>
+                    {
+                        new() { ProductId = 1, OrderedQty = 1100, ReceivedQty = 1100, AcceptedQty = 1100, UnitLandedCost = 100000m }
+                    }
+                },
+                new()
+                {
+                    GrCode = "PNK-2026-006",
+                    ExternalPoNumber = "PO-NCC-006",
+                    PartnerId = 4,
+                    WarehouseId = 3,
+                    ReceivedBy = 4,
+                    ReceivedDate = seedTimestamp.AddDays(-4),
+                    Status = "COMPLETED",
+                    Notes = "Giao hàng tại Kho Tổng Gia Lâm",
+                    DtlGoodsReceiptItems = new List<DtlGoodsReceiptItem>
+                    {
+                        new() { ProductId = 1, OrderedQty = 500, ReceivedQty = 500, AcceptedQty = 500, UnitLandedCost = 100000m }
+                    }
+                },
+                new()
+                {
+                    GrCode = "PNK-2026-007",
+                    ExternalPoNumber = "PO-NCC-007",
+                    PartnerId = 4,
+                    WarehouseId = 5,
+                    ReceivedBy = 4,
+                    ReceivedDate = seedTimestamp.AddDays(-2),
+                    Status = "COMPLETED",
+                    Notes = "Giao hàng tại Kho Hà Đông",
+                    DtlGoodsReceiptItems = new List<DtlGoodsReceiptItem>
+                    {
+                        new() { ProductId = 1, OrderedQty = 365, ReceivedQty = 365, AcceptedQty = 365, UnitLandedCost = 100000m }
+                    }
+                },
+                new()
+                {
+                    GrCode = "PNK-2026-008",
+                    ExternalPoNumber = "PO-NCC-008",
+                    PartnerId = 6,
+                    WarehouseId = 6,
+                    ReceivedBy = 4,
+                    ReceivedDate = seedTimestamp.AddDays(-3),
+                    Status = "COMPLETED",
+                    Notes = "Giao phụ gia tại Kho Hoàn Kiếm",
+                    DtlGoodsReceiptItems = new List<DtlGoodsReceiptItem>
+                    {
+                        new() { ProductId = 1, OrderedQty = 182, ReceivedQty = 182, AcceptedQty = 182, UnitLandedCost = 100000m }
+                    }
+                }
+            };
+
+            await context.TrxGoodsReceipts.AddRangeAsync(initialReceipts);
+            await context.SaveChangesAsync();
+            await context.Database.ExecuteSqlRawAsync("SELECT setval(pg_get_serial_sequence('stockflow.trx_goods_receipts', 'gr_id'), COALESCE(MAX(gr_id), 1)) FROM stockflow.trx_goods_receipts;");
+        }
     }
 }
+

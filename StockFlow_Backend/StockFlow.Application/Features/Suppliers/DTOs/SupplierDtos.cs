@@ -3,6 +3,15 @@ namespace StockFlow.Application.Features.Suppliers.DTOs;
 /// <summary>
 /// DTO đại diện cho một Nhà cung cấp trong danh sách.
 /// </summary>
+public record WarehouseDebtBreakdownDto(
+    int WarehouseId,
+    string WarehouseCode,
+    string WarehouseName,
+    decimal TotalPurchasedAmount,
+    decimal BranchPayableAmount,
+    int ReceiptsCount
+);
+
 public record SupplierDto(
     string Id,
     int PartnerId,
@@ -15,7 +24,9 @@ public record SupplierDto(
     decimal CreditLimit,
     decimal CurrentPayable,
     decimal CurrentDebt,
-    string Status
+    string Status,
+    decimal? BranchPayable = null,
+    int? BranchReceiptsCount = null
 );
 
 /// <summary>
@@ -25,6 +36,7 @@ public record SupplierRecentReceiptDto(
     int ReceiptId,
     string ReceiptNumber,
     DateTime? ReceiptDate,
+    int? WarehouseId,
     string? WarehouseName,
     decimal TotalAmount,
     string? Status
@@ -48,7 +60,8 @@ public record SupplierDetailDto(
     string Status,
     int TotalReceiptsCount,
     decimal TotalPurchasedAmount,
-    List<SupplierRecentReceiptDto> RecentReceipts
+    List<SupplierRecentReceiptDto> RecentReceipts,
+    List<WarehouseDebtBreakdownDto> WarehouseBreakdown
 );
 
 /// <summary>

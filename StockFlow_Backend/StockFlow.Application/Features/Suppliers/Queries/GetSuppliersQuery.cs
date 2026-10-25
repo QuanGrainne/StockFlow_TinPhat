@@ -12,7 +12,8 @@ namespace StockFlow.Application.Features.Suppliers.Queries;
 public record GetSuppliersQuery(
     string? Search = null,
     string? DebtStatus = null,
-    string? Status = null
+    string? Status = null,
+    int? WarehouseId = null
 ) : IRequest<Result<List<SupplierDto>>>;
 
 public class GetSuppliersQueryHandler : IRequestHandler<GetSuppliersQuery, Result<List<SupplierDto>>>
@@ -70,26 +71,80 @@ public class GetSuppliersQueryHandler : IRequestHandler<GetSuppliersQuery, Resul
             }
         }
 
-        // 5. Sắp xếp danh sách
+        // 5. Lọc theo Chi nhánh / Kho nhập hàng (nếu có chọn kho)
+        Dictionary<int, (decimal TotalPurchased, int ReceiptCount)> branchStats = new();
+        if (query.WarehouseId.HasValue && query.WarehouseId.Value > 0)
+        {
+            var targetWhId = query.WarehouseId.Value;
+            var partnerIdsInWh = await _context.TrxGoodsReceipts
+                .Where(r => r.WarehouseId == targetWhId)
+                .Select(r => r.PartnerId)
+                .Distinct()
+                .ToListAsync(cancellationToken);
+
+            dbQuery = dbQuery.Where(p => partnerIdsInWh.Contains(p.PartnerId));
+
+            // Tính số tiền nhập và số phiếu tại kho này
+            var receiptsInWh = await _context.TrxGoodsReceipts
+                .Include(r => r.DtlGoodsReceiptItems)
+                .Where(r => r.WarehouseId == targetWhId)
+                .AsNoTracking()
+                .ToListAsync(cancellationToken);
+
+            branchStats = receiptsInWh
+                .GroupBy(r => r.PartnerId)
+                .ToDictionary(
+                    g => g.Key,
+                    g => (
+                        TotalPurchased: g.Sum(r => r.DtlGoodsReceiptItems.Sum(i => (i.ReceivedQty ?? 0) * (i.UnitLandedCost ?? 0))),
+                        ReceiptCount: g.Count()
+                    )
+                );
+        }
+
+        // 6. Sắp xếp danh sách
         var partners = await dbQuery
             .OrderBy(p => p.PartnerId)
             .ToListAsync(cancellationToken);
 
-        // 6. Map sang DTO
-        var dtos = partners.Select(p => new SupplierDto(
-            Id: p.PartnerId.ToString(),
-            PartnerId: p.PartnerId,
-            Code: p.PartnerCode ?? $"NCC{p.PartnerId:D6}",
-            Name: p.PartnerName ?? "",
-            Type: p.PartnerType ?? "SUPPLIER",
-            Phone: p.Phone,
-            Email: p.Email,
-            Address: p.Address,
-            CreditLimit: p.CreditLimit ?? 0m,
-            CurrentPayable: p.CurrentPayable ?? 0m,
-            CurrentDebt: p.CurrentDebt ?? 0m,
-            Status: p.IsActive != false ? "ACTIVE" : "INACTIVE"
-        )).ToList();
+        // 7. Map sang DTO
+        var dtos = partners.Select(p =>
+        {
+            decimal? branchPayable = null;
+            int? branchReceiptsCount = null;
+
+            if (query.WarehouseId.HasValue && query.WarehouseId.Value > 0)
+            {
+                if (branchStats.TryGetValue(p.PartnerId, out var stat))
+                {
+                    // Công nợ theo chi nhánh được phản ánh từ giá trị phát sinh của kho đó
+                    branchPayable = stat.TotalPurchased;
+                    branchReceiptsCount = stat.ReceiptCount;
+                }
+                else
+                {
+                    branchPayable = 0m;
+                    branchReceiptsCount = 0;
+                }
+            }
+
+            return new SupplierDto(
+                Id: p.PartnerId.ToString(),
+                PartnerId: p.PartnerId,
+                Code: p.PartnerCode ?? $"NCC{p.PartnerId:D6}",
+                Name: p.PartnerName ?? "",
+                Type: p.PartnerType ?? "SUPPLIER",
+                Phone: p.Phone,
+                Email: p.Email,
+                Address: p.Address,
+                CreditLimit: p.CreditLimit ?? 0m,
+                CurrentPayable: p.CurrentPayable ?? 0m,
+                CurrentDebt: p.CurrentDebt ?? 0m,
+                Status: p.IsActive != false ? "ACTIVE" : "INACTIVE",
+                BranchPayable: branchPayable,
+                BranchReceiptsCount: branchReceiptsCount
+            );
+        }).ToList();
 
         return Result.Success(dtos);
     }
