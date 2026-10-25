@@ -171,8 +171,17 @@ public class CreateProductCommandHandler : IRequestHandler<CreateProductCommand,
             int warehouseId = req.InitialWarehouseId ?? 0;
             if (warehouseId <= 0)
             {
-                var firstWarehouse = await _context.MstWarehouses.FirstOrDefaultAsync(cancellationToken);
-                warehouseId = firstWarehouse?.WarehouseId ?? 1;
+                if (_currentUserService.IsAuthenticated && !_currentUserService.IsAdmin)
+                {
+                    var authorizedIds = await _currentUserService.GetAuthorizedWarehouseIdsAsync(cancellationToken);
+                    warehouseId = authorizedIds.FirstOrDefault();
+                }
+
+                if (warehouseId <= 0)
+                {
+                    var firstWarehouse = await _context.MstWarehouses.FirstOrDefaultAsync(w => w.IsActive == true, cancellationToken);
+                    warehouseId = firstWarehouse?.WarehouseId ?? 1;
+                }
             }
 
             // Kiểm tra phân quyền truy cập kho đối với tài khoản nhân sự

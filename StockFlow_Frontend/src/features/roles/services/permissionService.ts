@@ -65,6 +65,7 @@ export const permissionService = {
           .filter((w: any) => w.isActive !== false && w.status !== 'INACTIVE')
           .map((w: any, index: number) => ({
             id: w.code || (w.warehouseId ? `FAC-${w.warehouseId}` : `FAC-${index + 1}`),
+            warehouseId: typeof w.warehouseId === 'number' ? w.warehouseId : (w.id ? Number(String(w.id).replace(/\D/g, '')) : undefined),
             code: (w.code || w.warehouseCode || `WH-${w.warehouseId}`).toUpperCase(),
             name: w.name || w.warehouseName || `Kho #${w.warehouseId}`,
             address: w.address || 'Hà Nội, Việt Nam',
@@ -115,6 +116,7 @@ export const permissionService = {
           .filter((w: any) => w.isActive !== false && w.status !== 'INACTIVE')
           .map((w: any, index: number) => ({
             id: w.code || (w.warehouseId ? `FAC-${w.warehouseId}` : `FAC-${index + 1}`),
+            warehouseId: typeof w.warehouseId === 'number' ? w.warehouseId : (w.id ? Number(String(w.id).replace(/\D/g, '')) : undefined),
             code: (w.code || w.warehouseCode || `WH-${w.warehouseId}`).toUpperCase(),
             name: w.name || w.warehouseName || `Kho #${w.warehouseId}`,
             address: w.address || 'Hà Nội, Việt Nam',

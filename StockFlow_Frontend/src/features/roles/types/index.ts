@@ -390,6 +390,7 @@ export interface StaffAccount {
 
 export interface WarehouseFacility {
   id: string;
+  warehouseId?: number;
   code: string;           // WH-HN-01, WH-HN-02, WH-HN-03, WH-HN-04
   name: string;           // Kho Tổng Gia Lâm, Kho Đông Anh, Kho Hà Đông, Kho Hoàn Kiếm
   address: string;

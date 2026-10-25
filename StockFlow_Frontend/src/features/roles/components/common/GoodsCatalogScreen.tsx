@@ -1196,8 +1196,14 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
         (w.warehouseCode && w.warehouseCode.trim().toLowerCase() === norm)
     );
 
-    const actual = entry ? Number(entry.actualStock) || 0 : 0;
-    const available = entry ? Number(entry.availableStock) || 0 : 0;
+    const isCreationWh = norm === (item.warehouse || '').trim().toLowerCase();
+    const hasWarehouseList = item.stockByWarehouse && item.stockByWarehouse.length > 0;
+    const actual = entry
+      ? Number(entry.actualStock) || 0
+      : (!hasWarehouseList && isCreationWh ? Number(item.stockQuantity) || 0 : 0);
+    const available = entry
+      ? Number(entry.availableStock) || 0
+      : (!hasWarehouseList && isCreationWh ? Number(item.availableQuantity ?? item.stockQuantity) || 0 : 0);
     const reserved = Math.max(0, actual - available);
     // Nếu kho này chưa có tồn kho và không có giá vốn riêng, giá vốn = 0 theo chuẩn kho độc lập
     const costPrice = entry?.costPrice !== undefined
@@ -1208,7 +1214,6 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
       : (item.standardPrice || 0);
 
     // Định mức tồn kho: chỉ áp dụng cho kho tạo/kho được thiết lập, các kho khác mặc định = 0
-    const isCreationWh = norm === (item.warehouse || '').trim().toLowerCase();
     const minSafe = isCreationWh
       ? (entry?.minSafeStock !== undefined ? Number(entry.minSafeStock) || 0 : (item.minSafeStock || 0))
       : (entry?.minSafeStock !== undefined && entry.minSafeStock !== item.minSafeStock ? Number(entry.minSafeStock) || 0 : 0);
@@ -1963,6 +1968,13 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
     };
 
     // Chuẩn bị payload chuẩn gửi đến backend ASP.NET Core & MediatR
+    const activeFac: any = targetFacilities.find(
+      (f) =>
+        f.name.trim().toLowerCase() === activeWh.trim().toLowerCase() ||
+        (f.code && f.code.trim().toLowerCase() === activeWh.trim().toLowerCase())
+    );
+    const numericWhId = activeFac?.warehouseId || (activeFac?.id && Number(String(activeFac.id).replace(/\D/g, '')) ? Number(String(activeFac.id).replace(/\D/g, '')) : undefined);
+
     const apiPayload: any = {
       code: savedItem.code,
       name: savedItem.name,
@@ -1984,6 +1996,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
       imageUrl: savedItem.imageUrl,
       description: savedItem.description,
       initialStock: savedItem.stockQuantity,
+      initialWarehouseId: numericWhId,
       createdAt: new Date().toISOString(),
       units: savedItem.units?.map((u) => ({
         name: u.name,
