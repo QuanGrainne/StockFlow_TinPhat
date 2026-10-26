@@ -388,11 +388,13 @@ export interface StaffAccount {
 
 export interface WarehouseFacility {
   id: string;
-  code: string;           // WH-HN-01, WH-HN-02, WH-HN-03, WH-HN-04
+  warehouseId?: number;
+  code: string;           // K001, K002, K003, K004
   name: string;           // Kho Tổng Gia Lâm, Kho Đông Anh, Kho Hà Đông, Kho Hoàn Kiếm
   address: string;
   staffCount: number;
   area: string;           // 8,500 m²
+  description?: string;
   status: 'ACTIVE' | 'INACTIVE';
 }
 
