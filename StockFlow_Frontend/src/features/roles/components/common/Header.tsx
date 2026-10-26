@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { adminService } from '../../services/adminService';
 import { useRouter } from 'next/navigation';
+import { TIN_PHAT_WAREHOUSES, setActiveWarehouseGlobal } from '@/lib/warehouse/useActiveWarehouse';
 
 interface HeaderProps {
   currentRole: UserRole;
@@ -219,13 +220,21 @@ export const Header: React.FC<HeaderProps> = ({
         setUserWarehouseAccess(normalized);
       }
     };
+    const handleActiveWarehouseSync = (e: any) => {
+      const wh = e.detail;
+      if (wh && wh.name && wh.name !== selectedBranch) {
+        setSelectedBranch(wh.name);
+      }
+    };
     window.addEventListener('stockflow_branch_changed', handleBranchSync);
+    window.addEventListener('stockflow:warehouse-changed', handleActiveWarehouseSync);
     window.addEventListener('stockflow_user_updated', handleUserSync);
     return () => {
       window.removeEventListener('stockflow_branch_changed', handleBranchSync);
+      window.removeEventListener('stockflow:warehouse-changed', handleActiveWarehouseSync);
       window.removeEventListener('stockflow_user_updated', handleUserSync);
     };
-  }, [currentRole]);
+  }, [currentRole, selectedBranch]);
 
   // Kiểm tra quyền Admin (Chỉ tài khoản Quản trị viên hệ thống mới xem 100% kho nếu không có cấu hình kho cụ thể)
   const isSystemAdminUser =
@@ -307,6 +316,15 @@ export const Header: React.FC<HeaderProps> = ({
           },
         })
       );
+      const matchingWh = TIN_PHAT_WAREHOUSES.find(
+        (w) =>
+          w.name.toLowerCase() === branchName.toLowerCase() ||
+          (fac?.code && w.code.toLowerCase() === fac.code.toLowerCase()) ||
+          (fac?.name && w.name.toLowerCase() === fac.name.toLowerCase())
+      );
+      if (matchingWh) {
+        setActiveWarehouseGlobal(matchingWh);
+      }
     }
     setBranchDropdownOpen(false);
   };

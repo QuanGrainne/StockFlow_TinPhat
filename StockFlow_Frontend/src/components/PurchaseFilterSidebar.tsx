@@ -1,10 +1,12 @@
 'use client';
 
-import { Calendar, ChevronDown, ChevronRight, ChevronUp, X } from 'lucide-react';
-import { useEffect, useId, useRef, useState } from 'react';
+import { Calendar, ChevronDown, ChevronRight, ChevronUp, Search, X, Check } from 'lucide-react';
+import { useEffect, useId, useRef, useState, useMemo } from 'react';
 import type { PurchaseFilterState, PurchaseStatus } from '@/app/(dashboard)/purchases/PurchasesClient';
 import DateRangePickerPopover, { formatDateVN } from '@/components/DateRangePickerPopover';
 import PeriodPickerPopover from '@/components/PeriodPickerPopover';
+import { WarehouseItem } from '@/lib/warehouse/useActiveWarehouse';
+import { Supplier } from '@/features/suppliers/types';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -12,6 +14,9 @@ type PurchaseFilterSidebarProps = {
   state: PurchaseFilterState;
   onChange: (patch: Partial<PurchaseFilterState>) => void;
   isCollapsed?: boolean;
+  warehouses?: WarehouseItem[];
+  suppliers?: Supplier[];
+  activeWarehouse?: WarehouseItem;
 };
 
 // ─── Status options ───────────────────────────────────────────────────────────
@@ -24,16 +29,29 @@ const STATUS_OPTIONS: { label: string; value: PurchaseStatus }[] = [
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-export default function PurchaseFilterSidebar({ state, onChange, isCollapsed = false }: PurchaseFilterSidebarProps) {
+export default function PurchaseFilterSidebar({
+  state,
+  onChange,
+  isCollapsed = false,
+  warehouses = [],
+  suppliers = [],
+  activeWarehouse,
+}: PurchaseFilterSidebarProps) {
   const timeRangeRadioName = `purchase-time-range-${useId()}`;
   const [periodPopoverOpen, setPeriodPopoverOpen] = useState(false);
   const [dateRangeOpen, setDateRangeOpen] = useState(false);
+  const [supplierSearchOpen, setSupplierSearchOpen] = useState(false);
+  const [supplierSearchKeyword, setSupplierSearchKeyword] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
+  const supplierRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         setDateRangeOpen(false);
+      }
+      if (supplierRef.current && !supplierRef.current.contains(e.target as Node)) {
+        setSupplierSearchOpen(false);
       }
     }
     document.addEventListener('mousedown', handleClickOutside);
@@ -49,6 +67,15 @@ export default function PurchaseFilterSidebar({ state, onChange, isCollapsed = f
     onChange({ statuses: next });
   }
 
+  // Toggle warehouse checkbox (KiotViet multi-branch selection)
+  function toggleWarehouse(whId: number) {
+    const current = state.warehouseIds || (activeWarehouse?.warehouseId ? [activeWarehouse.warehouseId] : []);
+    const next = current.includes(whId)
+      ? current.filter((id) => id !== whId)
+      : [...current, whId];
+    onChange({ warehouseIds: next.length > 0 ? next : undefined });
+  }
+
   function activateTimeRange(timeRange: PurchaseFilterState['timeRange']) {
     onChange({ timeRange });
     if (timeRange === 'this_month') {
@@ -61,11 +88,25 @@ export default function PurchaseFilterSidebar({ state, onChange, isCollapsed = f
     setPeriodPopoverOpen(false);
   }
 
+  // Filtered suppliers by search
+  const filteredSuppliers = useMemo(() => {
+    const kw = supplierSearchKeyword.trim().toLowerCase();
+    if (!kw) return suppliers.slice(0, 8);
+    return suppliers.filter(
+      (s) => s.name.toLowerCase().includes(kw) || s.code.toLowerCase().includes(kw)
+    ).slice(0, 10);
+  }, [suppliers, supplierSearchKeyword]);
+
+  const selectedSupplierObj = useMemo(() => {
+    if (!state.partnerId) return null;
+    return suppliers.find((s) => Number(s.id) === state.partnerId) || null;
+  }, [suppliers, state.partnerId]);
+
   return (
     <aside
       ref={containerRef}
       className={`relative shrink-0 bg-white border-r border-[#e5e7eb] select-none text-[#262626] transition-all duration-300 ${
-        isCollapsed ? 'w-0 overflow-hidden px-0 py-0' : 'w-[260px] overflow-visible px-4 py-5'
+        isCollapsed ? 'w-0 overflow-hidden px-0 py-0' : 'w-[260px] overflow-y-auto max-h-[calc(100vh-56px)] px-4 py-5'
       }`}
     >
       {/* Title */}
@@ -73,9 +114,52 @@ export default function PurchaseFilterSidebar({ state, onChange, isCollapsed = f
         Nhập hàng
       </h2>
 
-      <div className="space-y-5">
+      <div className="space-y-5 text-xs">
 
-        {/* ── 1. Trạng thái ── */}
+        {/* ── 1. Chi nhánh (Kho hàng) - Chuẩn KiotViet Đa Kho ── */}
+        <div>
+          <div className="text-[13px] font-semibold text-slate-800 mb-2 flex items-center justify-between">
+            <span>Chi nhánh / Kho</span>
+            {state.warehouseIds && state.warehouseIds.length > 0 && (
+              <button
+                type="button"
+                onClick={() => onChange({ warehouseIds: undefined })}
+                className="text-[11px] text-blue-600 hover:underline font-normal"
+              >
+                Mặc định
+              </button>
+            )}
+          </div>
+          <div className="space-y-1.5">
+            {warehouses.map((wh) => {
+              const isChecked = state.warehouseIds
+                ? state.warehouseIds.includes(wh.warehouseId)
+                : activeWarehouse?.warehouseId === wh.warehouseId;
+
+              return (
+                <label
+                  key={wh.warehouseId}
+                  className="flex items-center gap-2.5 cursor-pointer group"
+                >
+                  <input
+                    type="checkbox"
+                    checked={isChecked}
+                    onChange={() => toggleWarehouse(wh.warehouseId)}
+                    className="h-4 w-4 rounded border-slate-300 accent-[#0071BA] cursor-pointer"
+                  />
+                  <span className="text-[13px] text-slate-700 group-hover:text-slate-900 transition truncate" title={wh.name}>
+                    {wh.name}
+                  </span>
+                </label>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Divider */}
+        <div className="border-t border-[#e5e7eb]" />
+
+        {/* ── 2. Trạng thái ── */}
         <div>
           <div className="text-[13px] font-semibold text-slate-800 mb-2">
             Trạng thái
@@ -106,7 +190,7 @@ export default function PurchaseFilterSidebar({ state, onChange, isCollapsed = f
         {/* Divider */}
         <div className="border-t border-[#e5e7eb]" />
 
-        {/* ── 2. Thời gian ── */}
+        {/* ── 3. Thời gian ── */}
         <div>
           <div className="text-[13px] font-semibold text-slate-800 mb-2">
             Thời gian
@@ -154,7 +238,7 @@ export default function PurchaseFilterSidebar({ state, onChange, isCollapsed = f
                 </button>
               </div>
 
-              {/* Period Picker Popover matching Image 1 */}
+              {/* Period Picker Popover */}
               <PeriodPickerPopover
                 open={periodPopoverOpen}
                 selectedPeriod={state.periodLabel || 'Tháng này'}
@@ -216,7 +300,7 @@ export default function PurchaseFilterSidebar({ state, onChange, isCollapsed = f
                 </button>
               </div>
 
-              {/* Dual-calendar Date Range Popover matching screenshot */}
+              {/* Dual-calendar Date Range Popover */}
               <DateRangePickerPopover
                 key={`${dateRangeOpen}-${state.dateFrom ?? ''}-${state.dateTo ?? ''}`}
                 open={dateRangeOpen}
@@ -239,7 +323,109 @@ export default function PurchaseFilterSidebar({ state, onChange, isCollapsed = f
         {/* Divider */}
         <div className="border-t border-[#e5e7eb]" />
 
-        {/* ── 3. Người tạo ── */}
+        {/* ── 4. Nhà cung cấp ── */}
+        <div ref={supplierRef}>
+          <div className="text-[13px] font-semibold text-slate-800 mb-2 flex items-center justify-between">
+            <span>Nhà cung cấp</span>
+            {state.partnerId && (
+              <button
+                type="button"
+                onClick={() => onChange({ partnerId: undefined })}
+                className="text-[11px] text-blue-600 hover:underline font-normal"
+              >
+                Xóa lọc
+              </button>
+            )}
+          </div>
+
+          <div className="relative">
+            <div
+              onClick={() => setSupplierSearchOpen((v) => !v)}
+              className={`h-[34px] px-3 bg-white border rounded-[6px] flex items-center justify-between text-[13px] cursor-pointer transition ${
+                supplierSearchOpen
+                  ? 'border-blue-500 ring-2 ring-blue-100 shadow-xs'
+                  : 'border-slate-300 hover:border-slate-400'
+              }`}
+            >
+              <span className={selectedSupplierObj ? 'text-slate-800 font-medium truncate' : 'text-slate-400 truncate'}>
+                {selectedSupplierObj ? selectedSupplierObj.name : 'Chọn nhà cung cấp'}
+              </span>
+              <div className="flex items-center gap-1 shrink-0 text-slate-400">
+                {selectedSupplierObj && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onChange({ partnerId: undefined });
+                    }}
+                    className="hover:text-slate-600 p-0.5"
+                  >
+                    <X size={12} />
+                  </button>
+                )}
+                {supplierSearchOpen ? <ChevronUp size={14} className="text-slate-600" /> : <ChevronDown size={14} />}
+              </div>
+            </div>
+
+            {supplierSearchOpen && (
+              <div className="absolute top-full left-0 mt-1 w-full bg-white rounded-[6px] border border-slate-200 shadow-lg py-1.5 z-40">
+                <div className="px-2.5 pb-1.5 border-b border-slate-100">
+                  <div className="flex items-center gap-1.5 px-2 py-1 bg-slate-50 border border-slate-200 rounded text-xs">
+                    <Search size={13} className="text-slate-400" />
+                    <input
+                      type="text"
+                      placeholder="Tìm NCC..."
+                      value={supplierSearchKeyword}
+                      onChange={(e) => setSupplierSearchKeyword(e.target.value)}
+                      className="w-full bg-transparent outline-none text-slate-700 placeholder:text-slate-400"
+                    />
+                  </div>
+                </div>
+
+                <div className="max-h-48 overflow-y-auto pt-1">
+                  <div
+                    onClick={() => {
+                      onChange({ partnerId: undefined });
+                      setSupplierSearchOpen(false);
+                    }}
+                    className={`px-3 py-1.5 text-xs cursor-pointer transition ${
+                      !state.partnerId ? 'bg-blue-50 text-blue-700 font-medium' : 'text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    Tất cả nhà cung cấp
+                  </div>
+
+                  {filteredSuppliers.map((supp) => {
+                    const isSelected = state.partnerId === Number(supp.id);
+                    return (
+                      <div
+                        key={supp.id}
+                        onClick={() => {
+                          onChange({ partnerId: Number(supp.id) });
+                          setSupplierSearchOpen(false);
+                        }}
+                        className={`px-3 py-1.5 text-xs cursor-pointer flex items-center justify-between transition ${
+                          isSelected ? 'bg-blue-50 text-blue-700 font-medium' : 'text-slate-700 hover:bg-slate-50'
+                        }`}
+                      >
+                        <div className="truncate pr-2">
+                          <div>{supp.name}</div>
+                          <div className="text-[10px] text-slate-400 font-mono">{supp.code}</div>
+                        </div>
+                        {isSelected && <Check size={13} className="text-blue-600 shrink-0" />}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Divider */}
+        <div className="border-t border-[#e5e7eb]" />
+
+        {/* ── 5. Người tạo ── */}
         <div>
           <div className="text-[13px] font-semibold text-slate-800 mb-2">
             Người tạo
@@ -253,7 +439,7 @@ export default function PurchaseFilterSidebar({ state, onChange, isCollapsed = f
         {/* Divider */}
         <div className="border-t border-[#e5e7eb]" />
 
-        {/* ── 4. Số hóa đơn đầu vào ── */}
+        {/* ── 6. Số hóa đơn đầu vào ── */}
         <div>
           <div className="text-[13px] font-semibold text-slate-800 mb-2">
             Số hóa đơn đầu vào
@@ -270,7 +456,7 @@ export default function PurchaseFilterSidebar({ state, onChange, isCollapsed = f
         {/* Divider */}
         <div className="border-t border-[#e5e7eb]" />
 
-        {/* ── 5. Người nhập ── */}
+        {/* ── 7. Người nhập ── */}
         <div>
           <div className="text-[13px] font-semibold text-slate-800 mb-2">
             Người nhập

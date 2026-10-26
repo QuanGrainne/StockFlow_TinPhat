@@ -52,7 +52,7 @@ public class SuppliersController : ControllerBase
         {
             return BadRequest(new { message = result.Error });
         }
-        return Ok(result.Value.Where(w => w.Status == "ACTIVE"));
+        return Ok((result.Value ?? Enumerable.Empty<WarehouseFacilityDto>()).Where(w => w.Status == "ACTIVE"));
     }
 
     /// <summary>
