@@ -25,22 +25,22 @@ import { adminService } from '../../../services/adminService';
 
 const WAREHOUSE_OPTIONS = [
   {
-    code: 'WH-HN-01',
+    code: 'K001',
     name: 'Kho Tổng Gia Lâm',
     address: 'Số 18 Đường Dệt May, Gia Lâm, Hà Nội',
   },
   {
-    code: 'WH-HN-02',
+    code: 'K002',
     name: 'Kho Đông Anh',
     address: 'CCN Nguyên Khê, Đông Anh, Hà Nội',
   },
   {
-    code: 'WH-HN-03',
+    code: 'K003',
     name: 'Kho Hà Đông',
     address: 'Km14 Quốc lộ 6, Yên Nghĩa, Hà Đông, Hà Nội',
   },
   {
-    code: 'WH-HN-04',
+    code: 'K004',
     name: 'Kho Hoàn Kiếm',
     address: '42 Phố Trần Hưng Đạo, Hoàn Kiếm, Hà Nội',
   },
@@ -114,44 +114,15 @@ export const StaffAccountsScreen: React.FC<StaffAccountsScreenProps> = ({
     : WAREHOUSE_OPTIONS;
 
   const normalizeWarehouseCode = (code: string): string => {
+    if (!code) return '';
     const upper = code.trim().toUpperCase();
+    if (upper === 'K001' || upper === 'K01' || upper === 'WH-HN-01' || upper === 'KTP-01' || upper.includes('GIA LÂM')) return 'K001';
+    if (upper === 'K002' || upper === 'K02' || upper === 'WH-HN-02' || upper === 'KNVL-01' || upper.includes('ĐÔNG ANH')) return 'K002';
+    if (upper === 'K003' || upper === 'K03' || upper === 'WH-HN-03' || upper.includes('HÀ ĐÔNG')) return 'K003';
+    if (upper === 'K004' || upper === 'K04' || upper === 'WH-HN-04' || upper.includes('HOÀN KIẾM')) return 'K004';
+
     const exact = warehouseList.find((w) => w.code.toUpperCase() === upper);
     if (exact) return exact.code;
-
-    // Mapping bí danh giữa WH-HN-xx và K00x
-    if (upper === 'WH-HN-01' || upper === 'KTP-01') {
-      const match = warehouseList.find((w) => w.code === 'K001' || w.name.includes('Gia Lâm'));
-      if (match) return match.code;
-    }
-    if (upper === 'WH-HN-02' || upper === 'KNVL-01') {
-      const match = warehouseList.find((w) => w.code === 'K002' || w.name.includes('Đông Anh'));
-      if (match) return match.code;
-    }
-    if (upper === 'WH-HN-03') {
-      const match = warehouseList.find((w) => w.code === 'K003' || w.name.includes('Hà Đông'));
-      if (match) return match.code;
-    }
-    if (upper === 'WH-HN-04') {
-      const match = warehouseList.find((w) => w.code === 'K004' || w.name.includes('Hoàn Kiếm'));
-      if (match) return match.code;
-    }
-
-    if (upper === 'K001') {
-      const match = warehouseList.find((w) => w.code === 'WH-HN-01' || w.name.includes('Gia Lâm'));
-      if (match) return match.code;
-    }
-    if (upper === 'K002') {
-      const match = warehouseList.find((w) => w.code === 'WH-HN-02' || w.name.includes('Đông Anh'));
-      if (match) return match.code;
-    }
-    if (upper === 'K003') {
-      const match = warehouseList.find((w) => w.code === 'WH-HN-03' || w.name.includes('Hà Đông'));
-      if (match) return match.code;
-    }
-    if (upper === 'K004') {
-      const match = warehouseList.find((w) => w.code === 'WH-HN-04' || w.name.includes('Hoàn Kiếm'));
-      if (match) return match.code;
-    }
 
     return code;
   };
@@ -345,6 +316,16 @@ export const StaffAccountsScreen: React.FC<StaffAccountsScreenProps> = ({
     const isEditingAdmin = isTargetAdmin(editingStaff);
     const finalRoleToSave = isEditingAdmin ? 'ROLE_ADMIN' : formRole;
 
+    // Bắt buộc chọn ít nhất 1 kho trực thuộc cho nhân viên
+    const finalWarehousesToSave = Array.from(
+      new Set(formWarehouses.map((w) => normalizeWarehouseCode(w)).filter(Boolean))
+    );
+
+    if (finalWarehousesToSave.length === 0) {
+      alert('Vui lòng chọn ít nhất 1 chi nhánh kho trực thuộc cho nhân viên!');
+      return;
+    }
+
     const matchedRole = availableRoles.find(
       (r) =>
         r.code.toUpperCase() === finalRoleToSave.toUpperCase() ||
@@ -381,11 +362,42 @@ export const StaffAccountsScreen: React.FC<StaffAccountsScreenProps> = ({
           department: '',
           role: finalRoleToSave,
           roleTitle: resolvedRoleTitle,
-          assignedWarehouses: formWarehouses,
+          assignedWarehouses: finalWarehousesToSave,
           avatar: formAvatar.trim() || undefined,
           password: formPassword.trim() ? formPassword.trim() : undefined,
         });
         showToast(`Đã cập nhật thông tin nhân viên ${trimmedName}`);
+
+        // Nếu cập nhật chính tài khoản đang đăng nhập, đồng bộ ngay lập tức vào localStorage & Header
+        if (typeof window !== 'undefined') {
+          const rawUser = localStorage.getItem('stockflow_user');
+          if (rawUser) {
+            try {
+              const uObj = JSON.parse(rawUser);
+              const isCurrent =
+                (uObj.userId && String(uObj.userId) === String(editingStaff.id).replace(/\D/g, '')) ||
+                (uObj.code && uObj.code.toUpperCase() === editingStaff.code.toUpperCase()) ||
+                (uObj.username && uObj.username.toLowerCase() === editingStaff.username?.toLowerCase()) ||
+                (isEditingAdmin && (uObj.role === 'ADMIN' || (Array.isArray(uObj.roles) && uObj.roles.includes('ADMIN'))));
+
+              if (isCurrent) {
+                uObj.assignedWarehouses = finalWarehousesToSave;
+                uObj.warehouses = finalWarehousesToSave.map((w: string) => ({
+                  warehouseCode: w,
+                  warehouseName: w,
+                }));
+                localStorage.setItem('stockflow_user', JSON.stringify(uObj));
+                window.dispatchEvent(
+                  new CustomEvent('stockflow_user_updated', {
+                    detail: { assignedWarehouses: finalWarehousesToSave },
+                  })
+                );
+              }
+            } catch (syncErr) {
+              console.warn('Failed to sync current user in localStorage:', syncErr);
+            }
+          }
+        }
       } else {
         await adminService.createStaff({
           code: finalCode,
@@ -397,7 +409,7 @@ export const StaffAccountsScreen: React.FC<StaffAccountsScreenProps> = ({
           department: '',
           role: finalRoleToSave,
           roleTitle: resolvedRoleTitle,
-          assignedWarehouses: formWarehouses,
+          assignedWarehouses: finalWarehousesToSave,
           avatar: formAvatar.trim() || undefined,
           status: 'ACTIVE',
           password: formPassword.trim() || 'TinPhat@2026',
@@ -1034,12 +1046,13 @@ export const StaffAccountsScreen: React.FC<StaffAccountsScreenProps> = ({
                           type="checkbox"
                           checked={isChecked}
                           onChange={(e) => {
+                            const normalized = normalizeWarehouseCode(w.code);
                             if (e.target.checked) {
-                              setFormWarehouses([...formWarehouses, w.code]);
+                              setFormWarehouses(Array.from(new Set([...formWarehouses, normalized])));
                             } else {
                               setFormWarehouses(
                                 formWarehouses.filter(
-                                  (c) => c !== w.code && normalizeWarehouseCode(c) !== w.code
+                                  (c) => normalizeWarehouseCode(c) !== normalized
                                 )
                               );
                             }
@@ -1061,6 +1074,12 @@ export const StaffAccountsScreen: React.FC<StaffAccountsScreenProps> = ({
                     );
                   })}
                 </div>
+
+                {formWarehouses.length === 0 && (
+                  <p className="text-[11px] text-rose-500 font-semibold flex items-center gap-1 pt-0.5">
+                    ⚠️ Bắt buộc phải chọn ít nhất 1 chi nhánh kho trực thuộc cho nhân viên.
+                  </p>
+                )}
               </div>
 
               {/* Action buttons */}

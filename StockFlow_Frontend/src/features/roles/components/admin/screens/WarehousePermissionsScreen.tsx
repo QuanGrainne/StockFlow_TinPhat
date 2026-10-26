@@ -13,6 +13,8 @@ import {
   Shield,
   Building2,
   Plus,
+  Pencil,
+  Trash2,
 } from 'lucide-react';
 import { StaffAccount, WarehouseFacility } from '../../../types';
 import { adminService } from '../../../services/adminService';
@@ -60,6 +62,15 @@ export const WarehousePermissionsScreen: React.FC = () => {
   const [newWhArea, setNewWhArea] = useState('3,500 m²');
   const [isCreatingWh, setIsCreatingWh] = useState(false);
   const [createWhError, setCreateWhError] = useState('');
+
+  // Modal Chỉnh sửa kho
+  const [editWhModalOpen, setEditWhModalOpen] = useState(false);
+  const [editingWh, setEditingWh] = useState<WarehouseFacility | null>(null);
+  const [editWhName, setEditWhName] = useState('');
+  const [editWhAddress, setEditWhAddress] = useState('');
+  const [editWhArea, setEditWhArea] = useState('3,500 m²');
+  const [isUpdatingWh, setIsUpdatingWh] = useState(false);
+  const [editWhError, setEditWhError] = useState('');
 
   const suggestedWhCode = getNextWarehouseCode(facilities);
   const isWhCodeDuplicate = newWhCode.trim()
@@ -147,6 +158,76 @@ export const WarehousePermissionsScreen: React.FC = () => {
     }
   };
 
+  const handleOpenEditWhModal = (fac: WarehouseFacility) => {
+    setEditingWh(fac);
+    setEditWhName(fac.name);
+    setEditWhAddress(fac.address);
+    setEditWhArea(fac.area || '3,500 m²');
+    setEditWhError('');
+    setEditWhModalOpen(true);
+  };
+
+  const handleSaveEditWarehouse = async () => {
+    if (!editingWh) return;
+    if (!editWhName.trim()) {
+      setEditWhError('Vui lòng nhập tên cơ sở kho');
+      return;
+    }
+    if (!editWhAddress.trim()) {
+      setEditWhError('Vui lòng nhập địa chỉ kho');
+      return;
+    }
+
+    setIsUpdatingWh(true);
+    setEditWhError('');
+    try {
+      const updated = await adminService.updateWarehouseFacility(
+        editingWh.warehouseId || editingWh.code,
+        {
+          name: editWhName.trim(),
+          address: editWhAddress.trim(),
+          area: editWhArea.trim(),
+        }
+      );
+      setFacilities((prev) =>
+        prev.map((f) => (f.code === updated.code || f.id === updated.id ? updated : f))
+      );
+      showToast(`Đã cập nhật cơ sở kho: ${updated.name} (${updated.code})`);
+      setEditWhModalOpen(false);
+      await loadData();
+    } catch (err: any) {
+      setEditWhError(err.message || 'Lỗi khi cập nhật cơ sở kho');
+    } finally {
+      setIsUpdatingWh(false);
+    }
+  };
+
+  const handleDeleteWarehouse = async (fac: WarehouseFacility) => {
+    if (fac.staffCount > 0) {
+      alert(
+        `Không thể xóa cơ sở kho "${fac.name}" (${fac.code}) vì hiện đang có ${fac.staffCount} nhân sự trực thuộc.\n\nVui lòng chuyển hoặc gỡ phân quyền toàn bộ nhân sự khỏi kho này trước khi xóa.`
+      );
+      return;
+    }
+
+    if (
+      !confirm(
+        `Bạn có chắc chắn muốn xóa cơ sở kho "${fac.name}" (${fac.code}) không?\n\nHành động này không thể hoàn tác.`
+      )
+    ) {
+      return;
+    }
+
+    try {
+      await adminService.deleteWarehouseFacility(fac.warehouseId || fac.code);
+      setFacilities((prev) => prev.filter((f) => f.code !== fac.code && f.id !== fac.id));
+      showToast(`Đã xóa cơ sở kho ${fac.name} (${fac.code})`);
+      await loadData();
+    } catch (err: any) {
+      alert(`Lỗi khi xóa kho: ${err.message || 'Thao tác không thành công'}`);
+    }
+  };
+
   const filteredStaff = staffList.filter((s) => {
     const matchSearch =
       s.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -206,9 +287,37 @@ export const WarehousePermissionsScreen: React.FC = () => {
                 <span className="font-mono text-xs font-bold text-blue-700 px-2 py-0.5 rounded bg-blue-50 border border-blue-100">
                   {fac.code}
                 </span>
-                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-                  Hoạt động
-                </span>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    Hoạt động
+                  </span>
+                  <div className="flex items-center gap-0.5 ml-0.5">
+                    <button
+                      type="button"
+                      onClick={() => handleOpenEditWhModal(fac)}
+                      title="Chỉnh sửa thông tin kho"
+                      className="p-1 rounded text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition cursor-pointer"
+                    >
+                      <Pencil size={13} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteWarehouse(fac)}
+                      title={
+                        fac.staffCount > 0
+                          ? `Kho đang có ${fac.staffCount} nhân sự trực thuộc - Không thể xóa`
+                          : `Xóa cơ sở kho ${fac.code}`
+                      }
+                      className={`p-1 rounded transition cursor-pointer ${
+                        fac.staffCount > 0
+                          ? 'text-slate-300 hover:text-slate-500 hover:bg-slate-100'
+                          : 'text-slate-400 hover:text-rose-600 hover:bg-rose-50'
+                      }`}
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
+                </div>
               </div>
               <h3 className="text-sm font-bold text-slate-900 mb-1">{fac.name}</h3>
               <p className="text-[11px] text-slate-400 flex items-start gap-1">
@@ -219,8 +328,10 @@ export const WarehousePermissionsScreen: React.FC = () => {
 
             <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
               <div className="flex items-center gap-1">
-                <Users size={12} className="text-slate-400" />
-                <span>{fac.staffCount} nhân sự</span>
+                <Users size={12} className={fac.staffCount === 0 ? "text-amber-500" : "text-slate-400"} />
+                <span className={fac.staffCount === 0 ? "text-amber-600 font-medium" : ""}>
+                  {fac.staffCount} nhân sự
+                </span>
               </div>
               <span className="font-mono font-semibold text-slate-700">{fac.area}</span>
             </div>
@@ -571,6 +682,112 @@ export const WarehousePermissionsScreen: React.FC = () => {
                 className="px-4 py-2 rounded-lg bg-[#1E56A0] hover:bg-[#184580] text-xs font-semibold text-white cursor-pointer disabled:opacity-50"
               >
                 {isCreatingWh ? 'Đang lưu...' : 'Tạo cơ sở kho'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Chỉnh sửa kho */}
+      {editWhModalOpen && editingWh && (
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+                  <Building2 size={16} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">Chỉnh sửa cơ sở kho</h3>
+                  <p className="text-[11px] text-slate-500">Cập nhật thông tin chi nhánh kho</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditWhModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-md hover:bg-slate-100 cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {editWhError && (
+              <div className="p-2.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium">
+                {editWhError}
+              </div>
+            )}
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Mã kho
+                </label>
+                <input
+                  type="text"
+                  disabled
+                  value={editingWh.code}
+                  className="w-full h-9 px-3 rounded-lg bg-slate-100 border border-slate-200 text-xs font-mono uppercase text-slate-500 cursor-not-allowed font-bold"
+                />
+                <p className="text-[11px] text-slate-400 mt-1">
+                  Mã kho chuẩn K00X cố định của hệ thống
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Tên kho <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={editWhName}
+                  onChange={(e) => setEditWhName(e.target.value)}
+                  placeholder="Vd: Kho Tổng Gia Lâm"
+                  className="w-full h-9 px-3 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-800 focus:outline-none focus:border-blue-500 focus:bg-white transition"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Địa chỉ kho <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={editWhAddress}
+                  onChange={(e) => setEditWhAddress(e.target.value)}
+                  placeholder="Vd: Số 18 Đường Dệt May, Gia Lâm, Hà Nội"
+                  className="w-full h-9 px-3 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-800 focus:outline-none focus:border-blue-500 focus:bg-white transition"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Diện tích / Quy mô kho
+                </label>
+                <input
+                  type="text"
+                  value={editWhArea}
+                  onChange={(e) => setEditWhArea(e.target.value)}
+                  placeholder="Vd: 8,500 m²"
+                  className="w-full h-9 px-3 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-800 focus:outline-none focus:border-blue-500 focus:bg-white transition"
+                />
+              </div>
+            </div>
+
+            <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setEditWhModalOpen(false)}
+                className="px-4 py-2 rounded-lg border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 cursor-pointer"
+              >
+                Hủy bỏ
+              </button>
+              <button
+                type="button"
+                disabled={isUpdatingWh}
+                onClick={handleSaveEditWarehouse}
+                className="px-4 py-2 rounded-lg bg-[#1E56A0] hover:bg-[#184580] text-xs font-semibold text-white cursor-pointer disabled:opacity-50"
+              >
+                {isUpdatingWh ? 'Đang lưu...' : 'Lưu thay đổi'}
               </button>
             </div>
           </div>
