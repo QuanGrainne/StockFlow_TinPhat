@@ -3,7 +3,8 @@
 import { useState, useRef, useEffect, useSyncExternalStore } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { ShoppingCart } from 'lucide-react';
+import { ShoppingCart, MapPin, ChevronDown, Check } from 'lucide-react';
+import { useActiveWarehouse } from '@/lib/warehouse/useActiveWarehouse';
 
 interface DropdownItem {
   label: string;
@@ -69,11 +70,18 @@ export default function Navbar() {
   // Get username safely using useSyncExternalStore
   const username = useSyncExternalStore(subscribeUser, getUserSnapshot, getServerUserSnapshot);
 
+  const { activeWarehouse, setActiveWarehouse, warehouses } = useActiveWarehouse();
+  const [warehouseDropdownOpen, setWarehouseDropdownOpen] = useState(false);
+  const warehouseMenuRef = useRef<HTMLDivElement>(null);
+
   // Close dropdown when clicking outside
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (navRef.current && !navRef.current.contains(e.target as Node)) {
         setOpenMenu(null);
+      }
+      if (warehouseMenuRef.current && !warehouseMenuRef.current.contains(e.target as Node)) {
+        setWarehouseDropdownOpen(false);
       }
     }
     document.addEventListener('mousedown', handleClickOutside);
@@ -168,8 +176,55 @@ export default function Navbar() {
           })}
         </nav>
 
-        {/* Right side: Bán hàng + user + logout */}
+        {/* Right side: Kho + Bán hàng + user + logout */}
         <div className="flex items-center gap-3 ml-auto shrink-0">
+          {/* Bộ chọn Chi nhánh / Kho chuẩn KiotViet */}
+          <div className="relative shrink-0" ref={warehouseMenuRef}>
+            <button
+              type="button"
+              id="header-branch-selector"
+              onClick={() => setWarehouseDropdownOpen(!warehouseDropdownOpen)}
+              className="flex items-center gap-1.5 rounded-lg bg-[#005f9d] hover:bg-[#005288] px-3 py-1.5 text-xs sm:text-sm font-medium text-white transition cursor-pointer border border-blue-400/30 shadow-xs"
+              title="Chọn Chi nhánh / Kho làm việc hiện tại"
+            >
+              <MapPin size={15} className="text-amber-300 shrink-0" />
+              <span className="max-w-[130px] sm:max-w-[170px] truncate">{activeWarehouse.name}</span>
+              <ChevronDown size={14} className={`text-white/80 transition-transform ${warehouseDropdownOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            {warehouseDropdownOpen && (
+              <div className="absolute top-full right-0 mt-1.5 w-60 bg-white rounded-xl shadow-xl border border-slate-200 py-1.5 z-50 text-slate-800 animate-in fade-in zoom-in-95 duration-100">
+                <div className="px-3 py-1.5 text-[11px] font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-100 flex items-center justify-between">
+                  <span>Chi nhánh / Kho ({warehouses.length})</span>
+                </div>
+                {warehouses.map((wh) => {
+                  const isSelected = wh.warehouseId === activeWarehouse.warehouseId;
+                  return (
+                    <button
+                      key={wh.warehouseId}
+                      type="button"
+                      onClick={() => {
+                        setActiveWarehouse(wh);
+                        setWarehouseDropdownOpen(false);
+                      }}
+                      className={`w-full text-left px-3.5 py-2 text-xs sm:text-sm flex items-center justify-between transition cursor-pointer ${
+                        isSelected
+                          ? 'bg-blue-50 text-[#0071BA] font-semibold'
+                          : 'text-slate-700 hover:bg-slate-50 hover:text-slate-900'
+                      }`}
+                    >
+                      <div className="flex flex-col">
+                        <span>{wh.name}</span>
+                        <span className="text-[11px] font-mono text-slate-400">{wh.code}</span>
+                      </div>
+                      {isSelected && <Check size={16} className="text-[#0071BA] shrink-0" />}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
           <Link
             href="/orders"
             className="flex items-center gap-1.5 rounded-lg bg-white px-3.5 py-1.5 text-sm font-semibold text-[#0071BA] shadow-xs hover:bg-blue-50 transition"
