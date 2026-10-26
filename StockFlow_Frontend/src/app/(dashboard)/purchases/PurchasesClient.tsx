@@ -122,7 +122,7 @@ function statusTag(status: string) {
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-export default function PurchasesClient() {
+export default function PurchasesClient({ onNavigate }: { onNavigate?: (screen: string) => void } = {}) {
   const router = useRouter();
   const { activeWarehouse, warehouses } = useActiveWarehouse();
 

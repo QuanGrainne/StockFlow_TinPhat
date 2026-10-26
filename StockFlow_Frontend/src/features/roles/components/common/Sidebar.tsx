@@ -290,6 +290,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
       requiredModule: 'PURCHASE',
       dropdownItems: [
         {
+          id: 'purchases',
+          title: 'Nhập hàng',
+          desc: 'Quản lý phiếu nhập kho & thanh toán',
+          icon: ArrowDownToLine,
+          requiredModule: 'PURCHASE',
+        },
+        {
           id: 'warehouse-inbound',
           title: 'Nhập kho từ chứng từ',
           desc: 'Tiếp nhận đơn mua PO',
@@ -552,11 +559,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
     },
     {
       id: 'manager-landed-cost',
-      label: 'Mua bán chi phí',
-      icon: ShoppingBag,
+      label: 'Mua hàng',
+      icon: ArrowDownToLine,
       hasDropdown: true,
       requiredModule: 'PURCHASE',
       dropdownItems: [
+        {
+          id: 'purchases',
+          title: 'Nhập hàng',
+          desc: 'Quản lý phiếu nhập kho & thanh toán',
+          icon: ArrowDownToLine,
+          requiredModule: 'PURCHASE',
+        },
         {
           id: 'manager-landed-cost',
           title: 'Chi phí mua hàng & Landed Cost',
@@ -744,12 +758,33 @@ export const Sidebar: React.FC<SidebarProps> = ({
     },
     {
       id: 'warehouse-inbound',
-      label: 'Nhập kho từ Chứng từ (3.2.5.2)',
+      label: 'Mua hàng',
       icon: ArrowDownToLine,
-      hasDropdown: false,
-      badgeText: '2',
-      badgeColor: 'bg-blue-600',
+      hasDropdown: true,
       requiredModule: 'PURCHASE',
+      dropdownItems: [
+        {
+          id: 'purchases',
+          title: 'Nhập hàng',
+          desc: 'Quản lý phiếu nhập kho & thanh toán',
+          icon: ArrowDownToLine,
+          requiredModule: 'PURCHASE',
+        },
+        {
+          id: 'warehouse-inbound',
+          title: 'Nhập kho từ Chứng từ (3.2.5.2)',
+          desc: 'Đối chiếu chứng từ giấy PO',
+          icon: ArrowDownToLine,
+          requiredModule: 'PURCHASE',
+        },
+        {
+          id: 'suppliers',
+          title: 'Nhà cung cấp',
+          desc: 'Quản lý thông tin & công nợ NCC',
+          icon: Building2,
+          requiredModule: 'PURCHASE',
+        },
+      ],
     },
     {
       id: 'warehouse-outbound',
@@ -890,6 +925,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const isTabActive = (tab: TabConfig) => {
     if (tab.id === 'suppliers' && (activeScreen === 'suppliers' || activeScreen.includes('suppliers'))) return true;
+    if (tab.id === 'purchases' && (activeScreen === 'purchases' || activeScreen.includes('purchases'))) return true;
     if (tab.id === activeScreen) return true;
     if (tab.dropdownItems?.some((sub) => sub.id === activeScreen)) return true;
     if (tab.id === 'admin-staff' && activeScreen === 'admin-staff-active') return true;
@@ -898,7 +934,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     if (tab.id === 'manager-production' && activeScreen === 'manager-bom') return true;
     if (tab.id === 'manager-partners' && activeScreen === 'manager-cashflow') return true;
     if (tab.id === 'sales-orders' && (activeScreen === 'sales-orders' || activeScreen === 'sales-consolidate' || activeScreen === 'sales-returns')) return true;
-    if (tab.id === 'warehouse-inbound' && (activeScreen === 'warehouse-inbound' || activeScreen === 'manager-landed-cost')) return true;
+    if (tab.id === 'warehouse-inbound' && (activeScreen === 'warehouse-inbound' || activeScreen === 'purchases' || activeScreen.includes('purchases') || activeScreen === 'manager-landed-cost')) return true;
     if (tab.id === 'warehouse-overview' && (activeScreen === 'warehouse-overview' || activeScreen === 'warehouse-outbound' || activeScreen === 'warehouse-transfer' || activeScreen === 'warehouse-audit' || activeScreen === 'warehouse-returns')) return true;
     if (tab.id === 'production-orders' && (activeScreen === 'production-orders' || activeScreen === 'production-import' || activeScreen === 'production-logs')) return true;
     if (tab.id === 'manager-cashflow' && (activeScreen === 'manager-cashflow' || activeScreen === 'manager-reports')) return true;

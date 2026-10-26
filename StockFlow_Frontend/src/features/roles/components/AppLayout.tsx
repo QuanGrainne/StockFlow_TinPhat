@@ -5,6 +5,7 @@ import { Header } from './common/Header';
 import { Sidebar } from './common/Sidebar';
 import { GoodsCatalogScreen } from './common/GoodsCatalogScreen';
 import SuppliersClient from '@/app/(dashboard)/suppliers/SuppliersClient';
+import PurchasesClient from '@/app/(dashboard)/purchases/PurchasesClient';
 import PriceBooksClient from '@/features/price-books/screens/PriceBooksClient';
 import { permissionService } from '../services/permissionService';
 
@@ -40,6 +41,7 @@ const SCREEN_MODULE_MAP: Record<string, string> = {
   'production-import': 'PROD',
   'production-logs': 'PROD',
   'goods-catalog': 'GOODS',
+  'purchases': 'PURCHASE',
 };
 
 // Sales Screens
@@ -160,7 +162,11 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ initialScreen }) => {
       localStorage.setItem('stockflow_active_screen', newScreen);
       if (newScreen === 'suppliers' || newScreen === '/suppliers') {
         window.history.pushState(null, '', '/suppliers');
-      } else if (window.location.pathname.includes('/suppliers')) {
+      } else if (newScreen === 'purchases' || newScreen === '/purchases') {
+        window.history.pushState(null, '', '/purchases');
+      } else if (newScreen === 'goods-catalog' || newScreen === 'products' || newScreen === '/products') {
+        window.history.pushState(null, '', '/products');
+      } else if (window.location.pathname.includes('/suppliers') || window.location.pathname.includes('/purchases') || window.location.pathname.includes('/products')) {
         window.history.pushState(null, '', '/dashboard');
       }
     }
@@ -293,11 +299,17 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ initialScreen }) => {
       case 'admin-users':
         return <StaffAccountsScreen initialFilter="ALL" />;
 
-      // ─── Common / Goods Catalog / Suppliers Screens (Tất cả Role) ───
+      // ─── Common / Goods Catalog / Suppliers / Purchases Screens (Tất cả Role) ───
       case 'suppliers':
       case 'manager-suppliers':
       case 'admin-suppliers':
         return <SuppliersClient onNavigate={handleNavigate} />;
+
+      case 'purchases':
+      case 'admin-purchases':
+      case 'manager-purchases':
+      case 'warehouse-purchases':
+        return <PurchasesClient onNavigate={handleNavigate} />;
 
       case 'goods-catalog':
       case 'admin-goods':
@@ -345,7 +357,9 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ initialScreen }) => {
       </div>
 
       {/* 2. Main Workspace Content (Chỉ cuộn vùng nội dung) */}
-      {activeScreen === 'suppliers' || activeScreen.includes('suppliers') ? (
+      {activeScreen === 'suppliers' || activeScreen.includes('suppliers') ||
+       activeScreen === 'purchases' || activeScreen.includes('purchases') ||
+       activeScreen === 'goods-catalog' || activeScreen === 'products' ? (
         <main className="flex-1 min-w-0 flex flex-col overflow-y-auto bg-[#F8FAFC]">
           {renderActiveScreen()}
         </main>
