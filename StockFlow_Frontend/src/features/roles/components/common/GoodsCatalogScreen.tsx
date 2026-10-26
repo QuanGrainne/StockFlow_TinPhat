@@ -595,6 +595,21 @@ export const formatRealDateTime = (dateInput?: string | Date | null): string => 
   }
 };
 
+// Định dạng hiển thị số với dấu phẩy ngăn cách hàng nghìn (VD: 50,000; 500,000; 999,999,999)
+export const formatNumberWithCommas = (val: number | string | undefined | null): string => {
+  if (val === undefined || val === null || val === '') return '';
+  const str = String(val).replace(/\D/g, '');
+  if (!str) return '';
+  return str.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+};
+
+// Chuyển chuỗi định dạng có dấu phẩy về số nguyên an toàn
+export const parseCleanNumber = (val: string | number | undefined | null): number => {
+  if (val === undefined || val === null || val === '') return 0;
+  const str = String(val).replace(/\D/g, '');
+  return str ? Number(str) : 0;
+};
+
 // Lấy thời gian tạo chuẩn: từ item.createdAt, hoặc suy từ timestamp của ID, hoặc thời gian thực hiện tại
 export const getItemCreatedTime = (item: GoodsItem): string => {
   if (item.createdAt && item.createdAt !== '23/09/2026 10:28') {
@@ -1274,7 +1289,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
   // Xác nhận nhập hàng / cân chỉnh tồn kho tại kho được chọn
   const handleConfirmInbound = () => {
     if (!inboundItem) return;
-    const numQty = Number(inboundQty) || 0;
+    const numQty = parseCleanNumber(inboundQty);
     if (numQty <= 0 && inboundType === 'ADD') {
       alert('Vui lòng nhập số lượng hợp lệ lớn hơn 0!');
       return;
@@ -1354,8 +1369,8 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
   // Quyền hạn RBAC
   const canViewCostPrice = role === 'ADMIN' || role === 'MANAGER';
   const canViewSellingPrice = role === 'ADMIN' || role === 'MANAGER' || role === 'SALES';
-  const canManageMaster = role === 'ADMIN' || role === 'MANAGER';
-  const canDelete = role === 'ADMIN';
+  const canManageMaster = role === 'ADMIN' || role === 'MANAGER' || role === 'WAREHOUSE';
+  const canDelete = true; // Mở nút xóa với cơ chế kiểm tra thông minh theo nghiệp vụ
   const canViewStockCard = role === 'ADMIN' || role === 'MANAGER' || role === 'WAREHOUSE';
 
   // Hàm sinh ma trận biến thể tự động theo (Thuộc tính × Đơn vị tính)
@@ -1477,7 +1492,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
   // Đồng bộ số lượng nhập vào với kho hiện đang chọn
   const handleStockQuantityChange = (val: string | number) => {
     setFormStockQuantity(val);
-    const num = Math.max(0, Number(val) || 0);
+    const num = Math.max(0, parseCleanNumber(val));
     const activeWh = formWarehouse || warehouseFilter || 'Kho Tổng Gia Lâm';
     setFormWarehouseStocks((prev) => ({
       ...prev,
@@ -1763,13 +1778,13 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
         formSupplier.trim() !== (editInitialSnapshot.supplier || '') ||
         formUom.trim() !== editInitialSnapshot.uom ||
         formSpec.trim() !== editInitialSnapshot.spec ||
-        Number(formStandardPrice) !== Number(editInitialSnapshot.standardPrice) ||
-        Number(formCostPrice) !== Number(editInitialSnapshot.costPrice) ||
-        Number(formStockQuantity) !== Number(editInitialSnapshot.stockQuantity) ||
-        Number(formMinSafe) !== Number(editInitialSnapshot.minSafe) ||
-        Number(formMaxSafe) !== Number(editInitialSnapshot.maxSafe) ||
+        parseCleanNumber(formStandardPrice) !== Number(editInitialSnapshot.standardPrice) ||
+        parseCleanNumber(formCostPrice) !== Number(editInitialSnapshot.costPrice) ||
+        parseCleanNumber(formStockQuantity) !== Number(editInitialSnapshot.stockQuantity) ||
+        parseCleanNumber(formMinSafe) !== Number(editInitialSnapshot.minSafe) ||
+        parseCleanNumber(formMaxSafe) !== Number(editInitialSnapshot.maxSafe) ||
         formLocation.trim() !== editInitialSnapshot.location ||
-        Number(formWeight) !== Number(editInitialSnapshot.weight) ||
+        parseCleanNumber(formWeight) !== Number(editInitialSnapshot.weight) ||
         String(formWidth) !== String(editInitialSnapshot.width) ||
         String(formLength) !== String(editInitialSnapshot.length) ||
         formDimensionUnit !== editInitialSnapshot.dimensionUnit ||
@@ -1808,11 +1823,11 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
     setBranchDropdownOpen(false);
     const finalCode = formCode.trim() ? formCode.trim().toUpperCase() : suggestedProductCode;
     const activeWh = formWarehouse || warehouseFilter || 'Kho Tổng Gia Lâm';
-    const numEnteredStock = Math.max(0, Number(formStockQuantity) || 0);
-    const numEnteredCost = Math.max(0, Number(formCostPrice) || 0);
-    const numEnteredSalePrice = Math.max(0, Number(formStandardPrice) || 0);
-    const numEnteredMinSafe = Math.max(0, Number(formMinSafe) || 0);
-    const numEnteredMaxSafe = Math.max(0, Number(formMaxSafe) || 999999999);
+    const numEnteredStock = Math.max(0, parseCleanNumber(formStockQuantity));
+    const numEnteredCost = Math.max(0, parseCleanNumber(formCostPrice));
+    const numEnteredSalePrice = Math.max(0, parseCleanNumber(formStandardPrice));
+    const numEnteredMinSafe = Math.max(0, parseCleanNumber(formMinSafe));
+    const numEnteredMaxSafe = formMaxSafe === '' ? 999999999 : Math.max(0, parseCleanNumber(formMaxSafe));
 
     const targetFacilities = permittedFacilities.length > 0
       ? permittedFacilities
@@ -1926,7 +1941,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
       status: 'ACTIVE',
       createdAt: editingItem ? getItemCreatedTime(editingItem) : nowFormatted,
       supplier: formSupplier.trim() || undefined,
-      weight: Number(formWeight) || 0,
+      weight: parseCleanNumber(formWeight),
       dimensions: {
         width: Number(formWidth) || 0,
         length: Number(formLength) || 0,
@@ -1948,7 +1963,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
               docCode: `DC-${finalCode}`,
               type: 'NHAP' as const,
               typeName: `Cập nhật tồn kho tại ${formWarehouse || warehouseFilter}`,
-              qtyChange: Number(formStockQuantity) || 0,
+              qtyChange: parseCleanNumber(formStockQuantity),
               balance: totalActualStock,
               partnerOrDept: formWarehouse || warehouseFilter,
             },
@@ -2088,12 +2103,41 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
   };
 
   const handleDeleteItem = async (item: GoodsItem) => {
-    if (window.confirm(`Bạn có chắc chắn muốn xóa mặt hàng "${item.name}" khỏi cơ sở dữ liệu?`)) {
+    // 1. Kiểm tra nếu sản phẩm đang có khách đặt hàng
+    const stockInfo = getProductStockForWarehouse(item, warehouseFilter);
+    const reservedQty = stockInfo.reserved || item.reservedQuantity || 0;
+    if (reservedQty > 0) {
+      if (
+        window.confirm(
+          `Sản phẩm "${item.name}" (${item.code}) đang có đơn đặt hàng từ khách (Khách đặt: ${reservedQty.toLocaleString('vi-VN')} ${item.uom}).\n\n` +
+          `Để bảo toàn dữ liệu sổ sách và lịch sử đơn hàng, hệ thống KHÔNG CHO PHÉP XÓA VĨNH VIỄN!\n\n` +
+          `Bạn có muốn chuyển mặt hàng này sang trạng thái "Ngừng kinh doanh" để ẩn đi không?`
+        )
+      ) {
+        try {
+          const numericId = item.productId || (Number(item.id) ? Number(item.id) : undefined);
+          if (numericId) {
+            await productService.updateProduct(numericId, { isActive: false });
+          }
+          const updated = goods.map((g) => (g.id === item.id ? { ...g, status: 'DISCONTINUED' as const } : g));
+          setGoods(updated);
+          if (typeof window !== 'undefined') {
+            localStorage.setItem(STOCKFLOW_GOODS_STORAGE_KEY, JSON.stringify(updated));
+          }
+          showToast(`Đã chuyển sản phẩm ${item.code} sang trạng thái Ngừng kinh doanh!`);
+        } catch (err: any) {
+          alert(`Lỗi khi cập nhật trạng thái: ${err?.message || 'Thao tác thất bại'}`);
+        }
+      }
+      return;
+    }
+
+    // 2. Nếu là hàng mới tạo / test / rác: hỏi xác nhận xóa vĩnh viễn
+    if (window.confirm(`Bạn có chắc chắn muốn xóa vĩnh viễn mặt hàng "${item.name}" (${item.code}) khỏi cơ sở dữ liệu hệ thống?`)) {
       try {
         const numericId = item.productId || (Number(item.id) ? Number(item.id) : undefined);
         if (numericId) {
           await productService.deleteProduct(numericId);
-          showToast(`Đã xóa hàng hóa ${item.code} khỏi cơ sở dữ liệu thành công!`);
         }
         const updated = goods.filter((g) => g.id !== item.id);
         setGoods(updated);
@@ -2105,9 +2149,29 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
             console.warn('Lỗi ghi localStorage khi xóa:', err);
           }
         }
+        showToast(`Đã xóa vĩnh viễn hàng hóa ${item.code} khỏi cơ sở dữ liệu thành công!`);
       } catch (err: any) {
         console.error('Lỗi khi xóa khỏi CSDL:', err);
-        alert(`Lỗi khi xóa khỏi cơ sở dữ liệu: ${err?.message || 'Thao tác xóa thất bại'}`);
+        const errMsg = err?.message || 'Thao tác xóa thất bại';
+        if (
+          window.confirm(
+            `Không thể xóa vĩnh viễn: ${errMsg}\n\n` +
+            `Bạn có muốn chuyển sang trạng thái "Ngừng kinh doanh" để ẩn mặt hàng này khỏi danh mục bán không?`
+          )
+        ) {
+          try {
+            const numericId = item.productId || (Number(item.id) ? Number(item.id) : undefined);
+            if (numericId) {
+              await productService.updateProduct(numericId, { isActive: false });
+            }
+            const updated = goods.map((g) => (g.id === item.id ? { ...g, status: 'DISCONTINUED' as const } : g));
+            setGoods(updated);
+            if (typeof window !== 'undefined') {
+              localStorage.setItem(STOCKFLOW_GOODS_STORAGE_KEY, JSON.stringify(updated));
+            }
+            showToast(`Đã chuyển sản phẩm ${item.code} sang Ngừng kinh doanh!`);
+          } catch {}
+        }
       }
     }
   };
@@ -2228,30 +2292,70 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
 
   const handleBulkDelete = async () => {
     if (selectedItemIds.length === 0) return;
-    if (!window.confirm(`Bạn có chắc chắn muốn xóa ${selectedItemIds.length} mặt hàng đã chọn khỏi cơ sở dữ liệu?`)) return;
+
+    // Phân loại các sản phẩm đã chọn: có khách đặt vs chưa có khách đặt
+    const itemsWithOrders = selectedItemIds
+      .map((id) => goods.find((g) => g.id === id))
+      .filter((g): g is GoodsItem => {
+        if (!g) return false;
+        const s = getProductStockForWarehouse(g, warehouseFilter);
+        return (s.reserved || g.reservedQuantity || 0) > 0;
+      });
+
+    if (itemsWithOrders.length > 0) {
+      const orderNames = itemsWithOrders.map((i) => `• ${i.code} - ${i.name}`).slice(0, 3).join('\n');
+      const moreText = itemsWithOrders.length > 3 ? `\nvà ${itemsWithOrders.length - 3} sản phẩm khác` : '';
+      alert(
+        `Trong số các mặt hàng đã chọn, có ${itemsWithOrders.length} sản phẩm đang có đơn đặt hàng từ khách:\n${orderNames}${moreText}\n\n` +
+        `Để bảo toàn chứng từ kế toán, hệ thống KHÔNG CHO PHÉP xóa các sản phẩm này!`
+      );
+      return;
+    }
+
+    if (!window.confirm(`Bạn có chắc chắn muốn xóa vĩnh viễn ${selectedItemIds.length} mặt hàng đã chọn khỏi cơ sở dữ liệu?`)) return;
+
+    let successCount = 0;
+    const failedItems: string[] = [];
+    const deletedIds: string[] = [];
 
     for (const id of selectedItemIds) {
       const it = goods.find((g) => g.id === id);
-      const numId = it?.productId || (Number(it?.id) ? Number(it?.id) : undefined);
+      if (!it) continue;
+      const numId = it.productId || (Number(it.id) ? Number(it.id) : undefined);
       if (numId) {
         try {
           await productService.deleteProduct(numId);
-        } catch {}
+          deletedIds.push(id);
+          successCount++;
+        } catch {
+          failedItems.push(it.code);
+        }
+      } else {
+        deletedIds.push(id);
+        successCount++;
       }
     }
 
-    setGoods((prev) => {
-      const updated = prev.filter((g) => !selectedItemIds.includes(g.id));
-      if (typeof window !== 'undefined') {
-        try {
-          localStorage.setItem(STOCKFLOW_GOODS_STORAGE_KEY, JSON.stringify(updated));
-        } catch {}
-      }
-      return updated;
-    });
+    if (deletedIds.length > 0) {
+      setGoods((prev) => {
+        const updated = prev.filter((g) => !deletedIds.includes(g.id));
+        if (typeof window !== 'undefined') {
+          try {
+            localStorage.setItem(STOCKFLOW_GOODS_STORAGE_KEY, JSON.stringify(updated));
+          } catch {}
+        }
+        return updated;
+      });
+    }
+
     setSelectedItemIds([]);
     setBulkActionMenuOpen(false);
-    showToast(`Đã xóa ${selectedItemIds.length} mặt hàng thành công!`);
+
+    if (failedItems.length > 0) {
+      alert(`Đã xóa ${successCount} mặt hàng. Có ${failedItems.length} mặt hàng không thể xóa do đã phát sinh giao dịch/chứng từ: ${failedItems.join(', ')}`);
+    } else {
+      showToast(`Đã xóa ${successCount} mặt hàng thành công!`);
+    }
   };
 
   const handleBulkPrintBarcode = () => {
@@ -2667,6 +2771,8 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                 const hasVariants = item.variants && item.variants.length > 0;
                 const variantCount = hasVariants ? item.variants!.length : 0;
                 const itemStock = getProductStockForWarehouse(item, warehouseFilter);
+                const isOutOfStock = itemStock.actual <= 0;
+                const isLowStock = !isOutOfStock && itemStock.minSafe > 0 && itemStock.actual < itemStock.minSafe;
 
                 return (
                   <React.Fragment key={item.id}>
@@ -2676,6 +2782,8 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                         isSelected ? 'bg-blue-50/50 hover:bg-blue-50/70 border-l-2 border-l-blue-600' : ''
                       } ${
                         isExpanded ? 'bg-blue-50/25 border-b border-blue-200/60' : ''
+                      } ${
+                        isLowStock ? 'bg-amber-50/30 hover:bg-amber-50/50' : isOutOfStock ? 'bg-rose-50/20 hover:bg-rose-50/40' : ''
                       }`}
                       onClick={() => setExpandedRowId(isExpanded ? null : item.id)}
                     >
@@ -2804,27 +2912,59 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                       {/* Tồn Kho */}
                       <td className="py-3 px-4 text-right">
                         <div>
-                          <span
-                            className={`font-mono font-extrabold text-xs ${
-                              itemStock.actual > 0 ? 'text-slate-900' : 'text-slate-400'
-                            }`}
-                          >
-                            {itemStock.actual.toLocaleString('vi-VN')}
-                          </span>
-                          <div
-                            className={`text-[10px] font-medium truncate max-w-[130px] ml-auto ${
-                              itemStock.actual > 0 ? 'text-blue-600 font-bold' : 'text-slate-400'
-                            }`}
-                            title={`Tồn kho thực tế tại ${warehouseFilter}`}
-                          >
-                            tại {warehouseFilter.replace(/^Kho\s*/i, '')}
+                          <div className="flex items-center justify-end gap-1">
+                            {isOutOfStock ? (
+                              <span className="w-2 h-2 rounded-full bg-rose-500 shrink-0" title="Đã hết hàng" />
+                            ) : isLowStock ? (
+                              <span title="Tồn kho dưới định mức an toàn">
+                                <AlertTriangle size={12} className="text-amber-500 shrink-0 animate-pulse" />
+                              </span>
+                            ) : null}
+                            <span
+                              className={`font-mono font-extrabold text-xs ${
+                                isOutOfStock
+                                  ? 'text-rose-600'
+                                  : isLowStock
+                                  ? 'text-amber-600'
+                                  : itemStock.actual > 0
+                                  ? 'text-slate-900'
+                                  : 'text-slate-400'
+                              }`}
+                            >
+                              {itemStock.actual.toLocaleString('vi-VN')}
+                            </span>
                           </div>
+
+                          {isOutOfStock ? (
+                            <div className="inline-flex items-center gap-1 mt-0.5 px-1.5 py-0.5 rounded bg-rose-50 border border-rose-200 text-rose-700 text-[10px] font-bold">
+                              <span>Hết hàng</span>
+                            </div>
+                          ) : isLowStock ? (
+                            <div className="inline-flex items-center gap-1 mt-0.5 px-1.5 py-0.5 rounded bg-amber-50 border border-amber-300 text-amber-800 text-[10px] font-bold shadow-2xs">
+                              <span>Tồn thấp ({itemStock.actual}/{itemStock.minSafe})</span>
+                            </div>
+                          ) : (
+                            <div
+                              className={`text-[10px] font-medium truncate max-w-[130px] ml-auto ${
+                                itemStock.actual > 0 ? 'text-blue-600 font-bold' : 'text-slate-400'
+                              }`}
+                              title={`Tồn kho thực tế tại ${warehouseFilter}`}
+                            >
+                              tại {warehouseFilter.replace(/^Kho\s*/i, '')}
+                            </div>
+                          )}
                         </div>
                       </td>
 
                       {/* Khách Đặt */}
-                      <td className="py-3 px-4 text-right font-mono text-slate-500 text-xs">
-                        {itemStock.reserved.toLocaleString('vi-VN')}
+                      <td className="py-3 px-4 text-right font-mono text-xs">
+                        {itemStock.reserved > 0 ? (
+                          <span className="font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
+                            {itemStock.reserved.toLocaleString('vi-VN')}
+                          </span>
+                        ) : (
+                          <span className="text-slate-400">0</span>
+                        )}
                       </td>
 
                       {/* Thời Gian Tạo (Thời gian thực chuẩn) */}
@@ -2833,10 +2973,18 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                       </td>
 
                       {/* Dự Kiến Hết Hàng */}
-                      <td className="py-3 px-4 text-center text-slate-400 text-xs">
-                        {itemStock.actual === 0
-                          ? (itemStock.minSafe > 0 ? '0 ngày' : '---')
-                          : (itemStock.minSafe > 0 && itemStock.actual < itemStock.minSafe ? '3 ngày' : '---')}
+                      <td className="py-3 px-4 text-center text-xs">
+                        {isOutOfStock ? (
+                          <span className="inline-flex items-center gap-1 text-rose-600 font-bold text-[11px] bg-rose-50 px-2 py-0.5 rounded-full border border-rose-200">
+                            <AlertTriangle size={11} /> Hết hàng
+                          </span>
+                        ) : isLowStock ? (
+                          <span className="inline-flex items-center gap-1 text-amber-700 font-bold text-[11px] bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
+                            <Clock size={11} /> Cần nhập gấp
+                          </span>
+                        ) : (
+                          <span className="text-slate-400">---</span>
+                        )}
                       </td>
 
                       {/* Thao Tác Nhanh */}
@@ -2854,8 +3002,12 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                             <button
                               type="button"
                               onClick={() => handleDeleteItem(item)}
-                              title="Xóa hàng hóa"
-                              className="p-1 rounded-md hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition cursor-pointer"
+                              title={itemStock.reserved > 0 ? "Sản phẩm có đơn đặt hàng (chỉ cho phép ngừng kinh doanh)" : "Xóa hàng hóa"}
+                              className={`p-1 rounded-md transition cursor-pointer ${
+                                itemStock.reserved > 0
+                                  ? 'hover:bg-amber-50 text-slate-400 hover:text-amber-600'
+                                  : 'hover:bg-rose-50 text-slate-400 hover:text-rose-600'
+                              }`}
                             >
                               <Trash2 size={13} />
                             </button>
@@ -3728,9 +3880,17 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                             Giá vốn tại {formWarehouse || warehouseFilter} (VNĐ)
                           </label>
                           <input
-                            type="number"
-                            value={formCostPrice}
-                            onChange={(e) => setFormCostPrice(e.target.value)}
+                            type="text"
+                            inputMode="numeric"
+                            value={formatNumberWithCommas(formCostPrice)}
+                            onChange={(e) => {
+                              const raw = e.target.value.replace(/\D/g, '');
+                              setFormCostPrice(raw === '' ? '' : Number(raw));
+                            }}
+                            onBlur={() => {
+                              if (formCostPrice === '') setFormCostPrice(0);
+                            }}
+                            placeholder="0"
                             className="w-full h-9 px-3 rounded-lg border border-slate-200 font-mono text-xs focus:outline-none focus:border-blue-500"
                           />
                         </div>
@@ -3747,9 +3907,17 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                             </button>
                           </div>
                           <input
-                            type="number"
-                            value={formStandardPrice}
-                            onChange={(e) => setFormStandardPrice(e.target.value)}
+                            type="text"
+                            inputMode="numeric"
+                            value={formatNumberWithCommas(formStandardPrice)}
+                            onChange={(e) => {
+                              const raw = e.target.value.replace(/\D/g, '');
+                              setFormStandardPrice(raw === '' ? '' : Number(raw));
+                            }}
+                            onBlur={() => {
+                              if (formStandardPrice === '') setFormStandardPrice(0);
+                            }}
+                            placeholder="0"
                             className="w-full h-9 px-3 rounded-lg border border-slate-200 font-mono font-bold text-blue-700 text-xs focus:outline-none focus:border-blue-500"
                           />
                         </div>
@@ -3780,9 +3948,17 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                           </label>
                           <div className="relative">
                             <input
-                              type="number"
-                              value={formStockQuantity}
-                              onChange={(e) => handleStockQuantityChange(e.target.value)}
+                              type="text"
+                              inputMode="numeric"
+                              value={formatNumberWithCommas(formStockQuantity)}
+                              onChange={(e) => {
+                                const raw = e.target.value.replace(/\D/g, '');
+                                handleStockQuantityChange(raw === '' ? '' : Number(raw));
+                              }}
+                              onBlur={() => {
+                                if (formStockQuantity === '') handleStockQuantityChange(0);
+                              }}
+                              placeholder="0"
                               className="w-full h-9 pl-3 pr-8 rounded-lg border border-slate-200 font-mono font-bold text-slate-900 text-xs focus:outline-none focus:border-blue-500"
                             />
                             <Warehouse size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -3791,18 +3967,34 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                         <div>
                           <label className="block font-semibold text-slate-700 mb-1">Định mức tồn thấp nhất</label>
                           <input
-                            type="number"
-                            value={formMinSafe}
-                            onChange={(e) => setFormMinSafe(e.target.value)}
+                            type="text"
+                            inputMode="numeric"
+                            value={formatNumberWithCommas(formMinSafe)}
+                            onChange={(e) => {
+                              const raw = e.target.value.replace(/\D/g, '');
+                              setFormMinSafe(raw === '' ? '' : Number(raw));
+                            }}
+                            onBlur={() => {
+                              if (formMinSafe === '') setFormMinSafe(0);
+                            }}
+                            placeholder="0"
                             className="w-full h-9 px-3 rounded-lg border border-slate-200 font-mono text-xs focus:outline-none focus:border-blue-500"
                           />
                         </div>
                         <div>
                           <label className="block font-semibold text-slate-700 mb-1">Định mức tồn cao nhất</label>
                           <input
-                            type="number"
-                            value={formMaxSafe}
-                            onChange={(e) => setFormMaxSafe(e.target.value)}
+                            type="text"
+                            inputMode="numeric"
+                            value={formatNumberWithCommas(formMaxSafe)}
+                            onChange={(e) => {
+                              const raw = e.target.value.replace(/\D/g, '');
+                              setFormMaxSafe(raw === '' ? '' : Number(raw));
+                            }}
+                            onBlur={() => {
+                              if (formMaxSafe === '') setFormMaxSafe(999999999);
+                            }}
+                            placeholder="999,999,999"
                             className="w-full h-9 px-3 rounded-lg border border-slate-200 font-mono text-xs focus:outline-none focus:border-blue-500"
                           />
                         </div>
@@ -3868,9 +4060,17 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                             <label className="block font-semibold text-slate-700 mb-1">Trọng lượng</label>
                             <div className="flex items-center gap-2">
                               <input
-                                type="number"
-                                value={formWeight}
-                                onChange={(e) => setFormWeight(e.target.value)}
+                                type="text"
+                                inputMode="numeric"
+                                value={formatNumberWithCommas(formWeight)}
+                                onChange={(e) => {
+                                  const raw = e.target.value.replace(/\D/g, '');
+                                  setFormWeight(raw === '' ? '' : Number(raw));
+                                }}
+                                onBlur={() => {
+                                  if (formWeight === '') setFormWeight(0);
+                                }}
+                                placeholder="0"
                                 className="w-full h-9 px-3 rounded-lg border border-slate-200 font-mono text-xs focus:outline-none focus:border-blue-500"
                               />
                               <div className="w-24 shrink-0">
@@ -4016,11 +4216,12 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                             <span className="text-[11px] text-slate-500 font-medium">Tồn tại kho:</span>
                             <div className="relative w-28">
                               <input
-                                type="number"
-                                min={0}
-                                value={curQty}
+                                type="text"
+                                inputMode="numeric"
+                                value={formatNumberWithCommas(curQty)}
                                 onChange={(e) => {
-                                  const val = Math.max(0, Number(e.target.value) || 0);
+                                  const raw = e.target.value.replace(/\D/g, '');
+                                  const val = raw === '' ? 0 : Number(raw);
                                   const updated = {
                                     ...formWarehouseStocks,
                                     [fac.name]: val,
@@ -4690,26 +4891,38 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                             </td>
                             <td className="py-2 px-3">
                               <input
-                                type="number"
-                                value={v.costPrice}
-                                onChange={(e) => handleUpdateVariantRow(v.id, 'costPrice', Number(e.target.value))}
+                                type="text"
+                                inputMode="numeric"
+                                value={formatNumberWithCommas(v.costPrice)}
+                                onChange={(e) => {
+                                  const raw = e.target.value.replace(/\D/g, '');
+                                  handleUpdateVariantRow(v.id, 'costPrice', raw === '' ? 0 : Number(raw));
+                                }}
                                 className="w-full h-8 px-2 rounded border border-slate-200 text-xs font-mono"
                               />
                             </td>
                             <td className="py-2 px-3">
                               <input
-                                type="number"
-                                value={v.salePrice}
-                                onChange={(e) => handleUpdateVariantRow(v.id, 'salePrice', Number(e.target.value))}
+                                type="text"
+                                inputMode="numeric"
+                                value={formatNumberWithCommas(v.salePrice)}
+                                onChange={(e) => {
+                                  const raw = e.target.value.replace(/\D/g, '');
+                                  handleUpdateVariantRow(v.id, 'salePrice', raw === '' ? 0 : Number(raw));
+                                }}
                                 className="w-full h-8 px-2 rounded border border-slate-200 text-xs font-mono font-bold text-blue-700"
                               />
                             </td>
                             <td className="py-2 px-3">
                               <div className="relative">
                                 <input
-                                  type="number"
-                                  value={v.stock}
-                                  onChange={(e) => handleUpdateVariantRow(v.id, 'stock', Number(e.target.value))}
+                                  type="text"
+                                  inputMode="numeric"
+                                  value={formatNumberWithCommas(v.stock)}
+                                  onChange={(e) => {
+                                    const raw = e.target.value.replace(/\D/g, '');
+                                    handleUpdateVariantRow(v.id, 'stock', raw === '' ? 0 : Number(raw));
+                                  }}
                                   className="w-full h-8 pl-2 pr-6 rounded border border-slate-200 text-xs font-mono"
                                 />
                                 <Warehouse size={12} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -4874,10 +5087,16 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                 </label>
                 <div className="relative">
                   <input
-                    type="number"
-                    min={0}
-                    value={inboundQty}
-                    onChange={(e) => setInboundQty(e.target.value)}
+                    type="text"
+                    inputMode="numeric"
+                    value={formatNumberWithCommas(inboundQty)}
+                    onChange={(e) => {
+                      const raw = e.target.value.replace(/\D/g, '');
+                      setInboundQty(raw === '' ? '' : Number(raw));
+                    }}
+                    onBlur={() => {
+                      if (inboundQty === '') setInboundQty(0);
+                    }}
                     placeholder="Nhập số lượng..."
                     className="w-full h-9 pl-3 pr-12 rounded-lg border border-slate-200 text-xs font-mono font-bold text-slate-900 focus:outline-none focus:border-blue-500"
                     autoFocus
@@ -4906,7 +5125,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                   (w) => w.warehouseName.toLowerCase() === inboundTargetWarehouse.toLowerCase()
                 );
                 const currentBranchStock = curTargetEntry ? Number(curTargetEntry.actualStock) || 0 : 0;
-                const num = Number(inboundQty) || 0;
+                const num = parseCleanNumber(inboundQty);
                 const newBranchStock = inboundType === 'ADD' ? currentBranchStock + num : num;
                 const delta = inboundType === 'ADD' ? num : num - currentBranchStock;
                 const newTotalStock = inboundItem.stockQuantity + delta;

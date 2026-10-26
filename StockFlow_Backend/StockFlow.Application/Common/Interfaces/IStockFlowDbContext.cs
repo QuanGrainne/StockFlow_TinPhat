@@ -21,6 +21,7 @@ public interface IStockFlowDbContext
     DbSet<DtlGoodsReceiptItem> DtlGoodsReceiptItems { get; }
     DbSet<MstPriceBook> MstPriceBooks { get; }
     DbSet<DtlPriceBookItem> DtlPriceBookItems { get; }
+    DbSet<DtlOrderItem> DtlOrderItems { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }
