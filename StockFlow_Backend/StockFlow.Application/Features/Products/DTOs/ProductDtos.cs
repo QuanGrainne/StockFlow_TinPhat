@@ -53,7 +53,8 @@ public record ProductDto(
     string? ImageUrl = null,
     string? VariantsJson = null,
     string? Description = null,
-    DateTime? CreatedAt = null
+    DateTime? CreatedAt = null,
+    List<ProductWarehouseStockDto>? Warehouses = null
 );
 
 public record ProductWarehouseStockDto(
