@@ -282,6 +282,43 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                     b.ToTable("dtl_order_items", "stockflow");
                 });
 
+            modelBuilder.Entity("StockFlow.Domain.Entities.DtlPriceBookItem", b =>
+                {
+                    b.Property<int>("PriceBookItemId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("price_book_item_id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("PriceBookItemId"));
+
+                    b.Property<decimal>("Price")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("price");
+
+                    b.Property<int>("PriceBookId")
+                        .HasColumnType("integer")
+                        .HasColumnName("price_book_id");
+
+                    b.Property<int>("ProductId")
+                        .HasColumnType("integer")
+                        .HasColumnName("product_id");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("PriceBookItemId")
+                        .HasName("dtl_price_book_items_pkey");
+
+                    b.HasIndex("ProductId");
+
+                    b.HasIndex(new[] { "PriceBookId", "ProductId" }, "uq_dtl_price_book_items_book_product")
+                        .IsUnique();
+
+                    b.ToTable("dtl_price_book_items", "stockflow");
+                });
+
             modelBuilder.Entity("StockFlow.Domain.Entities.DtlReturnRequestItem", b =>
                 {
                     b.Property<int>("ReturnItemId")
@@ -701,6 +738,120 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                     b.HasIndex("ProductId");
 
                     b.ToTable("mst_inventory_lots", "stockflow");
+                });
+
+            modelBuilder.Entity("StockFlow.Domain.Entities.MstPriceBook", b =>
+                {
+                    b.Property<int>("PriceBookId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("price_book_id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("PriceBookId"));
+
+                    b.Property<bool>("AllowUnlistedProducts")
+                        .HasColumnType("boolean")
+                        .HasColumnName("allow_unlisted_products");
+
+                    b.Property<DateTime?>("CreatedAt")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTime?>("EffectiveFrom")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("effective_from");
+
+                    b.Property<DateTime?>("EffectiveTo")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("effective_to");
+
+                    b.Property<int?>("FormulaBasePriceBookId")
+                        .HasColumnType("integer")
+                        .HasColumnName("formula_base_price_book_id");
+
+                    b.Property<string>("FormulaBaseType")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("formula_base_type");
+
+                    b.Property<string>("FormulaOperator")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("formula_operator");
+
+                    b.Property<string>("FormulaUnit")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("formula_unit");
+
+                    b.Property<decimal?>("FormulaValue")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("formula_value");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<bool>("IsDefault")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_default");
+
+                    b.Property<string>("PriceBookCode")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("price_book_code");
+
+                    b.Property<string>("PriceBookName")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("price_book_name");
+
+                    b.Property<string>("ScopeBranchType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("scope_branch_type");
+
+                    b.Property<string>("ScopeCustomerGroupCodes")
+                        .HasColumnType("text")
+                        .HasColumnName("scope_customer_group_codes");
+
+                    b.Property<string>("ScopeCustomerType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("scope_customer_type");
+
+                    b.Property<string>("ScopeUserIds")
+                        .HasColumnType("text")
+                        .HasColumnName("scope_user_ids");
+
+                    b.Property<string>("ScopeUserType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("scope_user_type");
+
+                    b.Property<string>("ScopeWarehouseIds")
+                        .HasColumnType("text")
+                        .HasColumnName("scope_warehouse_ids");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<bool>("WarnUnlistedProducts")
+                        .HasColumnType("boolean")
+                        .HasColumnName("warn_unlisted_products");
+
+                    b.HasKey("PriceBookId")
+                        .HasName("mst_price_books_pkey");
+
+                    b.HasIndex("FormulaBasePriceBookId");
+
+                    b.ToTable("mst_price_books", "stockflow");
                 });
 
             modelBuilder.Entity("StockFlow.Domain.Entities.MstProduct", b =>
@@ -2357,6 +2508,27 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                     b.Navigation("Unit");
                 });
 
+            modelBuilder.Entity("StockFlow.Domain.Entities.DtlPriceBookItem", b =>
+                {
+                    b.HasOne("StockFlow.Domain.Entities.MstPriceBook", "PriceBook")
+                        .WithMany("DtlPriceBookItems")
+                        .HasForeignKey("PriceBookId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_dtl_price_book_items_price_book_id");
+
+                    b.HasOne("StockFlow.Domain.Entities.MstProduct", "Product")
+                        .WithMany("DtlPriceBookItems")
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_dtl_price_book_items_product_id");
+
+                    b.Navigation("PriceBook");
+
+                    b.Navigation("Product");
+                });
+
             modelBuilder.Entity("StockFlow.Domain.Entities.DtlReturnRequestItem", b =>
                 {
                     b.HasOne("StockFlow.Domain.Entities.DtlOrderItem", "OrderItem")
@@ -2560,6 +2732,17 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_mst_inventory_lots_product_id");
 
                     b.Navigation("Product");
+                });
+
+            modelBuilder.Entity("StockFlow.Domain.Entities.MstPriceBook", b =>
+                {
+                    b.HasOne("StockFlow.Domain.Entities.MstPriceBook", "FormulaBasePriceBook")
+                        .WithMany()
+                        .HasForeignKey("FormulaBasePriceBookId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_mst_price_books_base_price_book_id");
+
+                    b.Navigation("FormulaBasePriceBook");
                 });
 
             modelBuilder.Entity("StockFlow.Domain.Entities.MstProduct", b =>
@@ -3178,6 +3361,11 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                     b.Navigation("TrxInventoryTransactions");
                 });
 
+            modelBuilder.Entity("StockFlow.Domain.Entities.MstPriceBook", b =>
+                {
+                    b.Navigation("DtlPriceBookItems");
+                });
+
             modelBuilder.Entity("StockFlow.Domain.Entities.MstProduct", b =>
                 {
                     b.Navigation("DtlBomItems");
@@ -3187,6 +3375,8 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                     b.Navigation("DtlInventoryDisposalItems");
 
                     b.Navigation("DtlOrderItems");
+
+                    b.Navigation("DtlPriceBookItems");
 
                     b.Navigation("DtlReturnRequestItems");
 

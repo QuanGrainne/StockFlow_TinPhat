@@ -86,5 +86,7 @@ public partial class MstProduct
     public virtual ICollection<TrxProductionMaterialRequirement> TrxProductionMaterialRequirements { get; set; } = new List<TrxProductionMaterialRequirement>();
 
     public virtual ICollection<TrxProductionOrder> TrxProductionOrders { get; set; } = new List<TrxProductionOrder>();
+
+    public virtual ICollection<DtlPriceBookItem> DtlPriceBookItems { get; set; } = new List<DtlPriceBookItem>();
 }
 

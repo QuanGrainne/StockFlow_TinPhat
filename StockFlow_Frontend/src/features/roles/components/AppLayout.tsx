@@ -5,6 +5,7 @@ import { Header } from './common/Header';
 import { Sidebar } from './common/Sidebar';
 import { GoodsCatalogScreen } from './common/GoodsCatalogScreen';
 import SuppliersClient from '@/app/(dashboard)/suppliers/SuppliersClient';
+import PriceBooksClient from '@/features/price-books/screens/PriceBooksClient';
 import { permissionService } from '../services/permissionService';
 
 interface AppLayoutProps {
@@ -19,6 +20,8 @@ const SCREEN_MODULE_MAP: Record<string, string> = {
   'admin-warehouse-perms': 'AUTH',
   'admin-warehouse-facilities': 'AUTH',
   'admin-goods': 'GOODS',
+  'admin-price-books': 'GOODS',
+  'price-books': 'GOODS',
   'manager-bom': 'BOM',
   'manager-partners': 'PARTNER',
   'manager-cashflow': 'FIN',
@@ -304,6 +307,10 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ initialScreen }) => {
       case 'production-goods':
       case 'products':
         return <GoodsCatalogScreen onNavigate={handleNavigate} currentRole={currentRole} />;
+
+      case 'admin-price-books':
+      case 'price-books':
+        return <PriceBooksClient />;
 
       default:
         if (currentRole === 'SALES') return <SalesDashboard onNavigate={handleNavigate} />;

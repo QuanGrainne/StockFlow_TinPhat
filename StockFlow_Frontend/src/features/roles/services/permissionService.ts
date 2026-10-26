@@ -65,7 +65,7 @@ export const permissionService = {
           .filter((w: any) => w.isActive !== false && w.status !== 'INACTIVE')
           .map((w: any, index: number) => ({
             id: w.code || (w.warehouseId ? `FAC-${w.warehouseId}` : `FAC-${index + 1}`),
-            warehouseId: typeof w.warehouseId === 'number' ? w.warehouseId : (w.id ? Number(String(w.id).replace(/\D/g, '')) : undefined),
+            warehouseId: typeof w.warehouseId === 'number' ? w.warehouseId : (typeof w.id === 'number' ? w.id : (w.id ? Number(String(w.id).replace(/\D/g, '')) : undefined)),
             code: (w.code || w.warehouseCode || `WH-${w.warehouseId}`).toUpperCase(),
             name: w.name || w.warehouseName || `Kho #${w.warehouseId}`,
             address: w.address || 'Hà Nội, Việt Nam',
@@ -116,7 +116,7 @@ export const permissionService = {
           .filter((w: any) => w.isActive !== false && w.status !== 'INACTIVE')
           .map((w: any, index: number) => ({
             id: w.code || (w.warehouseId ? `FAC-${w.warehouseId}` : `FAC-${index + 1}`),
-            warehouseId: typeof w.warehouseId === 'number' ? w.warehouseId : (w.id ? Number(String(w.id).replace(/\D/g, '')) : undefined),
+            warehouseId: typeof w.warehouseId === 'number' ? w.warehouseId : (typeof w.id === 'number' ? w.id : (w.id ? Number(String(w.id).replace(/\D/g, '')) : undefined)),
             code: (w.code || w.warehouseCode || `WH-${w.warehouseId}`).toUpperCase(),
             name: w.name || w.warehouseName || `Kho #${w.warehouseId}`,
             address: w.address || 'Hà Nội, Việt Nam',
@@ -159,6 +159,7 @@ export const permissionService = {
 
     const newFacility: WarehouseFacility = {
       id: createdApi?.code || payload.code.trim().toUpperCase(),
+      warehouseId: typeof createdApi?.warehouseId === 'number' ? createdApi.warehouseId : undefined,
       code: (createdApi?.code || payload.code).trim().toUpperCase(),
       name: createdApi?.name || payload.name.trim(),
       address: createdApi?.address || payload.address.trim(),
@@ -178,6 +179,109 @@ export const permissionService = {
     }
 
     return newFacility;
+  },
+
+  async updateWarehouseFacility(
+    idOrCode: string | number,
+    payload: {
+      name: string;
+      address: string;
+      area?: string;
+      isActive?: boolean;
+    }
+  ): Promise<WarehouseFacility> {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('stockflow_token') ?? undefined : undefined;
+    const target = warehouseFacilities.find(
+      (w) =>
+        (typeof idOrCode === 'number' && w.warehouseId === idOrCode) ||
+        w.id === String(idOrCode) ||
+        w.code === String(idOrCode)
+    );
+    const numericId = target?.warehouseId || (typeof idOrCode === 'number' ? idOrCode : parseInt(String(idOrCode).replace(/\D/g, ''), 10));
+
+    let updatedApi: any = null;
+    if (!isNaN(numericId) && numericId > 0) {
+      try {
+        updatedApi = await apiClient.put<any>(
+          `/api/warehouses/${numericId}`,
+          {
+            warehouseName: payload.name.trim(),
+            address: payload.address.trim(),
+            description: payload.area?.trim() || '3,500 m²',
+            isActive: payload.isActive ?? true,
+          },
+          token
+        );
+      } catch (err) {
+        console.error('API updateWarehouse failed:', err);
+        throw err;
+      }
+    }
+
+    const updatedFacility: WarehouseFacility = {
+      ...(target || {
+        id: String(idOrCode),
+        code: String(idOrCode),
+        staffCount: 0,
+        status: 'ACTIVE',
+      }),
+      warehouseId: updatedApi?.warehouseId || target?.warehouseId || (numericId > 0 ? numericId : undefined),
+      name: updatedApi?.name || payload.name.trim(),
+      address: updatedApi?.address || payload.address.trim(),
+      area: updatedApi?.area || updatedApi?.description || payload.area?.trim() || (target?.area ?? '3,500 m²'),
+      status: updatedApi?.status === 'INACTIVE' ? 'INACTIVE' : 'ACTIVE',
+    };
+
+    warehouseFacilities = warehouseFacilities.map((w) =>
+      w.code === updatedFacility.code || w.id === updatedFacility.id || (w.warehouseId && w.warehouseId === updatedFacility.warehouseId)
+        ? updatedFacility
+        : w
+    );
+
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem(WAREHOUSE_STORAGE_KEY, JSON.stringify(warehouseFacilities));
+      } catch (e) {
+        console.warn('Cannot write warehouse cache:', e);
+      }
+    }
+
+    return updatedFacility;
+  },
+
+  async deleteWarehouseFacility(idOrCode: string | number): Promise<boolean> {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('stockflow_token') ?? undefined : undefined;
+    const target = warehouseFacilities.find(
+      (w) =>
+        (typeof idOrCode === 'number' && w.warehouseId === idOrCode) ||
+        w.id === String(idOrCode) ||
+        w.code === String(idOrCode)
+    );
+    const numericId = target?.warehouseId || (typeof idOrCode === 'number' ? idOrCode : parseInt(String(idOrCode).replace(/\D/g, ''), 10));
+
+    if (!isNaN(numericId) && numericId > 0) {
+      try {
+        await apiClient.delete<any>(`/api/warehouses/${numericId}`, token);
+      } catch (err: any) {
+        console.error('API deleteWarehouse failed:', err);
+        throw new Error(err.message || 'Không thể xóa cơ sở kho từ máy chủ');
+      }
+    }
+
+    warehouseFacilities = warehouseFacilities.filter(
+      (w) =>
+        !(w.code === String(idOrCode) || w.id === String(idOrCode) || (numericId > 0 && w.warehouseId === numericId))
+    );
+
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem(WAREHOUSE_STORAGE_KEY, JSON.stringify(warehouseFacilities));
+      } catch (e) {
+        console.warn('Cannot write warehouse cache:', e);
+      }
+    }
+
+    return true;
   },
 
   async updateWarehousePermissions(staffId: string, assignedWarehouses: string[]): Promise<StaffAccount> {
@@ -456,10 +560,10 @@ export const NAVBAR_FEATURES: NavFeatureConfig[] = [
   },
   {
     id: 'feat-goods',
-    name: 'Danh mục hàng hóa',
-    desc: 'Quản trị danh mục sản phẩm, vật tư, đơn vị tính và thẻ kho',
+    name: 'Danh mục hàng hóa & Bảng giá',
+    desc: 'Quản trị danh mục sản phẩm, vật tư, đơn vị tính, thẻ kho và thiết lập bảng giá',
     moduleKey: 'GOODS',
-    tabIds: ['admin-goods', 'warehouse-goods', 'production-goods', 'goods-catalog'],
+    tabIds: ['admin-goods', 'admin-price-books', 'price-books', 'warehouse-goods', 'production-goods', 'goods-catalog'],
   },
   {
     id: 'feat-sales',

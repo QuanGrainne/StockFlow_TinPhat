@@ -649,7 +649,7 @@ export const INITIAL_STAFF_ACCOUNTS: StaffAccount[] = [
     department: 'Quản trị hệ thống',
     role: 'ADMIN',
     roleTitle: 'Quản trị viên',
-    assignedWarehouses: ['WH-HN-01', 'WH-HN-02', 'WH-HN-03', 'WH-HN-04'],
+    assignedWarehouses: ['K001', 'K002', 'K003', 'K004'],
     status: 'ACTIVE',
   },
   {
@@ -662,7 +662,7 @@ export const INITIAL_STAFF_ACCOUNTS: StaffAccount[] = [
     department: 'Ban Giám đốc',
     role: 'MANAGER',
     roleTitle: 'Quản lý',
-    assignedWarehouses: ['WH-HN-01', 'WH-HN-02'],
+    assignedWarehouses: ['K001', 'K002'],
     status: 'ACTIVE',
   },
   {
@@ -675,7 +675,7 @@ export const INITIAL_STAFF_ACCOUNTS: StaffAccount[] = [
     department: 'Phòng Kinh doanh',
     role: 'SALES',
     roleTitle: 'Nhân viên bán hàng',
-    assignedWarehouses: ['WH-HN-01', 'WH-HN-03'],
+    assignedWarehouses: ['K001', 'K003'],
     status: 'ACTIVE',
   },
   {
@@ -688,7 +688,7 @@ export const INITIAL_STAFF_ACCOUNTS: StaffAccount[] = [
     department: 'Kho vận & Logistics',
     role: 'WAREHOUSE',
     roleTitle: 'Nhân viên kho',
-    assignedWarehouses: ['WH-HN-01'],
+    assignedWarehouses: ['K001'],
     status: 'ACTIVE',
   },
   {
@@ -701,7 +701,7 @@ export const INITIAL_STAFF_ACCOUNTS: StaffAccount[] = [
     department: 'Xưởng Sản xuất',
     role: 'PRODUCTION',
     roleTitle: 'Nhân viên sản xuất',
-    assignedWarehouses: ['WH-HN-02'],
+    assignedWarehouses: ['K002'],
     status: 'ACTIVE',
   },
   {
@@ -714,15 +714,16 @@ export const INITIAL_STAFF_ACCOUNTS: StaffAccount[] = [
     department: 'Kho vận & Logistics',
     role: 'WAREHOUSE',
     roleTitle: 'Nhân viên kho',
-    assignedWarehouses: ['WH-HN-02'],
+    assignedWarehouses: ['K002'],
     status: 'LOCKED',
   },
 ];
 
 export const INITIAL_WAREHOUSE_FACILITIES: WarehouseFacility[] = [
   {
-    id: 'FAC-01',
-    code: 'WH-HN-01',
+    id: 'K001',
+    warehouseId: 1,
+    code: 'K001',
     name: 'Kho Tổng Gia Lâm',
     address: 'Số 18 Đường Dệt May, Gia Lâm, Hà Nội',
     staffCount: 4,
@@ -730,8 +731,9 @@ export const INITIAL_WAREHOUSE_FACILITIES: WarehouseFacility[] = [
     status: 'ACTIVE',
   },
   {
-    id: 'FAC-02',
-    code: 'WH-HN-02',
+    id: 'K002',
+    warehouseId: 2,
+    code: 'K002',
     name: 'Kho Đông Anh',
     address: 'CCN Nguyên Khê, Đông Anh, Hà Nội',
     staffCount: 4,
@@ -739,8 +741,9 @@ export const INITIAL_WAREHOUSE_FACILITIES: WarehouseFacility[] = [
     status: 'ACTIVE',
   },
   {
-    id: 'FAC-03',
-    code: 'WH-HN-03',
+    id: 'K003',
+    warehouseId: 3,
+    code: 'K003',
     name: 'Kho Hà Đông',
     address: 'Km14 Quốc lộ 6, Yên Nghĩa, Hà Đông, Hà Nội',
     staffCount: 2,
@@ -748,8 +751,9 @@ export const INITIAL_WAREHOUSE_FACILITIES: WarehouseFacility[] = [
     status: 'ACTIVE',
   },
   {
-    id: 'FAC-04',
-    code: 'WH-HN-04',
+    id: 'K004',
+    warehouseId: 4,
+    code: 'K004',
     name: 'Kho Hoàn Kiếm',
     address: '42 Phố Trần Hưng Đạo, Hoàn Kiếm, Hà Nội',
     staffCount: 1,

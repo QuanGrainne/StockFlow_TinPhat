@@ -201,29 +201,27 @@ public class DeleteWarehouseCommandHandler : IRequestHandler<DeleteWarehouseComm
             return Result.Failure<bool>("Không tìm thấy kho.");
         }
 
+        // Kiểm tra nếu kho đang có nhân sự trực thuộc thì không cho xóa
+        if (warehouse.JncUserWarehouseAccesses.Any())
+        {
+            return Result.Failure<bool>($"Không thể xóa cơ sở kho '{warehouse.WarehouseName}' vì đang có {warehouse.JncUserWarehouseAccesses.Count} nhân sự được phân quyền trực thuộc. Vui lòng gỡ hoặc chuyển hết nhân sự sang kho khác trước khi xóa.");
+        }
+
         var hasInventory = warehouse.TrxInventoryBalances.Any(b => (b.Quantity ?? 0) > 0);
         if (hasInventory)
         {
-            // Soft-deactivate if warehouse has inventory stock
-            warehouse.IsActive = false;
-            await _context.SaveChangesAsync(cancellationToken);
-            return Result.Success(true);
+            return Result.Failure<bool>($"Không thể xóa cơ sở kho '{warehouse.WarehouseName}' vì kho đang có hàng tồn kho. Vui lòng điều chuyển hoặc xuất toàn bộ tồn kho trước khi xóa.");
         }
 
         try
         {
-            // Remove user accesses first
-            _context.JncUserWarehouseAccesses.RemoveRange(warehouse.JncUserWarehouseAccesses);
             _context.MstWarehouses.Remove(warehouse);
             await _context.SaveChangesAsync(cancellationToken);
             return Result.Success(true);
         }
-        catch
+        catch (Exception ex)
         {
-            // Fallback soft deactivate on foreign key constraint
-            warehouse.IsActive = false;
-            await _context.SaveChangesAsync(cancellationToken);
-            return Result.Success(true);
+            return Result.Failure<bool>($"Không thể xóa kho do có dữ liệu liên kết trong hệ thống ({ex.Message}).");
         }
     }
 }

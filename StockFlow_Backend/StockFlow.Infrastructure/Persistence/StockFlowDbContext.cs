@@ -95,7 +95,9 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
 
     public virtual DbSet<TrxStocktake> TrxStocktakes { get; set; }
 
-    
+    public virtual DbSet<MstPriceBook> MstPriceBooks { get; set; }
+
+    public virtual DbSet<DtlPriceBookItem> DtlPriceBookItems { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -1709,6 +1711,99 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
             entity.HasOne(d => d.User).WithMany(p => p.JncUserWarehouseAccesses)
                 .HasForeignKey(d => d.UserId)
                 .HasConstraintName("fk_jnc_user_warehouse_access_user_id");
+        });
+
+        modelBuilder.Entity<MstPriceBook>(entity =>
+        {
+            entity.HasKey(e => e.PriceBookId).HasName("mst_price_books_pkey");
+
+            entity.ToTable("mst_price_books", "stockflow");
+
+            entity.Property(e => e.PriceBookId).HasColumnName("price_book_id");
+            entity.Property(e => e.PriceBookCode)
+                .HasMaxLength(50)
+                .HasColumnName("price_book_code");
+            entity.Property(e => e.PriceBookName)
+                .HasMaxLength(255)
+                .HasColumnName("price_book_name");
+            entity.Property(e => e.EffectiveFrom)
+                .HasColumnType("timestamp without time zone")
+                .HasColumnName("effective_from");
+            entity.Property(e => e.EffectiveTo)
+                .HasColumnType("timestamp without time zone")
+                .HasColumnName("effective_to");
+            entity.Property(e => e.IsActive).HasColumnName("is_active");
+            entity.Property(e => e.IsDefault).HasColumnName("is_default");
+            entity.Property(e => e.FormulaBaseType)
+                .HasMaxLength(50)
+                .HasColumnName("formula_base_type");
+            entity.Property(e => e.FormulaBasePriceBookId).HasColumnName("formula_base_price_book_id");
+            entity.Property(e => e.FormulaOperator)
+                .HasMaxLength(10)
+                .HasColumnName("formula_operator");
+            entity.Property(e => e.FormulaValue)
+                .HasPrecision(18, 2)
+                .HasColumnName("formula_value");
+            entity.Property(e => e.FormulaUnit)
+                .HasMaxLength(20)
+                .HasColumnName("formula_unit");
+            entity.Property(e => e.AllowUnlistedProducts).HasColumnName("allow_unlisted_products");
+            entity.Property(e => e.WarnUnlistedProducts).HasColumnName("warn_unlisted_products");
+            entity.Property(e => e.ScopeBranchType)
+                .HasMaxLength(20)
+                .HasColumnName("scope_branch_type");
+            entity.Property(e => e.ScopeWarehouseIds).HasColumnName("scope_warehouse_ids");
+            entity.Property(e => e.ScopeCustomerType)
+                .HasMaxLength(20)
+                .HasColumnName("scope_customer_type");
+            entity.Property(e => e.ScopeCustomerGroupCodes).HasColumnName("scope_customer_group_codes");
+            entity.Property(e => e.ScopeUserType)
+                .HasMaxLength(20)
+                .HasColumnName("scope_user_type");
+            entity.Property(e => e.ScopeUserIds).HasColumnName("scope_user_ids");
+            entity.Property(e => e.CreatedAt)
+                .HasColumnType("timestamp without time zone")
+                .HasColumnName("created_at");
+            entity.Property(e => e.UpdatedAt)
+                .HasColumnType("timestamp without time zone")
+                .HasColumnName("updated_at");
+
+            entity.HasOne(d => d.FormulaBasePriceBook)
+                .WithMany()
+                .HasForeignKey(d => d.FormulaBasePriceBookId)
+                .OnDelete(DeleteBehavior.SetNull)
+                .HasConstraintName("fk_mst_price_books_base_price_book_id");
+        });
+
+        modelBuilder.Entity<DtlPriceBookItem>(entity =>
+        {
+            entity.HasKey(e => e.PriceBookItemId).HasName("dtl_price_book_items_pkey");
+
+            entity.ToTable("dtl_price_book_items", "stockflow");
+
+            entity.HasIndex(e => new { e.PriceBookId, e.ProductId }, "uq_dtl_price_book_items_book_product").IsUnique();
+
+            entity.Property(e => e.PriceBookItemId).HasColumnName("price_book_item_id");
+            entity.Property(e => e.PriceBookId).HasColumnName("price_book_id");
+            entity.Property(e => e.ProductId).HasColumnName("product_id");
+            entity.Property(e => e.Price)
+                .HasPrecision(18, 2)
+                .HasColumnName("price");
+            entity.Property(e => e.UpdatedAt)
+                .HasColumnType("timestamp without time zone")
+                .HasColumnName("updated_at");
+
+            entity.HasOne(d => d.PriceBook)
+                .WithMany(p => p.DtlPriceBookItems)
+                .HasForeignKey(d => d.PriceBookId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("fk_dtl_price_book_items_price_book_id");
+
+            entity.HasOne(d => d.Product)
+                .WithMany(p => p.DtlPriceBookItems)
+                .HasForeignKey(d => d.ProductId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("fk_dtl_price_book_items_product_id");
         });
 
         OnModelCreatingPartial(modelBuilder);
