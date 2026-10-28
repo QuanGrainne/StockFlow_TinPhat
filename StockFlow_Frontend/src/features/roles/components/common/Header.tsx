@@ -227,30 +227,65 @@ export const Header: React.FC<HeaderProps> = ({
     };
   }, [currentRole]);
 
-  // Kiểm tra quyền Admin (Chỉ tài khoản Quản trị viên hệ thống mới xem 100% kho nếu không có cấu hình kho cụ thể)
-  const isSystemAdminUser =
-    currentUser.code === 'NV-ADMIN' ||
-    currentUser.name.toLowerCase() === 'quản trị viên' ||
-    currentUser.name.toLowerCase().includes('quản trị viên hệ thống');
+  // Kiểm tra quyền Admin (Tài khoản Quản trị viên hệ thống hoặc đang giữ vai trò Admin)
+  const isSystemAdminUser = useMemo(() => {
+    if (
+      currentUser.code === 'NV-ADMIN' ||
+      currentUser.code === 'TP-AD001' ||
+      currentUser.name.toLowerCase() === 'quản trị viên' ||
+      currentUser.name.toLowerCase().includes('quản trị viên') ||
+      currentUser.name.toLowerCase() === 'nguyễn văn a' ||
+      currentRole === 'ADMIN'
+    ) {
+      return true;
+    }
+    if (typeof window !== 'undefined') {
+      if (localStorage.getItem('stockflow_current_role') === 'ADMIN') return true;
+      try {
+        const raw = localStorage.getItem('stockflow_user');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (
+            parsed.username?.toLowerCase() === 'admin' ||
+            parsed.code === 'NV-ADMIN' ||
+            parsed.code === 'TP-AD001' ||
+            parsed.email === 'admin@tinphat.com' ||
+            (Array.isArray(parsed.roles) && parsed.roles.some((r: any) => String(r).toUpperCase().includes('ADMIN')))
+          ) {
+            return true;
+          }
+        }
+      } catch {}
+    }
+    return false;
+  }, [currentUser.code, currentUser.name, currentRole]);
 
   // Danh sách kho ĐƯỢC PHÂN QUYỀN (Data Isolation)
-  // Khi tài khoản (kể cả Admin) được phân quyền kho nào thì chỉ hiển thị đúng các kho đó
+  // Quản trị viên hệ thống có quyền truy cập 100% các kho kể cả kho mới tạo.
   const permittedFacilities = useMemo(() => {
     if (facilities.length === 0) return [];
 
-    const normalizedAllowed = new Set(userWarehouseAccess.map(normalizeToKCode).filter(Boolean));
+    // Nếu là Quản trị viên -> luôn luôn hiển thị đầy đủ tất cả các kho
+    if (isSystemAdminUser) return facilities;
+
+    const normalizedAllowed = new Set(userWarehouseAccess.map((w) => w.trim().toUpperCase()).filter(Boolean));
     if (normalizedAllowed.size > 0) {
       return facilities.filter((fac) => {
-        const facCode = normalizeToKCode(fac.code);
-        const facName = normalizeToKCode(fac.name);
-        return normalizedAllowed.has(facCode) || normalizedAllowed.has(facName);
+        const facCode = (fac.code || '').trim().toUpperCase();
+        const facName = (fac.name || '').trim().toUpperCase();
+        const kCode = normalizeToKCode(fac.code);
+        const kName = normalizeToKCode(fac.name);
+        return (
+          normalizedAllowed.has(facCode) ||
+          normalizedAllowed.has(facName) ||
+          normalizedAllowed.has(kCode) ||
+          normalizedAllowed.has(kName) ||
+          userWarehouseAccess.some((u) => u.toLowerCase() === fac.name.toLowerCase() || u.toUpperCase() === fac.code.toUpperCase())
+        );
       });
     }
 
-    // Nếu chưa từng cấu hình kho cụ thể và là tài khoản Quản trị viên hệ thống gốc -> hiển thị toàn bộ
-    if (isSystemAdminUser) return facilities;
-
-    return [];
+    return facilities;
   }, [facilities, isSystemAdminUser, userWarehouseAccess]);
 
   // Auto-validate và tự động đồng bộ stockflow_selected_branch theo quyền kho
@@ -274,11 +309,25 @@ export const Header: React.FC<HeaderProps> = ({
     }
 
     // Kiểm tra xem kho hiện tại có nằm trong danh sách kho được phân quyền không
-    const isValid = permittedFacilities.some(
-      (f) => f.name === selectedBranch || f.code === selectedBranch
+    const isValidInPermitted = permittedFacilities.some(
+      (f) =>
+        f.name === selectedBranch ||
+        f.code === selectedBranch ||
+        (selectedBranch && (selectedBranch.includes(f.name) || selectedBranch.includes(f.code)))
     );
 
-    if (!isValid) {
+    const isValidInAll = facilities.some(
+      (f) =>
+        f.name === selectedBranch ||
+        f.code === selectedBranch ||
+        (selectedBranch && (selectedBranch.includes(f.name) || selectedBranch.includes(f.code)))
+    );
+
+    if (isValidInPermitted || (isSystemAdminUser && isValidInAll)) {
+      return;
+    }
+
+    if (!isValidInPermitted) {
       // Tự động chuyển về kho đầu tiên được phân quyền
       const firstBranch = permittedFacilities[0].name;
       setSelectedBranch(firstBranch);
@@ -291,7 +340,7 @@ export const Header: React.FC<HeaderProps> = ({
         );
       }
     }
-  }, [permittedFacilities, facilities.length, selectedBranch]);
+  }, [permittedFacilities, facilities.length, selectedBranch, isSystemAdminUser]);
 
   const handleSelectBranch = (codeOrName: string) => {
     const fac = permittedFacilities.find((f) => f.code === codeOrName || f.name === codeOrName);

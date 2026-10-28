@@ -1175,7 +1175,10 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
     if (facilities.length === 0 || permittedFacilities.length === 0) return;
 
     const isValid = permittedFacilities.some(
-      (f) => f.name === warehouseFilter || f.code === warehouseFilter
+      (f) =>
+        f.name === warehouseFilter ||
+        f.code === warehouseFilter ||
+        (warehouseFilter && (warehouseFilter.includes(f.name) || warehouseFilter.includes(f.code)))
     );
 
     if (!isValid) {
