@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace StockFlow.Domain.Entities;
@@ -16,6 +16,8 @@ public partial class TrxStockTransfer
     public int CreatedBy { get; set; }
 
     public DateTime? TransferDate { get; set; }
+
+    public DateTime? ReceivedDate { get; set; }
 
     public string? Status { get; set; }
 

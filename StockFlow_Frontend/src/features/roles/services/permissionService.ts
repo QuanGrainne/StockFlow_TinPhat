@@ -465,6 +465,16 @@ export const permissionService = {
       if (saved) {
         try {
           matrix = JSON.parse(saved);
+          // One-time cleanup: đảm bảo tính năng chuyển hàng không bị tự động bật mặc định
+          if (!localStorage.getItem('stockflow_transfers_default_cleaned_v2')) {
+            for (const r in matrix) {
+              if (Array.isArray(matrix[r])) {
+                matrix[r] = matrix[r].filter((id: string) => id !== 'feat-transfers');
+              }
+            }
+            localStorage.setItem('stockflow_feature_matrix', JSON.stringify(matrix));
+            localStorage.setItem('stockflow_transfers_default_cleaned_v2', 'true');
+          }
         } catch {}
       }
     }
@@ -564,6 +574,13 @@ export const NAVBAR_FEATURES: NavFeatureConfig[] = [
     desc: 'Quản trị danh mục sản phẩm, vật tư, đơn vị tính, thẻ kho và thiết lập bảng giá',
     moduleKey: 'GOODS',
     tabIds: ['admin-goods', 'admin-price-books', 'price-books', 'warehouse-goods', 'production-goods', 'goods-catalog'],
+  },
+  {
+    id: 'feat-transfers',
+    name: 'Chuyển hàng (Chuyển kho)',
+    desc: 'Tạo phiếu chuyển kho, theo dõi hàng đang chuyển và xác nhận nhập kho đích',
+    moduleKey: 'TRANSFER',
+    tabIds: ['transfers', 'admin-transfers', 'manager-transfers', 'sales-transfers', 'warehouse-transfers', 'warehouse-transfer'],
   },
   {
     id: 'feat-sales',

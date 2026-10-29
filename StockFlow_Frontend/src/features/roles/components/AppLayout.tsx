@@ -7,6 +7,7 @@ import { GoodsCatalogScreen } from './common/GoodsCatalogScreen';
 import SuppliersClient from '@/app/(dashboard)/suppliers/SuppliersClient';
 import PurchasesClient from '@/app/(dashboard)/purchases/PurchasesClient';
 import PriceBooksClient from '@/features/price-books/screens/PriceBooksClient';
+import TransfersClient from '@/app/(dashboard)/transfers/TransfersClient';
 import { permissionService } from '../services/permissionService';
 
 interface AppLayoutProps {
@@ -42,6 +43,9 @@ const SCREEN_MODULE_MAP: Record<string, string> = {
   'production-logs': 'PROD',
   'goods-catalog': 'GOODS',
   'purchases': 'PURCHASE',
+  'transfers': 'TRANSFER',
+  'admin-transfers': 'TRANSFER',
+  'manager-transfers': 'TRANSFER',
 };
 
 // Sales Screens
@@ -166,7 +170,9 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ initialScreen }) => {
         window.history.pushState(null, '', '/purchases');
       } else if (newScreen === 'goods-catalog' || newScreen === 'products' || newScreen === '/products') {
         window.history.pushState(null, '', '/products');
-      } else if (window.location.pathname.includes('/suppliers') || window.location.pathname.includes('/purchases') || window.location.pathname.includes('/products')) {
+      } else if (newScreen === 'transfers' || newScreen === '/transfers' || newScreen === 'admin-transfers' || newScreen === 'manager-transfers') {
+        window.history.pushState(null, '', '/transfers');
+      } else if (window.location.pathname.includes('/suppliers') || window.location.pathname.includes('/purchases') || window.location.pathname.includes('/products') || window.location.pathname.includes('/transfers')) {
         window.history.pushState(null, '', '/dashboard');
       }
     }
@@ -324,6 +330,12 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ initialScreen }) => {
       case 'price-books':
         return <PriceBooksClient />;
 
+      case 'transfers':
+      case 'admin-transfers':
+      case 'manager-transfers':
+      case 'warehouse-transfer':
+        return <TransfersClient />;
+
       default:
         if (currentRole === 'SALES') return <SalesDashboard onNavigate={handleNavigate} />;
         if (currentRole === 'MANAGER') return <ManagerDashboard onNavigate={handleNavigate} />;
@@ -359,7 +371,9 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ initialScreen }) => {
       {/* 2. Main Workspace Content (Chỉ cuộn vùng nội dung) */}
       {activeScreen === 'suppliers' || activeScreen.includes('suppliers') ||
        activeScreen === 'purchases' || activeScreen.includes('purchases') ||
-       activeScreen === 'goods-catalog' || activeScreen === 'products' ? (
+       activeScreen === 'goods-catalog' || activeScreen === 'products' ||
+       activeScreen === 'transfers' || activeScreen.includes('transfers') ||
+       activeScreen === 'warehouse-transfer' ? (
         <main className="flex-1 min-w-0 flex flex-col overflow-y-auto bg-[#F8FAFC]">
           {renderActiveScreen()}
         </main>

@@ -1596,6 +1596,9 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
             entity.Property(e => e.TransferDate)
                 .HasColumnType("timestamp without time zone")
                 .HasColumnName("transfer_date");
+            entity.Property(e => e.ReceivedDate)
+                .HasColumnType("timestamp without time zone")
+                .HasColumnName("received_date");
 
             entity.HasOne(d => d.CreatedByNavigation).WithMany(p => p.TrxStockTransfers)
                 .HasForeignKey(d => d.CreatedBy)

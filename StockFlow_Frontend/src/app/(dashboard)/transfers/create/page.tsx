@@ -1,0 +1,21 @@
+import { Suspense } from 'react';
+import CreateTransferClient from './CreateTransferClient';
+
+export const metadata = {
+  title: 'Tạo phiếu chuyển hàng | StockFlow Tín Phát',
+  description: 'Thêm mới hoặc chỉnh sửa phiếu chuyển hàng nội bộ',
+};
+
+export default function CreateTransferPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="h-[calc(100vh-56px)] flex items-center justify-center bg-[#f4f6f8] text-slate-500">
+          Đang tải dữ liệu phiếu chuyển...
+        </div>
+      }
+    >
+      <CreateTransferClient />
+    </Suspense>
+  );
+}
