@@ -52,6 +52,8 @@ import { productService } from '../../services/productService';
 import { adminService } from '../../services/adminService';
 import { WarehouseFacility } from '../../types';
 import { SkuAnalyticsModal } from './SkuAnalyticsModal';
+import { TIN_PHAT_WAREHOUSES, getActiveWarehouse, setActiveWarehouseGlobal } from '@/lib/warehouse/useActiveWarehouse';
+import ViewPriceBooksModal from './ViewPriceBooksModal';
 
 // ─── Component Combobox Đa Năng (Vừa Tự Nhập Vừa Tự Chọn) ──────────────────────
 interface CustomComboboxProps {
@@ -262,10 +264,13 @@ const INITIAL_GOODS_LIST: GoodsItem[] = [
       { id: 'V-06', attributeValue: 'Vani', unitName: 'Thùng', conversionRate: 48, code: 'SP652366-THUNG', barcode: '893600123906', costPrice: 240000, salePrice: 320000, stock: 10 },
     ],
     stockByWarehouse: [
-      { warehouseName: 'Kho Tổng Gia Lâm', actualStock: 200, availableStock: 200 },
+      { warehouseName: 'Kho Tổng Gia Lâm', warehouseCode: 'K001', actualStock: 120, availableStock: 120 },
+      { warehouseName: 'Kho Đông Anh', warehouseCode: 'K002', actualStock: 50, availableStock: 50 },
+      { warehouseName: 'Kho Hà Đông', warehouseCode: 'K003', actualStock: 20, availableStock: 20 },
+      { warehouseName: 'Kho Hoàn Kiếm', warehouseCode: 'K004', actualStock: 10, availableStock: 10 },
     ],
     stockCardRecent: [
-      { date: '23/09/2026 10:28', docCode: 'NK-2026-099', type: 'NHAP', typeName: 'Nhập kho sản xuất', qtyChange: 200, balance: 200, partnerOrDept: 'Kho Ba Vì' },
+      { date: '23/09/2026 10:28', docCode: 'NK-2026-099', type: 'NHAP', typeName: 'Nhập kho sản xuất', qtyChange: 120, balance: 200, partnerOrDept: 'Kho Tổng Gia Lâm' },
     ],
   },
   {
@@ -301,8 +306,10 @@ const INITIAL_GOODS_LIST: GoodsItem[] = [
       { name: 'MÀU SẮC', values: ['Trắng Vân Mây', 'Đá Carrara', 'Xám Bê Tông'] },
     ],
     stockByWarehouse: [
-      { warehouseName: 'Kho Tổng Gia Lâm', actualStock: 1150, availableStock: 950 },
-      { warehouseName: 'Kho Đông Anh', actualStock: 100, availableStock: 100 },
+      { warehouseName: 'Kho Tổng Gia Lâm', warehouseCode: 'K001', actualStock: 950, availableStock: 850 },
+      { warehouseName: 'Kho Đông Anh', warehouseCode: 'K002', actualStock: 180, availableStock: 120 },
+      { warehouseName: 'Kho Hà Đông', warehouseCode: 'K003', actualStock: 80, availableStock: 50 },
+      { warehouseName: 'Kho Hoàn Kiếm', warehouseCode: 'K004', actualStock: 40, availableStock: 30 },
     ],
     stockCardRecent: [
       { date: '15/10/2026', docCode: 'NK-2026-042', type: 'NHAP', typeName: 'Nhập kho sản xuất (Xưởng)', qtyChange: 500, balance: 1250, partnerOrDept: 'Xưởng đùn tấm K3' },
@@ -335,7 +342,10 @@ const INITIAL_GOODS_LIST: GoodsItem[] = [
     hasRewardPoints: true,
     imageUrl: 'https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?w=400&auto=format&fit=crop&q=80',
     stockByWarehouse: [
-      { warehouseName: 'Kho Tổng Gia Lâm', actualStock: 280, availableStock: 240 },
+      { warehouseName: 'Kho Tổng Gia Lâm', warehouseCode: 'K001', actualStock: 180, availableStock: 150 },
+      { warehouseName: 'Kho Đông Anh', warehouseCode: 'K002', actualStock: 60, availableStock: 50 },
+      { warehouseName: 'Kho Hà Đông', warehouseCode: 'K003', actualStock: 25, availableStock: 25 },
+      { warehouseName: 'Kho Hoàn Kiếm', warehouseCode: 'K004', actualStock: 15, availableStock: 15 },
     ],
     stockCardRecent: [
       { date: '12/10/2026', docCode: 'PN-2026-082', type: 'NHAP', typeName: 'Nhập kho hàng nhập khẩu', qtyChange: 150, balance: 280, partnerOrDept: 'NCC Vật liệu Đài Loan' },
@@ -363,7 +373,10 @@ const INITIAL_GOODS_LIST: GoodsItem[] = [
     status: 'ACTIVE',
     imageUrl: 'https://images.unsplash.com/photo-1513694203232-719a280e022f?w=400&auto=format&fit=crop&q=80',
     stockByWarehouse: [
-      { warehouseName: 'Kho Đông Anh', actualStock: 640, availableStock: 560 },
+      { warehouseName: 'Kho Tổng Gia Lâm', warehouseCode: 'K001', actualStock: 180, availableStock: 150 },
+      { warehouseName: 'Kho Đông Anh', warehouseCode: 'K002', actualStock: 360, availableStock: 320 },
+      { warehouseName: 'Kho Hà Đông', warehouseCode: 'K003', actualStock: 60, availableStock: 50 },
+      { warehouseName: 'Kho Hoàn Kiếm', warehouseCode: 'K004', actualStock: 40, availableStock: 40 },
     ],
     stockCardRecent: [
       { date: '14/10/2026', docCode: 'PN-2026-086', type: 'NHAP', typeName: 'Nhập mua hàng NCC Tân Á', qtyChange: 300, balance: 640, partnerOrDept: 'Công ty Nhôm Tân Á' },
@@ -390,7 +403,10 @@ const INITIAL_GOODS_LIST: GoodsItem[] = [
     status: 'ACTIVE',
     imageUrl: 'https://images.unsplash.com/photo-1513519245088-0e12902e5a38?w=400&auto=format&fit=crop&q=80',
     stockByWarehouse: [
-      { warehouseName: 'Kho Tổng Gia Lâm', actualStock: 420, availableStock: 370 },
+      { warehouseName: 'Kho Tổng Gia Lâm', warehouseCode: 'K001', actualStock: 280, availableStock: 250 },
+      { warehouseName: 'Kho Đông Anh', warehouseCode: 'K002', actualStock: 90, availableStock: 80 },
+      { warehouseName: 'Kho Hà Đông', warehouseCode: 'K003', actualStock: 30, availableStock: 25 },
+      { warehouseName: 'Kho Hoàn Kiếm', warehouseCode: 'K004', actualStock: 20, availableStock: 15 },
     ],
     stockCardRecent: [
       { date: '08/10/2026', docCode: 'NK-2026-038', type: 'NHAP', typeName: 'Nhập kho thành phẩm sản xuất', qtyChange: 200, balance: 420, partnerOrDept: 'Phân xưởng định hình số 2' },
@@ -421,8 +437,10 @@ const INITIAL_GOODS_LIST: GoodsItem[] = [
     hasRewardPoints: true,
     imageUrl: 'https://images.unsplash.com/photo-1581244277943-fe4a9c777189?w=400&auto=format&fit=crop&q=80',
     stockByWarehouse: [
-      { warehouseName: 'Kho Tổng Gia Lâm', warehouseCode: 'K001', actualStock: 200, availableStock: 200 },
+      { warehouseName: 'Kho Tổng Gia Lâm', warehouseCode: 'K001', actualStock: 150, availableStock: 150 },
       { warehouseName: 'Kho Đông Anh', warehouseCode: 'K002', actualStock: 80, availableStock: 80 },
+      { warehouseName: 'Kho Hà Đông', warehouseCode: 'K003', actualStock: 30, availableStock: 30 },
+      { warehouseName: 'Kho Hoàn Kiếm', warehouseCode: 'K004', actualStock: 20, availableStock: 20 },
     ],
     stockCardRecent: [
       { date: '23/09/2026 10:28', docCode: 'NK-2026-099', type: 'NHAP', typeName: 'Nhập kho từ NCC', qtyChange: 80, balance: 280, partnerOrDept: 'Kho Đông Anh' },
@@ -450,7 +468,10 @@ const INITIAL_GOODS_LIST: GoodsItem[] = [
     status: 'ACTIVE',
     imageUrl: 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=400&auto=format&fit=crop&q=80',
     stockByWarehouse: [
-      { warehouseName: 'Kho Tổng Gia Lâm', actualStock: 18500, availableStock: 13500 },
+      { warehouseName: 'Kho Tổng Gia Lâm', warehouseCode: 'K001', actualStock: 12000, availableStock: 9000 },
+      { warehouseName: 'Kho Đông Anh', warehouseCode: 'K002', actualStock: 4500, availableStock: 3500 },
+      { warehouseName: 'Kho Hà Đông', warehouseCode: 'K003', actualStock: 1500, availableStock: 800 },
+      { warehouseName: 'Kho Hoàn Kiếm', warehouseCode: 'K004', actualStock: 500, availableStock: 200 },
     ],
     stockCardRecent: [
       { date: '16/10/2026', docCode: 'PN-2026-088', type: 'NHAP', typeName: 'Nhập khẩu hạt nhựa nguyên sinh', qtyChange: 10000, balance: 18500, partnerOrDept: 'Tập đoàn Formosa' },
@@ -670,9 +691,11 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
   // Menu thao tác hàng loạt
   const [bulkActionMenuOpen, setBulkActionMenuOpen] = useState(false);
   
-  // Đồng bộ chi nhánh kho từ Header / localStorage (Mặc định kho vật lý cụ thể, KHÔNG dùng "ALL")
+  // Đồng bộ chi nhánh kho từ Header / useActiveWarehouse / localStorage (Mặc định kho vật lý cụ thể, KHÔNG dùng "ALL")
   const [warehouseFilter, setWarehouseFilter] = useState<string>(() => {
     if (typeof window !== 'undefined') {
+      const activeWh = getActiveWarehouse();
+      if (activeWh && activeWh.name) return activeWh.name;
       const stored = localStorage.getItem('stockflow_selected_branch');
       if (stored && stored !== 'ALL') return stored;
     }
@@ -810,6 +833,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoadingDb, setIsLoadingDb] = useState(false);
+  const [viewingPriceBookItem, setViewingPriceBookItem] = useState<GoodsItem | null>(null);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -1019,7 +1043,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                   ? localMatch.stockByWarehouse
                   : dbItem.stockByWarehouse,
                 costPrice: localMatch.costPrice || dbItem.costPrice,
-                standardPrice: localMatch.standardPrice || dbItem.standardPrice,
+                standardPrice: (dbItem.standardPrice !== undefined && dbItem.standardPrice !== null && dbItem.standardPrice > 0) ? dbItem.standardPrice : (localMatch.standardPrice || 0),
                 stockQuantity: localMatch.stockQuantity || dbItem.stockQuantity,
                 availableQuantity: localMatch.availableQuantity || dbItem.availableQuantity,
               };
@@ -1119,10 +1143,11 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
       }
     });
 
-    // Lắng nghe sự kiện đổi chi nhánh từ Header
+    // Lắng nghe sự kiện đổi chi nhánh từ Header và useActiveWarehouse
     const handleBranchSync = (e: any) => {
-      if (e.detail?.branch && e.detail.branch !== 'ALL') {
-        setWarehouseFilter(e.detail.branch);
+      const branchName = e.detail?.name || e.detail?.branch;
+      if (branchName && branchName !== 'ALL') {
+        setWarehouseFilter(branchName);
       }
       const curUserRaw = typeof window !== 'undefined' ? localStorage.getItem('stockflow_user') : null;
       if (curUserRaw) {
@@ -1133,10 +1158,12 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
       }
     };
     window.addEventListener('stockflow_branch_changed', handleBranchSync);
+    window.addEventListener('stockflow:warehouse-changed', handleBranchSync);
 
     return () => {
       isMounted = false;
       window.removeEventListener('stockflow_branch_changed', handleBranchSync);
+      window.removeEventListener('stockflow:warehouse-changed', handleBranchSync);
     };
   }, []);
 
@@ -1208,11 +1235,16 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
       : whCodeOrName;
 
     const norm = targetWh.trim().toLowerCase();
-    const entry = item.stockByWarehouse?.find(
-      (w) =>
-        w.warehouseName.trim().toLowerCase() === norm ||
-        (w.warehouseCode && w.warehouseCode.trim().toLowerCase() === norm)
-    );
+    const entry = item.stockByWarehouse?.find((w) => {
+      const wName = (w.warehouseName || '').trim().toLowerCase();
+      const wCode = (w.warehouseCode || '').trim().toLowerCase();
+      if (wName === norm || wCode === norm) return true;
+      if (norm.includes('gia lâm') && (wName.includes('gia lâm') || wCode === 'k001')) return true;
+      if (norm.includes('đông anh') && (wName.includes('đông anh') || wCode === 'k002')) return true;
+      if (norm.includes('hà đông') && (wName.includes('hà đông') || wCode === 'k003')) return true;
+      if (norm.includes('hoàn kiếm') && (wName.includes('hoàn kiếm') || wCode === 'k004')) return true;
+      return false;
+    });
 
     const isCreationWh = norm === (item.warehouse || '').trim().toLowerCase();
     const hasWarehouseList = item.stockByWarehouse && item.stockByWarehouse.length > 0;
@@ -1261,14 +1293,24 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
       const fac = (permittedFacilities.length > 0 ? permittedFacilities : facilities).find(
         (f) => f.code === val || f.name === val
       );
+      const branchName = fac ? fac.name : val === 'ALL' ? 'Tất cả các kho' : val;
       window.dispatchEvent(
         new CustomEvent('stockflow_branch_changed', {
           detail: {
             branch: val,
-            branchName: fac ? fac.name : val === 'ALL' ? 'Tất cả các kho' : val,
+            branchName,
           },
         })
       );
+      const matchingWh = TIN_PHAT_WAREHOUSES.find(
+        (w) =>
+          w.name.toLowerCase() === branchName.toLowerCase() ||
+          (fac?.code && w.code.toLowerCase() === fac.code.toLowerCase()) ||
+          (fac?.name && w.name.toLowerCase() === fac.name.toLowerCase())
+      );
+      if (matchingWh) {
+        setActiveWarehouseGlobal(matchingWh);
+      }
     }
   };
 
@@ -2895,8 +2937,21 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                       </td>
 
                       {/* Giá Bán */}
-                      <td className="py-3 px-4 text-right font-mono font-bold text-slate-900 text-xs">
-                        {item.standardPrice > 0 ? `${item.standardPrice.toLocaleString('vi-VN')}` : '---'}
+                      <td className="py-3 px-4 text-right">
+                        <div className="font-mono font-bold text-slate-900 text-xs">
+                          {item.standardPrice > 0 ? `${item.standardPrice.toLocaleString('vi-VN')}` : '---'}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setViewingPriceBookItem(item);
+                          }}
+                          className="text-[10px] text-blue-600 hover:text-blue-800 hover:underline inline-flex items-center gap-0.5 mt-0.5 cursor-pointer font-medium"
+                          title="Xem các bảng giá khác của sản phẩm này"
+                        >
+                          <span>Thiết lập giá</span>
+                        </button>
                       </td>
 
                       {/* Giá Vốn */}
@@ -3050,25 +3105,15 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                               </button>
                               <button
                                 type="button"
-                                onClick={() => setExpandedTab('stockCard')}
-                                className={`pb-2 -mb-2 border-b-2 transition cursor-pointer ${
-                                  expandedTab === 'stockCard'
-                                    ? 'border-blue-600 text-blue-600 font-bold'
-                                    : 'border-transparent hover:text-slate-900'
-                                }`}
-                              >
-                                Thẻ kho
-                              </button>
-                              <button
-                                type="button"
                                 onClick={() => setExpandedTab('stockByWh')}
-                                className={`pb-2 -mb-2 border-b-2 transition cursor-pointer ${
+                                className={`pb-2 -mb-2 border-b-2 transition cursor-pointer flex items-center gap-1.5 ${
                                   expandedTab === 'stockByWh'
                                     ? 'border-blue-600 text-blue-600 font-bold'
                                     : 'border-transparent hover:text-slate-900'
                                 }`}
                               >
-                                Tồn kho
+                                <Warehouse size={13} />
+                                <span>Tồn kho / Thẻ kho</span>
                               </button>
                               <button
                                 type="button"
@@ -3337,132 +3382,291 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                               </div>
                             )}
 
-                            {/* Tab 4: TỒN KHO PHÂN BỔ THEO CƠ SỞ KHO */}
-                            {expandedTab === 'stockByWh' && (
-                              <div className="space-y-3">
-                                <div className="p-3 bg-blue-50/70 border border-blue-200/80 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5">
-                                  <div className="flex items-center gap-2">
-                                    <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center shrink-0">
-                                      <Warehouse size={16} />
-                                    </div>
-                                    <div>
-                                      <div className="text-xs font-bold text-blue-950">
-                                        Tổng tồn toàn hệ thống: <span className="font-mono text-sm text-blue-700">{item.stockQuantity.toLocaleString('vi-VN')} {item.uom}</span>
-                                      </div>
-                                      <div className="text-[11px] text-blue-700/80">
-                                        Phân bổ trên {(permittedFacilities.length > 0 ? permittedFacilities : facilities).length} chi nhánh kho được phân quyền
-                                      </div>
-                                    </div>
-                                  </div>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleOpenInboundModal(item, warehouseFilter)}
-                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs transition cursor-pointer shadow-2xs"
-                                  >
-                                    <Plus size={13} />
-                                    <span>Nhập thêm hàng vào chi nhánh</span>
-                                  </button>
-                                </div>
+                            {/* Tab 4: TỒN KHO & THẺ KHO CHI TIẾT TỪNG CHI NHÁNH */}
+                            {expandedTab === 'stockByWh' && (() => {
+                              const standardFacilities = [
+                                { code: 'K001', name: 'Kho Tổng Gia Lâm', address: 'Số 18 Đường Dệt May, Gia Lâm, Hà Nội' },
+                                { code: 'K002', name: 'Kho Đông Anh', address: 'CCN Nguyên Khê, Đông Anh, Hà Nội' },
+                                { code: 'K003', name: 'Kho Hà Đông', address: 'Km14 Quốc lộ 6, Yên Nghĩa, Hà Đông, Hà Nội' },
+                                { code: 'K004', name: 'Kho Hoàn Kiếm', address: '42 Phố Trần Hưng Đạo, Hoàn Kiếm, Hà Nội' },
+                              ];
 
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                                  {(permittedFacilities.length > 0
-                                    ? permittedFacilities
-                                    : (facilities.length > 0
-                                      ? facilities
-                                      : (item.stockByWarehouse?.map((w) => ({ code: w.warehouseCode || 'WH', name: w.warehouseName, address: '' })) || [])
-                                    )
-                                  ).map((fac) => {
-                                    const entry = item.stockByWarehouse?.find(
-                                      (w) =>
-                                        w.warehouseName.trim().toLowerCase() === fac.name.trim().toLowerCase() ||
-                                        (w.warehouseCode && fac.code && w.warehouseCode.trim().toLowerCase() === fac.code.trim().toLowerCase())
-                                    );
-                                    const actual = entry ? Number(entry.actualStock) || 0 : 0;
-                                    const available = entry ? Number(entry.availableStock) || 0 : 0;
-                                    const isCurrentFilter = warehouseFilter === fac.name || warehouseFilter === fac.code;
+                              const facList = (permittedFacilities.length >= 4 ? permittedFacilities : standardFacilities);
 
-                                    return (
-                                      <div
-                                        key={fac.code || fac.name}
-                                        className={`p-3.5 bg-white border rounded-xl flex flex-col justify-between gap-3 shadow-2xs transition ${
-                                          isCurrentFilter
-                                            ? 'border-blue-500 ring-2 ring-blue-100 bg-blue-50/20'
-                                            : 'border-slate-200 hover:border-slate-300'
-                                        }`}
-                                      >
-                                        <div className="flex items-start justify-between gap-2">
-                                          <div className="flex items-center gap-2.5 min-w-0">
-                                            <div
-                                              className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 font-mono text-[10px] font-bold ${
-                                                actual > 0 ? 'bg-blue-50 text-blue-700' : 'bg-slate-100 text-slate-400'
-                                              }`}
-                                            >
-                                              {fac.code ? fac.code.slice(0, 4) : 'KHO'}
-                                            </div>
-                                            <div className="min-w-0">
-                                              <div className="text-xs font-bold text-slate-800 truncate" title={fac.name}>
-                                                {fac.name}
-                                              </div>
-                                              <div className="text-[10px] text-slate-400 truncate">
-                                                {fac.address || 'Hệ thống kho nội bộ'}
-                                              </div>
-                                            </div>
-                                          </div>
-                                          <span
-                                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold shrink-0 ${
-                                              actual > 0
-                                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                                                : 'bg-slate-100 text-slate-500 border border-slate-200'
-                                            }`}
-                                          >
-                                            {actual > 0 ? 'Còn hàng' : 'Hết hàng'}
+                              const stockRows = facList.map((fac) => {
+                                const entry = item.stockByWarehouse?.find((w) => {
+                                  const wName = (w.warehouseName || '').trim().toLowerCase();
+                                  const wCode = (w.warehouseCode || '').trim().toLowerCase();
+                                  const fName = (fac.name || '').trim().toLowerCase();
+                                  const fCode = (fac.code || '').trim().toLowerCase();
+                                  return (
+                                    wName === fName ||
+                                    wCode === fCode ||
+                                    (fName.includes('gia lâm') && (wName.includes('gia lâm') || wCode === 'k001')) ||
+                                    (fName.includes('đông anh') && (wName.includes('đông anh') || wCode === 'k002')) ||
+                                    (fName.includes('hà đông') && (wName.includes('hà đông') || wCode === 'k003')) ||
+                                    (fName.includes('hoàn kiếm') && (wName.includes('hoàn kiếm') || wCode === 'k004'))
+                                  );
+                                });
+
+                                const actual = entry ? Number(entry.actualStock) || 0 : 0;
+                                const available = entry ? Number(entry.availableStock) || 0 : 0;
+                                const costPrice = entry?.costPrice !== undefined ? Number(entry.costPrice) || 0 : (item.costPrice || 0);
+                                const isCurrentFilter = warehouseFilter.toLowerCase().includes(fac.name.toLowerCase()) ||
+                                  fac.name.toLowerCase().includes(warehouseFilter.toLowerCase()) ||
+                                  warehouseFilter.toUpperCase() === fac.code.toUpperCase();
+
+                                return {
+                                  ...fac,
+                                  actual,
+                                  available,
+                                  costPrice,
+                                  isCurrentFilter,
+                                };
+                              });
+
+                              const totalActual = stockRows.reduce((sum, r) => sum + r.actual, 0);
+                              const totalAvailable = stockRows.reduce((sum, r) => sum + r.available, 0);
+                              const totalValue = stockRows.reduce((sum, r) => sum + r.actual * r.costPrice, 0);
+                              const currentStockRow = stockRows.find((r) => r.isCurrentFilter) || stockRows[0];
+
+                              return (
+                                <div className="space-y-4">
+                                  {/* 1. Header Banner */}
+                                  <div className="p-3.5 bg-gradient-to-r from-blue-50/90 to-indigo-50/70 border border-blue-200/80 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-2xs">
+                                    <div className="flex items-center gap-3">
+                                      <div className="w-9 h-9 rounded-lg bg-[#0071BA] text-white flex items-center justify-center shrink-0 shadow-xs">
+                                        <Warehouse size={18} />
+                                      </div>
+                                      <div>
+                                        <div className="text-xs font-bold text-slate-900 flex items-center gap-2">
+                                          <span>Tổng tồn toàn hệ thống:</span>
+                                          <span className="font-mono text-base font-extrabold text-[#0071BA]">
+                                            {totalActual.toLocaleString('vi-VN')} {item.uom}
                                           </span>
                                         </div>
-
-                                        <div className="flex items-end justify-between pt-2 border-t border-slate-100">
-                                          <div>
-                                            <div className="text-[10px] text-slate-400">Khả dụng</div>
-                                            <div className="font-mono font-bold text-xs text-slate-700">
-                                              {available.toLocaleString('vi-VN')} {item.uom}
-                                            </div>
-                                          </div>
-                                          <div className="text-right">
-                                            <div className="text-[10px] text-slate-400">Tồn thực tế</div>
-                                            <div className={`font-mono font-extrabold text-base ${actual > 0 ? 'text-slate-900' : 'text-slate-400'}`}>
-                                              {actual.toLocaleString('vi-VN')}
-                                            </div>
-                                          </div>
-                                        </div>
-
-                                        <div className="flex items-center gap-1.5 pt-1">
-                                          <button
-                                            type="button"
-                                            onClick={() => handleOpenInboundModal(item, fac.name)}
-                                            className="flex-1 py-1 px-2 rounded-lg bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 text-slate-700 text-[11px] font-semibold transition cursor-pointer flex items-center justify-center gap-1"
-                                          >
-                                            <Plus size={11} />
-                                            <span>Nhập hàng</span>
-                                          </button>
-                                          <button
-                                            type="button"
-                                            onClick={() => handleWarehouseFilterChange(fac.name)}
-                                            className={`py-1 px-2 rounded-lg text-[11px] font-semibold transition cursor-pointer flex items-center justify-center gap-1 ${
-                                              isCurrentFilter
-                                                ? 'bg-blue-600 text-white'
-                                                : 'bg-slate-100 hover:bg-blue-50 hover:text-blue-700 text-slate-700'
-                                            }`}
-                                            title="Lọc danh sách theo kho này"
-                                          >
-                                            <Store size={11} />
-                                            <span>{isCurrentFilter ? 'Đang chọn' : 'Xem kho'}</span>
-                                          </button>
+                                        <div className="text-[11px] text-slate-500 mt-0.5">
+                                          Chi nhánh đang kích hoạt: <strong className="text-blue-700">{currentStockRow.name}</strong> (Tồn kho: <strong className="font-mono text-slate-800">{currentStockRow.actual.toLocaleString('vi-VN')} {item.uom}</strong>)
                                         </div>
                                       </div>
-                                    );
-                                  })}
+                                    </div>
+                                    <div className="flex items-center gap-2 shrink-0">
+                                      <button
+                                        type="button"
+                                        onClick={() => handleOpenInboundModal(item, warehouseFilter)}
+                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#0071BA] hover:bg-[#005f9d] text-white font-semibold text-xs transition cursor-pointer shadow-2xs"
+                                      >
+                                        <Plus size={14} />
+                                        <span>Nhập thêm hàng vào chi nhánh</span>
+                                      </button>
+                                    </div>
+                                  </div>
+
+                                  {/* 2. BẢNG TỒN KHO CHI TIẾT TỪNG CHI NHÁNH (Chuẩn KiotViet Requirement 5.2) */}
+                                  <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-2xs">
+                                    <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                                          Chi tiết tồn kho tại các cơ sở chi nhánh
+                                        </span>
+                                        <span className="text-[11px] text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full font-semibold border border-blue-200">
+                                          {stockRows.length} cơ sở kho
+                                        </span>
+                                      </div>
+                                      <div className="text-[11px] text-slate-400">
+                                        Đơn vị tính: <strong className="text-slate-700">{item.uom}</strong>
+                                      </div>
+                                    </div>
+
+                                    <table className="w-full text-left border-collapse text-xs">
+                                      <thead>
+                                        <tr className="border-b border-slate-200 bg-slate-50/70 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                                          <th className="py-2.5 px-4 min-w-[200px]">Cơ sở chi nhánh</th>
+                                          <th className="py-2.5 px-3 w-24">Mã kho</th>
+                                          <th className="py-2.5 px-4 text-right min-w-[120px]">Tồn thực tế</th>
+                                          <th className="py-2.5 px-4 text-right min-w-[120px]">Khả dụng</th>
+                                          {canViewCostPrice && (
+                                            <>
+                                              <th className="py-2.5 px-4 text-right min-w-[120px]">Giá vốn BQ</th>
+                                              <th className="py-2.5 px-4 text-right min-w-[140px]">Giá trị tồn kho</th>
+                                            </>
+                                          )}
+                                          <th className="py-2.5 px-4 text-center w-28">Trạng thái</th>
+                                          <th className="py-2.5 px-4 text-center w-36">Thao tác</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody className="divide-y divide-slate-100">
+                                        {stockRows.map((r) => {
+                                          const isOutOfStock = r.actual <= 0;
+                                          return (
+                                            <tr
+                                              key={r.code}
+                                              className={`transition ${
+                                                r.isCurrentFilter
+                                                  ? 'bg-blue-50/40 font-medium'
+                                                  : 'hover:bg-slate-50/70'
+                                              }`}
+                                            >
+                                              <td className="py-3 px-4">
+                                                <div className="flex items-center gap-2">
+                                                  <Store size={14} className={r.isCurrentFilter ? 'text-[#0071BA]' : 'text-slate-400'} />
+                                                  <div>
+                                                    <span className={`font-bold ${r.isCurrentFilter ? 'text-[#0071BA]' : 'text-slate-800'}`}>
+                                                      {r.name}
+                                                    </span>
+                                                    {r.isCurrentFilter && (
+                                                      <span className="ml-2 inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-bold bg-blue-100 text-[#0071BA]">
+                                                        Đang chọn
+                                                      </span>
+                                                    )}
+                                                    <div className="text-[10px] text-slate-400 truncate max-w-xs">{r.address}</div>
+                                                  </div>
+                                                </div>
+                                              </td>
+                                              <td className="py-3 px-3">
+                                                <span className="font-mono text-xs font-bold text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded">
+                                                  {r.code}
+                                                </span>
+                                              </td>
+                                              <td className="py-3 px-4 text-right">
+                                                <span className={`font-mono text-sm font-extrabold ${isOutOfStock ? 'text-slate-400' : 'text-slate-900'}`}>
+                                                  {r.actual.toLocaleString('vi-VN')}
+                                                </span>{' '}
+                                                <span className="text-[11px] text-slate-400">{item.uom}</span>
+                                              </td>
+                                              <td className="py-3 px-4 text-right">
+                                                <span className="font-mono text-xs font-semibold text-slate-600">
+                                                  {r.available.toLocaleString('vi-VN')}
+                                                </span>{' '}
+                                                <span className="text-[11px] text-slate-400">{item.uom}</span>
+                                              </td>
+                                              {canViewCostPrice && (
+                                                <>
+                                                  <td className="py-3 px-4 text-right font-mono text-xs text-slate-600">
+                                                    {r.costPrice > 0 ? `${r.costPrice.toLocaleString('vi-VN')} đ` : '---'}
+                                                  </td>
+                                                  <td className="py-3 px-4 text-right font-mono text-xs font-bold text-slate-800">
+                                                    {(r.actual * r.costPrice) > 0 ? `${(r.actual * r.costPrice).toLocaleString('vi-VN')} đ` : '0 đ'}
+                                                  </td>
+                                                </>
+                                              )}
+                                              <td className="py-3 px-4 text-center">
+                                                <span
+                                                  className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                                    r.actual > 0
+                                                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                                      : 'bg-rose-50 text-rose-600 border border-rose-200'
+                                                  }`}
+                                                >
+                                                  {r.actual > 0 ? 'Còn hàng' : 'Hết hàng'}
+                                                </span>
+                                              </td>
+                                              <td className="py-3 px-4 text-center" onClick={(e) => e.stopPropagation()}>
+                                                <div className="flex items-center justify-center gap-1.5">
+                                                  <button
+                                                    type="button"
+                                                    onClick={() => handleWarehouseFilterChange(r.name)}
+                                                    className={`px-2 py-1 rounded text-[11px] font-semibold transition cursor-pointer ${
+                                                      r.isCurrentFilter
+                                                        ? 'bg-blue-600 text-white shadow-2xs'
+                                                        : 'bg-slate-100 hover:bg-blue-50 hover:text-blue-700 text-slate-700'
+                                                    }`}
+                                                    title={`Đổi kho active sang ${r.name}`}
+                                                  >
+                                                    {r.isCurrentFilter ? 'Đang kích hoạt' : 'Chọn kho'}
+                                                  </button>
+                                                  <button
+                                                    type="button"
+                                                    onClick={() => handleOpenInboundModal(item, r.name)}
+                                                    className="p-1 rounded bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 text-slate-600 transition cursor-pointer"
+                                                    title={`Nhập hàng vào ${r.name}`}
+                                                  >
+                                                    <Plus size={13} />
+                                                  </button>
+                                                </div>
+                                              </td>
+                                            </tr>
+                                          );
+                                        })}
+                                      </tbody>
+                                      <tfoot>
+                                        <tr className="bg-blue-50/60 font-bold border-t-2 border-blue-200 text-xs">
+                                          <td colSpan={2} className="py-3 px-4 text-blue-950 font-bold uppercase tracking-wider">
+                                            Tổng tồn toàn hệ thống
+                                          </td>
+                                          <td className="py-3 px-4 text-right font-mono text-sm font-extrabold text-[#0071BA]">
+                                            {totalActual.toLocaleString('vi-VN')} {item.uom}
+                                          </td>
+                                          <td className="py-3 px-4 text-right font-mono text-xs font-bold text-slate-800">
+                                            {totalAvailable.toLocaleString('vi-VN')} {item.uom}
+                                          </td>
+                                          {canViewCostPrice && (
+                                            <>
+                                              <td className="py-3 px-4 text-right text-slate-400 text-[11px]">
+                                                Bình quân
+                                              </td>
+                                              <td className="py-3 px-4 text-right font-mono text-xs font-extrabold text-blue-900">
+                                                {totalValue.toLocaleString('vi-VN')} đ
+                                              </td>
+                                            </>
+                                          )}
+                                          <td colSpan={2} className="py-3 px-4 text-right text-[11px] text-slate-500 font-normal">
+                                            Tất cả {stockRows.length} chi nhánh
+                                          </td>
+                                        </tr>
+                                      </tfoot>
+                                    </table>
+                                  </div>
+
+                                  {/* 3. LỊCH SỬ BIẾN ĐỘNG THẺ KHO GẦN ĐÂY CỦA SẢN PHẨM */}
+                                  <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-2xs">
+                                    <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+                                      <div className="flex items-center gap-2">
+                                        <Clock size={14} className="text-slate-500" />
+                                        <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                                          Nhật ký thẻ kho gần đây
+                                        </span>
+                                      </div>
+                                      <span className="text-[11px] text-slate-400">
+                                        Hiển thị {item.stockCardRecent.length} giao dịch phát sinh gần nhất
+                                      </span>
+                                    </div>
+                                    {item.stockCardRecent.length > 0 ? (
+                                      <table className="w-full text-left border-collapse text-xs">
+                                        <thead>
+                                          <tr className="border-b border-slate-200 bg-slate-50/70 text-[11px] font-bold text-slate-500 uppercase">
+                                            <th className="py-2.5 px-4 w-36">Thời gian</th>
+                                            <th className="py-2.5 px-3 w-32">Mã chứng từ</th>
+                                            <th className="py-2.5 px-4">Loại giao dịch</th>
+                                            <th className="py-2.5 px-4 text-right w-28">Biến động</th>
+                                            <th className="py-2.5 px-4 text-right w-28">Tồn sau GD</th>
+                                            <th className="py-2.5 px-4">Đối tác / Kho liên quan</th>
+                                          </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100">
+                                          {item.stockCardRecent.map((sc, scIdx) => (
+                                            <tr key={scIdx} className="hover:bg-slate-50/80">
+                                              <td className="py-2.5 px-4 text-slate-500">{sc.date}</td>
+                                              <td className="py-2.5 px-3 font-mono font-bold text-[#0071BA]">{sc.docCode}</td>
+                                              <td className="py-2.5 px-4 text-slate-700 font-medium">{sc.typeName}</td>
+                                              <td className={`py-2.5 px-4 text-right font-mono font-bold ${sc.qtyChange >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                                {sc.qtyChange > 0 ? `+${sc.qtyChange}` : sc.qtyChange} {item.uom}
+                                              </td>
+                                              <td className="py-2.5 px-4 text-right font-mono font-extrabold text-slate-900">{sc.balance} {item.uom}</td>
+                                              <td className="py-2.5 px-4 text-slate-600">{sc.partnerOrDept}</td>
+                                            </tr>
+                                          ))}
+                                        </tbody>
+                                      </table>
+                                    ) : (
+                                      <div className="py-6 text-center text-slate-400 text-xs">
+                                        Chưa phát sinh giao dịch nhập / xuất kho cho mặt hàng này.
+                                      </div>
+                                    )}
+                                  </div>
                                 </div>
-                              </div>
-                            )}
+                              );
+                            })()}
 
                             {/* Tab 5: HÀNG HÓA CÙNG LOẠI (DANH SÁCH BIẾN THỂ TƯƠNG ỨNG ẢNH 5) */}
                             {expandedTab === 'variants' && (
@@ -3902,7 +4106,16 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                             <label className="font-semibold text-slate-700">Giá bán (VNĐ)</label>
                             <button
                               type="button"
-                              onClick={() => showToast('Mở bảng thiết lập giá đại lý / bán buôn')}
+                              onClick={() => {
+                                setViewingPriceBookItem(editingItem || ({
+                                  id: 'temp',
+                                  name: formName || 'Sản phẩm mới',
+                                  code: formCode,
+                                  standardPrice: Number(formStandardPrice) || 0,
+                                  costPrice: Number(formCostPrice) || 0,
+                                  uom: formUom || 'Cái',
+                                } as any));
+                              }}
                               className="text-blue-600 hover:text-blue-700 inline-flex items-center gap-1 font-medium text-[11px] cursor-pointer"
                             >
                               <RefreshCw size={11} />
@@ -5173,7 +5386,6 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
           </div>
         </div>
       )}
-
       {/* Modal Biểu Đồ Phân Tích Chuyên Sâu SKU Hàng Hóa */}
       {analyticsItem && (
         <SkuAnalyticsModal
@@ -5184,6 +5396,13 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
           canViewCostPrice={canViewCostPrice}
         />
       )}
+
+      {/* MODAL XEM BẢNG GIÁ SẢN PHẨM (CHỈ XEM) */}
+      <ViewPriceBooksModal
+        item={viewingPriceBookItem}
+        isOpen={!!viewingPriceBookItem}
+        onClose={() => setViewingPriceBookItem(null)}
+      />
     </div>
   );
 };

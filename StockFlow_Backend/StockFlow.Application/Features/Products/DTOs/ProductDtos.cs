@@ -54,7 +54,8 @@ public record ProductDto(
     string? VariantsJson = null,
     string? Description = null,
     DateTime? CreatedAt = null,
-    string? Supplier = null
+    string? Supplier = null,
+    List<ProductWarehouseStockDto>? Warehouses = null
 );
 
 public record ProductWarehouseStockDto(

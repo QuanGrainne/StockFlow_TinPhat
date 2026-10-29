@@ -47,6 +47,7 @@ public class GetProductsQueryHandler : IRequestHandler<GetProductsQuery, Result<
             .Include(p => p.Category)
             .Include(p => p.BaseUnit)
             .Include(p => p.TrxInventoryBalances)
+                .ThenInclude(b => b.Warehouse)
             .AsNoTracking();
 
         if (!string.IsNullOrWhiteSpace(query.Search))
@@ -123,6 +124,25 @@ public class GetProductsQueryHandler : IRequestHandler<GetProductsQuery, Result<
                 catch {}
             }
 
+            var warehouseStocks = p.TrxInventoryBalances
+                .GroupBy(b => b.WarehouseId)
+                .Select(g =>
+                {
+                    var first = g.First();
+                    return new ProductWarehouseStockDto(
+                        WarehouseId: g.Key,
+                        WarehouseCode: first.Warehouse?.WarehouseCode ?? $"WH-{g.Key}",
+                        WarehouseName: first.Warehouse?.WarehouseName ?? $"Kho #{g.Key}",
+                        Quantity: g.Sum(x => x.Quantity ?? 0),
+                        UnitCost: g.Average(x => x.UnitCost ?? costPrice)
+                    );
+                }).ToList();
+
+            if (authorizedWarehouseIds != null)
+            {
+                warehouseStocks = warehouseStocks.Where(w => authorizedWarehouseIds.Contains(w.WarehouseId)).ToList();
+            }
+
             return new ProductDto(
                 Id: p.ProductId.ToString(),
                 ProductId: p.ProductId,
@@ -151,7 +171,8 @@ public class GetProductsQueryHandler : IRequestHandler<GetProductsQuery, Result<
                 VariantsJson: p.VariantsJson,
                 Description: p.Description,
                 CreatedAt: p.CreatedAt,
-                Supplier: supplier
+                Supplier: supplier,
+                Warehouses: warehouseStocks
             );
         }).ToList();
 
