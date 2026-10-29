@@ -54,6 +54,7 @@ public record ProductDto(
     string? VariantsJson = null,
     string? Description = null,
     DateTime? CreatedAt = null,
+    string? Supplier = null,
     List<ProductWarehouseStockDto>? Warehouses = null
 );
 
@@ -96,7 +97,8 @@ public record ProductDetailDto(
     List<ProductWarehouseStockDto> Warehouses,
     List<ProductConversionUnitDto>? Units = null,
     List<ProductAttributeDto>? Attributes = null,
-    List<ProductVariantItemDto>? Variants = null
+    List<ProductVariantItemDto>? Variants = null,
+    string? Supplier = null
 );
 
 public record ProductCategoryDto(
@@ -120,6 +122,7 @@ public class CreateProductRequest
     public string Type { get; set; } = "FINISHED";
     public int? CategoryId { get; set; }
     public string? CategoryName { get; set; }
+    public string? CategoryName { get; set; }
     public int? BaseUnitId { get; set; }
     public string? Uom { get; set; }
     public decimal? StandardPrice { get; set; }
@@ -142,6 +145,8 @@ public class CreateProductRequest
     public List<ProductConversionUnitDto>? Units { get; set; }
     public List<ProductAttributeDto>? Attributes { get; set; }
     public List<ProductVariantItemDto>? Variants { get; set; }
+    public DateTime? CreatedAt { get; set; }
+    public string? Supplier { get; set; }
 }
 
 public class UpdateProductRequest
@@ -150,6 +155,7 @@ public class UpdateProductRequest
     public string? Name { get; set; }
     public string? Type { get; set; }
     public int? CategoryId { get; set; }
+    public string? CategoryName { get; set; }
     public int? BaseUnitId { get; set; }
     public string? Uom { get; set; }
     public decimal? StandardPrice { get; set; }
@@ -159,6 +165,7 @@ public class UpdateProductRequest
     public decimal? MaxSafeStock { get; set; }
     public string? Barcode { get; set; }
     public string? Brand { get; set; }
+    public string? Supplier { get; set; }
     public decimal? Weight { get; set; }
     public string? Dimensions { get; set; }
     public string? LocationName { get; set; }
@@ -168,6 +175,8 @@ public class UpdateProductRequest
     public string? VariantsJson { get; set; }
     public string? Description { get; set; }
     public bool? IsActive { get; set; }
+    public decimal? InitialStock { get; set; }
+    public int? InitialWarehouseId { get; set; }
     public List<ProductConversionUnitDto>? Units { get; set; }
     public List<ProductAttributeDto>? Attributes { get; set; }
     public List<ProductVariantItemDto>? Variants { get; set; }

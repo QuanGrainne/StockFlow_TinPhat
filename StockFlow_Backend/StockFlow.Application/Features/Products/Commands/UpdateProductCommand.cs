@@ -64,6 +64,25 @@ public class UpdateProductCommandHandler : IRequestHandler<UpdateProductCommand,
         {
             product.CategoryId = req.CategoryId.Value;
         }
+        else if (!string.IsNullOrWhiteSpace(req.CategoryName))
+        {
+            var defaultCatName = req.CategoryName.Trim();
+            var cat = await _context.MstProductCategories
+                .FirstOrDefaultAsync(c => c.CategoryName != null && c.CategoryName.ToLower() == defaultCatName.ToLower(), cancellationToken);
+
+            if (cat == null)
+            {
+                cat = new MstProductCategory
+                {
+                    CategoryName = defaultCatName,
+                    Description = $"Nhóm hàng {defaultCatName}",
+                    IsActive = true
+                };
+                await _context.MstProductCategories.AddAsync(cat, cancellationToken);
+                await _context.SaveChangesAsync(cancellationToken);
+            }
+            product.CategoryId = cat.CategoryId;
+        }
 
         if (req.BaseUnitId.HasValue && req.BaseUnitId.Value > 0)
         {
@@ -159,13 +178,45 @@ public class UpdateProductCommandHandler : IRequestHandler<UpdateProductCommand,
         {
             product.VariantsJson = req.VariantsJson;
         }
-        else if (req.Variants != null || req.Units != null || req.Attributes != null)
+        else if (req.Variants != null || req.Units != null || req.Attributes != null || req.Supplier != null)
         {
+            var units = req.Units;
+            var attributes = req.Attributes;
+            var variants = req.Variants;
+            string? supplierToSave = req.Supplier?.Trim();
+
+            if (!string.IsNullOrEmpty(product.VariantsJson))
+            {
+                try
+                {
+                    using var doc = System.Text.Json.JsonDocument.Parse(product.VariantsJson);
+                    var root = doc.RootElement;
+                    if (units == null && root.TryGetProperty("units", out var uEl))
+                    {
+                        units = System.Text.Json.JsonSerializer.Deserialize<List<ProductConversionUnitDto>>(uEl.GetRawText());
+                    }
+                    if (attributes == null && root.TryGetProperty("attributes", out var aEl))
+                    {
+                        attributes = System.Text.Json.JsonSerializer.Deserialize<List<ProductAttributeDto>>(aEl.GetRawText());
+                    }
+                    if (variants == null && root.TryGetProperty("variants", out var vEl))
+                    {
+                        variants = System.Text.Json.JsonSerializer.Deserialize<List<ProductVariantItemDto>>(vEl.GetRawText());
+                    }
+                    if (req.Supplier == null && root.TryGetProperty("supplier", out var supEl))
+                    {
+                        supplierToSave = supEl.GetString();
+                    }
+                }
+                catch { }
+            }
+
             product.VariantsJson = System.Text.Json.JsonSerializer.Serialize(new
             {
-                units = req.Units,
-                attributes = req.Attributes,
-                variants = req.Variants
+                units = units,
+                attributes = attributes,
+                variants = variants,
+                supplier = supplierToSave
             });
         }
 
@@ -177,6 +228,37 @@ public class UpdateProductCommandHandler : IRequestHandler<UpdateProductCommand,
         if (req.IsActive.HasValue)
         {
             product.IsActive = req.IsActive.Value;
+        }
+
+        if (req.InitialStock.HasValue)
+        {
+            var targetWhId = req.InitialWarehouseId;
+            if (!targetWhId.HasValue || targetWhId.Value <= 0)
+            {
+                var firstWh = await _context.MstWarehouses.FirstOrDefaultAsync(w => w.IsActive != false, cancellationToken);
+                targetWhId = firstWh?.WarehouseId ?? 1;
+            }
+
+            var balance = product.TrxInventoryBalances.FirstOrDefault(b => b.WarehouseId == targetWhId.Value);
+            if (balance != null)
+            {
+                balance.Quantity = req.InitialStock.Value;
+                if (product.MovingAverageCost.HasValue)
+                {
+                    balance.UnitCost = product.MovingAverageCost.Value;
+                }
+            }
+            else
+            {
+                await _context.TrxInventoryBalances.AddAsync(new TrxInventoryBalance
+                {
+                    ProductId = product.ProductId,
+                    WarehouseId = targetWhId.Value,
+                    Quantity = req.InitialStock.Value,
+                    UnitCost = product.MovingAverageCost ?? 0,
+                    LastUpdated = DateTime.UtcNow,
+                }, cancellationToken);
+            }
         }
 
         await _context.SaveChangesAsync(cancellationToken);
@@ -191,6 +273,24 @@ public class UpdateProductCommandHandler : IRequestHandler<UpdateProductCommand,
         var costPrice = updatedProduct.MovingAverageCost ?? 0;
         var standardPrice = updatedProduct.StandardPrice ?? (costPrice > 0 ? Math.Round(costPrice * 1.35m, 0) : 0);
         var totalStock = updatedProduct.TrxInventoryBalances.Sum(b => b.Quantity ?? 0);
+
+        string? resolvedSupplier = null;
+        if (!string.IsNullOrEmpty(updatedProduct.VariantsJson))
+        {
+            try
+            {
+                using var doc = System.Text.Json.JsonDocument.Parse(updatedProduct.VariantsJson);
+                if (doc.RootElement.TryGetProperty("supplier", out var supEl))
+                {
+                    resolvedSupplier = supEl.GetString();
+                }
+            }
+            catch { }
+        }
+        if (string.IsNullOrEmpty(resolvedSupplier))
+        {
+            resolvedSupplier = req.Supplier?.Trim();
+        }
 
         var dto = new ProductDto(
             Id: updatedProduct.ProductId.ToString(),
@@ -219,7 +319,8 @@ public class UpdateProductCommandHandler : IRequestHandler<UpdateProductCommand,
             ImageUrl: updatedProduct.ImageUrl,
             VariantsJson: updatedProduct.VariantsJson,
             Description: updatedProduct.Description,
-            CreatedAt: updatedProduct.CreatedAt
+            CreatedAt: updatedProduct.CreatedAt,
+            Supplier: resolvedSupplier
         );
 
         return Result.Success(dto);

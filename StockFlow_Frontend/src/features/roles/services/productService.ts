@@ -31,6 +31,8 @@ export interface CreateProductPayload {
   units?: ProductUnitConversion[];
   attributes?: ProductAttributeDef[];
   variants?: ProductVariant[];
+  createdAt?: string;
+  supplier?: string;
 }
 
 export interface UpdateProductPayload extends Partial<CreateProductPayload> {
