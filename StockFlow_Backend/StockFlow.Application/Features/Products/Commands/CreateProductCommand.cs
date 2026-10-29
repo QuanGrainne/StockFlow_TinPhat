@@ -124,13 +124,14 @@ public class CreateProductCommandHandler : IRequestHandler<CreateProductCommand,
         var standardPrice = req.StandardPrice ?? (req.CostPrice.HasValue && req.CostPrice.Value > 0 ? Math.Round(req.CostPrice.Value * 1.35m, 0) : 0m);
 
         string? variantsJson = req.VariantsJson;
-        if (string.IsNullOrEmpty(variantsJson) && (req.Variants != null || req.Units != null || req.Attributes != null))
+        if (string.IsNullOrEmpty(variantsJson) && (req.Variants != null || req.Units != null || req.Attributes != null || !string.IsNullOrWhiteSpace(req.Supplier)))
         {
             variantsJson = System.Text.Json.JsonSerializer.Serialize(new
             {
                 units = req.Units,
                 attributes = req.Attributes,
-                variants = req.Variants
+                variants = req.Variants,
+                supplier = req.Supplier?.Trim()
             });
         }
 
@@ -157,7 +158,7 @@ public class CreateProductCommandHandler : IRequestHandler<CreateProductCommand,
             ImageUrl = req.ImageUrl?.Trim(),
             VariantsJson = variantsJson,
             IsActive = true,
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = req.CreatedAt ?? DateTime.UtcNow
         };
 
         await _context.MstProducts.AddAsync(product, cancellationToken);
@@ -170,8 +171,17 @@ public class CreateProductCommandHandler : IRequestHandler<CreateProductCommand,
             int warehouseId = req.InitialWarehouseId ?? 0;
             if (warehouseId <= 0)
             {
-                var firstWarehouse = await _context.MstWarehouses.FirstOrDefaultAsync(cancellationToken);
-                warehouseId = firstWarehouse?.WarehouseId ?? 1;
+                if (_currentUserService.IsAuthenticated && !_currentUserService.IsAdmin)
+                {
+                    var authorizedIds = await _currentUserService.GetAuthorizedWarehouseIdsAsync(cancellationToken);
+                    warehouseId = authorizedIds.FirstOrDefault();
+                }
+
+                if (warehouseId <= 0)
+                {
+                    var firstWarehouse = await _context.MstWarehouses.FirstOrDefaultAsync(w => w.IsActive == true, cancellationToken);
+                    warehouseId = firstWarehouse?.WarehouseId ?? 1;
+                }
             }
 
             // Kiểm tra phân quyền truy cập kho đối với tài khoản nhân sự
@@ -232,7 +242,8 @@ public class CreateProductCommandHandler : IRequestHandler<CreateProductCommand,
             ImageUrl: createdProduct.ImageUrl,
             VariantsJson: createdProduct.VariantsJson,
             Description: createdProduct.Description,
-            CreatedAt: createdProduct.CreatedAt
+            CreatedAt: createdProduct.CreatedAt,
+            Supplier: req.Supplier?.Trim()
         );
 
         return Result.Success(dto);

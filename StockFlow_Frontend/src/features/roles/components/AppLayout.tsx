@@ -376,8 +376,9 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ initialScreen }) => {
           {renderActiveScreen()}
         </main>
       ) : activeScreen === 'suppliers' || activeScreen.includes('suppliers') ||
-       activeScreen === 'goods-catalog' || activeScreen === 'products' ? (
-        <main className="flex-1 min-w-0 flex flex-col overflow-y-auto bg-[#F8FAFC]">
+       activeScreen === 'goods-catalog' || activeScreen === 'products' ||
+       activeScreen.includes('goods') || activeScreen.includes('catalog') ? (
+        <main className="flex-1 min-w-0 flex flex-col overflow-y-auto bg-[#F8FAFC] p-4 lg:p-6">
           {renderActiveScreen()}
         </main>
       ) : (

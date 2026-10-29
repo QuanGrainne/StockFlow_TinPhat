@@ -109,6 +109,37 @@ export const WarehousePermissionsScreen: React.FC = () => {
   const handleSavePerms = async () => {
     if (!selectedStaff) return;
     await adminService.updateWarehousePermissions(selectedStaff.id, selectedWarehouses);
+
+    // Đồng bộ session người dùng đang đăng nhập nếu đúng nhân sự này
+    if (typeof window !== 'undefined') {
+      const rawUser = localStorage.getItem('stockflow_user');
+      if (rawUser) {
+        try {
+          const uObj = JSON.parse(rawUser);
+          const isCurrent =
+            (uObj.userId && String(uObj.userId) === String(selectedStaff.id).replace(/\D/g, '')) ||
+            (uObj.code && uObj.code.toUpperCase() === selectedStaff.code.toUpperCase()) ||
+            (uObj.username && uObj.username.toLowerCase() === selectedStaff.username?.toLowerCase());
+
+          if (isCurrent) {
+            uObj.assignedWarehouses = selectedWarehouses;
+            uObj.warehouses = selectedWarehouses.map((w: string) => ({
+              warehouseCode: w,
+              warehouseName: w,
+            }));
+            localStorage.setItem('stockflow_user', JSON.stringify(uObj));
+            window.dispatchEvent(
+              new CustomEvent('stockflow_user_updated', {
+                detail: { assignedWarehouses: selectedWarehouses },
+              })
+            );
+          }
+        } catch (syncErr) {
+          console.warn('Failed to sync current user in localStorage:', syncErr);
+        }
+      }
+    }
+
     showToast(`Đã cập nhật phân quyền kho cho nhân sự ${selectedStaff.name}`);
     setModalOpen(false);
     loadData();
