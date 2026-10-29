@@ -50,6 +50,7 @@ import { productService } from '../../services/productService';
 import { adminService } from '../../services/adminService';
 import { WarehouseFacility } from '../../types';
 import { TIN_PHAT_WAREHOUSES, getActiveWarehouse, setActiveWarehouseGlobal } from '@/lib/warehouse/useActiveWarehouse';
+import ViewPriceBooksModal from './ViewPriceBooksModal';
 
 // ─── Component Combobox Đa Năng (Vừa Tự Nhập Vừa Tự Chọn) ──────────────────────
 interface CustomComboboxProps {
@@ -773,6 +774,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoadingDb, setIsLoadingDb] = useState(false);
+  const [viewingPriceBookItem, setViewingPriceBookItem] = useState<GoodsItem | null>(null);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -969,7 +971,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                   ? localMatch.stockByWarehouse
                   : dbItem.stockByWarehouse,
                 costPrice: localMatch.costPrice || dbItem.costPrice,
-                standardPrice: localMatch.standardPrice || dbItem.standardPrice,
+                standardPrice: (dbItem.standardPrice !== undefined && dbItem.standardPrice !== null && dbItem.standardPrice > 0) ? dbItem.standardPrice : (localMatch.standardPrice || 0),
                 stockQuantity: localMatch.stockQuantity || dbItem.stockQuantity,
                 availableQuantity: localMatch.availableQuantity || dbItem.availableQuantity,
               };
@@ -2467,8 +2469,21 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                       </td>
 
                       {/* Giá Bán */}
-                      <td className="py-3 px-4 text-right font-mono font-bold text-slate-900 text-xs">
-                        {item.standardPrice > 0 ? `${item.standardPrice.toLocaleString('vi-VN')}` : '---'}
+                      <td className="py-3 px-4 text-right">
+                        <div className="font-mono font-bold text-slate-900 text-xs">
+                          {item.standardPrice > 0 ? `${item.standardPrice.toLocaleString('vi-VN')}` : '---'}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setViewingPriceBookItem(item);
+                          }}
+                          className="text-[10px] text-blue-600 hover:text-blue-800 hover:underline inline-flex items-center gap-0.5 mt-0.5 cursor-pointer font-medium"
+                          title="Xem các bảng giá khác của sản phẩm này"
+                        >
+                          <span>Thiết lập giá</span>
+                        </button>
                       </td>
 
                       {/* Giá Vốn */}
@@ -3546,7 +3561,16 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                             <label className="font-semibold text-slate-700">Giá bán (VNĐ)</label>
                             <button
                               type="button"
-                              onClick={() => showToast('Mở bảng thiết lập giá đại lý / bán buôn')}
+                              onClick={() => {
+                                setViewingPriceBookItem(editingItem || ({
+                                  id: 'temp',
+                                  name: formName || 'Sản phẩm mới',
+                                  code: formCode,
+                                  standardPrice: Number(formStandardPrice) || 0,
+                                  costPrice: Number(formCostPrice) || 0,
+                                  uom: formUom || 'Cái',
+                                } as any));
+                              }}
                               className="text-blue-600 hover:text-blue-700 inline-flex items-center gap-1 font-medium text-[11px] cursor-pointer"
                             >
                               <RefreshCw size={11} />
@@ -4758,6 +4782,12 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
           </div>
         </div>
       )}
-    </div>
+          {/* MODAL XEM BẢNG GIÁ SẢN PHẨM (CHỈ XEM) */}
+      <ViewPriceBooksModal
+        item={viewingPriceBookItem}
+        isOpen={!!viewingPriceBookItem}
+        onClose={() => setViewingPriceBookItem(null)}
+      />
+</div>
   );
 };
