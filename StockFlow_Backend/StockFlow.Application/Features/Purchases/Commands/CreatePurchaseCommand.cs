@@ -103,8 +103,22 @@ public class CreatePurchaseCommandHandler : IRequestHandler<CreatePurchaseComman
             return Result.Failure<PurchaseDetailDto>("Một số sản phẩm trong phiếu nhập không tồn tại trong danh mục.");
         }
 
-        // 5. Sinh mã phiếu nhập chuẩn KiotViet: PN000001, PN000002...
-        string grCode = await GoodsReceiptHelper.GenerateNextGoodsReceiptCodeAsync(_context, cancellationToken);
+        // 5. Sinh mã phiếu nhập chuẩn KiotViet: PN000001, PN000002... hoặc sử dụng mã người dùng nhập
+        string grCode;
+        if (string.IsNullOrWhiteSpace(req.PurchaseCode) || req.PurchaseCode.Trim().Equals("Mã phiếu tự động", StringComparison.OrdinalIgnoreCase))
+        {
+            grCode = await GoodsReceiptHelper.GenerateNextGoodsReceiptCodeAsync(_context, cancellationToken);
+        }
+        else
+        {
+            grCode = req.PurchaseCode.Trim().ToUpper();
+            var exists = await _context.TrxGoodsReceipts
+                .AnyAsync(r => r.GrCode == grCode, cancellationToken);
+            if (exists)
+            {
+                return Result.Failure<PurchaseDetailDto>($"Mã phiếu nhập '{grCode}' đã tồn tại trong hệ thống.");
+            }
+        }
 
         int currentUserId = _currentUserService.UserId ?? 0;
         if (currentUserId <= 0)
