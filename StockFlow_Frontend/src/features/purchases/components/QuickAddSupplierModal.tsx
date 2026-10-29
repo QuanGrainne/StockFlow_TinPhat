@@ -48,7 +48,7 @@ export function QuickAddSupplierModal({ open, onClose, onSuccess }: QuickAddSupp
       confirmLoading={loading}
       okText="Lưu & Chọn NCC"
       cancelText="Hủy"
-      okButtonProps={{ style: { backgroundColor: '#0071BA' } }}
+      okButtonProps={{ style: { backgroundColor: '#0070f4' } }}
     >
       <div className="space-y-3 py-2 text-xs">
         <div>
