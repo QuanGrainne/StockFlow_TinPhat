@@ -24,6 +24,7 @@ const NAV_ITEMS: NavItem[] = [
     children: [
       { label: 'Danh mục hàng hóa', href: '/products' },
       { label: 'Thiết lập giá', href: '/products/price-books' },
+      { label: 'Chuyển hàng', href: '/transfers' },
     ],
   },
   { label: 'Nhà cung cấp', href: '/suppliers' },

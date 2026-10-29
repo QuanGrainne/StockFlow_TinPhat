@@ -43,6 +43,7 @@ interface DropdownItem {
   desc: string;
   icon: any;
   requiredModule?: string;
+  requiredFeature?: string;
 }
 
 interface TabConfig {
@@ -236,6 +237,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
           desc: 'Bảng giá bán, công thức giá động đa kho',
           icon: DollarSign,
           requiredModule: 'GOODS',
+        },
+        {
+          id: 'transfers',
+          title: 'Chuyển hàng',
+          desc: 'Điều chuyển hàng hóa nội bộ giữa các chi nhánh',
+          icon: Repeat,
+          requiredFeature: 'feat-transfers',
+          requiredModule: 'TRANSFER',
         },
       ],
     },
@@ -644,6 +653,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
           icon: DollarSign,
           requiredModule: 'GOODS',
         },
+        {
+          id: 'transfers',
+          title: 'Chuyển hàng',
+          desc: 'Điều chuyển hàng hóa nội bộ giữa các chi nhánh',
+          icon: Repeat,
+          requiredFeature: 'feat-transfers',
+          requiredModule: 'TRANSFER',
+        },
       ],
     },
     {
@@ -682,6 +699,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
           desc: 'Bảng giá bán và chính sách giá',
           icon: DollarSign,
           requiredModule: 'GOODS',
+        },
+        {
+          id: 'transfers',
+          title: 'Chuyển hàng',
+          desc: 'Điều chuyển hàng hóa nội bộ giữa các chi nhánh',
+          icon: Repeat,
+          requiredFeature: 'feat-transfers',
+          requiredModule: 'TRANSFER',
         },
       ],
     },
@@ -744,11 +769,28 @@ export const Sidebar: React.FC<SidebarProps> = ({
       requiredModule: 'STOCK',
     },
     {
-      id: 'warehouse-goods',
-      label: 'Danh mục hàng hóa',
+      id: 'warehouse-goods-group',
+      label: 'Hàng hóa',
       icon: Package,
-      hasDropdown: false,
+      hasDropdown: true,
       requiredModule: 'GOODS',
+      dropdownItems: [
+        {
+          id: 'warehouse-goods',
+          title: 'Danh mục hàng hóa',
+          desc: 'Tra cứu mã hàng & tồn kho thực tế',
+          icon: Package,
+          requiredModule: 'GOODS',
+        },
+        {
+          id: 'transfers',
+          title: 'Chuyển hàng',
+          desc: 'Điều chuyển hàng hóa nội bộ giữa các chi nhánh',
+          icon: Repeat,
+          requiredFeature: 'feat-transfers',
+          requiredModule: 'TRANSFER',
+        },
+      ],
     },
     {
       id: 'suppliers',
@@ -893,19 +935,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const filterTabByPermission = (tab: TabConfig): TabConfig | null => {
     if (!allowedModules && !allowedFeatures) return tab;
 
-    // 1. Kiểm tra quyền của chính Tab cha trước: Nếu bị bỏ tích thì ẩn ngay
-    if (tab.requiredModule) {
-      if (allowedFeatures && allowedFeatures.size > 0) {
-        const hasFeature = allowedFeatures.has(tab.id) || allowedFeatures.has(tab.requiredModule);
-        if (!hasFeature) return null;
-      } else if (allowedModules && !allowedModules.has(tab.requiredModule)) {
-        return null;
-      }
-    }
-
-    // 2. Nếu có dropdown, lọc các mục con theo quyền
+    // 1. Nếu có dropdown, lọc các mục con theo quyền trước
+    let allowedChildren: DropdownItem[] | undefined = undefined;
     if (tab.dropdownItems && tab.dropdownItems.length > 0) {
-      const allowedChildren = tab.dropdownItems.filter((child) => {
+      allowedChildren = tab.dropdownItems.filter((child) => {
+        // Nếu mục con yêu cầu một tính năng cụ thể trên ma trận
+        if (child.requiredFeature) {
+          if (!allowedFeatures || !allowedFeatures.has(child.requiredFeature)) {
+            return false;
+          }
+        }
         if (!child.requiredModule) return true;
         if (allowedFeatures && allowedFeatures.size > 0) {
           return allowedFeatures.has(child.id) || allowedFeatures.has(child.requiredModule);
@@ -913,6 +952,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
         return allowedModules ? allowedModules.has(child.requiredModule) : true;
       });
       if (allowedChildren.length === 0) return null;
+    }
+
+    // 2. Kiểm tra quyền của chính Tab cha
+    if (tab.requiredModule) {
+      if (allowedFeatures && allowedFeatures.size > 0) {
+        const hasFeature = allowedFeatures.has(tab.id) || allowedFeatures.has(tab.requiredModule);
+        const hasAllowedChild = allowedChildren && allowedChildren.length > 0;
+        if (!hasFeature && !hasAllowedChild) return null;
+      } else if (allowedModules && !allowedModules.has(tab.requiredModule)) {
+        const hasAllowedChild = allowedChildren && allowedChildren.length > 0;
+        if (!hasAllowedChild) return null;
+      }
+    }
+
+    if (allowedChildren !== undefined) {
       return { ...tab, dropdownItems: allowedChildren };
     }
 
@@ -926,6 +980,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const isTabActive = (tab: TabConfig) => {
     if (tab.id === 'suppliers' && (activeScreen === 'suppliers' || activeScreen.includes('suppliers'))) return true;
     if (tab.id === 'purchases' && (activeScreen === 'purchases' || activeScreen.includes('purchases'))) return true;
+    if (tab.id === 'transfers' && (activeScreen === 'transfers' || activeScreen.includes('transfers'))) return true;
+    if (tab.id.includes('goods') && (activeScreen === 'transfers' || activeScreen.includes('transfers'))) return true;
     if (tab.id === activeScreen) return true;
     if (tab.dropdownItems?.some((sub) => sub.id === activeScreen)) return true;
     if (tab.id === 'admin-staff' && activeScreen === 'admin-staff-active') return true;
