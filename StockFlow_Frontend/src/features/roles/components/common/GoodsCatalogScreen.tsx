@@ -1,6 +1,6 @@
 // src/features/roles/components/common/GoodsCatalogScreen.tsx
 // Màn hình Danh mục Hàng hóa & Tồn kho Master Data cho toàn bộ các Role trong hệ thống
-// Hỗ trợ thiết kế Tạo hàng hóa KiotViet chuẩn với Đơn vị tính, Thuộc tính và Ma trận biến thể
+// Hỗ trợ thiết kế Tạo hàng hóa StockFlow chuẩn với Đơn vị tính, Thuộc tính và Ma trận biến thể
 // Hỗ trợ cả TỰ NHẬP (free text) và TỰ CHỌN (dropdown suggestions) cho tất cả các trường dữ liệu
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
@@ -54,6 +54,14 @@ import { WarehouseFacility } from '../../types';
 import { SkuAnalyticsModal } from './SkuAnalyticsModal';
 import { TIN_PHAT_WAREHOUSES, getActiveWarehouse, setActiveWarehouseGlobal } from '@/lib/warehouse/useActiveWarehouse';
 import ViewPriceBooksModal from './ViewPriceBooksModal';
+import GoodsExportModal from './GoodsExportModal';
+import GoodsExportDownloadDock from './GoodsExportDownloadDock';
+import GoodsImportModal from './GoodsImportModal';
+import ProductFilterSidebar, {
+  FilterSidebarState,
+  INITIAL_FILTER_STATE,
+} from '@/components/ProductFilterSidebar';
+import { SlidersHorizontal, RotateCcw } from 'lucide-react';
 
 // ─── Component Combobox Đa Năng (Vừa Tự Nhập Vừa Tự Chọn) ──────────────────────
 interface CustomComboboxProps {
@@ -650,6 +658,27 @@ export const getItemCreatedTime = (item: GoodsItem): string => {
   return nowTime;
 };
 
+// Chuyển chuỗi ngày (DD/MM/YYYY hoặc ISO YYYY-MM-DD) sang Date để so sánh khoảng thời gian
+const parseDateToComparable = (str?: string): Date | null => {
+  if (!str) return null;
+  const dmyMatch = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (dmyMatch) {
+    const day = parseInt(dmyMatch[1], 10);
+    const month = parseInt(dmyMatch[2], 10) - 1;
+    const year = parseInt(dmyMatch[3], 10);
+    return new Date(year, month, day);
+  }
+  const ymdMatch = str.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (ymdMatch) {
+    const year = parseInt(ymdMatch[1], 10);
+    const month = parseInt(ymdMatch[2], 10) - 1;
+    const day = parseInt(ymdMatch[3], 10);
+    return new Date(year, month, day);
+  }
+  const d = new Date(str);
+  return isNaN(d.getTime()) ? null : d;
+};
+
 interface GoodsCatalogScreenProps {
   onNavigate?: (screenId: string) => void;
   currentRole?: string;
@@ -686,10 +715,96 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
   const suggestedProductCode = getNextProductCode(goods);
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<'ALL' | 'LOW_STOCK' | 'STARRED'>('ALL');
+
+  // Bộ lọc bên trái nâng cao kiểu StockFlow (Ảnh 2 & 3)
+  const [filterSidebarState, setFilterSidebarState] = useState<FilterSidebarState>(INITIAL_FILTER_STATE);
+  const [isFilterSidebarCollapsed, setIsFilterSidebarCollapsed] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const stored = localStorage.getItem('stockflow_goods_filter_collapsed');
+        if (stored !== null) return stored === 'true';
+      } catch {}
+    }
+    return false; // Mặc định mở rộng để thấy ngay bộ lọc như ảnh 2 & 3
+  });
+
+  const handleToggleSidebar = () => {
+    setIsFilterSidebarCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('stockflow_goods_filter_collapsed', String(next));
+      } catch {}
+      return next;
+    });
+  };
+
+  const handleResetSidebarFilters = () => {
+    setFilterSidebarState(INITIAL_FILTER_STATE);
+    showToast('Đã đặt lại tất cả bộ lọc');
+  };
+
+  // Đếm số lượng tiêu chí lọc nâng cao đang áp dụng
+  const activeFiltersCount = useMemo(() => {
+    let count = 0;
+    if (filterSidebarState.category || (filterSidebarState.categories?.length ?? 0) > 0) count++;
+    if (filterSidebarState.stockCriteria !== 'all') count++;
+    if (filterSidebarState.expectedOutOfStockType !== 'all' || (filterSidebarState.expectedOutOfStockPeriod && filterSidebarState.expectedOutOfStockPeriod !== 'Toàn thời gian')) count++;
+    if (filterSidebarState.createdDateType !== 'all' || (filterSidebarState.createdPeriod && filterSidebarState.createdPeriod !== 'Toàn thời gian')) count++;
+    if (filterSidebarState.attrType?.trim()) count++;
+    if (filterSidebarState.attrColor?.trim()) count++;
+    if (filterSidebarState.attrSize?.trim()) count++;
+    if ((filterSidebarState.suppliers?.length ?? 0) > 0 || filterSidebarState.supplier?.trim()) count++;
+    if ((filterSidebarState.locations?.length ?? 0) > 0 || filterSidebarState.location?.trim()) count++;
+    if ((filterSidebarState.productTypes?.length ?? 0) > 0 || filterSidebarState.productType?.trim()) count++;
+    if (filterSidebarState.directSale !== 'all') count++;
+    if (filterSidebarState.businessStatus !== 'all') count++;
+    return count;
+  }, [filterSidebarState]);
+
+  // Danh sách các danh mục, nhà cung cấp, vị trí trích xuất tự động từ dữ liệu thực
+  const categoriesList = useMemo(() => {
+    const set = new Set<string>();
+    goods.forEach((g) => {
+      if (g.category) set.add(g.category);
+      if (g.subCategory) set.add(g.subCategory);
+    });
+    DEFAULT_SUBCATEGORY_OPTIONS.forEach((c) => set.add(c));
+    return Array.from(set).filter(Boolean);
+  }, [goods]);
+
+  const suppliersList = useMemo(() => {
+    const set = new Set<string>();
+    goods.forEach((g) => {
+      if (g.supplier) set.add(g.supplier);
+    });
+    DEFAULT_SUPPLIER_OPTIONS.forEach((s) => set.add(s));
+    return Array.from(set).filter(Boolean);
+  }, [goods]);
+
+  const locationsList = useMemo(() => {
+    const set = new Set<string>();
+    goods.forEach((g) => {
+      if (g.locationName) set.add(g.locationName);
+    });
+    DEFAULT_LOCATION_OPTIONS.forEach((l) => set.add(l));
+    return Array.from(set).filter(Boolean);
+  }, [goods]);
   // Quản lý tích ô vuông các mặt hàng được chọn
   const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
   // Menu thao tác hàng loạt
   const [bulkActionMenuOpen, setBulkActionMenuOpen] = useState(false);
+
+  // Modal Tùy chọn cột xuất Excel & Floating Dock (Ảnh 1, 2, 3)
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [itemsToExport, setItemsToExport] = useState<GoodsItem[]>([]);
+  const [lastExportedFile, setLastExportedFile] = useState<{
+    fileName: string;
+    workbook: any;
+  } | null>(null);
+  const [isExportDockOpen, setIsExportDockOpen] = useState(false);
+
+  // Modal Nhập hàng hóa từ file dữ liệu (Ảnh 2, 3)
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   
   // Đồng bộ chi nhánh kho từ Header / useActiveWarehouse / localStorage (Mặc định kho vật lý cụ thể, KHÔNG dùng "ALL")
   const [warehouseFilter, setWarehouseFilter] = useState<string>(() => {
@@ -726,13 +841,13 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
   const [selectedItem, setSelectedItem] = useState<GoodsItem | null>(null);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
 
-  // Modal 1: Thêm mới / Chỉnh sửa Hàng hóa (Chuẩn KiotViet - Ảnh 1)
+  // Modal 1: Thêm mới / Chỉnh sửa Hàng hóa (Chuẩn StockFlow - Ảnh 1)
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<'create' | 'edit'>('create');
   const [modalTab, setModalTab] = useState<'info' | 'desc' | 'branch'>('info');
   const [editingItem, setEditingItem] = useState<GoodsItem | null>(null);
 
-  // Modal Xác nhận phạm vi áp dụng giá vốn (Chuẩn KiotViet - Ảnh 2)
+  // Modal Xác nhận phạm vi áp dụng giá vốn (Chuẩn StockFlow - Ảnh 2)
   const [costConfirmModalOpen, setCostConfirmModalOpen] = useState(false);
   const [costScope, setCostScope] = useState<'ALL' | 'BRANCH'>('ALL');
   const [costSelectedBranches, setCostSelectedBranches] = useState<string[]>(['Kho Tổng Gia Lâm']);
@@ -813,7 +928,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
   const [stockAccordionOpen, setStockAccordionOpen] = useState(true);
   const [specAccordionOpen, setSpecAccordionOpen] = useState(true);
 
-  // Modal 2: Thiết lập đơn vị tính & thuộc tính (Chuẩn KiotViet - Ảnh 2, 3, 4)
+  // Modal 2: Thiết lập đơn vị tính & thuộc tính (Chuẩn StockFlow - Ảnh 2, 3, 4)
   const [configModalOpen, setConfigModalOpen] = useState(false);
   const [formUnits, setFormUnits] = useState<GoodsUnitConversion[]>([
     { name: 'Hộp', conversionRate: 1, isBase: true, isDirectSale: true },
@@ -1799,7 +1914,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
     setTempVariants((prev) => prev.filter((v) => v.id !== varId));
   };
 
-  // Lưu hàng hóa: mở modal xác nhận phạm vi áp dụng giá vốn chuẩn KiotViet (Ảnh 2)
+  // Lưu hàng hóa: mở modal xác nhận phạm vi áp dụng giá vốn chuẩn StockFlow (Ảnh 2)
   const handleSaveItem = (e?: React.FormEvent, keepOpen = false) => {
     if (e) e.preventDefault();
     if (!formName.trim()) {
@@ -1811,45 +1926,28 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
       return;
     }
 
-    // Khi chỉnh sửa: nếu không có bất kỳ dữ liệu nào thay đổi, lưu/đóng trực tiếp mà KHÔNG hiện popup xác nhận
+    // Khi chỉnh sửa:
     if (modalMode === 'edit' && editInitialSnapshot) {
-      const isDataChanged =
-        formName.trim() !== editInitialSnapshot.name ||
-        formCode.trim().toUpperCase() !== editInitialSnapshot.code.toUpperCase() ||
-        formBarcode.trim() !== editInitialSnapshot.barcode ||
-        formCategory !== editInitialSnapshot.category ||
-        formSubCategory.trim() !== editInitialSnapshot.subCategory ||
-        formBrand.trim() !== editInitialSnapshot.brand ||
-        formSupplier.trim() !== (editInitialSnapshot.supplier || '') ||
-        formUom.trim() !== editInitialSnapshot.uom ||
-        formSpec.trim() !== editInitialSnapshot.spec ||
-        parseCleanNumber(formStandardPrice) !== Number(editInitialSnapshot.standardPrice) ||
-        parseCleanNumber(formCostPrice) !== Number(editInitialSnapshot.costPrice) ||
-        parseCleanNumber(formStockQuantity) !== Number(editInitialSnapshot.stockQuantity) ||
-        parseCleanNumber(formMinSafe) !== Number(editInitialSnapshot.minSafe) ||
-        parseCleanNumber(formMaxSafe) !== Number(editInitialSnapshot.maxSafe) ||
-        formLocation.trim() !== editInitialSnapshot.location ||
-        parseCleanNumber(formWeight) !== Number(editInitialSnapshot.weight) ||
-        String(formWidth) !== String(editInitialSnapshot.width) ||
-        String(formLength) !== String(editInitialSnapshot.length) ||
-        formDimensionUnit !== editInitialSnapshot.dimensionUnit ||
-        formImageUrl.trim() !== editInitialSnapshot.imageUrl ||
-        formDescription.trim() !== editInitialSnapshot.description ||
-        formIsDirectSale !== editInitialSnapshot.isDirectSale ||
-        formHasRewardPoints !== editInitialSnapshot.hasRewardPoints ||
-        JSON.stringify(formUnits) !== JSON.stringify(editInitialSnapshot.units) ||
-        JSON.stringify(formAttributes) !== JSON.stringify(editInitialSnapshot.attributes) ||
-        JSON.stringify(formVariants) !== JSON.stringify(editInitialSnapshot.variants) ||
-        JSON.stringify(formWarehouseStocks) !== JSON.stringify(editInitialSnapshot.stocks);
+      // 1. Kiểm tra giá vốn có thực sự bị thay đổi so với ban đầu hay không
+      const currentEnteredCost = parseCleanNumber(formCostPrice);
+      const initialCost = Number(editInitialSnapshot.costPrice ?? 0);
+      const isCostPriceChanged = currentEnteredCost !== initialCost;
 
-      if (!isDataChanged) {
-        // Dữ liệu không đổi: lưu và đóng modal ngay, không hiện popup
-        executeSaveItem('ALL', [], keepOpen);
+      // NẾU KHÔNG SỬA GIÁ VỐN: LƯU TRỰC TIẾP VÀO DATABASE, TUYỆT ĐỐI KHÔNG HIỆN POPUP ẢNH 2!
+      if (!isCostPriceChanged) {
+        executeSaveItem('KEEP_EXISTING', [], keepOpen);
         return;
       }
     }
 
-    // Khi tạo mới, hoặc khi chỉnh sửa CÓ sửa data: mở modal xác nhận phạm vi giá vốn
+    // Khi tạo mới: nếu giá vốn = 0 thì lưu trực tiếp, không cần hỏi xác nhận
+    const currentCost = parseCleanNumber(formCostPrice);
+    if (modalMode === 'create' && currentCost === 0) {
+      executeSaveItem('ALL', [], keepOpen);
+      return;
+    }
+
+    // CHỈ KHI NÀO SỬA GIÁ VỐN (hoặc tạo mới có giá vốn > 0): mới mở modal xác nhận phạm vi giá vốn (Ảnh 2)
     setCostScope('ALL');
     const defaultBranch = formWarehouse || warehouseFilter || 'Kho Tổng Gia Lâm';
     setCostSelectedBranches([defaultBranch]);
@@ -1860,7 +1958,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
   };
 
   const executeSaveItem = async (
-    applyCostScope: 'ALL' | 'BRANCH',
+    applyCostScope: 'ALL' | 'BRANCH' | 'KEEP_EXISTING',
     targetBranchesForCost: string[] = [],
     keepOpen = false
   ) => {
@@ -1901,11 +1999,11 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
             ? Number(formWarehouseStocks[fac.name]) || 0
             : (Number(existingEntry?.actualStock) || 0));
 
-      // Giá vốn: Toàn hệ thống vs Chi nhánh (chọn nhiều kho)
+      // Giá vốn: Toàn hệ thống vs Chi nhánh vs Giữ nguyên
       let cost: number;
       if (applyCostScope === 'ALL') {
         cost = numEnteredCost;
-      } else {
+      } else if (applyCostScope === 'BRANCH') {
         const isCostTarget = targetBranchesForCost.some(
           (b) =>
             b.trim().toLowerCase() === fac.name.trim().toLowerCase() ||
@@ -1914,6 +2012,9 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
         cost = isCostTarget
           ? numEnteredCost
           : (existingEntry?.costPrice ?? 0);
+      } else {
+        // KEEP_EXISTING: Không sửa giá vốn, giữ nguyên giá vốn từng kho như cũ
+        cost = existingEntry?.costPrice ?? (editingItem?.costPrice ?? numEnteredCost);
       }
 
       // Giá bán: đồng bộ toàn hệ thống theo giá vừa cập nhật (30.000đ ở mọi kho)
@@ -1976,12 +2077,14 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
       standardPrice: numEnteredSalePrice,
       costPrice: applyCostScope === 'ALL'
         ? numEnteredCost
-        : (targetBranchesForCost.some(
-            (b) =>
-              b.trim().toLowerCase() === (editingItem?.warehouse || activeWh).trim().toLowerCase()
-          )
-            ? numEnteredCost
-            : (editingItem?.costPrice ?? 0)),
+        : (applyCostScope === 'BRANCH'
+            ? (targetBranchesForCost.some(
+                (b) =>
+                  b.trim().toLowerCase() === (editingItem?.warehouse || activeWh).trim().toLowerCase()
+              )
+                ? numEnteredCost
+                : (editingItem?.costPrice ?? 0))
+            : (editingItem?.costPrice ?? numEnteredCost)),
       barcode: formBarcode.trim() || `893600${Math.floor(1000000 + Math.random() * 9000000)}`,
       status: 'ACTIVE',
       createdAt: editingItem ? getItemCreatedTime(editingItem) : nowFormatted,
@@ -2082,12 +2185,25 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
 
     setIsSaving(true);
     try {
-      const numericId = editingItem?.productId || (editingItem && Number(editingItem.id) ? Number(editingItem.id) : undefined);
+      let numericId = editingItem?.productId || (editingItem && Number(editingItem.id) ? Number(editingItem.id) : undefined);
+      if (editingItem && !numericId) {
+        try {
+          const found = await productService.getProducts({ search: editingItem.code });
+          const exact = found.find((p: any) => (p.code || p.productCode || '').toUpperCase() === editingItem.code.toUpperCase());
+          if (exact) {
+            numericId = (exact as any).productId || (Number(exact.id) ? Number(exact.id) : undefined);
+          }
+        } catch {}
+      }
+
       if (editingItem && numericId) {
         try {
           const updateRes = await productService.updateProduct(numericId, apiPayload);
           if (updateRes) {
             savedItem.productId = (updateRes as any).productId || numericId;
+            if ((updateRes as any).categoryName) {
+              savedItem.subCategory = (updateRes as any).categoryName;
+            }
           }
           showToast(`Đã cập nhật hàng hóa: ${savedItem.name}`);
         } catch (apiErr) {
@@ -2103,6 +2219,9 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
             if ((createRes as any).createdAt) {
               savedItem.createdAt = formatRealDateTime((createRes as any).createdAt);
             }
+            if ((createRes as any).categoryName) {
+              savedItem.subCategory = (createRes as any).categoryName;
+            }
           }
           showToast(`Tạo mới hàng hóa thành công: ${savedItem.name}`);
         } catch (apiErr) {
@@ -2117,10 +2236,10 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
       // Cập nhật React state và lưu cache LocalStorage
       let updatedList: GoodsItem[];
       if (editingItem) {
-        updatedList = goods.map((g) => (g.id === editingItem.id ? savedItem : g));
+        updatedList = goods.map((g) => (g.id === editingItem.id || g.code.toUpperCase() === editingItem.code.toUpperCase() ? savedItem : g));
       } else {
         // Hàng hóa mới tạo sau luôn được đưa lên TRÊN CÙNG (index 0)
-        updatedList = [savedItem, ...goods.filter((g) => g.id !== savedItem.id && g.code !== savedItem.code)];
+        updatedList = [savedItem, ...goods.filter((g) => g.id !== savedItem.id && g.code.toUpperCase() !== savedItem.code.toUpperCase())];
       }
 
       setGoods(updatedList);
@@ -2231,7 +2350,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
     }
   };
 
-  // Filtered List
+  // Filtered List kết hợp cả thanh tìm kiếm + bộ lọc nâng cao StockFlow (Ảnh 2 & 3)
   const filteredGoods = goods.filter((item) => {
     const matchSearch =
       item.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -2242,6 +2361,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
 
     if (!matchSearch) return false;
 
+    // Header Category Filter Tabs (Tất cả, Đã gắn sao, Cảnh báo tồn thấp)
     if (categoryFilter === 'LOW_STOCK') {
       const stockInfo = getProductStockForWarehouse(item, warehouseFilter);
       if (stockInfo.minSafe <= 0 || stockInfo.actual >= stockInfo.minSafe) return false;
@@ -2250,6 +2370,160 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
     if (categoryFilter === 'STARRED') {
       if (!item.isStarred) return false;
     }
+
+    // ─── 1. Nhóm hàng (Category / SubCategory) ───
+    if (filterSidebarState.category && filterSidebarState.category.trim()) {
+      const cat = filterSidebarState.category.trim().toLowerCase();
+      const matchCat =
+        (item.category && item.category.toLowerCase().includes(cat)) ||
+        (item.subCategory && item.subCategory.toLowerCase().includes(cat));
+      if (!matchCat) return false;
+    }
+
+    // ─── 2. Tồn kho (Tiêu chí tồn: below_min, above_max, in_stock, out_of_stock, custom) ───
+    const itemStock = getProductStockForWarehouse(item, warehouseFilter);
+    if (filterSidebarState.stockCriteria === 'below_min') {
+      if (itemStock.minSafe <= 0 || itemStock.actual >= itemStock.minSafe) return false;
+    } else if (filterSidebarState.stockCriteria === 'above_max') {
+      if (itemStock.maxSafe <= 0 || itemStock.actual <= itemStock.maxSafe) return false;
+    } else if (filterSidebarState.stockCriteria === 'in_stock') {
+      if (itemStock.actual <= 0) return false;
+    } else if (filterSidebarState.stockCriteria === 'out_of_stock') {
+      if (itemStock.actual > 0) return false;
+    } else if (filterSidebarState.stockCriteria === 'custom') {
+      if (typeof filterSidebarState.customStockMin === 'number' && itemStock.actual < filterSidebarState.customStockMin) {
+        return false;
+      }
+      if (typeof filterSidebarState.customStockMax === 'number' && itemStock.actual > filterSidebarState.customStockMax) {
+        return false;
+      }
+    }
+
+    // ─── 3. Dự kiến hết hàng ───
+    if (filterSidebarState.expectedOutOfStockType === 'custom') {
+      if (itemStock.actual > (itemStock.minSafe || 0)) return false;
+    } else if (filterSidebarState.expectedOutOfStockPeriod && filterSidebarState.expectedOutOfStockPeriod !== 'Toàn thời gian') {
+      const p = filterSidebarState.expectedOutOfStockPeriod;
+      if (['Ngày mai', 'Ngày kia', '3 ngày tới'].includes(p)) {
+        if (itemStock.actual > Math.max(0, itemStock.minSafe || 0) + 5) return false;
+      } else if (['5 ngày tới', '7 ngày tới', 'Tuần này', 'Tuần tới'].includes(p)) {
+        if (itemStock.actual > Math.max(0, itemStock.minSafe || 0) + 15) return false;
+      } else if (['2 tuần tới', 'Tháng này', 'Tháng tới', '30 ngày tới', '2 tháng tới', '3 tháng tới'].includes(p)) {
+        if (itemStock.actual > Math.max(0, itemStock.minSafe || 0) + 50) return false;
+      }
+    }
+
+    // ─── 4. Thời gian tạo ───
+    if (filterSidebarState.createdDateType === 'custom') {
+      const itemDate = parseDateToComparable(item.createdAt);
+      if (itemDate) {
+        if (filterSidebarState.createdDateFrom) {
+          const fromDate = parseDateToComparable(filterSidebarState.createdDateFrom);
+          if (fromDate && itemDate < fromDate) return false;
+        }
+        if (filterSidebarState.createdDateTo) {
+          const toDate = parseDateToComparable(filterSidebarState.createdDateTo);
+          if (toDate) {
+            const endOfDay = new Date(toDate.getFullYear(), toDate.getMonth(), toDate.getDate(), 23, 59, 59, 999);
+            if (itemDate > endOfDay) return false;
+          }
+        }
+      }
+    } else if (filterSidebarState.createdPeriod && filterSidebarState.createdPeriod !== 'Toàn thời gian') {
+      const p = filterSidebarState.createdPeriod;
+      const itemDate = parseDateToComparable(item.createdAt);
+      if (itemDate) {
+        const now = new Date();
+        const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        if (p === 'Hôm nay') {
+          if (itemDate < startOfToday) return false;
+        } else if (p === 'Hôm qua') {
+          const yesterday = new Date(startOfToday.getTime() - 24 * 60 * 60 * 1000);
+          if (itemDate < yesterday || itemDate >= startOfToday) return false;
+        } else if (p === 'Tuần này' || p === '7 ngày qua') {
+          const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+          if (itemDate < sevenDaysAgo) return false;
+        } else if (p === 'Tháng này' || p === '30 ngày qua') {
+          const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+          if (itemDate < thirtyDaysAgo) return false;
+        }
+      }
+    }
+
+    // ─── 5. Thuộc tính (LOẠI, MÀU, SIZE) ───
+    if (filterSidebarState.attrType && filterSidebarState.attrType.trim()) {
+      const query = filterSidebarState.attrType.trim().toLowerCase();
+      const matchAttr =
+        item.specification?.toLowerCase().includes(query) ||
+        item.attributes?.some((a) => a.name.toLowerCase().includes(query) || a.values.some((v) => v.toLowerCase().includes(query))) ||
+        item.variants?.some((v) => v.attributeValue?.toLowerCase().includes(query));
+      if (!matchAttr) return false;
+    }
+
+    if (filterSidebarState.attrColor && filterSidebarState.attrColor.trim()) {
+      const query = filterSidebarState.attrColor.trim().toLowerCase();
+      const matchColor =
+        item.name.toLowerCase().includes(query) ||
+        item.specification?.toLowerCase().includes(query) ||
+        item.attributes?.some((a) => a.name.toLowerCase().includes('màu') && a.values.some((v) => v.toLowerCase().includes(query))) ||
+        item.variants?.some((v) => v.attributeValue?.toLowerCase().includes(query));
+      if (!matchColor) return false;
+    }
+
+    if (filterSidebarState.attrSize && filterSidebarState.attrSize.trim()) {
+      const query = filterSidebarState.attrSize.trim().toLowerCase();
+      const matchSize =
+        item.name.toLowerCase().includes(query) ||
+        item.specification?.toLowerCase().includes(query) ||
+        item.attributes?.some((a) => a.name.toLowerCase().includes('size') && a.values.some((v) => v.toLowerCase().includes(query))) ||
+        item.variants?.some((v) => v.attributeValue?.toLowerCase().includes(query));
+      if (!matchSize) return false;
+    }
+
+    // ─── 6. Nhà cung cấp (Hỗ trợ chọn nhiều - Multi-select) ───
+    const selectedSuppliers = (filterSidebarState.suppliers && filterSidebarState.suppliers.length > 0)
+      ? filterSidebarState.suppliers
+      : filterSidebarState.supplier?.trim() ? [filterSidebarState.supplier.trim()] : [];
+    if (selectedSuppliers.length > 0) {
+      const matchSup = selectedSuppliers.some(
+        (s) => item.supplier && item.supplier.toLowerCase().includes(s.toLowerCase())
+      );
+      if (!matchSup) return false;
+    }
+
+    // ─── 7. Vị trí (Hỗ trợ chọn nhiều - Multi-select) ───
+    const selectedLocations = (filterSidebarState.locations && filterSidebarState.locations.length > 0)
+      ? filterSidebarState.locations
+      : filterSidebarState.location?.trim() ? [filterSidebarState.location.trim()] : [];
+    if (selectedLocations.length > 0) {
+      const matchLoc = selectedLocations.some(
+        (l) => item.locationName && item.locationName.toLowerCase().includes(l.toLowerCase())
+      );
+      if (!matchLoc) return false;
+    }
+
+    // ─── 8. Loại hàng (Hàng hóa, Dịch vụ, Combo - Hỗ trợ chọn nhiều) ───
+    const selectedTypes = (filterSidebarState.productTypes && filterSidebarState.productTypes.length > 0)
+      ? filterSidebarState.productTypes
+      : filterSidebarState.productType?.trim() ? [filterSidebarState.productType.trim()] : [];
+    if (selectedTypes.length > 0) {
+      const matchPType = selectedTypes.some((pType) => {
+        const query = pType.toLowerCase();
+        return (
+          (item.category && item.category.toLowerCase().includes(query)) ||
+          (item.subCategory && item.subCategory.toLowerCase().includes(query))
+        );
+      });
+      if (!matchPType) return false;
+    }
+
+    // ─── 9. Bán trực tiếp (Tất cả / Có / Không) ───
+    if (filterSidebarState.directSale === 'yes' && item.isDirectSale === false) return false;
+    if (filterSidebarState.directSale === 'no' && item.isDirectSale === true) return false;
+
+    // ─── 10. Trạng thái hàng hóa (Hàng đang kinh doanh / Hàng ngừng kinh doanh / Tất cả) ───
+    if (filterSidebarState.businessStatus === 'active' && item.status !== 'ACTIVE') return false;
+    if (filterSidebarState.businessStatus === 'inactive' && item.status !== 'DISCONTINUED') return false;
 
     // Các mặt hàng hiển thị thì ở tất cả các kho đều giống nhau,
     // số lượng tồn kho sẽ thay đổi tương ứng theo chi nhánh được chọn.
@@ -2410,7 +2684,25 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
 
   const handleBulkExportExcel = () => {
     if (selectedItemIds.length === 0) return;
-    showToast(`Đang kết xuất tệp Excel cho ${selectedItemIds.length} mặt hàng đã chọn...`);
+    const items = goods.filter((g) => selectedItemIds.includes(g.id));
+    setItemsToExport(items);
+    setIsExportModalOpen(true);
+  };
+
+  const handleExportSuccess = (result: { fileName: string; workbook: any }) => {
+    setLastExportedFile(result);
+    setIsExportDockOpen(true);
+    showToast(`Đã xuất thành công tệp ${result.fileName}`);
+  };
+
+  const handleImportSuccess = (importedCount: number, fileName: string, newGoods: GoodsItem[]) => {
+    setGoods(newGoods);
+    try {
+      localStorage.setItem(STOCKFLOW_GOODS_STORAGE_KEY, JSON.stringify(newGoods));
+    } catch {}
+    setLastExportedFile({ fileName: fileName, workbook: null });
+    setIsExportDockOpen(true);
+    showToast(`Nhập dữ liệu thành công! Đã xử lý ${importedCount} mặt hàng từ file.`);
   };
 
   // Quick tag suggestions for attribute modal
@@ -2432,7 +2724,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="w-full relative">
       {/* Toast Notification */}
       {toastMessage && (
         <div className="fixed top-20 right-8 z-50 bg-slate-900 text-white px-4 py-2.5 rounded-lg shadow-xl text-xs font-semibold flex items-center gap-2 animate-in fade-in">
@@ -2441,8 +2733,25 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
         </div>
       )}
 
-      {/* 1. Header Màn hình */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      {/* KHỐI LAYOUT CHIA 2 CỘT: BỘ LỌC BÊN TRÁI (Ảnh 2 & 3) + NỘI DUNG CHÍNH (Ảnh 1) */}
+      <div className="flex items-start gap-4 w-full">
+        {/* Bộ lọc bên trái StockFlow - Thu vào kéo ra mượt mà */}
+        <ProductFilterSidebar
+          state={filterSidebarState}
+          onChange={(patch) => setFilterSidebarState((prev) => ({ ...prev, ...patch }))}
+          onCreateCategory={handleOpenCreate}
+          categoriesList={categoriesList}
+          suppliersList={suppliersList}
+          locationsList={locationsList}
+          isCollapsed={isFilterSidebarCollapsed}
+          onToggleCollapse={handleToggleSidebar}
+          onResetFilters={handleResetSidebarFilters}
+        />
+
+        {/* Nội dung danh mục hàng hóa - Tự động giãn 100% khi thu gọn */}
+        <div className="flex-1 min-w-0 space-y-6">
+          {/* 1. Header Màn hình */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-xl font-bold text-slate-900 tracking-tight">
             Danh mục Hàng hóa &amp; Tồn kho
@@ -2465,7 +2774,20 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
 
           <button
             type="button"
-            onClick={() => showToast('Đang kết xuất tệp Excel danh mục hàng hóa...')}
+            onClick={() => setIsImportModalOpen(true)}
+            title="Nhập hàng hóa từ tệp dữ liệu Excel"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 transition cursor-pointer shadow-2xs"
+          >
+            <ArrowDownToLine size={14} className="text-slate-500" />
+            <span>Import file</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setItemsToExport(filteredGoods);
+              setIsExportModalOpen(true);
+            }}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 transition cursor-pointer shadow-2xs"
           >
             <FileSpreadsheet size={14} className="text-slate-500" />
@@ -2581,6 +2903,26 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
       {/* 3. Thanh Bộ Lọc & Tìm Kiếm */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white p-3 rounded-xl border border-slate-200/90 shadow-2xs">
         <div className="flex flex-1 items-center gap-2">
+          {/* Nút bật/tắt bộ lọc bên trái (Ảnh 2 & 3) */}
+          <button
+            type="button"
+            onClick={handleToggleSidebar}
+            className={`inline-flex items-center gap-1.5 px-3 h-9 rounded-lg border text-xs font-semibold transition cursor-pointer shadow-2xs shrink-0 ${
+              !isFilterSidebarCollapsed
+                ? 'border-blue-400 bg-blue-50 text-blue-700'
+                : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-700'
+            }`}
+            title={isFilterSidebarCollapsed ? 'Mở rộng bộ lọc bên trái (ảnh 2, 3)' : 'Thu gọn bộ lọc bên trái'}
+          >
+            <SlidersHorizontal size={14} className={!isFilterSidebarCollapsed ? 'text-blue-600' : 'text-slate-500'} />
+            <span>Bộ lọc</span>
+            {activeFiltersCount > 0 && (
+              <span className="w-4 h-4 rounded-full bg-blue-600 text-white text-[10px] flex items-center justify-center font-bold">
+                {activeFiltersCount}
+              </span>
+            )}
+          </button>
+
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
             <input
@@ -2592,8 +2934,20 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
             />
           </div>
 
+          {activeFiltersCount > 0 && (
+            <button
+              type="button"
+              onClick={handleResetSidebarFilters}
+              className="inline-flex items-center gap-1 px-2.5 h-9 rounded-lg border border-rose-200 bg-rose-50 text-rose-600 hover:bg-rose-100 text-xs font-medium transition cursor-pointer shrink-0"
+              title="Xóa tất cả điều kiện lọc đang áp dụng"
+            >
+              <RotateCcw size={12} />
+              <span>Xóa lọc ({activeFiltersCount})</span>
+            </button>
+          )}
+
           {selectedItemIds.length > 0 ? (
-            /* Thanh Thao Tác Hàng Loạt Chuẩn KiotViet Khi Tích Chọn Ô Vuông (Ảnh 2) */
+            /* Thanh Thao Tác Hàng Loạt Chuẩn StockFlow Khi Tích Chọn Ô Vuông (Ảnh 2) */
             <div className="flex flex-wrap items-center gap-2">
               <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-700 border border-blue-200 rounded-lg text-xs font-bold animate-in fade-in">
                 <span>Đã chọn {selectedItemIds.length}</span>
@@ -2746,7 +3100,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
         </div>
       </div>
 
-      {/* 4. Bảng Danh Sách Hàng Hóa Chuẩn KiotViet Master-Detail (Ảnh 1 & Ảnh 2) */}
+      {/* 4. Bảng Danh Sách Hàng Hóa Chuẩn StockFlow Master-Detail (Ảnh 1 & Ảnh 2) */}
       <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
@@ -2861,7 +3215,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                         </button>
                       </td>
 
-                      {/* Ảnh Thumbnail Nhỏ Cạnh Tên / Mã Hàng (Chuẩn 100% Ảnh Chụp KiotViet) */}
+                      {/* Ảnh Thumbnail Nhỏ Cạnh Tên / Mã Hàng (Chuẩn 100% Ảnh Chụp StockFlow) */}
                       <td
                         className="py-2.5 px-2 text-center w-12 relative"
                         onClick={(e) => e.stopPropagation()}
@@ -3074,7 +3428,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                       </td>
                     </tr>
 
-                    {/* DÒNG EXPAND CHI TIẾT SẢN PHẨM & MA TRẬN BIẾN THỂ (ẢNH 5 KIOTVIET) */}
+                    {/* DÒNG EXPAND CHI TIẾT SẢN PHẨM & MA TRẬN BIẾN THỂ (ẢNH 5 StockFlow) */}
                     {isExpanded && (
                       <tr className="bg-slate-50/60 border-b border-slate-200">
                         <td colSpan={12} className="p-0">
@@ -3462,7 +3816,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                                     </div>
                                   </div>
 
-                                  {/* 2. BẢNG TỒN KHO CHI TIẾT TỪNG CHI NHÁNH (Chuẩn KiotViet Requirement 5.2) */}
+                                  {/* 2. BẢNG TỒN KHO CHI TIẾT TỪNG CHI NHÁNH (Chuẩn StockFlow Requirement 5.2) */}
                                   <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-2xs">
                                     <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
                                       <div className="flex items-center gap-2">
@@ -3753,8 +4107,32 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                   </React.Fragment>
                 );
               })}
+
+              {filteredGoods.length === 0 && (
+                <tr>
+                  <td colSpan={10} className="py-12 text-center text-slate-500">
+                    <Package size={36} className="mx-auto text-slate-300 mb-2" />
+                    <p className="font-semibold text-slate-700">Không tìm thấy hàng hóa nào phù hợp</p>
+                    <p className="text-xs text-slate-400 mt-1">Vui lòng thay đổi từ khóa tìm kiếm hoặc đặt lại các bộ lọc</p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSearch('');
+                        handleResetSidebarFilters();
+                        setCategoryFilter('ALL');
+                      }}
+                      className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 text-xs font-semibold transition cursor-pointer"
+                    >
+                      <RotateCcw size={12} />
+                      <span>Đặt lại toàn bộ tìm kiếm &amp; bộ lọc</span>
+                    </button>
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
+        </div>
+      </div>
         </div>
       </div>
 
@@ -3947,7 +4325,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                       </div>
                     </div>
 
-                    {/* Cột Phải: Khung Upload Ảnh từ Máy Tính (Chuẩn Ảnh 1 KiotViet) */}
+                    {/* Cột Phải: Khung Upload Ảnh từ Máy Tính (Chuẩn Ảnh 1 StockFlow) */}
                     <div className="md:col-span-4 flex items-start gap-2.5">
                       {/* Input file ẩn trực tiếp mở cửa sổ chọn tệp từ máy tính */}
                       <input
@@ -4041,7 +4419,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                         )}
                       </div>
 
-                      {/* 3 Thumbnails Nhỏ bên cạnh (Ảnh 1 KiotViet) */}
+                      {/* 3 Thumbnails Nhỏ bên cạnh (Ảnh 1 StockFlow) */}
                       <div className="flex flex-col gap-1.5">
                         {[0, 1, 2].map((slotIdx) => {
                           const slotImg = formImages[slotIdx + 1];
@@ -5402,6 +5780,30 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
         item={viewingPriceBookItem}
         isOpen={!!viewingPriceBookItem}
         onClose={() => setViewingPriceBookItem(null)}
+      />
+
+      {/* MODAL TÙY CHỌN CỘT XUẤT FILE EXCEL (ẢNH 1 & 3) */}
+      <GoodsExportModal
+        isOpen={isExportModalOpen}
+        onClose={() => setIsExportModalOpen(false)}
+        items={itemsToExport}
+        onExportSuccess={handleExportSuccess}
+      />
+
+      {/* MODAL NHẬP HÀNG HÓA TỪ FILE DỮ LIỆU (ẢNH 2 & 3) */}
+      <GoodsImportModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        existingGoods={goods}
+        onImportSuccess={handleImportSuccess}
+      />
+
+      {/* FLOATING DOCK DOWNLOAD FILE ĐÃ KẾT XUẤT (ẢNH 2) */}
+      <GoodsExportDownloadDock
+        isOpen={isExportDockOpen}
+        onClose={() => setIsExportDockOpen(false)}
+        fileName={lastExportedFile?.fileName || ''}
+        workbook={lastExportedFile?.workbook || null}
       />
     </div>
   );

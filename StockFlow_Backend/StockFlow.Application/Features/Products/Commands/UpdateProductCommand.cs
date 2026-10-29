@@ -64,6 +64,25 @@ public class UpdateProductCommandHandler : IRequestHandler<UpdateProductCommand,
         {
             product.CategoryId = req.CategoryId.Value;
         }
+        else if (!string.IsNullOrWhiteSpace(req.CategoryName))
+        {
+            var defaultCatName = req.CategoryName.Trim();
+            var cat = await _context.MstProductCategories
+                .FirstOrDefaultAsync(c => c.CategoryName != null && c.CategoryName.ToLower() == defaultCatName.ToLower(), cancellationToken);
+
+            if (cat == null)
+            {
+                cat = new MstProductCategory
+                {
+                    CategoryName = defaultCatName,
+                    Description = $"Nhóm hàng {defaultCatName}",
+                    IsActive = true
+                };
+                await _context.MstProductCategories.AddAsync(cat, cancellationToken);
+                await _context.SaveChangesAsync(cancellationToken);
+            }
+            product.CategoryId = cat.CategoryId;
+        }
 
         if (req.BaseUnitId.HasValue && req.BaseUnitId.Value > 0)
         {
@@ -209,6 +228,37 @@ public class UpdateProductCommandHandler : IRequestHandler<UpdateProductCommand,
         if (req.IsActive.HasValue)
         {
             product.IsActive = req.IsActive.Value;
+        }
+
+        if (req.InitialStock.HasValue)
+        {
+            var targetWhId = req.InitialWarehouseId;
+            if (!targetWhId.HasValue || targetWhId.Value <= 0)
+            {
+                var firstWh = await _context.MstWarehouses.FirstOrDefaultAsync(w => w.IsActive != false, cancellationToken);
+                targetWhId = firstWh?.WarehouseId ?? 1;
+            }
+
+            var balance = product.TrxInventoryBalances.FirstOrDefault(b => b.WarehouseId == targetWhId.Value);
+            if (balance != null)
+            {
+                balance.Quantity = req.InitialStock.Value;
+                if (product.MovingAverageCost.HasValue)
+                {
+                    balance.UnitCost = product.MovingAverageCost.Value;
+                }
+            }
+            else
+            {
+                await _context.TrxInventoryBalances.AddAsync(new TrxInventoryBalance
+                {
+                    ProductId = product.ProductId,
+                    WarehouseId = targetWhId.Value,
+                    Quantity = req.InitialStock.Value,
+                    UnitCost = product.MovingAverageCost ?? 0,
+                    LastUpdated = DateTime.UtcNow,
+                }, cancellationToken);
+            }
         }
 
         await _context.SaveChangesAsync(cancellationToken);
