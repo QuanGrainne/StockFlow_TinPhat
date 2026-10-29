@@ -22,6 +22,7 @@ public interface IStockFlowDbContext
     DbSet<TrxFinancialTransaction> TrxFinancialTransactions { get; }
     DbSet<MstPriceBook> MstPriceBooks { get; }
     DbSet<DtlPriceBookItem> DtlPriceBookItems { get; }
+    DbSet<DtlOrderItem> DtlOrderItems { get; }
     DbSet<TrxStockTransfer> TrxStockTransfers { get; }
     DbSet<DtlStockTransferItem> DtlStockTransferItems { get; }
 

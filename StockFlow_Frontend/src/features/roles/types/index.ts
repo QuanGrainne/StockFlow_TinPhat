@@ -73,6 +73,8 @@ export interface Product {
   units?: ProductUnitConversion[];
   attributes?: ProductAttributeDef[];
   variants?: ProductVariant[];
+  createdAt?: string;
+  isStarred?: boolean;
 }
 
 // ─── Sales Types ─────────────────────────────────────────────────────────────

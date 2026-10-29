@@ -53,13 +53,42 @@ public class DeleteProductCommandHandler : IRequestHandler<DeleteProductCommand,
             return Result.Failure<bool>("Không tìm thấy thông tin hàng hóa.");
         }
 
-        var hasBalance = product.TrxInventoryBalances.Any(b => (b.Quantity ?? 0) > 0);
-        if (hasBalance)
+        // 1. Kiểm tra nếu sản phẩm ĐÃ CÓ ĐƠN ĐẶT HÀNG
+        var hasOrders = await _context.DtlOrderItems.AnyAsync(o => o.ProductId == command.ProductId, cancellationToken);
+        if (hasOrders)
         {
-            // Soft-deactivate if product has existing stock
-            product.IsActive = false;
-            await _context.SaveChangesAsync(cancellationToken);
-            return Result.Success(true);
+            return Result.Failure<bool>("Sản phẩm này đã phát sinh đơn đặt hàng trong hệ thống. Để bảo toàn lịch sử dữ liệu và chứng từ, không thể xóa vĩnh viễn! Bạn có thể chuyển trạng thái sang 'Ngừng kinh doanh' để ẩn sản phẩm.");
+        }
+
+        // 2. Kiểm tra nếu sản phẩm ĐÃ PHÁT SINH GIAO DỊCH THẺ KHO / CHỨNG TỪ NHẬP XUẤT
+        var hasTransactions = await _context.TrxInventoryTransactions.AnyAsync(t => t.ProductId == command.ProductId, cancellationToken);
+        var hasReceipts = await _context.DtlGoodsReceiptItems.AnyAsync(r => r.ProductId == command.ProductId, cancellationToken);
+        if (hasTransactions || hasReceipts)
+        {
+            return Result.Failure<bool>("Sản phẩm này đã phát sinh giao dịch xuất/nhập kho (thẻ kho). Không thể xóa vĩnh viễn để bảo đảm tính toàn vẹn của sổ sách kho!");
+        }
+
+        // 3. Kiểm tra nếu sản phẩm vẫn còn tồn kho thực tế > 0
+        var balances = await _context.TrxInventoryBalances
+            .Where(b => b.ProductId == command.ProductId)
+            .ToListAsync(cancellationToken);
+        if (balances.Any(b => (b.Quantity ?? 0) > 0))
+        {
+            return Result.Failure<bool>("Sản phẩm hiện vẫn còn tồn kho thực tế. Vui lòng xuất kho hoặc cân chỉnh tồn về 0 trước khi xóa.");
+        }
+
+        // 4. Nếu là sản phẩm mới tạo / hàng rác (chưa có đơn hàng, chưa có giao dịch xuất nhập)
+        if (balances.Count > 0)
+        {
+            _context.TrxInventoryBalances.RemoveRange(balances);
+        }
+
+        var priceBookItems = await _context.DtlPriceBookItems
+            .Where(pb => pb.ProductId == command.ProductId)
+            .ToListAsync(cancellationToken);
+        if (priceBookItems.Count > 0)
+        {
+            _context.DtlPriceBookItems.RemoveRange(priceBookItems);
         }
 
         try
@@ -68,12 +97,9 @@ public class DeleteProductCommandHandler : IRequestHandler<DeleteProductCommand,
             await _context.SaveChangesAsync(cancellationToken);
             return Result.Success(true);
         }
-        catch
+        catch (Exception ex)
         {
-            // Fallback to soft-deactivate on foreign key constraint
-            product.IsActive = false;
-            await _context.SaveChangesAsync(cancellationToken);
-            return Result.Success(true);
+            return Result.Failure<bool>($"Lỗi ràng buộc dữ liệu khi xóa sản phẩm: {ex.Message}");
         }
     }
 }

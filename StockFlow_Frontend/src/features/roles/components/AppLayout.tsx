@@ -371,10 +371,10 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ initialScreen }) => {
       {/* 2. Main Workspace Content (Chỉ cuộn vùng nội dung) */}
       {activeScreen === 'suppliers' || activeScreen.includes('suppliers') ||
        activeScreen === 'purchases' || activeScreen.includes('purchases') ||
-       activeScreen === 'goods-catalog' || activeScreen === 'products' ||
+       activeScreen === 'goods-catalog' || activeScreen === 'products' || activeScreen.includes('goods') || activeScreen.includes('catalog') ||
        activeScreen === 'transfers' || activeScreen.includes('transfers') ||
        activeScreen === 'warehouse-transfer' ? (
-        <main className="flex-1 min-w-0 flex flex-col overflow-y-auto bg-[#F8FAFC]">
+        <main className="flex-1 min-w-0 flex flex-col overflow-y-auto bg-[#F8FAFC] p-4 lg:p-6">
           {renderActiveScreen()}
         </main>
       ) : (

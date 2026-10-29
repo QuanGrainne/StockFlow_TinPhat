@@ -65,6 +65,7 @@ public class GetProductByIdQueryHandler : IRequestHandler<GetProductByIdQuery, R
         List<ProductConversionUnitDto>? units = null;
         List<ProductAttributeDto>? attributes = null;
         List<ProductVariantItemDto>? variants = null;
+        string? supplier = null;
 
         if (!string.IsNullOrWhiteSpace(product.VariantsJson))
         {
@@ -83,6 +84,10 @@ public class GetProductByIdQueryHandler : IRequestHandler<GetProductByIdQuery, R
                 if (root.TryGetProperty("variants", out var vEl))
                 {
                     variants = System.Text.Json.JsonSerializer.Deserialize<List<ProductVariantItemDto>>(vEl.GetRawText());
+                }
+                if (root.TryGetProperty("supplier", out var supEl))
+                {
+                    supplier = supEl.GetString();
                 }
             }
             catch
@@ -122,7 +127,8 @@ public class GetProductByIdQueryHandler : IRequestHandler<GetProductByIdQuery, R
             Warehouses: warehouses,
             Units: units,
             Attributes: attributes,
-            Variants: variants
+            Variants: variants,
+            Supplier: supplier
         );
 
         return Result.Success(detail);
