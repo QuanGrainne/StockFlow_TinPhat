@@ -60,7 +60,7 @@ export default function CreatePriceBookModal({
   const [formulaBasePriceBookId, setFormulaBasePriceBookId] = useState<number | null>(null);
   const [formulaOperator, setFormulaOperator] = useState<'+' | '-'>('+');
   const [formulaValue, setFormulaValue] = useState<number | ''>('');
-  const [formulaUnit, setFormulaUnit] = useState<'VND' | 'PERCENT'>('VND');
+  const [formulaUnit, setFormulaUnit] = useState<'VND' | 'PERCENT'>('PERCENT');
 
   const [allowUnlistedProducts, setAllowUnlistedProducts] = useState(true);
   const [warnUnlistedProducts, setWarnUnlistedProducts] = useState(false);
@@ -108,7 +108,11 @@ export default function CreatePriceBookModal({
       setFormulaBasePriceBookId(editingPriceBook.formulaBasePriceBookId);
       setFormulaOperator(editingPriceBook.formulaOperator || '+');
       setFormulaValue(editingPriceBook.formulaValue ?? '');
-      setFormulaUnit(editingPriceBook.formulaUnit || 'VND');
+      
+      setFormulaUnit('PERCENT');
+      if (editingPriceBook.formulaBaseType) {
+        setExpandFormula(true);
+      }
 
       setAllowUnlistedProducts(editingPriceBook.allowUnlistedProducts);
       setWarnUnlistedProducts(editingPriceBook.warnUnlistedProducts);
@@ -136,7 +140,7 @@ export default function CreatePriceBookModal({
       setFormulaBasePriceBookId(null);
       setFormulaOperator('+');
       setFormulaValue('');
-      setFormulaUnit('VND');
+      setFormulaUnit('PERCENT');
 
       setAllowUnlistedProducts(true);
       setWarnUnlistedProducts(false);
@@ -178,7 +182,7 @@ export default function CreatePriceBookModal({
         formulaBasePriceBookId: formulaBaseType === 'PRICE_BOOK' ? formulaBasePriceBookId : null,
         formulaOperator: formulaValue !== '' ? formulaOperator : null,
         formulaValue: formulaValue !== '' ? Number(formulaValue) : null,
-        formulaUnit: formulaValue !== '' ? formulaUnit : null,
+        formulaUnit: formulaValue !== '' ? 'PERCENT' : null,
         allowUnlistedProducts,
         warnUnlistedProducts: allowUnlistedProducts ? warnUnlistedProducts : false,
         scopeBranchType,
@@ -254,7 +258,7 @@ export default function CreatePriceBookModal({
             onClick={() => setActiveTab('info')}
             className={`pb-2.5 text-sm font-semibold transition border-b-2 mr-6 ${
               activeTab === 'info'
-                ? 'border-[#0071BA] text-[#0071BA]'
+                ? 'border-[#0070f4] text-[#0070f4]'
                 : 'border-transparent text-slate-500 hover:text-slate-800'
             }`}
           >
@@ -265,7 +269,7 @@ export default function CreatePriceBookModal({
             onClick={() => setActiveTab('scope')}
             className={`pb-2.5 text-sm font-semibold transition border-b-2 ${
               activeTab === 'scope'
-                ? 'border-[#0071BA] text-[#0071BA]'
+                ? 'border-[#0070f4] text-[#0070f4]'
                 : 'border-transparent text-slate-500 hover:text-slate-800'
             }`}
           >
@@ -294,7 +298,7 @@ export default function CreatePriceBookModal({
                   value={priceBookName}
                   onChange={e => setPriceBookName(e.target.value)}
                   placeholder="Nhập tên bảng giá (vd: Bảng giá khách VIP, Bảng giá sỉ...)"
-                  className="h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-[#0071BA] focus:ring-2 focus:ring-blue-100"
+                  className="h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-[#0070f4] focus:ring-2 focus:ring-blue-100"
                   required
                 />
               </div>
@@ -319,14 +323,14 @@ export default function CreatePriceBookModal({
                           type="datetime-local"
                           value={effectiveFrom}
                           onChange={e => setEffectiveFrom(e.target.value)}
-                          className="h-8 rounded border border-slate-300 px-2.5 text-xs text-slate-700 outline-none focus:border-[#0071BA]"
+                          className="h-8 rounded border border-slate-300 px-2.5 text-xs text-slate-700 outline-none focus:border-[#0070f4]"
                         />
                         <span className="text-slate-400">đến</span>
                         <input
                           type="datetime-local"
                           value={effectiveTo}
                           onChange={e => setEffectiveTo(e.target.value)}
-                          className="h-8 rounded border border-slate-300 px-2.5 text-xs text-slate-700 outline-none focus:border-[#0071BA]"
+                          className="h-8 rounded border border-slate-300 px-2.5 text-xs text-slate-700 outline-none focus:border-[#0070f4]"
                         />
                       </div>
                     </div>
@@ -339,7 +343,7 @@ export default function CreatePriceBookModal({
                           name="status_radio"
                           checked={isActive === true}
                           onChange={() => setIsActive(true)}
-                          className="accent-[#0071BA]"
+                          className="accent-[#0070f4]"
                         />
                         <span className="font-medium text-slate-800">Áp dụng</span>
                       </label>
@@ -349,7 +353,7 @@ export default function CreatePriceBookModal({
                           name="status_radio"
                           checked={isActive === false}
                           onChange={() => setIsActive(false)}
-                          className="accent-[#0071BA]"
+                          className="accent-[#0070f4]"
                         />
                         <span className="font-medium text-slate-800">Chưa áp dụng</span>
                       </label>
@@ -392,7 +396,7 @@ export default function CreatePriceBookModal({
                             setFormulaBasePriceBookId(null);
                           }
                         }}
-                        className="h-8 rounded border border-slate-300 bg-white px-2.5 text-xs text-slate-800 outline-none focus:border-[#0071BA] min-w-[170px]"
+                        className="h-8 rounded border border-slate-300 bg-white px-2.5 text-xs text-slate-800 outline-none focus:border-[#0070f4] min-w-[170px]"
                       >
                         <option value="">-- Chọn nguồn giá cơ sở --</option>
                         <option value="COST">Giá vốn (theo kho hoặc toàn cty)</option>
@@ -412,7 +416,7 @@ export default function CreatePriceBookModal({
                           type="button"
                           onClick={() => setFormulaOperator('+')}
                           className={`px-2.5 py-1 text-xs font-bold transition ${
-                            formulaOperator === '+' ? 'bg-[#0071BA] text-white' : 'text-slate-600 hover:bg-slate-200'
+                            formulaOperator === '+' ? 'bg-[#0070f4] text-white' : 'text-slate-600 hover:bg-slate-200'
                           }`}
                         >
                           +
@@ -421,50 +425,74 @@ export default function CreatePriceBookModal({
                           type="button"
                           onClick={() => setFormulaOperator('-')}
                           className={`px-2.5 py-1 text-xs font-bold transition ${
-                            formulaOperator === '-' ? 'bg-[#0071BA] text-white' : 'text-slate-600 hover:bg-slate-200'
+                            formulaOperator === '-' ? 'bg-[#0070f4] text-white' : 'text-slate-600 hover:bg-slate-200'
                           }`}
                         >
                           -
                         </button>
                       </div>
 
-                      {/* Giá trị điều chỉnh */}
-                      <input
-                        type="number"
-                        min="0"
-                        step="any"
-                        value={formulaValue}
-                        onChange={e => setFormulaValue(e.target.value ? Number(e.target.value) : '')}
-                        placeholder="0"
-                        className="h-8 w-24 rounded border border-slate-300 px-2 text-right text-xs text-slate-800 outline-none focus:border-[#0071BA]"
-                      />
-
-                      {/* Đơn vị VND / % */}
-                      <div className="inline-flex rounded border border-slate-300 overflow-hidden bg-slate-100">
-                        <button
-                          type="button"
-                          onClick={() => setFormulaUnit('VND')}
-                          className={`px-2 py-1 text-xs font-semibold transition ${
-                            formulaUnit === 'VND' ? 'bg-[#0071BA] text-white' : 'text-slate-600 hover:bg-slate-200'
-                          }`}
-                        >
-                          VND
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setFormulaUnit('PERCENT')}
-                          className={`px-2 py-1 text-xs font-semibold transition ${
-                            formulaUnit === 'PERCENT' ? 'bg-[#0071BA] text-white' : 'text-slate-600 hover:bg-slate-200'
-                          }`}
-                        >
+                      {/* Giá trị điều chỉnh (%) */}
+                      <div className="inline-flex items-center">
+                        <input
+                          type="number"
+                          min="0"
+                          step="any"
+                          value={formulaValue}
+                          onChange={e => setFormulaValue(e.target.value ? Number(e.target.value) : '')}
+                          placeholder="0"
+                          className="h-8 w-20 rounded-l border border-r-0 border-slate-300 px-2.5 text-right text-xs text-slate-800 outline-none focus:border-[#0070f4]"
+                        />
+                        <span className="inline-flex h-8 items-center rounded-r border border-slate-300 bg-slate-100 px-2.5 text-xs font-bold text-slate-700 select-none">
                           %
-                        </button>
+                        </span>
                       </div>
                     </div>
 
-                    <p className="text-[11px] text-slate-500 italic">
-                      * Ví dụ: Giá mới = Giá vốn + 20 % hoặc Giá mới = Bảng giá chung - 15,000 VND
-                    </p>
+                    {/* Hộp xem trước kết quả trực tiếp */}
+                    {formulaBaseType && formulaValue !== '' && Number(formulaValue) > 0 ? (
+                      <div className="rounded-lg bg-blue-50/90 border border-blue-200 px-3.5 py-2.5 text-xs text-blue-900 flex flex-wrap items-center justify-between gap-2 shadow-2xs">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-bold text-[#0070f4] flex items-center gap-1">
+                            <Info size={13} />
+                            Xem trước:
+                          </span>
+                          <span>
+                            Giá mới ={' '}
+                            <strong>
+                              {formulaBaseType === 'COST'
+                                ? 'Giá vốn'
+                                : formulaBaseType === 'PRICE_BOOK'
+                                ? existingPriceBooks?.find(b => b.priceBookId === formulaBasePriceBookId)?.priceBookName || 'Bảng giá gốc'
+                                : 'Bảng giá chung'}
+                            </strong>{' '}
+                            <strong className="text-blue-700 bg-blue-100 px-1.5 py-0.5 rounded font-mono font-bold">
+                              {formulaOperator} {formulaValue}%
+                            </strong>
+                          </span>
+                        </div>
+                        <div className="text-[11px] text-slate-600 font-mono">
+                          Ví dụ giá gốc 100.000đ →{' '}
+                          <strong className="text-emerald-700 font-bold bg-white px-1.5 py-0.5 rounded border border-emerald-200">
+                            {new Intl.NumberFormat('vi-VN').format(
+                              Math.max(
+                                0,
+                                Math.round(
+                                  formulaOperator === '+'
+                                    ? 100000 + 100000 * (Number(formulaValue) / 100)
+                                    : 100000 - 100000 * (Number(formulaValue) / 100)
+                                )
+                              )
+                            )}{' '}
+                            đ
+                          </strong>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-[11px] text-slate-500 italic">
+                        * Ví dụ: Giá mới = Bảng giá chung + 15 % (tăng 15%) hoặc Giá mới = Giá vốn + 20 %
+                      </p>
+                    )}
                   </div>
                 )}
               </div>
@@ -490,7 +518,7 @@ export default function CreatePriceBookModal({
                         name="order_rule_radio"
                         checked={allowUnlistedProducts === true}
                         onChange={() => setAllowUnlistedProducts(true)}
-                        className="mt-0.5 accent-[#0071BA]"
+                        className="mt-0.5 accent-[#0070f4]"
                       />
                       <div>
                         <span className="font-medium text-slate-800">
@@ -503,7 +531,7 @@ export default function CreatePriceBookModal({
                                 type="checkbox"
                                 checked={warnUnlistedProducts}
                                 onChange={e => setWarnUnlistedProducts(e.target.checked)}
-                                className="accent-[#0071BA] rounded"
+                                className="accent-[#0070f4] rounded"
                               />
                               <span>Gửi cảnh báo khi thêm hàng hóa không có trong bảng giá</span>
                             </label>
@@ -521,7 +549,7 @@ export default function CreatePriceBookModal({
                           setAllowUnlistedProducts(false);
                           setWarnUnlistedProducts(false);
                         }}
-                        className="mt-0.5 accent-[#0071BA]"
+                        className="mt-0.5 accent-[#0070f4]"
                       />
                       <div className="flex items-center gap-1.5">
                         <span className="font-medium text-slate-800">
@@ -551,7 +579,7 @@ export default function CreatePriceBookModal({
                       name="scope_branch_radio"
                       checked={scopeBranchType === 'ALL'}
                       onChange={() => setScopeBranchType('ALL')}
-                      className="accent-[#0071BA]"
+                      className="accent-[#0070f4]"
                     />
                     <span className="font-medium text-slate-800">Toàn hệ thống (tất cả kho)</span>
                   </label>
@@ -562,7 +590,7 @@ export default function CreatePriceBookModal({
                       name="scope_branch_radio"
                       checked={scopeBranchType === 'SPECIFIC'}
                       onChange={() => setScopeBranchType('SPECIFIC')}
-                      className="accent-[#0071BA]"
+                      className="accent-[#0070f4]"
                     />
                     <span className="font-medium text-slate-800">Chi nhánh / Kho cụ thể</span>
                   </label>
@@ -576,7 +604,7 @@ export default function CreatePriceBookModal({
                           type="checkbox"
                           checked={selectedWarehouseIds.includes(w.warehouseId)}
                           onChange={() => toggleWarehouse(w.warehouseId)}
-                          className="accent-[#0071BA] rounded"
+                          className="accent-[#0070f4] rounded"
                         />
                         <span className="truncate">{w.warehouseName}</span>
                       </label>
@@ -600,7 +628,7 @@ export default function CreatePriceBookModal({
                       name="scope_cust_radio"
                       checked={scopeCustomerType === 'ALL'}
                       onChange={() => setScopeCustomerType('ALL')}
-                      className="accent-[#0071BA]"
+                      className="accent-[#0070f4]"
                     />
                     <span className="font-medium text-slate-800">Tất cả khách hàng</span>
                   </label>
@@ -611,7 +639,7 @@ export default function CreatePriceBookModal({
                       name="scope_cust_radio"
                       checked={scopeCustomerType === 'SPECIFIC'}
                       onChange={() => setScopeCustomerType('SPECIFIC')}
-                      className="accent-[#0071BA]"
+                      className="accent-[#0070f4]"
                     />
                     <span className="font-medium text-slate-800">Nhóm khách hàng cụ thể</span>
                   </label>
@@ -625,7 +653,7 @@ export default function CreatePriceBookModal({
                           type="checkbox"
                           checked={selectedCustomerGroupCodes.includes(g.code)}
                           onChange={() => toggleCustomerGroup(g.code)}
-                          className="accent-[#0071BA] rounded"
+                          className="accent-[#0070f4] rounded"
                         />
                         <span>{g.name}</span>
                       </label>
@@ -646,7 +674,7 @@ export default function CreatePriceBookModal({
                       name="scope_user_radio"
                       checked={scopeUserType === 'ALL'}
                       onChange={() => setScopeUserType('ALL')}
-                      className="accent-[#0071BA]"
+                      className="accent-[#0070f4]"
                     />
                     <span className="font-medium text-slate-800">Tất cả nhân viên / thu ngân</span>
                   </label>
@@ -657,7 +685,7 @@ export default function CreatePriceBookModal({
                       name="scope_user_radio"
                       checked={scopeUserType === 'SPECIFIC'}
                       onChange={() => setScopeUserType('SPECIFIC')}
-                      className="accent-[#0071BA]"
+                      className="accent-[#0070f4]"
                     />
                     <span className="font-medium text-slate-800">Người tạo giao dịch cụ thể</span>
                   </label>
@@ -671,7 +699,7 @@ export default function CreatePriceBookModal({
                           type="checkbox"
                           checked={selectedUserIds.includes(u.userId)}
                           onChange={() => toggleUser(u.userId)}
-                          className="accent-[#0071BA] rounded"
+                          className="accent-[#0070f4] rounded"
                         />
                         <span className="truncate">{u.fullName || u.username}</span>
                       </label>
@@ -716,7 +744,7 @@ export default function CreatePriceBookModal({
               <button
                 type="submit"
                 disabled={loading}
-                className="h-9 px-5 rounded-lg bg-[#0071BA] hover:bg-[#005f9d] text-xs font-semibold text-white shadow-xs transition disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
+                className="h-9 px-5 rounded-[8px] bg-[#0070f4] hover:bg-[#005ac3] text-xs font-semibold text-white shadow-xs transition disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
               >
                 {loading ? 'Đang lưu...' : 'Lưu'}
               </button>

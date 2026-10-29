@@ -13,6 +13,12 @@ import {
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import {
+  getDateRangeForPreset,
+  formatDateOnlyVN,
+  parseISODate,
+  toISODate,
+} from '@/features/transfers/utils/dateUtils';
 
 export type StockCriteriaType =
   | 'all'
@@ -1017,6 +1023,39 @@ function MultiSelectPillBox({
   );
 }
 
+const PRESET_COLUMNS = [
+  {
+    title: 'Theo ngày',
+    items: [
+      { key: 'today', label: 'Hôm nay' },
+      { key: 'yesterday', label: 'Hôm qua' },
+    ],
+  },
+  {
+    title: 'Theo tuần',
+    items: [
+      { key: 'this_week', label: 'Tuần này' },
+      { key: 'last_week', label: 'Tuần trước' },
+      { key: 'last_7_days', label: '7 ngày qua' },
+    ],
+  },
+  {
+    title: 'Theo tháng',
+    items: [
+      { key: 'this_month', label: 'Tháng này' },
+      { key: 'last_month', label: 'Tháng trước' },
+      { key: 'last_30_days', label: '30 ngày qua' },
+    ],
+  },
+  {
+    title: 'Theo năm',
+    items: [
+      { key: 'this_year', label: 'Năm nay' },
+      { key: 'last_year', label: 'Năm trước' },
+    ],
+  },
+];
+
 export default function ProductFilterSidebar({
   state,
   onChange,
@@ -1028,6 +1067,11 @@ export default function ProductFilterSidebar({
   onToggleCollapse,
   onResetFilters,
 }: ProductFilterSidebarProps) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   // Dropdown & Popover open states
   const [categoryOpen, setCategoryOpen] = useState(false);
   const [categorySearch, setCategorySearch] = useState('');
@@ -1037,11 +1081,52 @@ export default function ProductFilterSidebar({
   const [typeOpen, setTypeOpen] = useState(false);
   const [statusOpen, setStatusOpen] = useState(false);
 
-  // Popover for Date Periods
-  const [createdPeriodPopoverOpen, setCreatedPeriodPopoverOpen] = useState(false);
+  // Popover for Expected Date
   const [expectedPeriodPopoverOpen, setExpectedPeriodPopoverOpen] = useState(false);
-  const [createdDateRangeOpen, setCreatedDateRangeOpen] = useState(false);
   const [expectedDateRangeOpen, setExpectedDateRangeOpen] = useState(false);
+
+  // Creation Date Popover states & refs (Chuẩn Chuyển hàng)
+  const [showPresetPopover, setShowPresetPopover] = useState(false);
+  const [showCustomPopover, setShowCustomPopover] = useState(false);
+
+  const presetTriggerRef = useRef<HTMLDivElement>(null);
+  const customTriggerRef = useRef<HTMLDivElement>(null);
+  const presetBoxRef = useRef<HTMLDivElement>(null);
+  const customBoxRef = useRef<HTMLDivElement>(null);
+  const presetPopoverRef = useRef<HTMLDivElement>(null);
+  const customPopoverRef = useRef<HTMLDivElement>(null);
+
+  const [presetCoords, setPresetCoords] = useState<{ top: number; left: number; arrowTop: number }>({
+    top: 0,
+    left: 0,
+    arrowTop: 24,
+  });
+  const [customCoords, setCustomCoords] = useState<{ top: number; left: number; arrowTop: number }>({
+    top: 0,
+    left: 0,
+    arrowTop: 24,
+  });
+
+  const [createdPresetLabel, setCreatedPresetLabel] = useState<string>(() => {
+    return state.createdPeriod || 'Tháng này';
+  });
+
+  useEffect(() => {
+    if (state.createdPeriod) {
+      setCreatedPresetLabel(state.createdPeriod);
+    }
+  }, [state.createdPeriod]);
+
+  const [tempFrom, setTempFrom] = useState<Date>(() => parseISODate(state.createdDateFrom));
+  const [tempTo, setTempTo] = useState<Date>(() => parseISODate(state.createdDateTo));
+  const [leftMonth, setLeftMonth] = useState<Date>(() => {
+    const d = parseISODate(state.createdDateFrom);
+    return new Date(d.getFullYear(), d.getMonth(), 1);
+  });
+  const [rightMonth, setRightMonth] = useState<Date>(() => {
+    const d = parseISODate(state.createdDateTo);
+    return new Date(d.getFullYear(), d.getMonth(), 1);
+  });
 
   // Expanded attributes (LOẠI, MÀU, SIZE, KG, KHỔ, THÙNG (THÙNG = 600 VỈ))
   const [expandAttributes, setExpandAttributes] = useState(false);
@@ -1049,13 +1134,32 @@ export default function ProductFilterSidebar({
   const containerRef = useRef<HTMLDivElement>(null);
   const expectedPeriodAnchorRef = useRef<HTMLDivElement>(null);
   const expectedDateRangeAnchorRef = useRef<HTMLDivElement>(null);
-  const createdPeriodAnchorRef = useRef<HTMLDivElement>(null);
-  const createdDateRangeAnchorRef = useRef<HTMLDivElement>(null);
 
   // Close all open dropdowns/popovers when clicking outside
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       const target = e.target as Node;
+
+      if (
+        showPresetPopover &&
+        presetPopoverRef.current &&
+        !presetPopoverRef.current.contains(target) &&
+        presetTriggerRef.current &&
+        !presetTriggerRef.current.contains(target)
+      ) {
+        setShowPresetPopover(false);
+      }
+
+      if (
+        showCustomPopover &&
+        customPopoverRef.current &&
+        !customPopoverRef.current.contains(target) &&
+        customTriggerRef.current &&
+        !customTriggerRef.current.contains(target)
+      ) {
+        setShowCustomPopover(false);
+      }
+
       if (containerRef.current && containerRef.current.contains(target)) return;
       if ((target as Element)?.closest?.('[data-portal-popover]')) return;
 
@@ -1065,14 +1169,211 @@ export default function ProductFilterSidebar({
       setLocationOpen(false);
       setTypeOpen(false);
       setStatusOpen(false);
-      setCreatedPeriodPopoverOpen(false);
       setExpectedPeriodPopoverOpen(false);
-      setCreatedDateRangeOpen(false);
       setExpectedDateRangeOpen(false);
     }
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  }, [showPresetPopover, showCustomPopover]);
+
+  const handleOpenCreatedPreset = () => {
+    if (state.createdDateType === 'custom') {
+      const range = getDateRangeForPreset('this_month');
+      onChange({
+        createdDateType: 'all',
+        createdPeriod: range.label,
+        createdDateFrom: range.from,
+        createdDateTo: range.to,
+      });
+      setCreatedPresetLabel(range.label);
+    }
+
+    const anchor = presetBoxRef.current || presetTriggerRef.current;
+    if (anchor) {
+      const rect = anchor.getBoundingClientRect();
+      const popoverHeight = 220;
+      let top = rect.top - 20;
+      if (top + popoverHeight > window.innerHeight) {
+        top = Math.max(10, window.innerHeight - popoverHeight - 10);
+      }
+      if (top < 10) top = 10;
+      const arrowTop = Math.max(16, rect.top - top + rect.height / 2 - 8);
+      setPresetCoords({
+        top,
+        left: rect.right + 10,
+        arrowTop,
+      });
+    }
+
+    setShowPresetPopover((prev) => !prev);
+    setShowCustomPopover(false);
+  };
+
+  const handleOpenCreatedCustom = () => {
+    const f = state.createdDateFrom ? parseISODate(state.createdDateFrom) : new Date();
+    const t = state.createdDateTo ? parseISODate(state.createdDateTo) : new Date();
+
+    onChange({
+      createdDateType: 'custom',
+      createdDateFrom: toISODate(f),
+      createdDateTo: toISODate(t),
+    });
+
+    setTempFrom(f);
+    setTempTo(t);
+    setLeftMonth(new Date(f.getFullYear(), f.getMonth(), 1));
+    setRightMonth(new Date(t.getFullYear(), t.getMonth(), 1));
+
+    const anchor = customBoxRef.current || customTriggerRef.current;
+    if (anchor) {
+      const rect = anchor.getBoundingClientRect();
+      const popoverHeight = 360;
+      let top = rect.top - 60;
+      if (top + popoverHeight > window.innerHeight) {
+        top = Math.max(10, window.innerHeight - popoverHeight - 10);
+      }
+      if (top < 10) top = 10;
+      const arrowTop = Math.max(16, rect.top - top + rect.height / 2 - 8);
+      setCustomCoords({
+        top,
+        left: rect.right + 10,
+        arrowTop,
+      });
+    }
+
+    setShowCustomPopover((prev) => !prev);
+    setShowPresetPopover(false);
+  };
+
+  const handleSelectCreatedPreset = (key: string, label: string) => {
+    const range = getDateRangeForPreset(key);
+    setCreatedPresetLabel(label);
+    onChange({
+      createdDateType: 'all',
+      createdPeriod: label,
+      createdDateFrom: range.from,
+      createdDateTo: range.to,
+    });
+    setShowPresetPopover(false);
+  };
+
+  const handleApplyCreatedCustom = () => {
+    let f = tempFrom;
+    let t = tempTo;
+    if (f > t) {
+      const tmp = f;
+      f = t;
+      t = tmp;
+    }
+    const fromISO = toISODate(f);
+    const toISO = toISODate(t);
+    onChange({
+      createdDateType: 'custom',
+      createdDateFrom: fromISO,
+      createdDateTo: toISO,
+    });
+    setShowCustomPopover(false);
+  };
+
+  const handleSetCreatedToday = () => {
+    const today = new Date();
+    setTempFrom(today);
+    setTempTo(today);
+    setLeftMonth(new Date(today.getFullYear(), today.getMonth(), 1));
+    setRightMonth(new Date(today.getFullYear(), today.getMonth(), 1));
+  };
+
+  const renderCreatedCalendarDays = (monthDate: Date, isLeftCalendar: boolean) => {
+    const year = monthDate.getFullYear();
+    const month = monthDate.getMonth();
+
+    const firstDay = new Date(year, month, 1);
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const daysInPrevMonth = new Date(year, month, 0).getDate();
+
+    const startDayIndex = (firstDay.getDay() + 6) % 7;
+
+    interface DayItem {
+      date: Date;
+      dayNum: number;
+      isCurrentMonth: boolean;
+      iso: string;
+    }
+
+    const days: DayItem[] = [];
+
+    for (let i = startDayIndex - 1; i >= 0; i--) {
+      const d = daysInPrevMonth - i;
+      const date = new Date(year, month - 1, d);
+      days.push({
+        date,
+        dayNum: d,
+        isCurrentMonth: false,
+        iso: toISODate(date),
+      });
+    }
+
+    for (let d = 1; d <= daysInMonth; d++) {
+      const date = new Date(year, month, d);
+      days.push({
+        date,
+        dayNum: d,
+        isCurrentMonth: true,
+        iso: toISODate(date),
+      });
+    }
+
+    let nextDay = 1;
+    while (days.length % 7 !== 0 || days.length < 35) {
+      const date = new Date(year, month + 1, nextDay);
+      days.push({
+        date,
+        dayNum: nextDay,
+        isCurrentMonth: false,
+        iso: toISODate(date),
+      });
+      nextDay++;
+    }
+
+    const fromISO = toISODate(tempFrom);
+    const toISO = toISODate(tempTo);
+
+    return (
+      <div className="grid grid-cols-7 gap-y-1 text-center text-xs">
+        {days.map((item, idx) => {
+          const isSelected = isLeftCalendar
+            ? item.iso === fromISO
+            : item.iso === toISO;
+
+          return (
+            <div
+              key={idx}
+              onClick={() => {
+                if (isLeftCalendar) {
+                  setTempFrom(item.date);
+                } else {
+                  setTempTo(item.date);
+                }
+              }}
+              className="h-8 flex items-center justify-center cursor-pointer transition relative"
+            >
+              <span
+                className={`w-7 h-7 flex items-center justify-center rounded-full text-xs transition ${
+                  isSelected
+                    ? 'bg-[#0070f4] text-white font-bold shadow-xs'
+                    : item.isCurrentMonth
+                    ? 'text-[#15171a] hover:bg-[#f7f8f9] font-medium'
+                    : 'text-slate-300 hover:bg-[#f7f8f9]'
+                }`}
+              >
+                {item.dayNum}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
 
   const filteredCategories = categoriesList.filter((cat) =>
     cat.toLowerCase().includes(categorySearch.trim().toLowerCase())
@@ -1086,38 +1387,33 @@ export default function ProductFilterSidebar({
     BUSINESS_STATUS_OPTIONS.find((opt) => opt.value === state.businessStatus)?.label ??
     'Hàng đang kinh doanh';
 
-  const currentCreatedPeriodLabel = state.createdPeriod || 'Toàn thời gian';
   const currentExpectedPeriodLabel = state.expectedOutOfStockPeriod || 'Toàn thời gian';
 
   return (
-    <div className="relative shrink-0 flex items-start">
-      <aside
-        ref={containerRef}
-        className={`bg-white border-r border-[#e5e7eb] select-none text-[#262626] transition-all duration-300 relative ${
-          isCollapsed
-            ? 'w-0 overflow-hidden px-0 py-0 border-r-0 opacity-0'
-            : 'w-[260px] px-4 py-5 overflow-y-auto max-h-[calc(100vh-70px)] opacity-100 rounded-xl shadow-2xs'
-        }`}
-      >
-        {/* 0. Main Title & Reset */}
-        <div className="flex items-center justify-between mb-5">
-          <h2 className="text-[20px] font-bold text-slate-900 tracking-tight">
-            Hàng hóa
-          </h2>
-          {onResetFilters && (
-            <button
-              type="button"
-              onClick={onResetFilters}
-              className="text-xs text-blue-600 hover:text-blue-800 font-semibold cursor-pointer flex items-center gap-1 hover:underline transition"
-              title="Đặt lại tất cả bộ lọc"
-            >
-              <RotateCcw size={12} />
-              <span>Đặt lại</span>
-            </button>
+    <aside
+      ref={containerRef}
+      className={`relative ${
+        isCollapsed ? 'w-0 border-r-0' : 'w-60 border-r border-slate-200'
+      } h-full min-h-0 bg-white flex flex-col shrink-0 transition-all duration-200 text-[13px] text-[#15171a] select-none font-sans`}
+    >
+      {/* Nút thu gọn / mở rộng bộ lọc theo chuẩn giao diện */}
+      {onToggleCollapse && (
+        <button
+          type="button"
+          onClick={onToggleCollapse}
+          className="absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-white border border-[#0070f4] text-[#0070f4] hover:bg-[#e6f1fe] shadow-xs flex items-center justify-center cursor-pointer z-30 transition"
+          title={isCollapsed ? 'Mở rộng bộ lọc' : 'Thu gọn bộ lọc'}
+        >
+          {isCollapsed ? (
+            <ChevronRight size={13} className="stroke-[2.5]" />
+          ) : (
+            <ChevronLeft size={13} className="stroke-[2.5]" />
           )}
-        </div>
+        </button>
+      )}
 
-        <div className="space-y-4">
+      {!isCollapsed && (
+        <div className="flex-1 min-h-0 p-3.5 space-y-4 overflow-y-auto">
         {/* 1. Nhóm hàng */}
         <div>
           <div className="flex items-center justify-between mb-1.5">
@@ -1140,7 +1436,8 @@ export default function ProductFilterSidebar({
                 setLocationOpen(false);
                 setTypeOpen(false);
                 setStatusOpen(false);
-                setCreatedPeriodPopoverOpen(false);
+                setShowPresetPopover(false);
+                setShowCustomPopover(false);
                 setExpectedPeriodPopoverOpen(false);
               }}
               className={`h-[34px] px-3 bg-white border rounded-[6px] flex items-center justify-between text-[13px] cursor-pointer transition ${
@@ -1242,7 +1539,8 @@ export default function ProductFilterSidebar({
                 setLocationOpen(false);
                 setTypeOpen(false);
                 setStatusOpen(false);
-                setCreatedPeriodPopoverOpen(false);
+                setShowPresetPopover(false);
+                setShowCustomPopover(false);
                 setExpectedPeriodPopoverOpen(false);
               }}
               className={`h-[34px] px-3 bg-white border rounded-[6px] flex items-center justify-between text-[13px] cursor-pointer transition ${
@@ -1330,7 +1628,8 @@ export default function ProductFilterSidebar({
                 onClick={() => {
                   onChange({ expectedOutOfStockType: 'all' });
                   setExpectedPeriodPopoverOpen(!expectedPeriodPopoverOpen);
-                  setCreatedPeriodPopoverOpen(false);
+                  setShowPresetPopover(false);
+                  setShowCustomPopover(false);
                 }}
                 className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 cursor-pointer transition ${
                   state.expectedOutOfStockType === 'all'
@@ -1346,7 +1645,8 @@ export default function ProductFilterSidebar({
                 onClick={() => {
                   onChange({ expectedOutOfStockType: 'all' });
                   setExpectedPeriodPopoverOpen(!expectedPeriodPopoverOpen);
-                  setCreatedPeriodPopoverOpen(false);
+                  setShowPresetPopover(false);
+                  setShowCustomPopover(false);
                 }}
                 className={`flex-1 h-[34px] px-3 rounded-[6px] bg-white flex items-center justify-between text-[13px] text-slate-700 cursor-pointer transition ${
                   expectedPeriodPopoverOpen
@@ -1366,8 +1666,8 @@ export default function ProductFilterSidebar({
                 e.stopPropagation();
                 onChange({ expectedOutOfStockType: 'custom' });
                 setExpectedPeriodPopoverOpen(false);
-                setCreatedDateRangeOpen(false);
-                setCreatedPeriodPopoverOpen(false);
+                setShowPresetPopover(false);
+                setShowCustomPopover(false);
                 setExpectedDateRangeOpen((prev) => !prev);
               }}
               className="relative flex items-center gap-2.5 cursor-pointer group"
@@ -1423,111 +1723,80 @@ export default function ProductFilterSidebar({
           />
         </div>
 
-        {/* 4. Thời gian tạo */}
-        <div className="relative">
-          <div className="text-[13px] font-semibold text-slate-800 mb-1.5 flex items-center gap-1.5">
-            <span>Thời gian tạo</span>
-            {((state.createdDateType === 'all' && state.createdPeriod && state.createdPeriod !== 'Toàn thời gian') || state.createdDateType === 'custom') && (
-              <span className="w-1.5 h-1.5 rounded-full bg-blue-600"></span>
-            )}
-          </div>
+        {/* 4. Thời gian tạo (Chuẩn giao diện Chuyển hàng) */}
+        <div>
+          <label className="block text-[11px] font-bold text-[#677484] mb-1.5 uppercase tracking-wide">
+            Thời gian tạo
+          </label>
           <div className="space-y-1.5">
-            {/* Option A: Toàn thời gian / Chu kỳ tạo (Click opens Popover - Screenshot 2) */}
-            <div ref={createdPeriodAnchorRef} className="flex items-center gap-2.5 group">
-              <div
-                onClick={() => {
-                  onChange({ createdDateType: 'all' });
-                  setCreatedPeriodPopoverOpen(!createdPeriodPopoverOpen);
-                  setExpectedPeriodPopoverOpen(false);
-                }}
-                className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 cursor-pointer transition ${
-                  state.createdDateType === 'all'
-                    ? 'border-blue-600 bg-white'
-                    : 'border-slate-300 group-hover:border-slate-400 bg-white'
-                }`}
-              >
-                {state.createdDateType === 'all' && (
-                  <div className="w-2 h-2 rounded-full bg-blue-600" />
-                )}
-              </div>
-              <div
-                onClick={() => {
-                  onChange({ createdDateType: 'all' });
-                  setCreatedPeriodPopoverOpen(!createdPeriodPopoverOpen);
-                  setExpectedPeriodPopoverOpen(false);
-                }}
-                className={`flex-1 h-[34px] px-3 rounded-[6px] bg-white flex items-center justify-between text-[13px] text-slate-700 cursor-pointer transition ${
-                  createdPeriodPopoverOpen
-                    ? 'border-2 border-blue-500 shadow-xs'
-                    : 'border border-slate-300 hover:border-slate-400'
-                }`}
-              >
-                <span className="truncate">{currentCreatedPeriodLabel}</span>
-                <ChevronRight size={15} className="text-slate-400 shrink-0" />
-              </div>
-            </div>
-
-            {/* Option B: Tùy chỉnh */}
+            {/* Option 1: Preset */}
             <div
-              ref={createdDateRangeAnchorRef}
-              onClick={(e) => {
-                e.stopPropagation();
-                onChange({ createdDateType: 'custom' });
-                setCreatedPeriodPopoverOpen(false);
-                setExpectedDateRangeOpen(false);
-                setExpectedPeriodPopoverOpen(false);
-                setCreatedDateRangeOpen((prev) => !prev);
-              }}
-              className="relative flex items-center gap-2.5 cursor-pointer group"
+              ref={presetTriggerRef}
+              className="flex items-center gap-2"
             >
               <div
-                className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 transition ${
-                  state.createdDateType === 'custom'
-                    ? 'border-blue-600 bg-white'
-                    : 'border-slate-300 group-hover:border-slate-400 bg-white'
-                }`}
+                onClick={handleOpenCreatedPreset}
+                className="cursor-pointer p-0.5"
               >
-                {state.createdDateType === 'custom' && (
-                  <div className="w-2 h-2 rounded-full bg-blue-600" />
+                {state.createdDateType !== 'custom' ? (
+                  <div className="w-4 h-4 rounded-full border-2 border-[#0070f4] flex items-center justify-center shrink-0">
+                    <div className="w-2 h-2 rounded-full bg-[#0070f4]" />
+                  </div>
+                ) : (
+                  <div className="w-4 h-4 rounded-full border border-slate-300 shrink-0 hover:border-slate-400" />
                 )}
               </div>
-              <div className={`flex-1 h-[34px] px-3 border rounded-[6px] bg-white flex items-center justify-between text-[13px] text-slate-700 transition ${createdDateRangeOpen ? 'border-blue-500 ring-2 ring-blue-100' : 'border-slate-300 hover:border-slate-400'}`}>
-                <span>{state.createdDateFrom ? `${formatDateKey(state.createdDateFrom)} - ${formatDateKey(state.createdDateTo)}` : 'Tùy chỉnh'}</span>
-                <Calendar size={15} className="text-slate-500 shrink-0" />
+
+              <div
+                ref={presetBoxRef}
+                onClick={handleOpenCreatedPreset}
+                className={`flex-1 h-8 px-3 rounded-[8px] border flex items-center justify-between cursor-pointer transition select-none ${
+                  state.createdDateType !== 'custom'
+                    ? 'border-slate-300 bg-white text-[#15171a] shadow-xs hover:border-[#0070f4]'
+                    : 'border-slate-200 bg-white text-[#677484] hover:border-slate-300'
+                }`}
+              >
+                <span className="text-xs font-medium truncate">{createdPresetLabel}</span>
+                <ChevronRight size={14} className="text-[#677484] shrink-0" />
+              </div>
+            </div>
+
+            {/* Option 2: Tùy chỉnh */}
+            <div
+              ref={customTriggerRef}
+              className="flex items-center gap-2"
+            >
+              <div
+                onClick={handleOpenCreatedCustom}
+                className="cursor-pointer p-0.5"
+              >
+                {state.createdDateType === 'custom' ? (
+                  <div className="w-4 h-4 rounded-full border-2 border-[#0070f4] flex items-center justify-center shrink-0">
+                    <div className="w-2 h-2 rounded-full bg-[#0070f4]" />
+                  </div>
+                ) : (
+                  <div className="w-4 h-4 rounded-full border border-slate-300 shrink-0 hover:border-slate-400" />
+                )}
+              </div>
+
+              <div
+                ref={customBoxRef}
+                onClick={handleOpenCreatedCustom}
+                className={`flex-1 h-8 px-2.5 rounded-[8px] border flex items-center justify-between cursor-pointer transition select-none ${
+                  state.createdDateType === 'custom'
+                    ? 'border-slate-300 bg-white text-[#15171a] shadow-xs hover:border-[#0070f4]'
+                    : 'border-slate-200 bg-white text-[#677484] hover:border-slate-300'
+                }`}
+              >
+                <span className="text-[11px] font-medium truncate text-[#15171a] tracking-tight">
+                  {state.createdDateType === 'custom'
+                    ? `${formatDateOnlyVN(state.createdDateFrom || new Date())} - ${formatDateOnlyVN(state.createdDateTo || state.createdDateFrom || new Date())}`
+                    : 'Tùy chỉnh'}
+                </span>
+                <Calendar size={14} className="text-[#677484] shrink-0 ml-1" />
               </div>
             </div>
           </div>
-
-          {/* Floating Portal Popover for Date Range (Ảnh 2 - KHÔNG BỊ ĐÈ BỞI SIDEBAR) */}
-          <DateRangePopover
-            key={`created-${createdDateRangeOpen}-${state.createdDateFrom ?? ''}-${state.createdDateTo ?? ''}`}
-            open={createdDateRangeOpen}
-            anchorRef={createdDateRangeAnchorRef}
-            value={{ from: state.createdDateFrom, to: state.createdDateTo }}
-            onCancel={() => setCreatedDateRangeOpen(false)}
-            onToday={() => {
-              const today = toDateKey(new Date());
-              onChange({ createdDateFrom: today, createdDateTo: today });
-            }}
-            onApply={(range) => {
-              onChange({
-                createdDateFrom: range.from,
-                createdDateTo: range.to,
-                createdDate: range.from,
-              });
-              setCreatedDateRangeOpen(false);
-            }}
-          />
-
-          {/* Floating Portal Popover for Preset Periods (Ảnh 2) */}
-          <PeriodPresetPopover
-            open={createdPeriodPopoverOpen}
-            anchorRef={createdPeriodAnchorRef}
-            onClose={() => setCreatedPeriodPopoverOpen(false)}
-            selectedValue={state.createdPeriod}
-            onSelect={(val) => onChange({ createdDateType: 'all', createdPeriod: val })}
-            isExpected={false}
-          />
         </div>
 
         {/* 5. Thuộc tính (Matches Screenshot 1) */}
@@ -1702,51 +1971,6 @@ export default function ProductFilterSidebar({
         </div>
 
 
-        {/* 9.1 Liên kết kênh bán (Ảnh 3) */}
-        <div>
-          <div className="flex items-center gap-1.5 text-[13px] font-semibold text-slate-800 mb-2">
-            <span>Liên kết kênh bán</span>
-            {state.channelLinked && state.channelLinked !== 'all' && (
-              <span className="w-1.5 h-1.5 rounded-full bg-blue-600 inline-block" />
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => onChange({ channelLinked: 'all' })}
-              className={`px-4 py-1.5 rounded-full text-xs font-medium cursor-pointer transition ${
-                state.channelLinked === 'all' || !state.channelLinked
-                  ? 'bg-[#0071BA] text-white font-semibold shadow-xs'
-                  : 'bg-white border border-slate-300 text-slate-700 hover:border-slate-400'
-              }`}
-            >
-              Tất cả
-            </button>
-            <button
-              type="button"
-              onClick={() => onChange({ channelLinked: 'yes' })}
-              className={`px-4 py-1.5 rounded-full text-xs font-medium cursor-pointer transition ${
-                state.channelLinked === 'yes'
-                  ? 'bg-[#0071BA] text-white font-semibold shadow-xs'
-                  : 'bg-white border border-slate-300 text-slate-700 hover:border-slate-400'
-              }`}
-            >
-              Có
-            </button>
-            <button
-              type="button"
-              onClick={() => onChange({ channelLinked: 'no' })}
-              className={`px-4 py-1.5 rounded-full text-xs font-medium cursor-pointer transition ${
-                state.channelLinked === 'no'
-                  ? 'bg-[#0071BA] text-white font-semibold shadow-xs'
-                  : 'bg-white border border-slate-300 text-slate-700 hover:border-slate-400'
-              }`}
-            >
-              Không
-            </button>
-          </div>
-        </div>
-
         {/* 10. Trạng thái kinh doanh Dropdown (Bottom) */}
         <div className="pt-1">
           <div className="relative">
@@ -1758,7 +1982,8 @@ export default function ProductFilterSidebar({
                 setSupplierOpen(false);
                 setLocationOpen(false);
                 setTypeOpen(false);
-                setCreatedPeriodPopoverOpen(false);
+                setShowPresetPopover(false);
+                setShowCustomPopover(false);
                 setExpectedPeriodPopoverOpen(false);
               }}
               className={`h-[34px] px-3 bg-white border rounded-[6px] flex items-center justify-between text-[13px] cursor-pointer transition ${
@@ -1802,22 +2027,211 @@ export default function ProductFilterSidebar({
             )}
           </div>
         </div>
-      </div>
-    </aside>
-
-      {/* Collapse button on border (Matching Image 3) */}
-      {onToggleCollapse && (
-        <button
-          type="button"
-          onClick={onToggleCollapse}
-          title={isCollapsed ? 'Mở rộng bộ lọc (ảnh 2, 3)' : 'Thu gọn bộ lọc'}
-          className={`absolute z-30 top-[400px] flex h-7 w-7 items-center justify-center rounded-full border border-blue-500 bg-white text-blue-600 shadow-md transition-all duration-300 hover:bg-blue-50 hover:scale-110 cursor-pointer ${
-            isCollapsed ? 'left-1' : '-right-3.5'
-          }`}
-        >
-          {isCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
-        </button>
+        </div>
       )}
-    </div>
+
+      {/* Preset Popover (Chuẩn KiotViet Chuyển hàng) */}
+      {mounted &&
+        showPresetPopover &&
+        createPortal(
+          <div
+            ref={presetPopoverRef}
+            style={{
+              position: 'fixed',
+              top: presetCoords.top,
+              left: presetCoords.left,
+              zIndex: 9999,
+            }}
+            className="bg-white rounded-[8px] shadow-[rgba(169,180,203,0.32)_0px_8px_20px_0px] border border-slate-200 p-4 select-none animate-in fade-in zoom-in-95 duration-100"
+          >
+            {/* Mũi tên chỉ sang nút trigger ở sidebar */}
+            <div
+              className="absolute -left-[8px] w-0 h-0 border-y-[8px] border-y-transparent border-r-[8px] border-r-white drop-shadow-sm pointer-events-none"
+              style={{ top: presetCoords.arrowTop }}
+            />
+
+            <div className="grid grid-cols-4 gap-4 min-w-[440px]">
+              {PRESET_COLUMNS.map((col) => (
+                <div key={col.title} className="flex flex-col">
+                  <h4 className="text-xs font-bold text-[#15171a] mb-2.5 whitespace-nowrap">
+                    {col.title}
+                  </h4>
+                  <div className="flex flex-col gap-2">
+                    {col.items.map((it) => {
+                      const isSelected =
+                        state.createdPeriod === it.label ||
+                        (!state.createdPeriod && it.key === 'this_month');
+                      return (
+                        <button
+                          key={it.key}
+                          type="button"
+                          onClick={() => handleSelectCreatedPreset(it.key, it.label)}
+                          className={`w-full py-1.5 px-3 rounded-full text-xs text-center transition cursor-pointer whitespace-nowrap ${
+                            isSelected
+                              ? 'bg-[#0070f4] text-white font-semibold shadow-xs'
+                              : 'bg-white border border-slate-200 text-[#15171a] hover:border-[#0070f4] hover:text-[#0070f4] font-normal'
+                          }`}
+                        >
+                          {it.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>,
+          document.body
+        )}
+
+      {/* Custom Calendar Popover (Chuẩn KiotViet Chuyển hàng: Dual Calendar Side-by-Side độc lập) */}
+      {mounted &&
+        showCustomPopover &&
+        createPortal(
+          <div
+            ref={customPopoverRef}
+            style={{
+              position: 'fixed',
+              top: customCoords.top,
+              left: customCoords.left,
+              zIndex: 9999,
+            }}
+            className="bg-white rounded-[8px] shadow-[rgba(169,180,203,0.32)_0px_8px_20px_0px] border border-slate-200 p-4 select-none animate-in fade-in zoom-in-95 duration-100 w-[580px]"
+          >
+            {/* Mũi tên chỉ sang nút trigger ở sidebar */}
+            <div
+              className="absolute -left-[8px] w-0 h-0 border-y-[8px] border-y-transparent border-r-[8px] border-r-white drop-shadow-sm pointer-events-none"
+              style={{ top: customCoords.arrowTop }}
+            />
+
+            {/* Header: Từ ngày: DD/MM/YYYY - Đến ngày: DD/MM/YYYY */}
+            <div className="text-xs text-[#677484] pb-3 border-b border-slate-100 flex items-center gap-1.5">
+              <span>Từ ngày:</span>
+              <span className="font-bold text-[#15171a]">{formatDateOnlyVN(tempFrom)}</span>
+              <span className="mx-1 text-[#677484]">-</span>
+              <span>Đến ngày:</span>
+              <span className="font-bold text-[#15171a]">{formatDateOnlyVN(tempTo)}</span>
+            </div>
+
+            {/* Body: Hai cuốn lịch song song độc lập hoàn toàn */}
+            <div className="flex gap-6 py-3">
+              {/* Lịch bên trái: Chọn từ ngày */}
+              <div className="flex-1">
+                <div className="flex items-center justify-between mb-3 px-1">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setLeftMonth(
+                        (prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1)
+                      )
+                    }
+                    className="w-6 h-6 rounded-[4px] flex items-center justify-center text-[#677484] hover:bg-[#f7f8f9] cursor-pointer"
+                  >
+                    <ChevronLeft size={14} />
+                  </button>
+                  <span className="text-xs font-semibold text-[#15171a]">
+                    Tháng {leftMonth.getMonth() + 1} {leftMonth.getFullYear()}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setLeftMonth(
+                        (prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1)
+                      )
+                    }
+                    className="w-6 h-6 rounded-[4px] flex items-center justify-center text-[#677484] hover:bg-[#f7f8f9] cursor-pointer"
+                  >
+                    <ChevronRight size={14} />
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-7 text-center mb-1 text-[11px] font-medium text-[#677484]">
+                  <span>T2</span>
+                  <span>T3</span>
+                  <span>T4</span>
+                  <span>T5</span>
+                  <span>T6</span>
+                  <span>T7</span>
+                  <span>CN</span>
+                </div>
+
+                {renderCreatedCalendarDays(leftMonth, true)}
+              </div>
+
+              {/* Lịch bên phải: Chọn đến ngày */}
+              <div className="flex-1 border-l border-slate-100 pl-6">
+                <div className="flex items-center justify-between mb-3 px-1">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setRightMonth(
+                        (prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1)
+                      )
+                    }
+                    className="w-6 h-6 rounded-[4px] flex items-center justify-center text-[#677484] hover:bg-[#f7f8f9] cursor-pointer"
+                  >
+                    <ChevronLeft size={14} />
+                  </button>
+                  <span className="text-xs font-semibold text-[#15171a]">
+                    Tháng {rightMonth.getMonth() + 1} {rightMonth.getFullYear()}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setRightMonth(
+                        (prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1)
+                      )
+                    }
+                    className="w-6 h-6 rounded-[4px] flex items-center justify-center text-[#677484] hover:bg-[#f7f8f9] cursor-pointer"
+                  >
+                    <ChevronRight size={14} />
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-7 text-center mb-1 text-[11px] font-medium text-[#677484]">
+                  <span>T2</span>
+                  <span>T3</span>
+                  <span>T4</span>
+                  <span>T5</span>
+                  <span>T6</span>
+                  <span>T7</span>
+                  <span>CN</span>
+                </div>
+
+                {renderCreatedCalendarDays(rightMonth, false)}
+              </div>
+            </div>
+
+            {/* Footer: Hôm nay (trái) - Bỏ qua & Áp dụng (phải) */}
+            <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
+              <button
+                type="button"
+                onClick={handleSetCreatedToday}
+                className="text-xs text-[#0070f4] hover:text-[#005ac3] hover:underline font-semibold cursor-pointer"
+              >
+                Hôm nay
+              </button>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowCustomPopover(false)}
+                  className="px-3.5 py-1.5 rounded-[8px] border border-slate-300 text-xs text-[#15171a] hover:bg-[#f7f8f9] transition cursor-pointer font-medium"
+                >
+                  Bỏ qua
+                </button>
+                <button
+                  type="button"
+                  onClick={handleApplyCreatedCustom}
+                  className="px-4 py-1.5 rounded-[8px] bg-[#0070f4] hover:bg-[#005ac3] text-white text-xs font-semibold shadow-xs transition cursor-pointer"
+                >
+                  Áp dụng
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
+    </aside>
   );
 }

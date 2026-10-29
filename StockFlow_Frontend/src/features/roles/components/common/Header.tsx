@@ -38,7 +38,6 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   const router = useRouter();
   const [roleDropdownOpen, setRoleDropdownOpen] = useState(false);
-  const [globalSearch, setGlobalSearch] = useState('');
   const [facilities, setFacilities] = useState<WarehouseFacility[]>([]);
   const [userWarehouseAccess, setUserWarehouseAccess] = useState<string[]>([]);
   const [selectedBranch, setSelectedBranch] = useState<string>(() => {
@@ -502,20 +501,6 @@ export const Header: React.FC<HeaderProps> = ({
           <div className="text-[11px] text-slate-400 font-medium">
             Công ty Tín Phát • OIMS
           </div>
-        </div>
-      </div>
-
-      {/* Center: Global Search Bar */}
-      <div className="flex-1 max-w-xl mx-8">
-        <div className="relative">
-          <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input
-            type="text"
-            value={globalSearch}
-            onChange={(e) => setGlobalSearch(e.target.value)}
-            placeholder="Tìm mã đơn, khách hàng, sản phẩm..."
-            className="w-full h-10 pl-10 pr-4 rounded-[8px] bg-slate-50 border border-slate-200 text-xs text-slate-700 placeholder-slate-400 focus:outline-none focus:border-[#2B6CB0] focus:bg-white transition"
-          />
         </div>
       </div>
 
