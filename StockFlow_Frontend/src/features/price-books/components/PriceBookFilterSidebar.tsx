@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Plus, X, ChevronDown, Check, Building2, Layers, Package, DollarSign } from 'lucide-react';
+import { Plus, Layers, Package, Edit2, Trash2 } from 'lucide-react';
 import { PriceBook } from '../types';
 
 interface WarehouseItem {
@@ -20,9 +20,11 @@ interface PriceBookFilterSidebarProps {
   selectedPriceBookIds: number[];
   onTogglePriceBook: (id: number) => void;
   onOpenCreateModal: () => void;
-  warehouses: WarehouseItem[];
-  selectedWarehouseId: number | null;
-  onSelectWarehouse: (id: number | null) => void;
+  onEditPriceBook?: (priceBook: PriceBook) => void;
+  onDeletePriceBook?: (id: number) => void;
+  warehouses?: WarehouseItem[];
+  selectedWarehouseId?: number | null;
+  onSelectWarehouse?: (id: number | null) => void;
   categories: CategoryItem[];
   selectedCategoryId: number | null;
   onSelectCategory: (id: number | null) => void;
@@ -35,9 +37,8 @@ export default function PriceBookFilterSidebar({
   selectedPriceBookIds,
   onTogglePriceBook,
   onOpenCreateModal,
-  warehouses,
-  selectedWarehouseId,
-  onSelectWarehouse,
+  onEditPriceBook,
+  onDeletePriceBook,
   categories,
   selectedCategoryId,
   onSelectCategory,
@@ -61,48 +62,29 @@ export default function PriceBookFilterSidebar({
           <button
             type="button"
             onClick={onOpenCreateModal}
-            className="text-xs font-semibold text-[#0071BA] hover:text-[#005f9d] hover:underline flex items-center gap-0.5"
+            className="text-xs text-[#0071BA] font-semibold hover:underline flex items-center gap-1 cursor-pointer"
           >
-            <Plus size={13} /> Tạo mới
+            <Plus size={13} />
+            <span>Thêm</span>
           </button>
         </div>
 
-        {/* Selected Price Books Chips */}
-        <div className="flex flex-wrap gap-1.5 mb-3">
-          {priceBooks
-            .filter(pb => selectedPriceBookIds.includes(pb.priceBookId))
-            .map(pb => (
-              <span
-                key={pb.priceBookId}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-blue-50 text-[#0071BA] border border-blue-200"
-              >
-                {pb.priceBookName}
-                {/* Do not allow closing default if only 1 left */}
-                {selectedPriceBookIds.length > 1 && (
-                  <button
-                    type="button"
-                    onClick={() => onTogglePriceBook(pb.priceBookId)}
-                    className="hover:text-blue-900"
-                  >
-                    <X size={12} />
-                  </button>
-                )}
-              </span>
-            ))}
-        </div>
+        {/* Danh sách Price Books (Checkboxes + Chỉnh sửa / Xóa) */}
+        <div className="space-y-1.5 max-h-[260px] overflow-y-auto pr-1">
+          {priceBooks.length === 0 && (
+            <p className="text-xs text-slate-400 py-2">Chưa có bảng giá nào</p>
+          )}
 
-        {/* List of all price books */}
-        <div className="space-y-1.5 max-h-44 overflow-y-auto pr-1">
           {priceBooks.map(pb => {
             const isChecked = selectedPriceBookIds.includes(pb.priceBookId);
             return (
-              <label
+              <div
                 key={pb.priceBookId}
-                className={`flex items-center justify-between px-2 py-1.5 rounded-md text-xs cursor-pointer transition ${
+                className={`group flex items-center justify-between px-2 py-1.5 rounded-md text-xs transition ${
                   isChecked ? 'bg-blue-50/60 font-semibold text-[#0071BA]' : 'hover:bg-slate-50 text-slate-700'
                 }`}
               >
-                <div className="flex items-center gap-2 truncate">
+                <label className="flex items-center gap-2 truncate cursor-pointer flex-1 mr-1">
                   <input
                     type="checkbox"
                     checked={isChecked}
@@ -110,42 +92,47 @@ export default function PriceBookFilterSidebar({
                     className="accent-[#0071BA] rounded"
                   />
                   <span className="truncate">{pb.priceBookName}</span>
+                </label>
+
+                <div className="flex items-center gap-1 shrink-0">
+                  {pb.isDefault ? (
+                    <span className="text-[10px] text-slate-400 font-normal">Mặc định</span>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        title="Chỉnh sửa bảng giá này"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          onEditPriceBook?.(pb);
+                        }}
+                        className="p-1 rounded text-slate-400 hover:text-[#0071BA] hover:bg-blue-100/60 transition cursor-pointer"
+                      >
+                        <Edit2 size={13} />
+                      </button>
+                      <button
+                        type="button"
+                        title="Xóa bảng giá này"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          onDeletePriceBook?.(pb.priceBookId);
+                        }}
+                        className="p-1 rounded text-slate-400 hover:text-rose-600 hover:bg-rose-100/60 transition cursor-pointer"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </>
+                  )}
                 </div>
-                {pb.isDefault && (
-                  <span className="text-[10px] text-slate-400 font-normal">Mặc định</span>
-                )}
-              </label>
+              </div>
             );
           })}
         </div>
       </div>
 
-      {/* 2. MỤC KHO HÀNG (ĐA KHO) */}
-      <div className="mb-6 pb-5 border-b border-slate-100">
-        <div className="flex items-center gap-1.5 mb-2.5">
-          <Building2 size={14} className="text-[#0071BA]" />
-          <span className="text-[13px] font-bold text-slate-800 uppercase tracking-wide">
-            Kho xem giá vốn & giá nhập
-          </span>
-        </div>
-        <select
-          value={selectedWarehouseId ?? ''}
-          onChange={e => onSelectWarehouse(e.target.value ? Number(e.target.value) : null)}
-          className="h-9 w-full rounded-md border border-slate-300 bg-white px-2.5 text-xs text-slate-700 outline-none transition focus:border-[#0071BA] focus:ring-1 focus:ring-blue-100"
-        >
-          <option value="">Toàn hệ thống (Giá bình quân)</option>
-          {warehouses.map(w => (
-            <option key={w.warehouseId} value={w.warehouseId}>
-              {w.warehouseName} ({w.warehouseCode})
-            </option>
-          ))}
-        </select>
-        <p className="text-[11px] text-slate-400 mt-1.5 italic">
-          * Đổi kho sẽ hiển thị giá vốn & giá nhập cuối riêng của kho đó.
-        </p>
-      </div>
-
-      {/* 3. MỤC NHÓM HÀNG */}
+      {/* 2. MỤC NHÓM HÀNG */}
       <div className="mb-6 pb-5 border-b border-slate-100">
         <div className="flex items-center gap-1.5 mb-2.5">
           <Layers size={14} className="text-[#0071BA]" />
@@ -167,7 +154,7 @@ export default function PriceBookFilterSidebar({
         </select>
       </div>
 
-      {/* 4. MỤC TỒN KHO */}
+      {/* 3. MỤC TỒN KHO */}
       <div className="mb-6 pb-5 border-b border-slate-100">
         <div className="flex items-center gap-1.5 mb-2.5">
           <Package size={14} className="text-[#0071BA]" />
