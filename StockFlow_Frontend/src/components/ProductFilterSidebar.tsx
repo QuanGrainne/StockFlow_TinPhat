@@ -4,12 +4,15 @@ import {
   Calendar,
   Check,
   ChevronDown,
+  ChevronLeft,
   ChevronRight,
   ChevronUp,
+  RotateCcw,
   Search,
   X,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 export type StockCriteriaType =
   | 'all'
@@ -24,6 +27,7 @@ export type BusinessStatusType = 'all' | 'active' | 'inactive';
 
 export type FilterSidebarState = {
   category?: string;
+  categories?: string[];
   stockCriteria: StockCriteriaType;
   customStockMin?: number;
   customStockMax?: number;
@@ -45,10 +49,14 @@ export type FilterSidebarState = {
   attrKho?: string;
   attrThung?: string;
   supplier?: string;
+  suppliers?: string[];
   location?: string;
+  locations?: string[];
   productType?: string;
+  productTypes?: string[];
   directSale: DirectSaleType;
   businessStatus: BusinessStatusType;
+  channelLinked?: 'all' | 'yes' | 'no';
 };
 
 type ProductFilterSidebarProps = {
@@ -58,6 +66,26 @@ type ProductFilterSidebarProps = {
   categoriesList?: string[];
   suppliersList?: string[];
   locationsList?: string[];
+  isCollapsed?: boolean;
+  onToggleCollapse?: () => void;
+  onResetFilters?: () => void;
+};
+
+
+export const INITIAL_FILTER_STATE: FilterSidebarState = {
+  categories: [],
+  stockCriteria: 'all',
+  expectedOutOfStockType: 'all',
+  createdDateType: 'all',
+  attrType: '',
+  attrColor: '',
+  attrSize: '',
+  suppliers: [],
+  locations: [],
+  productTypes: [],
+  directSale: 'all',
+  businessStatus: 'all',
+  channelLinked: 'all',
 };
 
 const DEFAULT_CATEGORIES = [
@@ -72,6 +100,10 @@ const DEFAULT_CATEGORIES = [
 ];
 
 const DEFAULT_SUPPLIERS = [
+  'kiểm kho',
+  'tuân xả vải',
+  'xưởng sỉ',
+  'Ba Vì Milk',
   'Công ty TNHH Tín Phát',
   'Tập đoàn Hoa Sen',
   'Thép Hòa Phát',
@@ -127,45 +159,99 @@ function CalendarMonth({
   month,
   range,
   onSelect,
+  minDate,
+  maxDate,
+  hoverDate,
+  onHover,
+  selecting,
 }: {
   month: Date;
   range: DateRange;
   onSelect: (value: string) => void;
+  minDate?: string;
+  maxDate?: string;
+  hoverDate?: string | null;
+  onHover?: (value: string | null) => void;
+  selecting?: boolean;
 }) {
   const firstDay = new Date(month.getFullYear(), month.getMonth(), 1);
   const daysInMonth = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
+  const prevMonthLastDay = new Date(month.getFullYear(), month.getMonth(), 0).getDate();
   const leadingDays = (firstDay.getDay() + 6) % 7;
-  const cells = Array.from({ length: leadingDays + daysInMonth }, (_, index) =>
-    index < leadingDays ? undefined : index - leadingDays + 1
-  );
-  const monthLabel = month.toLocaleDateString('vi-VN', { month: 'long', year: 'numeric' });
+  const totalCells = Math.ceil((leadingDays + daysInMonth) / 7) * 7;
+
+  // Calculate effective range for continuous selection highlighting
+  const effectiveFrom = range.from;
+  const effectiveTo = range.to || (selecting && hoverDate ? hoverDate : undefined);
+  const start = effectiveFrom && effectiveTo ? (effectiveFrom <= effectiveTo ? effectiveFrom : effectiveTo) : effectiveFrom;
+  const end = effectiveFrom && effectiveTo ? (effectiveFrom <= effectiveTo ? effectiveTo : effectiveFrom) : undefined;
 
   return (
     <div className="min-w-0 flex-1">
-      <div className="mb-3 text-center text-sm font-semibold capitalize text-slate-800">{monthLabel}</div>
-      <div className="mb-1 grid grid-cols-7 text-center text-[10px] font-medium text-slate-400">
-        {['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'].map((day) => <span key={day}>{day}</span>)}
+      <div className="mb-2 grid grid-cols-7 text-center text-xs font-semibold text-slate-500">
+        {['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'].map((day) => (
+          <span key={day} className="py-1">{day}</span>
+        ))}
       </div>
-      <div className="grid grid-cols-7 gap-y-1 text-center">
-        {cells.map((day, index) => {
-          if (!day) return <span key={`empty-${index}`} className="h-7" />;
-          const value = toDateKey(new Date(month.getFullYear(), month.getMonth(), day));
-          const selected = value === range.from || value === range.to;
-          const inRange = Boolean(range.from && range.to && value > range.from && value < range.to);
+      <div className="grid grid-cols-7 gap-y-1.5 text-center">
+        {Array.from({ length: totalCells }, (_, index) => {
+          if (index < leadingDays) {
+            const prevDayNum = prevMonthLastDay - leadingDays + index + 1;
+            return (
+              <span key={`prev-${index}`} className="h-8 flex items-center justify-center text-xs text-slate-300 opacity-40 select-none">
+                {prevDayNum}
+              </span>
+            );
+          }
+          const dayNum = index - leadingDays + 1;
+          if (dayNum > daysInMonth) {
+            const nextDayNum = dayNum - daysInMonth;
+            return (
+              <span key={`next-${index}`} className="h-8 flex items-center justify-center text-xs text-slate-300 opacity-40 select-none">
+                {nextDayNum}
+              </span>
+            );
+          }
+          const value = toDateKey(new Date(month.getFullYear(), month.getMonth(), dayNum));
+          const isPast = minDate ? value < minDate : false;
+          const isFuture = maxDate ? value > maxDate : false;
+          const isDisabled = isPast || isFuture;
+
+          const isEndpoint = value === range.from || (range.to && value === range.to);
+          const inRange = Boolean(start && end && value >= start && value <= end && !isEndpoint);
+
+          if (isDisabled) {
+            return (
+              <span
+                key={value}
+                className="h-8 w-8 mx-auto flex items-center justify-center text-xs text-slate-300 opacity-30 cursor-not-allowed select-none"
+                title="Ngày đã qua không thể chọn"
+              >
+                {dayNum}
+              </span>
+            );
+          }
+
           return (
             <button
               key={value}
               type="button"
-              onClick={() => onSelect(value)}
-              className={`h-7 text-xs transition ${
-                selected
-                  ? 'rounded-full bg-[#0071BA] font-semibold text-white'
+              onClick={(e) => {
+                e.stopPropagation();
+                onSelect(value);
+              }}
+              onMouseEnter={() => {
+                if (selecting && onHover) onHover(value);
+              }}
+              className={`h-8 w-8 mx-auto flex items-center justify-center text-xs transition cursor-pointer select-none ${
+                isEndpoint
+                  ? 'rounded-full bg-[#0071BA] font-bold text-white shadow-xs scale-105'
                   : inRange
-                    ? 'bg-blue-50 text-blue-700'
-                    : 'rounded-full text-slate-700 hover:bg-blue-50'
+                    ? 'rounded-md bg-blue-50 text-blue-700 font-semibold'
+                    : 'rounded-full text-slate-700 hover:bg-blue-50 hover:text-blue-700'
               }`}
             >
-              {day}
+              {dayNum}
             </button>
           );
         })}
@@ -176,57 +262,757 @@ function CalendarMonth({
 
 function DateRangePopover({
   open,
+  anchorRef,
   value,
   onApply,
   onCancel,
   onToday,
+  minDate,
+  maxDate,
 }: {
   open: boolean;
+  anchorRef: React.RefObject<HTMLElement | null>;
   value: DateRange;
   onApply: (range: DateRange) => void;
   onCancel: () => void;
   onToday: () => void;
+  minDate?: string;
+  maxDate?: string;
 }) {
+  const [mounted, setMounted] = useState(false);
   const [draft, setDraft] = useState<DateRange>(value);
-  const [visibleMonth, setVisibleMonth] = useState(() => {
+  const [selecting, setSelecting] = useState(false);
+  const [hoverDate, setHoverDate] = useState<string | null>(null);
+
+  const [leftMonth, setLeftMonth] = useState(() => {
     const base = value.from ? new Date(`${value.from}T00:00:00`) : new Date();
     return new Date(base.getFullYear(), base.getMonth(), 1);
   });
+  const [rightMonth, setRightMonth] = useState(() => {
+    const base = value.to ? new Date(`${value.to}T00:00:00`) : new Date();
+    const lBase = value.from ? new Date(`${value.from}T00:00:00`) : new Date();
+    if (!value.to || (base.getFullYear() === lBase.getFullYear() && base.getMonth() === lBase.getMonth())) {
+      return addMonths(new Date(lBase.getFullYear(), lBase.getMonth(), 1), 1);
+    }
+    return new Date(base.getFullYear(), base.getMonth(), 1);
+  });
 
-  if (!open) return null;
+  const [coords, setCoords] = useState<{ top: number; left: number; arrowTop: number } | null>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
 
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (open) {
+      setDraft({ from: value.from, to: value.to });
+      setSelecting(false);
+      setHoverDate(null);
+      const base = value.from ? new Date(`${value.from}T00:00:00`) : new Date();
+      const l = new Date(base.getFullYear(), base.getMonth(), 1);
+      setLeftMonth(l);
+      const toBase = value.to ? new Date(`${value.to}T00:00:00`) : addMonths(l, 1);
+      setRightMonth(new Date(toBase.getFullYear(), toBase.getMonth(), 1));
+    }
+  }, [open, value.from, value.to]);
+
+  useEffect(() => {
+    if (!open || !anchorRef.current) return;
+
+    const updatePos = () => {
+      if (!anchorRef.current) return;
+      const rect = anchorRef.current.getBoundingClientRect();
+      const popoverWidth = 600;
+      const popoverHeight = 390;
+
+      let left = rect.right + 14;
+      if (left + popoverWidth > window.innerWidth - 16) {
+        left = Math.max(16, window.innerWidth - popoverWidth - 16);
+      }
+
+      let top = rect.top - 24;
+      if (top + popoverHeight > window.innerHeight - 16) {
+        top = Math.max(16, window.innerHeight - popoverHeight - 16);
+      }
+      if (top < 16) top = 16;
+
+      const arrowTop = Math.max(16, Math.min(popoverHeight - 24, rect.top + rect.height / 2 - top));
+      setCoords({ top, left, arrowTop });
+    };
+
+    updatePos();
+    window.addEventListener('resize', updatePos);
+    window.addEventListener('scroll', updatePos, true);
+    return () => {
+      window.removeEventListener('resize', updatePos);
+      window.removeEventListener('scroll', updatePos, true);
+    };
+  }, [open, anchorRef]);
+
+  useEffect(() => {
+    if (!open) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (popoverRef.current && popoverRef.current.contains(target)) return;
+      if (anchorRef.current && anchorRef.current.contains(target)) return;
+      onCancel();
+    };
+    const timer = setTimeout(() => {
+      document.addEventListener('mousedown', handleClickOutside);
+    }, 10);
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [open, onCancel, anchorRef]);
+
+  if (!mounted || !open || !coords || typeof document === 'undefined') return null;
+
+  // ─── Logic Chọn dải ngày chuẩn 2 click: Click 1 chọn 'Từ ngày', Click 2 chọn 'Đến ngày' ───
   function selectDate(date: string) {
-    if (!draft.from || draft.to || date < draft.from) {
-      setDraft({ from: date });
+    if (!selecting) {
+      // Click 1: Bắt đầu chọn Từ ngày
+      setDraft({ from: date, to: undefined });
+      setSelecting(true);
+      setHoverDate(null);
     } else {
-      setDraft({ from: draft.from, to: date });
+      // Click 2: Chọn Đến ngày và khóa dải
+      if (draft.from && date < draft.from) {
+        setDraft({ from: date, to: draft.from });
+      } else {
+        setDraft({ from: draft.from, to: date });
+      }
+      setSelecting(false);
+      setHoverDate(null);
     }
   }
 
-  return (
+  const handleTodayClick = () => {
+    const today = toDateKey(new Date());
+    setDraft({ from: today, to: today });
+    setSelecting(false);
+    setHoverDate(null);
+    const now = new Date();
+    setLeftMonth(new Date(now.getFullYear(), now.getMonth(), 1));
+    setRightMonth(addMonths(new Date(now.getFullYear(), now.getMonth(), 1), 1));
+  };
+
+  const handleApplyClick = () => {
+    if (!draft.from) return;
+    onApply({
+      from: draft.from,
+      to: draft.to || draft.from,
+    });
+  };
+
+  // Preview header date range
+  const displayFrom = draft.from;
+  const displayTo = draft.to || (selecting ? (hoverDate || draft.from) : draft.from);
+
+  return createPortal(
     <div
-      onClick={(event) => event.stopPropagation()}
-      className="absolute left-0 top-full z-[70] mt-2 w-[min(620px,calc(100vw-2rem))] max-w-[calc(100vw-2rem)] rounded-xl border border-slate-200 bg-white p-4 shadow-2xl"
+      ref={popoverRef}
+      data-portal-popover="true"
+      style={{ top: coords.top, left: coords.left }}
+      onMouseDown={(e) => e.stopPropagation()}
+      onClick={(e) => e.stopPropagation()}
+      className="fixed z-[9999] w-[600px] max-w-[calc(100vw-2rem)] rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl animate-in fade-in zoom-in-95 duration-150 select-none"
     >
-      <div className="mb-4 border-b border-slate-100 pb-3 text-sm text-slate-700">
-        <span className="font-medium">Từ ngày:</span> {formatDateKey(draft.from)}
-        <span className="mx-2 text-slate-300">-</span>
-        <span className="font-medium">Đến ngày:</span> {formatDateKey(draft.to)}
+      {/* Triangular notch pointing left to anchor */}
+      <div
+        style={{ top: coords.arrowTop }}
+        className="absolute -left-2 w-4 h-4 bg-white rotate-45 border-l border-b border-slate-200 z-10"
+      />
+
+      {/* Header matching Image 2 */}
+      <div className="mb-4 border-b border-slate-100 pb-3 text-sm text-slate-800">
+        <span className="font-semibold text-slate-600">Từ ngày: </span>
+        <span className="font-bold text-slate-900">{formatDateKey(displayFrom)}</span>
+        <span className="mx-2 text-slate-400">-</span>
+        <span className="font-semibold text-slate-600">Đến ngày: </span>
+        <span className="font-bold text-slate-900">{formatDateKey(displayTo)}</span>
+        {selecting && (
+          <span className="ml-2 text-xs text-blue-600 font-medium italic animate-pulse">
+            (Chọn ngày kết thúc...)
+          </span>
+        )}
       </div>
-      <div className="mb-3 flex items-center justify-between">
-        <button type="button" onClick={() => setVisibleMonth(addMonths(visibleMonth, -1))} className="rounded p-1 text-slate-500 hover:bg-slate-100">‹</button>
-        <span className="text-xs text-slate-500">Chọn dải ngày</span>
-        <button type="button" onClick={() => setVisibleMonth(addMonths(visibleMonth, 1))} className="rounded p-1 text-slate-500 hover:bg-slate-100">›</button>
+
+      {/* Two Months Side-by-Side (Image 2) */}
+      <div className="grid grid-cols-2 gap-6">
+        <div>
+          <div className="mb-3 flex items-center justify-between">
+            <button
+              type="button"
+              onClick={() => setLeftMonth(addMonths(leftMonth, -1))}
+              className="w-7 h-7 rounded flex items-center justify-center text-slate-500 hover:bg-slate-100 cursor-pointer font-bold text-sm"
+            >
+              ‹
+            </button>
+            <span className="text-sm font-bold text-slate-800">
+              {`Tháng ${leftMonth.getMonth() + 1} ${leftMonth.getFullYear()}`}
+            </span>
+            <button
+              type="button"
+              onClick={() => setLeftMonth(addMonths(leftMonth, 1))}
+              className="w-7 h-7 rounded flex items-center justify-center text-slate-500 hover:bg-slate-100 cursor-pointer font-bold text-sm"
+            >
+              ›
+            </button>
+          </div>
+          <CalendarMonth
+            month={leftMonth}
+            range={draft}
+            onSelect={selectDate}
+            minDate={minDate}
+            maxDate={maxDate}
+            hoverDate={hoverDate}
+            onHover={setHoverDate}
+            selecting={selecting}
+          />
+        </div>
+
+        <div>
+          <div className="mb-3 flex items-center justify-between">
+            <button
+              type="button"
+              onClick={() => setRightMonth(addMonths(rightMonth, -1))}
+              className="w-7 h-7 rounded flex items-center justify-center text-slate-500 hover:bg-slate-100 cursor-pointer font-bold text-sm"
+            >
+              ‹
+            </button>
+            <span className="text-sm font-bold text-slate-800">
+              {`Tháng ${rightMonth.getMonth() + 1} ${rightMonth.getFullYear()}`}
+            </span>
+            <button
+              type="button"
+              onClick={() => setRightMonth(addMonths(rightMonth, 1))}
+              className="w-7 h-7 rounded flex items-center justify-center text-slate-500 hover:bg-slate-100 cursor-pointer font-bold text-sm"
+            >
+              ›
+            </button>
+          </div>
+          <CalendarMonth
+            month={rightMonth}
+            range={draft}
+            onSelect={selectDate}
+            minDate={minDate}
+            maxDate={maxDate}
+            hoverDate={hoverDate}
+            onHover={setHoverDate}
+            selecting={selecting}
+          />
+        </div>
       </div>
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-        <CalendarMonth month={visibleMonth} range={draft} onSelect={selectDate} />
-        <CalendarMonth month={addMonths(visibleMonth, 1)} range={draft} onSelect={selectDate} />
+
+      {/* Footer matching Image 2 */}
+      <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3">
+        <button
+          type="button"
+          onClick={handleTodayClick}
+          className="text-xs text-blue-600 hover:text-blue-800 font-semibold cursor-pointer hover:underline transition"
+        >
+          Hôm nay
+        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="px-4 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition cursor-pointer"
+          >
+            Bỏ qua
+          </button>
+          <button
+            type="button"
+            disabled={!draft.from}
+            onClick={handleApplyClick}
+            className="px-4 py-1.5 text-xs font-semibold rounded-lg bg-[#0071BA] hover:bg-[#005f9d] text-white transition cursor-pointer shadow-xs disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Áp dụng
+          </button>
+        </div>
       </div>
-      <div className="mt-4 flex justify-end gap-2 border-t border-slate-100 pt-3">
-        <button type="button" onClick={onToday} className="mr-auto rounded px-3 py-1.5 text-xs text-blue-700 hover:bg-blue-50">Hôm nay</button>
-        <button type="button" onClick={onCancel} className="rounded border border-slate-300 px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50">Bỏ qua</button>
-        <button type="button" disabled={!draft.from || !draft.to} onClick={() => onApply(draft)} className="rounded bg-[#0071BA] px-3 py-1.5 text-xs text-white hover:bg-[#005f9d] disabled:cursor-not-allowed disabled:opacity-50">Áp dụng</button>
+    </div>,
+    document.body
+  );
+}
+
+function PeriodPresetPopover({
+  open,
+  anchorRef,
+  onClose,
+  selectedValue,
+  onSelect,
+  isExpected = false,
+}: {
+  open: boolean;
+  anchorRef: React.RefObject<HTMLElement | null>;
+  onClose: () => void;
+  selectedValue?: string;
+  onSelect: (val: string) => void;
+  isExpected?: boolean;
+}) {
+  const [mounted, setMounted] = useState(false);
+  const [coords, setCoords] = useState<{ top: number; left: number; arrowTop: number } | null>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!open || !anchorRef.current) return;
+    const updatePos = () => {
+      if (!anchorRef.current) return;
+      const rect = anchorRef.current.getBoundingClientRect();
+      const popoverWidth = isExpected ? 440 : 640;
+      const popoverHeight = 320;
+
+      let left = rect.right + 14;
+      if (left + popoverWidth > window.innerWidth - 16) {
+        left = Math.max(16, window.innerWidth - popoverWidth - 16);
+      }
+
+      let top = rect.top - 20;
+      if (top + popoverHeight > window.innerHeight - 16) {
+        top = Math.max(16, window.innerHeight - popoverHeight - 16);
+      }
+      if (top < 16) top = 16;
+
+      const arrowTop = Math.max(16, Math.min(popoverHeight - 24, rect.top + rect.height / 2 - top));
+      setCoords({ top, left, arrowTop });
+    };
+
+    updatePos();
+    window.addEventListener('resize', updatePos);
+    window.addEventListener('scroll', updatePos, true);
+    return () => {
+      window.removeEventListener('resize', updatePos);
+      window.removeEventListener('scroll', updatePos, true);
+    };
+  }, [open, anchorRef, isExpected]);
+
+  useEffect(() => {
+    if (!open) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (popoverRef.current && popoverRef.current.contains(target)) return;
+      if (anchorRef.current && anchorRef.current.contains(target)) return;
+      onClose();
+    };
+    const timer = setTimeout(() => {
+      document.addEventListener('mousedown', handleClickOutside);
+    }, 10);
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [open, onClose, anchorRef]);
+
+  if (!mounted || !open || !coords || typeof document === 'undefined') return null;
+
+  return createPortal(
+    <div
+      ref={popoverRef}
+      data-portal-popover="true"
+      style={{ top: coords.top, left: coords.left }}
+      onMouseDown={(e) => e.stopPropagation()}
+      onClick={(e) => e.stopPropagation()}
+      className={`fixed z-[9999] bg-white rounded-2xl shadow-2xl border border-slate-200 p-5 animate-in fade-in zoom-in-95 duration-100 ${
+        isExpected ? 'w-[440px]' : 'w-[640px]'
+      }`}
+    >
+      {/* Pointer beak pointing left to the button */}
+      <div
+        style={{ top: coords.arrowTop }}
+        className="absolute -left-2 w-4 h-4 bg-white rotate-45 border-l border-b border-slate-200 z-10"
+      />
+
+      {isExpected ? (
+        <div className="grid grid-cols-3 gap-5">
+          {/* Theo ngày */}
+          <div>
+            <div className="text-[13px] font-semibold text-slate-900 mb-3">Theo ngày</div>
+            <div className="flex flex-col gap-2">
+              {['Ngày mai', 'Ngày kia', '3 ngày tới', '5 ngày tới', '7 ngày tới'].map((item) => (
+                <button
+                  key={item}
+                  type="button"
+                  onClick={() => {
+                    onSelect(item);
+                    onClose();
+                  }}
+                  className={`px-3.5 py-1.5 rounded-full text-xs font-medium cursor-pointer transition text-center whitespace-nowrap block w-fit ${
+                    selectedValue === item
+                      ? 'bg-[#0071BA] text-white shadow-xs'
+                      : 'border border-slate-300 text-slate-700 bg-white hover:border-slate-400 hover:bg-slate-50'
+                  }`}
+                >
+                  {item}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Theo tuần */}
+          <div>
+            <div className="text-[13px] font-semibold text-slate-900 mb-3">Theo tuần</div>
+            <div className="flex flex-col gap-2">
+              {['Tuần này', 'Tuần tới', '2 tuần tới'].map((item) => (
+                <button
+                  key={item}
+                  type="button"
+                  onClick={() => {
+                    onSelect(item);
+                    onClose();
+                  }}
+                  className={`px-3.5 py-1.5 rounded-full text-xs font-medium cursor-pointer transition text-center whitespace-nowrap block w-fit ${
+                    selectedValue === item
+                      ? 'bg-[#0071BA] text-white shadow-xs'
+                      : 'border border-slate-300 text-slate-700 bg-white hover:border-slate-400 hover:bg-slate-50'
+                  }`}
+                >
+                  {item}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Theo tháng */}
+          <div>
+            <div className="text-[13px] font-semibold text-slate-900 mb-3">Theo tháng</div>
+            <div className="flex flex-col gap-2">
+              {['Tháng này', 'Tháng tới', '30 ngày tới', '2 tháng tới', '3 tháng tới'].map((item) => (
+                <button
+                  key={item}
+                  type="button"
+                  onClick={() => {
+                    onSelect(item);
+                    onClose();
+                  }}
+                  className={`px-3.5 py-1.5 rounded-full text-xs font-medium cursor-pointer transition text-center whitespace-nowrap block w-fit ${
+                    selectedValue === item
+                      ? 'bg-[#0071BA] text-white shadow-xs'
+                      : 'border border-slate-300 text-slate-700 bg-white hover:border-slate-400 hover:bg-slate-50'
+                  }`}
+                >
+                  {item}
+                </button>
+              ))}
+
+              <button
+                type="button"
+                onClick={() => {
+                  onSelect('Toàn thời gian');
+                  onClose();
+                }}
+                className={`px-4 py-1.5 rounded-full text-xs font-medium cursor-pointer transition text-center whitespace-nowrap block w-fit mt-1 ${
+                  !selectedValue || selectedValue === 'Toàn thời gian'
+                    ? 'bg-[#0071BA] text-white shadow-xs'
+                    : 'border border-slate-300 text-slate-700 bg-white hover:border-slate-400 hover:bg-slate-50'
+                }`}
+              >
+                Toàn thời gian
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="grid grid-cols-5 gap-3.5">
+          {/* Theo ngày */}
+          <div>
+            <div className="text-[13px] font-semibold text-slate-900 mb-3">Theo ngày</div>
+            <div className="flex flex-col gap-2">
+              {['Hôm nay', 'Hôm qua'].map((item) => (
+                <button
+                  key={item}
+                  type="button"
+                  onClick={() => {
+                    onSelect(item);
+                    onClose();
+                  }}
+                  className={`px-3.5 py-1.5 rounded-full text-xs font-medium cursor-pointer transition text-center whitespace-nowrap block w-fit ${
+                    selectedValue === item
+                      ? 'bg-[#0071BA] text-white shadow-xs'
+                      : 'border border-slate-300 text-slate-700 bg-white hover:border-slate-400 hover:bg-slate-50'
+                  }`}
+                >
+                  {item}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Theo tuần */}
+          <div>
+            <div className="text-[13px] font-semibold text-slate-900 mb-3">Theo tuần</div>
+            <div className="flex flex-col gap-2">
+              {['Tuần này', 'Tuần trước', '7 ngày qua'].map((item) => (
+                <button
+                  key={item}
+                  type="button"
+                  onClick={() => {
+                    onSelect(item);
+                    onClose();
+                  }}
+                  className={`px-3.5 py-1.5 rounded-full text-xs font-medium cursor-pointer transition text-center whitespace-nowrap block w-fit ${
+                    selectedValue === item
+                      ? 'bg-[#0071BA] text-white shadow-xs'
+                      : 'border border-slate-300 text-slate-700 bg-white hover:border-slate-400 hover:bg-slate-50'
+                  }`}
+                >
+                  {item}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Theo tháng */}
+          <div>
+            <div className="text-[13px] font-semibold text-slate-900 mb-3">Theo tháng</div>
+            <div className="flex flex-col gap-2">
+              {[
+                'Tháng này',
+                'Tháng trước',
+                'Tháng này (âm lịch)',
+                'Tháng trước (âm lịch)',
+                '30 ngày qua',
+              ].map((item) => (
+                <button
+                  key={item}
+                  type="button"
+                  onClick={() => {
+                    onSelect(item);
+                    onClose();
+                  }}
+                  className={`px-3.5 py-1.5 rounded-full text-xs font-medium cursor-pointer transition text-center whitespace-nowrap block w-fit ${
+                    selectedValue === item
+                      ? 'bg-[#0071BA] text-white shadow-xs'
+                      : 'border border-slate-300 text-slate-700 bg-white hover:border-slate-400 hover:bg-slate-50'
+                  }`}
+                >
+                  {item}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Theo quý */}
+          <div>
+            <div className="text-[13px] font-semibold text-slate-900 mb-3">Theo quý</div>
+            <div className="flex flex-col gap-2">
+              {['Quý này', 'Quý trước'].map((item) => (
+                <button
+                  key={item}
+                  type="button"
+                  onClick={() => {
+                    onSelect(item);
+                    onClose();
+                  }}
+                  className={`px-3.5 py-1.5 rounded-full text-xs font-medium cursor-pointer transition text-center whitespace-nowrap block w-fit ${
+                    selectedValue === item
+                      ? 'bg-[#0071BA] text-white shadow-xs'
+                      : 'border border-slate-300 text-slate-700 bg-white hover:border-slate-400 hover:bg-slate-50'
+                  }`}
+                >
+                  {item}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Theo năm */}
+          <div>
+            <div className="text-[13px] font-semibold text-slate-900 mb-3">Theo năm</div>
+            <div className="flex flex-col gap-2">
+              {['Năm nay', 'Năm trước'].map((item) => (
+                <button
+                  key={item}
+                  type="button"
+                  onClick={() => {
+                    onSelect(item);
+                    onClose();
+                  }}
+                  className={`px-3.5 py-1.5 rounded-full text-xs font-medium cursor-pointer transition text-center whitespace-nowrap block w-fit ${
+                    selectedValue === item
+                      ? 'bg-[#0071BA] text-white shadow-xs'
+                      : 'border border-slate-300 text-slate-700 bg-white hover:border-slate-400 hover:bg-slate-50'
+                  }`}
+                >
+                  {item}
+                </button>
+              ))}
+
+              <button
+                type="button"
+                onClick={() => {
+                  onSelect('Toàn thời gian');
+                  onClose();
+                }}
+                className={`px-4 py-1.5 rounded-full text-xs font-medium cursor-pointer transition text-center whitespace-nowrap block w-fit mt-1 ${
+                  !selectedValue || selectedValue === 'Toàn thời gian'
+                    ? 'bg-[#0071BA] text-white shadow-xs'
+                    : 'border border-slate-300 text-slate-700 bg-white hover:border-slate-400 hover:bg-slate-50'
+                }`}
+              >
+                Toàn thời gian
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>,
+    document.body
+  );
+}
+
+function MultiSelectPillBox({
+  label,
+  placeholder,
+  selected,
+  options,
+  onChange,
+  isOpen,
+  onToggle,
+  onClose,
+}: {
+  label: string;
+  placeholder?: string;
+  selected: string[];
+  options: string[];
+  onChange: (items: string[]) => void;
+  isOpen: boolean;
+  onToggle: () => void;
+  onClose: () => void;
+}) {
+  const [search, setSearch] = useState('');
+  const boxRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (boxRef.current && !boxRef.current.contains(e.target as Node)) {
+        onClose();
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isOpen, onClose]);
+
+  const filteredOptions = options.filter((opt) =>
+    opt.toLowerCase().includes(search.trim().toLowerCase())
+  );
+
+  const hasSelection = selected.length > 0;
+
+  return (
+    <div ref={boxRef} className="relative">
+      <div className="flex items-center gap-1.5 text-[13px] font-semibold text-slate-800 mb-1.5">
+        <span>{label}</span>
+        {hasSelection && <span className="w-1.5 h-1.5 rounded-full bg-blue-600 inline-block" />}
       </div>
+
+      {hasSelection ? (
+        <div
+          onClick={onToggle}
+          className="min-h-[38px] p-1.5 bg-white border border-slate-300 hover:border-slate-400 rounded-[6px] flex flex-wrap items-center gap-1.5 cursor-pointer transition"
+        >
+          {selected.map((item) => (
+            <span
+              key={item}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[6px] bg-[#0071BA] text-white text-xs font-semibold shadow-2xs"
+            >
+              <span className="truncate max-w-[170px]">{item}</span>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onChange(selected.filter((x) => x !== item));
+                }}
+                className="hover:text-blue-200 transition p-0.5 cursor-pointer"
+                title={`Bỏ chọn ${item}`}
+              >
+                <X size={12} strokeWidth={2.5} />
+              </button>
+            </span>
+          ))}
+        </div>
+      ) : (
+        <div
+          onClick={onToggle}
+          className="h-[34px] px-3 bg-white border border-slate-300 hover:border-slate-400 rounded-[6px] flex items-center justify-between text-[13px] text-slate-400 cursor-pointer transition"
+        >
+          <span className="truncate">{placeholder || `Chọn ${label.toLowerCase()}`}</span>
+          <ChevronDown size={14} className="text-slate-400 shrink-0" />
+        </div>
+      )}
+
+      {isOpen && (
+        <div className="absolute top-full left-0 mt-1 w-full bg-white rounded-[6px] border border-slate-200 shadow-xl py-1 z-40 max-h-56 overflow-y-auto animate-in fade-in zoom-in-95 duration-100">
+          {options.length > 5 && (
+            <div className="px-2 pb-1 border-b border-slate-100">
+              <input
+                type="text"
+                autoFocus
+                placeholder="Tìm kiếm..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full h-7 px-2 text-xs rounded border border-slate-200 bg-slate-50 outline-none focus:border-blue-500"
+              />
+            </div>
+          )}
+
+          <div className="py-1">
+            {filteredOptions.length === 0 ? (
+              <div className="px-3 py-2 text-xs text-slate-400 text-center">Không có lựa chọn</div>
+            ) : (
+              filteredOptions.map((opt) => {
+                const isChecked = selected.includes(opt);
+                return (
+                  <div
+                    key={opt}
+                    onClick={() => {
+                      if (isChecked) {
+                        onChange(selected.filter((x) => x !== opt));
+                      } else {
+                        onChange([...selected, opt]);
+                      }
+                    }}
+                    className={`px-3 py-1.5 text-xs cursor-pointer flex items-center justify-between transition ${
+                      isChecked ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 truncate">
+                      <div
+                        className={`w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0 ${
+                          isChecked ? 'bg-blue-600 border-blue-600 text-white' : 'border-slate-300 bg-white'
+                        }`}
+                      >
+                        {isChecked && <Check size={10} strokeWidth={3} />}
+                      </div>
+                      <span className="truncate">{opt}</span>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          {hasSelection && (
+            <div className="border-t border-slate-100 px-3 py-1 flex items-center justify-between text-[11px]">
+              <span className="text-slate-500">Đã chọn {selected.length}</span>
+              <button
+                type="button"
+                onClick={() => onChange([])}
+                className="text-rose-600 hover:text-rose-700 font-semibold cursor-pointer"
+              >
+                Bỏ chọn tất cả
+              </button>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -238,6 +1024,9 @@ export default function ProductFilterSidebar({
   categoriesList = DEFAULT_CATEGORIES,
   suppliersList = DEFAULT_SUPPLIERS,
   locationsList = DEFAULT_LOCATIONS,
+  isCollapsed = false,
+  onToggleCollapse,
+  onResetFilters,
 }: ProductFilterSidebarProps) {
   // Dropdown & Popover open states
   const [categoryOpen, setCategoryOpen] = useState(false);
@@ -258,22 +1047,28 @@ export default function ProductFilterSidebar({
   const [expandAttributes, setExpandAttributes] = useState(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
+  const expectedPeriodAnchorRef = useRef<HTMLDivElement>(null);
+  const expectedDateRangeAnchorRef = useRef<HTMLDivElement>(null);
+  const createdPeriodAnchorRef = useRef<HTMLDivElement>(null);
+  const createdDateRangeAnchorRef = useRef<HTMLDivElement>(null);
 
   // Close all open dropdowns/popovers when clicking outside
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setCategoryOpen(false);
-        setStockOpen(false);
-        setSupplierOpen(false);
-        setLocationOpen(false);
-        setTypeOpen(false);
-        setStatusOpen(false);
-        setCreatedPeriodPopoverOpen(false);
-        setExpectedPeriodPopoverOpen(false);
-        setCreatedDateRangeOpen(false);
-        setExpectedDateRangeOpen(false);
-      }
+      const target = e.target as Node;
+      if (containerRef.current && containerRef.current.contains(target)) return;
+      if ((target as Element)?.closest?.('[data-portal-popover]')) return;
+
+      setCategoryOpen(false);
+      setStockOpen(false);
+      setSupplierOpen(false);
+      setLocationOpen(false);
+      setTypeOpen(false);
+      setStatusOpen(false);
+      setCreatedPeriodPopoverOpen(false);
+      setExpectedPeriodPopoverOpen(false);
+      setCreatedDateRangeOpen(false);
+      setExpectedDateRangeOpen(false);
     }
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -295,16 +1090,34 @@ export default function ProductFilterSidebar({
   const currentExpectedPeriodLabel = state.expectedOutOfStockPeriod || 'Toàn thời gian';
 
   return (
-    <aside
-      ref={containerRef}
-      className="w-[260px] shrink-0 bg-white border-r border-[#e5e7eb] px-4 py-5 select-none text-[#262626] relative"
-    >
-      {/* 0. Main Title */}
-      <h2 className="text-[20px] font-bold text-slate-900 tracking-tight mb-5">
-        Hàng hóa
-      </h2>
+    <div className="relative shrink-0 flex items-start">
+      <aside
+        ref={containerRef}
+        className={`bg-white border-r border-[#e5e7eb] select-none text-[#262626] transition-all duration-300 relative ${
+          isCollapsed
+            ? 'w-0 overflow-hidden px-0 py-0 border-r-0 opacity-0'
+            : 'w-[260px] px-4 py-5 overflow-y-auto max-h-[calc(100vh-70px)] opacity-100 rounded-xl shadow-2xs'
+        }`}
+      >
+        {/* 0. Main Title & Reset */}
+        <div className="flex items-center justify-between mb-5">
+          <h2 className="text-[20px] font-bold text-slate-900 tracking-tight">
+            Hàng hóa
+          </h2>
+          {onResetFilters && (
+            <button
+              type="button"
+              onClick={onResetFilters}
+              className="text-xs text-blue-600 hover:text-blue-800 font-semibold cursor-pointer flex items-center gap-1 hover:underline transition"
+              title="Đặt lại tất cả bộ lọc"
+            >
+              <RotateCcw size={12} />
+              <span>Đặt lại</span>
+            </button>
+          )}
+        </div>
 
-      <div className="space-y-4">
+        <div className="space-y-4">
         {/* 1. Nhóm hàng */}
         <div>
           <div className="flex items-center justify-between mb-1.5">
@@ -504,10 +1317,15 @@ export default function ProductFilterSidebar({
 
         {/* 3. Dự kiến hết hàng */}
         <div className="relative">
-          <div className="text-[13px] font-semibold text-slate-800 mb-1.5">Dự kiến hết hàng</div>
+          <div className="text-[13px] font-semibold text-slate-800 mb-1.5 flex items-center gap-1.5">
+            <span>Dự kiến hết hàng</span>
+            {((state.expectedOutOfStockType === 'all' && state.expectedOutOfStockPeriod && state.expectedOutOfStockPeriod !== 'Toàn thời gian') || state.expectedOutOfStockType === 'custom') && (
+              <span className="w-1.5 h-1.5 rounded-full bg-blue-600"></span>
+            )}
+          </div>
           <div className="space-y-1.5">
             {/* Option A: Toàn thời gian / Chu kỳ dự kiến (Click opens Popover - Screenshot 3) */}
-            <div className="flex items-center gap-2.5 group">
+            <div ref={expectedPeriodAnchorRef} className="flex items-center gap-2.5 group">
               <div
                 onClick={() => {
                   onChange({ expectedOutOfStockType: 'all' });
@@ -543,11 +1361,14 @@ export default function ProductFilterSidebar({
 
             {/* Option B: Tùy chỉnh */}
             <div
-              onClick={() => {
+              ref={expectedDateRangeAnchorRef}
+              onClick={(e) => {
+                e.stopPropagation();
                 onChange({ expectedOutOfStockType: 'custom' });
                 setExpectedPeriodPopoverOpen(false);
                 setCreatedDateRangeOpen(false);
-                setExpectedDateRangeOpen(true);
+                setCreatedPeriodPopoverOpen(false);
+                setExpectedDateRangeOpen((prev) => !prev);
               }}
               className="relative flex items-center gap-2.5 cursor-pointer group"
             >
@@ -566,153 +1387,53 @@ export default function ProductFilterSidebar({
                 <span>{state.expectedOutOfStockDateFrom ? `${formatDateKey(state.expectedOutOfStockDateFrom)} - ${formatDateKey(state.expectedOutOfStockDateTo)}` : 'Tùy chỉnh'}</span>
                 <Calendar size={15} className="text-slate-500 shrink-0" />
               </div>
-              <DateRangePopover
-                key={`expected-${expectedDateRangeOpen}-${state.expectedOutOfStockDateFrom ?? ''}-${state.expectedOutOfStockDateTo ?? ''}`}
-                open={expectedDateRangeOpen}
-                value={{ from: state.expectedOutOfStockDateFrom, to: state.expectedOutOfStockDateTo }}
-                onCancel={() => setExpectedDateRangeOpen(false)}
-                onToday={() => {
-                  const today = toDateKey(new Date());
-                  onChange({ expectedOutOfStockDateFrom: today, expectedOutOfStockDateTo: today });
-                }}
-                onApply={(range) => {
-                  onChange({
-                    expectedOutOfStockDateFrom: range.from,
-                    expectedOutOfStockDateTo: range.to,
-                    expectedOutOfStockDate: range.from,
-                  });
-                  setExpectedDateRangeOpen(false);
-                }}
-              />
             </div>
           </div>
 
-          {/* Popover for "Dự kiến hết hàng" (Matches Screenshot 3) */}
-          {expectedPeriodPopoverOpen && (
-            <div className="absolute left-[calc(100%+14px)] top-0 z-50 bg-white rounded-2xl shadow-2xl border border-slate-100 p-5 w-[420px] max-w-[90vw] animate-in fade-in zoom-in-95 duration-100">
-              {/* Pointer beak pointing left to the button */}
-              <div className="absolute -left-2 top-5 w-4 h-4 bg-white rotate-45 border-l border-b border-slate-200 z-10" />
+          {/* Floating Portal Popover for Date Range (Ảnh 2 - KHÔNG BỊ ĐÈ BỞI SIDEBAR) */}
+          <DateRangePopover
+            key={`expected-${expectedDateRangeOpen}-${state.expectedOutOfStockDateFrom ?? ''}-${state.expectedOutOfStockDateTo ?? ''}`}
+            open={expectedDateRangeOpen}
+            anchorRef={expectedDateRangeAnchorRef}
+            value={{ from: state.expectedOutOfStockDateFrom, to: state.expectedOutOfStockDateTo }}
+            minDate={toDateKey(new Date())}
+            onCancel={() => setExpectedDateRangeOpen(false)}
+            onToday={() => {
+              const today = toDateKey(new Date());
+              onChange({ expectedOutOfStockDateFrom: today, expectedOutOfStockDateTo: today });
+            }}
+            onApply={(range) => {
+              onChange({
+                expectedOutOfStockDateFrom: range.from,
+                expectedOutOfStockDateTo: range.to,
+                expectedOutOfStockDate: range.from,
+              });
+              setExpectedDateRangeOpen(false);
+            }}
+          />
 
-              <div className="grid grid-cols-3 gap-5">
-                {/* 1. Theo ngày */}
-                <div>
-                  <div className="text-[13px] font-semibold text-slate-900 mb-3">Theo ngày</div>
-                  <div className="flex flex-col gap-2">
-                    {['Ngày mai', 'Ngày kia', '3 ngày tới', '5 ngày tới', '7 ngày tới'].map((item) => {
-                      const isSelected = state.expectedOutOfStockPeriod === item;
-                      return (
-                        <button
-                          key={item}
-                          type="button"
-                          onClick={() => {
-                            onChange({
-                              expectedOutOfStockType: 'all',
-                              expectedOutOfStockPeriod: item,
-                            });
-                            setExpectedPeriodPopoverOpen(false);
-                          }}
-                          className={`px-3.5 py-1.5 rounded-full text-xs font-medium cursor-pointer transition text-center whitespace-nowrap block w-fit ${
-                            isSelected
-                              ? 'bg-[#0071BA] text-white shadow-xs'
-                              : 'border border-slate-300 text-slate-700 bg-white hover:border-slate-400 hover:bg-slate-50'
-                          }`}
-                        >
-                          {item}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* 2. Theo tuần */}
-                <div>
-                  <div className="text-[13px] font-semibold text-slate-900 mb-3">Theo tuần</div>
-                  <div className="flex flex-col gap-2">
-                    {['Tuần này', 'Tuần tới', '2 tuần tới'].map((item) => {
-                      const isSelected = state.expectedOutOfStockPeriod === item;
-                      return (
-                        <button
-                          key={item}
-                          type="button"
-                          onClick={() => {
-                            onChange({
-                              expectedOutOfStockType: 'all',
-                              expectedOutOfStockPeriod: item,
-                            });
-                            setExpectedPeriodPopoverOpen(false);
-                          }}
-                          className={`px-3.5 py-1.5 rounded-full text-xs font-medium cursor-pointer transition text-center whitespace-nowrap block w-fit ${
-                            isSelected
-                              ? 'bg-[#0071BA] text-white shadow-xs'
-                              : 'border border-slate-300 text-slate-700 bg-white hover:border-slate-400 hover:bg-slate-50'
-                          }`}
-                        >
-                          {item}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* 3. Theo tháng */}
-                <div>
-                  <div className="text-[13px] font-semibold text-slate-900 mb-3">Theo tháng</div>
-                  <div className="flex flex-col gap-2">
-                    {['Tháng này', 'Tháng tới', '30 ngày tới', '2 tháng tới', '3 tháng tới'].map((item) => {
-                      const isSelected = state.expectedOutOfStockPeriod === item;
-                      return (
-                        <button
-                          key={item}
-                          type="button"
-                          onClick={() => {
-                            onChange({
-                              expectedOutOfStockType: 'all',
-                              expectedOutOfStockPeriod: item,
-                            });
-                            setExpectedPeriodPopoverOpen(false);
-                          }}
-                          className={`px-3.5 py-1.5 rounded-full text-xs font-medium cursor-pointer transition text-center whitespace-nowrap block w-fit ${
-                            isSelected
-                              ? 'bg-[#0071BA] text-white shadow-xs'
-                              : 'border border-slate-300 text-slate-700 bg-white hover:border-slate-400 hover:bg-slate-50'
-                          }`}
-                        >
-                          {item}
-                        </button>
-                      );
-                    })}
-
-                    {/* Button Toàn thời gian */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        onChange({
-                          expectedOutOfStockType: 'all',
-                          expectedOutOfStockPeriod: 'Toàn thời gian',
-                        });
-                        setExpectedPeriodPopoverOpen(false);
-                      }}
-                      className={`px-4 py-1.5 rounded-full text-xs font-medium cursor-pointer transition text-center whitespace-nowrap block w-fit mt-1 ${
-                        !state.expectedOutOfStockPeriod || state.expectedOutOfStockPeriod === 'Toàn thời gian'
-                          ? 'bg-[#0071BA] text-white shadow-xs'
-                          : 'border border-slate-300 text-slate-700 bg-white hover:border-slate-400 hover:bg-slate-50'
-                      }`}
-                    >
-                      Toàn thời gian
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
+          {/* Floating Portal Popover for Preset Periods (Ảnh 2) */}
+          <PeriodPresetPopover
+            open={expectedPeriodPopoverOpen}
+            anchorRef={expectedPeriodAnchorRef}
+            onClose={() => setExpectedPeriodPopoverOpen(false)}
+            selectedValue={state.expectedOutOfStockPeriod}
+            onSelect={(val) => onChange({ expectedOutOfStockType: 'all', expectedOutOfStockPeriod: val })}
+            isExpected={true}
+          />
         </div>
 
         {/* 4. Thời gian tạo */}
         <div className="relative">
-          <div className="text-[13px] font-semibold text-slate-800 mb-1.5">Thời gian tạo</div>
+          <div className="text-[13px] font-semibold text-slate-800 mb-1.5 flex items-center gap-1.5">
+            <span>Thời gian tạo</span>
+            {((state.createdDateType === 'all' && state.createdPeriod && state.createdPeriod !== 'Toàn thời gian') || state.createdDateType === 'custom') && (
+              <span className="w-1.5 h-1.5 rounded-full bg-blue-600"></span>
+            )}
+          </div>
           <div className="space-y-1.5">
             {/* Option A: Toàn thời gian / Chu kỳ tạo (Click opens Popover - Screenshot 2) */}
-            <div className="flex items-center gap-2.5 group">
+            <div ref={createdPeriodAnchorRef} className="flex items-center gap-2.5 group">
               <div
                 onClick={() => {
                   onChange({ createdDateType: 'all' });
@@ -748,11 +1469,14 @@ export default function ProductFilterSidebar({
 
             {/* Option B: Tùy chỉnh */}
             <div
-              onClick={() => {
+              ref={createdDateRangeAnchorRef}
+              onClick={(e) => {
+                e.stopPropagation();
                 onChange({ createdDateType: 'custom' });
                 setCreatedPeriodPopoverOpen(false);
                 setExpectedDateRangeOpen(false);
-                setCreatedDateRangeOpen(true);
+                setExpectedPeriodPopoverOpen(false);
+                setCreatedDateRangeOpen((prev) => !prev);
               }}
               className="relative flex items-center gap-2.5 cursor-pointer group"
             >
@@ -771,216 +1495,39 @@ export default function ProductFilterSidebar({
                 <span>{state.createdDateFrom ? `${formatDateKey(state.createdDateFrom)} - ${formatDateKey(state.createdDateTo)}` : 'Tùy chỉnh'}</span>
                 <Calendar size={15} className="text-slate-500 shrink-0" />
               </div>
-              <DateRangePopover
-                key={`created-${createdDateRangeOpen}-${state.createdDateFrom ?? ''}-${state.createdDateTo ?? ''}`}
-                open={createdDateRangeOpen}
-                value={{ from: state.createdDateFrom, to: state.createdDateTo }}
-                onCancel={() => setCreatedDateRangeOpen(false)}
-                onToday={() => {
-                  const today = toDateKey(new Date());
-                  onChange({ createdDateFrom: today, createdDateTo: today });
-                }}
-                onApply={(range) => {
-                  onChange({
-                    createdDateFrom: range.from,
-                    createdDateTo: range.to,
-                    createdDate: range.from,
-                  });
-                  setCreatedDateRangeOpen(false);
-                }}
-              />
             </div>
           </div>
 
-          {/* Popover for "Thời gian tạo" (Matches Screenshot 2) */}
-          {createdPeriodPopoverOpen && (
-            <div className="absolute left-[calc(100%+14px)] top-0 z-50 bg-white rounded-2xl shadow-2xl border border-slate-100 p-5 w-[640px] max-w-[90vw] animate-in fade-in zoom-in-95 duration-100">
-              {/* Pointer beak pointing left to the button */}
-              <div className="absolute -left-2 top-5 w-4 h-4 bg-white rotate-45 border-l border-b border-slate-200 z-10" />
+          {/* Floating Portal Popover for Date Range (Ảnh 2 - KHÔNG BỊ ĐÈ BỞI SIDEBAR) */}
+          <DateRangePopover
+            key={`created-${createdDateRangeOpen}-${state.createdDateFrom ?? ''}-${state.createdDateTo ?? ''}`}
+            open={createdDateRangeOpen}
+            anchorRef={createdDateRangeAnchorRef}
+            value={{ from: state.createdDateFrom, to: state.createdDateTo }}
+            onCancel={() => setCreatedDateRangeOpen(false)}
+            onToday={() => {
+              const today = toDateKey(new Date());
+              onChange({ createdDateFrom: today, createdDateTo: today });
+            }}
+            onApply={(range) => {
+              onChange({
+                createdDateFrom: range.from,
+                createdDateTo: range.to,
+                createdDate: range.from,
+              });
+              setCreatedDateRangeOpen(false);
+            }}
+          />
 
-              <div className="grid grid-cols-5 gap-3.5">
-                {/* 1. Theo ngày */}
-                <div>
-                  <div className="text-[13px] font-semibold text-slate-900 mb-3">Theo ngày</div>
-                  <div className="flex flex-col gap-2">
-                    {['Hôm nay', 'Hôm qua'].map((item) => {
-                      const isSelected = state.createdPeriod === item;
-                      return (
-                        <button
-                          key={item}
-                          type="button"
-                          onClick={() => {
-                            onChange({
-                              createdDateType: 'all',
-                              createdPeriod: item,
-                            });
-                            setCreatedPeriodPopoverOpen(false);
-                          }}
-                          className={`px-3.5 py-1.5 rounded-full text-xs font-medium cursor-pointer transition text-center whitespace-nowrap block w-fit ${
-                            isSelected
-                              ? 'bg-[#0071BA] text-white shadow-xs'
-                              : 'border border-slate-300 text-slate-700 bg-white hover:border-slate-400 hover:bg-slate-50'
-                          }`}
-                        >
-                          {item}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* 2. Theo tuần */}
-                <div>
-                  <div className="text-[13px] font-semibold text-slate-900 mb-3">Theo tuần</div>
-                  <div className="flex flex-col gap-2">
-                    {['Tuần này', 'Tuần trước', '7 ngày qua'].map((item) => {
-                      const isSelected = state.createdPeriod === item;
-                      return (
-                        <button
-                          key={item}
-                          type="button"
-                          onClick={() => {
-                            onChange({
-                              createdDateType: 'all',
-                              createdPeriod: item,
-                            });
-                            setCreatedPeriodPopoverOpen(false);
-                          }}
-                          className={`px-3.5 py-1.5 rounded-full text-xs font-medium cursor-pointer transition text-center whitespace-nowrap block w-fit ${
-                            isSelected
-                              ? 'bg-[#0071BA] text-white shadow-xs'
-                              : 'border border-slate-300 text-slate-700 bg-white hover:border-slate-400 hover:bg-slate-50'
-                          }`}
-                        >
-                          {item}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* 3. Theo tháng */}
-                <div>
-                  <div className="text-[13px] font-semibold text-slate-900 mb-3">Theo tháng</div>
-                  <div className="flex flex-col gap-2">
-                    {[
-                      'Tháng này',
-                      'Tháng trước',
-                      'Tháng này (âm lịch)',
-                      'Tháng trước (âm lịch)',
-                      '30 ngày qua',
-                    ].map((item) => {
-                      const isSelected = state.createdPeriod === item;
-                      return (
-                        <button
-                          key={item}
-                          type="button"
-                          onClick={() => {
-                            onChange({
-                              createdDateType: 'all',
-                              createdPeriod: item,
-                            });
-                            setCreatedPeriodPopoverOpen(false);
-                          }}
-                          className={`px-3.5 py-1.5 rounded-full text-xs font-medium cursor-pointer transition text-center whitespace-nowrap block w-fit ${
-                            isSelected
-                              ? 'bg-[#0071BA] text-white shadow-xs'
-                              : 'border border-slate-300 text-slate-700 bg-white hover:border-slate-400 hover:bg-slate-50'
-                          }`}
-                        >
-                          {item}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* 4. Theo quý */}
-                <div>
-                  <div className="text-[13px] font-semibold text-slate-900 mb-3">Theo quý</div>
-                  <div className="flex flex-col gap-2">
-                    {['Quý này', 'Quý trước'].map((item) => {
-                      const isSelected = state.createdPeriod === item;
-                      return (
-                        <button
-                          key={item}
-                          type="button"
-                          onClick={() => {
-                            onChange({
-                              createdDateType: 'all',
-                              createdPeriod: item,
-                            });
-                            setCreatedPeriodPopoverOpen(false);
-                          }}
-                          className={`px-3.5 py-1.5 rounded-full text-xs font-medium cursor-pointer transition text-center whitespace-nowrap block w-fit ${
-                            isSelected
-                              ? 'bg-[#0071BA] text-white shadow-xs'
-                              : 'border border-slate-300 text-slate-700 bg-white hover:border-slate-400 hover:bg-slate-50'
-                          }`}
-                        >
-                          {item}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* 5. Theo năm */}
-                <div>
-                  <div className="text-[13px] font-semibold text-slate-900 mb-3">Theo năm</div>
-                  <div className="flex flex-col gap-2">
-                    {[
-                      'Năm nay',
-                      'Năm trước',
-                      'Năm nay (âm lịch)',
-                      'Năm trước (âm lịch)',
-                    ].map((item) => {
-                      const isSelected = state.createdPeriod === item;
-                      return (
-                        <button
-                          key={item}
-                          type="button"
-                          onClick={() => {
-                            onChange({
-                              createdDateType: 'all',
-                              createdPeriod: item,
-                            });
-                            setCreatedPeriodPopoverOpen(false);
-                          }}
-                          className={`px-3.5 py-1.5 rounded-full text-xs font-medium cursor-pointer transition text-center whitespace-nowrap block w-fit ${
-                            isSelected
-                              ? 'bg-[#0071BA] text-white shadow-xs'
-                              : 'border border-slate-300 text-slate-700 bg-white hover:border-slate-400 hover:bg-slate-50'
-                          }`}
-                        >
-                          {item}
-                        </button>
-                      );
-                    })}
-
-                    {/* Button Toàn thời gian */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        onChange({
-                          createdDateType: 'all',
-                          createdPeriod: 'Toàn thời gian',
-                        });
-                        setCreatedPeriodPopoverOpen(false);
-                      }}
-                      className={`px-4 py-1.5 rounded-full text-xs font-medium cursor-pointer transition text-center whitespace-nowrap block w-fit mt-1 ${
-                        !state.createdPeriod || state.createdPeriod === 'Toàn thời gian'
-                          ? 'bg-[#0071BA] text-white shadow-xs'
-                          : 'border border-slate-300 text-slate-700 bg-white hover:border-slate-400 hover:bg-slate-50'
-                      }`}
-                    >
-                      Toàn thời gian
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
+          {/* Floating Portal Popover for Preset Periods (Ảnh 2) */}
+          <PeriodPresetPopover
+            open={createdPeriodPopoverOpen}
+            anchorRef={createdPeriodAnchorRef}
+            onClose={() => setCreatedPeriodPopoverOpen(false)}
+            selectedValue={state.createdPeriod}
+            onSelect={(val) => onChange({ createdDateType: 'all', createdPeriod: val })}
+            isExpected={false}
+          />
         </div>
 
         {/* 5. Thuộc tính (Matches Screenshot 1) */}
@@ -1057,222 +1604,66 @@ export default function ProductFilterSidebar({
           </div>
         </div>
 
-        {/* 6. Nhà cung cấp */}
-        <div>
-          <div className="text-[13px] font-semibold text-slate-800 mb-1.5">Nhà cung cấp</div>
-          <div className="relative">
-            <div
-              onClick={() => {
-                setSupplierOpen(!supplierOpen);
-                setCategoryOpen(false);
-                setStockOpen(false);
-                setLocationOpen(false);
-                setTypeOpen(false);
-                setStatusOpen(false);
-                setCreatedPeriodPopoverOpen(false);
-                setExpectedPeriodPopoverOpen(false);
-              }}
-              className="h-[34px] px-3 bg-white border border-slate-300 hover:border-slate-400 rounded-[6px] flex items-center justify-between text-[13px] cursor-pointer transition"
-            >
-              <span className={state.supplier ? 'text-slate-800 font-medium truncate' : 'text-slate-400 truncate'}>
-                {state.supplier || 'Chọn nhà cung cấp'}
-              </span>
-              <div className="flex items-center gap-1 text-slate-400">
-                {state.supplier && (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onChange({ supplier: undefined });
-                    }}
-                    className="hover:text-slate-600 p-0.5"
-                  >
-                    <X size={13} />
-                  </button>
-                )}
-                <ChevronDown size={14} />
-              </div>
-            </div>
+        {/* 6. Nhà cung cấp (Multi-select có tag theo Ảnh 2) */}
+        <MultiSelectPillBox
+          label="Nhà cung cấp"
+          placeholder="Chọn nhà cung cấp"
+          selected={state.suppliers || (state.supplier ? [state.supplier] : [])}
+          options={suppliersList}
+          onChange={(items) => onChange({ suppliers: items, supplier: items[0] })}
+          isOpen={supplierOpen}
+          onToggle={() => {
+            setSupplierOpen(!supplierOpen);
+            setLocationOpen(false);
+            setTypeOpen(false);
+            setCategoryOpen(false);
+            setStatusOpen(false);
+          }}
+          onClose={() => setSupplierOpen(false)}
+        />
 
-            {supplierOpen && (
-              <div className="absolute top-full left-0 mt-1 w-full bg-white rounded-[6px] border border-slate-200 shadow-lg py-1 z-40 animate-in fade-in zoom-in-95 duration-100">
-                <div
-                  onClick={() => {
-                    onChange({ supplier: undefined });
-                    setSupplierOpen(false);
-                  }}
-                  className="px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50 cursor-pointer flex items-center justify-between"
-                >
-                  <span>Tất cả nhà cung cấp</span>
-                  {!state.supplier && <Check size={14} className="text-blue-600 stroke-[2.5]" />}
-                </div>
-                {suppliersList.map((sup) => (
-                  <div
-                    key={sup}
-                    onClick={() => {
-                      onChange({ supplier: sup });
-                      setSupplierOpen(false);
-                    }}
-                    className={`px-3 py-1.5 text-xs cursor-pointer flex items-center justify-between transition ${
-                      state.supplier === sup
-                        ? 'bg-blue-50 text-blue-700 font-medium'
-                        : 'text-slate-700 hover:bg-slate-50'
-                    }`}
-                  >
-                    <span className="truncate">{sup}</span>
-                    {state.supplier === sup && <Check size={14} className="text-blue-600 stroke-[2.5]" />}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
+        {/* 7. Vị trí (Multi-select có tag theo Ảnh 2) */}
+        <MultiSelectPillBox
+          label="Vị trí"
+          placeholder="Chọn vị trí"
+          selected={state.locations || (state.location ? [state.location] : [])}
+          options={locationsList}
+          onChange={(items) => onChange({ locations: items, location: items[0] })}
+          isOpen={locationOpen}
+          onToggle={() => {
+            setLocationOpen(!locationOpen);
+            setSupplierOpen(false);
+            setTypeOpen(false);
+            setCategoryOpen(false);
+            setStatusOpen(false);
+          }}
+          onClose={() => setLocationOpen(false)}
+        />
 
-        {/* 7. Vị trí */}
-        <div>
-          <div className="text-[13px] font-semibold text-slate-800 mb-1.5">Vị trí</div>
-          <div className="relative">
-            <div
-              onClick={() => {
-                setLocationOpen(!locationOpen);
-                setCategoryOpen(false);
-                setStockOpen(false);
-                setSupplierOpen(false);
-                setTypeOpen(false);
-                setStatusOpen(false);
-                setCreatedPeriodPopoverOpen(false);
-                setExpectedPeriodPopoverOpen(false);
-              }}
-              className="h-[34px] px-3 bg-white border border-slate-300 hover:border-slate-400 rounded-[6px] flex items-center justify-between text-[13px] cursor-pointer transition"
-            >
-              <span className={state.location ? 'text-slate-800 font-medium truncate' : 'text-slate-400 truncate'}>
-                {state.location || 'Chọn vị trí'}
-              </span>
-              <div className="flex items-center gap-1 text-slate-400">
-                {state.location && (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onChange({ location: undefined });
-                    }}
-                    className="hover:text-slate-600 p-0.5"
-                  >
-                    <X size={13} />
-                  </button>
-                )}
-                <ChevronDown size={14} />
-              </div>
-            </div>
-
-            {locationOpen && (
-              <div className="absolute top-full left-0 mt-1 w-full bg-white rounded-[6px] border border-slate-200 shadow-lg py-1 z-40 animate-in fade-in zoom-in-95 duration-100">
-                <div
-                  onClick={() => {
-                    onChange({ location: undefined });
-                    setLocationOpen(false);
-                  }}
-                  className="px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50 cursor-pointer flex items-center justify-between"
-                >
-                  <span>Tất cả vị trí</span>
-                  {!state.location && <Check size={14} className="text-blue-600 stroke-[2.5]" />}
-                </div>
-                {locationsList.map((loc) => (
-                  <div
-                    key={loc}
-                    onClick={() => {
-                      onChange({ location: loc });
-                      setLocationOpen(false);
-                    }}
-                    className={`px-3 py-1.5 text-xs cursor-pointer flex items-center justify-between transition ${
-                      state.location === loc
-                        ? 'bg-blue-50 text-blue-700 font-medium'
-                        : 'text-slate-700 hover:bg-slate-50'
-                    }`}
-                  >
-                    <span className="truncate">{loc}</span>
-                    {state.location === loc && <Check size={14} className="text-blue-600 stroke-[2.5]" />}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* 8. Loại hàng */}
-        <div>
-          <div className="text-[13px] font-semibold text-slate-800 mb-1.5">Loại hàng</div>
-          <div className="relative">
-            <div
-              onClick={() => {
-                setTypeOpen(!typeOpen);
-                setCategoryOpen(false);
-                setStockOpen(false);
-                setSupplierOpen(false);
-                setLocationOpen(false);
-                setStatusOpen(false);
-                setCreatedPeriodPopoverOpen(false);
-                setExpectedPeriodPopoverOpen(false);
-              }}
-              className="h-[34px] px-3 bg-white border border-slate-300 hover:border-slate-400 rounded-[6px] flex items-center justify-between text-[13px] cursor-pointer transition"
-            >
-              <span className={state.productType ? 'text-slate-800 font-medium truncate' : 'text-slate-400 truncate'}>
-                {state.productType || 'Chọn loại hàng'}
-              </span>
-              <div className="flex items-center gap-1 text-slate-400">
-                {state.productType && (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onChange({ productType: undefined });
-                    }}
-                    className="hover:text-slate-600 p-0.5"
-                  >
-                    <X size={13} />
-                  </button>
-                )}
-                <ChevronDown size={14} />
-              </div>
-            </div>
-
-            {typeOpen && (
-              <div className="absolute top-full left-0 mt-1 w-full bg-white rounded-[6px] border border-slate-200 shadow-lg py-1 z-40 animate-in fade-in zoom-in-95 duration-100">
-                <div
-                  onClick={() => {
-                    onChange({ productType: undefined });
-                    setTypeOpen(false);
-                  }}
-                  className="px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50 cursor-pointer flex items-center justify-between"
-                >
-                  <span>Tất cả loại hàng</span>
-                  {!state.productType && <Check size={14} className="text-blue-600 stroke-[2.5]" />}
-                </div>
-                {PRODUCT_TYPES.map((t) => (
-                  <div
-                    key={t}
-                    onClick={() => {
-                      onChange({ productType: t });
-                      setTypeOpen(false);
-                    }}
-                    className={`px-3 py-1.5 text-xs cursor-pointer flex items-center justify-between transition ${
-                      state.productType === t
-                        ? 'bg-blue-50 text-blue-700 font-medium'
-                        : 'text-slate-700 hover:bg-slate-50'
-                    }`}
-                  >
-                    <span className="truncate">{t}</span>
-                    {state.productType === t && <Check size={14} className="text-blue-600 stroke-[2.5]" />}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
+        {/* 8. Loại hàng (Multi-select có tag theo Ảnh 2) */}
+        <MultiSelectPillBox
+          label="Loại hàng"
+          placeholder="Chọn loại hàng"
+          selected={state.productTypes || (state.productType ? [state.productType] : [])}
+          options={PRODUCT_TYPES}
+          onChange={(items) => onChange({ productTypes: items, productType: items[0] })}
+          isOpen={typeOpen}
+          onToggle={() => {
+            setTypeOpen(!typeOpen);
+            setSupplierOpen(false);
+            setLocationOpen(false);
+            setCategoryOpen(false);
+            setStatusOpen(false);
+          }}
+          onClose={() => setTypeOpen(false)}
+        />
 
         {/* 9. Bán trực tiếp */}
         <div>
-          <div className="text-[13px] font-semibold text-slate-800 mb-1.5">Bán trực tiếp</div>
+          <div className="flex items-center gap-1.5 text-[13px] font-semibold text-slate-800 mb-1.5">
+            <span>Bán trực tiếp</span>
+            {state.directSale !== 'all' && <span className="w-1.5 h-1.5 rounded-full bg-blue-600 inline-block" />}
+          </div>
           <div className="flex items-center gap-1.5">
             <button
               type="button"
@@ -1301,6 +1692,52 @@ export default function ProductFilterSidebar({
               onClick={() => onChange({ directSale: 'no' })}
               className={`px-4 py-1.5 rounded-full text-xs font-medium cursor-pointer transition ${
                 state.directSale === 'no'
+                  ? 'bg-[#0071BA] text-white font-semibold shadow-xs'
+                  : 'bg-white border border-slate-300 text-slate-700 hover:border-slate-400'
+              }`}
+            >
+              Không
+            </button>
+          </div>
+        </div>
+
+
+        {/* 9.1 Liên kết kênh bán (Ảnh 3) */}
+        <div>
+          <div className="flex items-center gap-1.5 text-[13px] font-semibold text-slate-800 mb-2">
+            <span>Liên kết kênh bán</span>
+            {state.channelLinked && state.channelLinked !== 'all' && (
+              <span className="w-1.5 h-1.5 rounded-full bg-blue-600 inline-block" />
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => onChange({ channelLinked: 'all' })}
+              className={`px-4 py-1.5 rounded-full text-xs font-medium cursor-pointer transition ${
+                state.channelLinked === 'all' || !state.channelLinked
+                  ? 'bg-[#0071BA] text-white font-semibold shadow-xs'
+                  : 'bg-white border border-slate-300 text-slate-700 hover:border-slate-400'
+              }`}
+            >
+              Tất cả
+            </button>
+            <button
+              type="button"
+              onClick={() => onChange({ channelLinked: 'yes' })}
+              className={`px-4 py-1.5 rounded-full text-xs font-medium cursor-pointer transition ${
+                state.channelLinked === 'yes'
+                  ? 'bg-[#0071BA] text-white font-semibold shadow-xs'
+                  : 'bg-white border border-slate-300 text-slate-700 hover:border-slate-400'
+              }`}
+            >
+              Có
+            </button>
+            <button
+              type="button"
+              onClick={() => onChange({ channelLinked: 'no' })}
+              className={`px-4 py-1.5 rounded-full text-xs font-medium cursor-pointer transition ${
+                state.channelLinked === 'no'
                   ? 'bg-[#0071BA] text-white font-semibold shadow-xs'
                   : 'bg-white border border-slate-300 text-slate-700 hover:border-slate-400'
               }`}
@@ -1367,5 +1804,20 @@ export default function ProductFilterSidebar({
         </div>
       </div>
     </aside>
+
+      {/* Collapse button on border (Matching Image 3) */}
+      {onToggleCollapse && (
+        <button
+          type="button"
+          onClick={onToggleCollapse}
+          title={isCollapsed ? 'Mở rộng bộ lọc (ảnh 2, 3)' : 'Thu gọn bộ lọc'}
+          className={`absolute z-30 top-[400px] flex h-7 w-7 items-center justify-center rounded-full border border-blue-500 bg-white text-blue-600 shadow-md transition-all duration-300 hover:bg-blue-50 hover:scale-110 cursor-pointer ${
+            isCollapsed ? 'left-1' : '-right-3.5'
+          }`}
+        >
+          {isCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+        </button>
+      )}
+    </div>
   );
 }
