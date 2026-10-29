@@ -8,6 +8,7 @@ using Microsoft.EntityFrameworkCore;
 using StockFlow.Application.Common;
 using StockFlow.Application.Common.Interfaces;
 using StockFlow.Application.Features.PriceBooks.DTOs;
+using StockFlow.Application.Features.PriceBooks.Services;
 using StockFlow.Domain.Entities;
 
 namespace StockFlow.Application.Features.PriceBooks.Commands;
@@ -50,9 +51,10 @@ public class UpdatePriceBookPricesCommandHandler : IRequestHandler<UpdatePriceBo
 
         foreach (var item in request.Items)
         {
+            var validPrice = Math.Max(0, item.Price);
             if (existingMap.TryGetValue(item.ProductId, out var existing))
             {
-                existing.Price = Math.Max(0, item.Price);
+                existing.Price = validPrice;
                 existing.UpdatedAt = DateTime.UtcNow;
             }
             else
@@ -61,13 +63,84 @@ public class UpdatePriceBookPricesCommandHandler : IRequestHandler<UpdatePriceBo
                 {
                     PriceBookId = request.PriceBookId,
                     ProductId = item.ProductId,
-                    Price = Math.Max(0, item.Price),
+                    Price = validPrice,
                     UpdatedAt = DateTime.UtcNow
                 }, cancellationToken);
             }
         }
 
         pb.UpdatedAt = DateTime.UtcNow;
+
+        // Nếu cập nhật Bảng giá chung (hoặc bảng giá mặc định):
+        // 1. Đồng bộ giá bán StandardPrice vào bảng MstProducts để toàn bộ hệ thống (danh mục hàng hóa, đơn hàng) nhận giá mới
+        // 2. Tự động tính toán lại đơn giá cho các bảng giá khác có công thức dựa trên Giá chung
+        if (pb.IsDefault)
+        {
+            var products = await _context.MstProducts
+                .Where(p => productIds.Contains(p.ProductId))
+                .ToListAsync(cancellationToken);
+
+            var priceLookup = request.Items.ToDictionary(x => x.ProductId, x => Math.Max(0, x.Price));
+            foreach (var prod in products)
+            {
+                if (priceLookup.TryGetValue(prod.ProductId, out var newStdPrice))
+                {
+                    prod.StandardPrice = newStdPrice;
+                }
+            }
+
+            // Tìm các bảng giá phụ thuộc theo công thức
+            var dependentBooks = await _context.MstPriceBooks
+                .Where(b => b.IsActive && !b.IsDefault &&
+                    (b.FormulaBaseType == "STANDARD" ||
+                     (b.FormulaBaseType == "PRICE_BOOK" && b.FormulaBasePriceBookId == pb.PriceBookId)))
+                .ToListAsync(cancellationToken);
+
+            if (dependentBooks.Any())
+            {
+                var depBookIds = dependentBooks.Select(b => b.PriceBookId).ToList();
+                var depExistingItems = await _context.DtlPriceBookItems
+                    .Where(i => depBookIds.Contains(i.PriceBookId) && productIds.Contains(i.ProductId))
+                    .ToListAsync(cancellationToken);
+
+                var depItemMap = depExistingItems
+                    .GroupBy(i => (i.PriceBookId, i.ProductId))
+                    .ToDictionary(g => g.Key, g => g.First());
+
+                foreach (var depBook in dependentBooks)
+                {
+                    foreach (var item in request.Items)
+                    {
+                        var basePrice = Math.Max(0, item.Price);
+                        var calculatedPrice = PriceFormulaCalculator.CalculatePrice(
+                            basePrice,
+                            depBook.FormulaOperator,
+                            depBook.FormulaValue,
+                            depBook.FormulaUnit
+                        );
+
+                        if (depItemMap.TryGetValue((depBook.PriceBookId, item.ProductId), out var existingDepItem))
+                        {
+                            existingDepItem.Price = calculatedPrice;
+                            existingDepItem.UpdatedAt = DateTime.UtcNow;
+                        }
+                        else
+                        {
+                            await _context.DtlPriceBookItems.AddAsync(new DtlPriceBookItem
+                            {
+                                PriceBookId = depBook.PriceBookId,
+                                ProductId = item.ProductId,
+                                Price = calculatedPrice,
+                                UpdatedAt = DateTime.UtcNow
+                            }, cancellationToken);
+                        }
+                    }
+
+                    depBook.UpdatedAt = DateTime.UtcNow;
+                }
+            }
+        }
+
         await _context.SaveChangesAsync(cancellationToken);
 
         return Result.Success();
