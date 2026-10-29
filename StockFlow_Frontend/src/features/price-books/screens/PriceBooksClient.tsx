@@ -8,6 +8,7 @@ import {
   CalculatorOutlined,
   SettingOutlined,
   ReloadOutlined,
+  DeleteOutlined,
 } from '@ant-design/icons';
 import { Table, Input, Button, Tag, notification } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
@@ -16,12 +17,6 @@ import CreatePriceBookModal from '../components/CreatePriceBookModal';
 import { PriceBook, PriceBookMatrixItem } from '../types';
 import { priceBookService } from '../services/priceBookService';
 import { apiClient } from '@/lib/api/client';
-
-interface WarehouseItem {
-  warehouseId: number;
-  warehouseCode: string;
-  warehouseName: string;
-}
 
 interface CategoryItem {
   categoryId: number;
@@ -40,11 +35,9 @@ export default function PriceBooksClient() {
   // Price Books & Lookups
   const [priceBooks, setPriceBooks] = useState<PriceBook[]>([]);
   const [selectedPriceBookIds, setSelectedPriceBookIds] = useState<number[]>([]);
-  const [warehouses, setWarehouses] = useState<WarehouseItem[]>([]);
   const [categories, setCategories] = useState<CategoryItem[]>([]);
 
   // Filters
-  const [selectedWarehouseId, setSelectedWarehouseId] = useState<number | null>(null);
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
   const [stockCondition, setStockCondition] = useState<string>('ALL');
   const [searchKeyword, setSearchKeyword] = useState<string>('');
@@ -66,17 +59,12 @@ export default function PriceBooksClient() {
 
   // Load initial lookups
   useEffect(() => {
-    // 1. Warehouses
-    apiClient.get<WarehouseItem[]>('/api/warehouses')
-      .then(res => setWarehouses(Array.isArray(res) ? res : []))
-      .catch(() => {});
-
-    // 2. Categories
+    // Categories
     apiClient.get<CategoryItem[]>('/api/products/categories')
       .then(res => setCategories(Array.isArray(res) ? res : []))
       .catch(() => {});
 
-    // 3. Price Books
+    // Price Books
     loadPriceBooks();
   }, []);
 
@@ -87,8 +75,10 @@ export default function PriceBooksClient() {
       if (data.length > 0) {
         setSelectedPriceBookIds(prev => {
           if (prev.length > 0) return prev;
+          // Hiển thị mặc định cả bảng giá chung và bảng giá công thức đầu tiên (nếu có)
           const def = data.find(p => p.isDefault) || data[0];
-          return [def.priceBookId];
+          const second = data.find(p => p.priceBookId !== def.priceBookId);
+          return second ? [def.priceBookId, second.priceBookId] : [def.priceBookId];
         });
       }
     } catch {
@@ -106,7 +96,6 @@ export default function PriceBooksClient() {
 
     try {
       const res = await priceBookService.getPriceMatrix({
-        warehouseId: selectedWarehouseId ?? undefined,
         search: searchKeyword.trim() || undefined,
         categoryId: selectedCategoryId ?? undefined,
         stockCondition,
@@ -125,7 +114,7 @@ export default function PriceBooksClient() {
     } finally {
       setLoading(false);
     }
-  }, [selectedWarehouseId, searchKeyword, selectedCategoryId, stockCondition, selectedPriceBookIds, pageIndex, pageSize, priceBooks.length, api]);
+  }, [searchKeyword, selectedCategoryId, stockCondition, selectedPriceBookIds, pageIndex, pageSize, priceBooks.length, api]);
 
   useEffect(() => {
     loadMatrix();
@@ -174,9 +163,39 @@ export default function PriceBooksClient() {
         await priceBookService.updatePrices(bookId, grouped[bookId]);
       }
 
+      // Đồng bộ vào localStorage để màn hình Danh mục hàng hóa cập nhật giá bán mới tức thì
+      try {
+        const defaultBook = priceBooks.find(b => b.isDefault) || priceBooks[0];
+        const defaultBookId = defaultBook?.priceBookId;
+        const storedStr = localStorage.getItem('stockflow_goods_catalog_v1');
+        if (storedStr && defaultBookId) {
+          const items = JSON.parse(storedStr);
+          if (Array.isArray(items)) {
+            let changed = false;
+            items.forEach((it: any) => {
+              const k = `${it.productId || it.id}_${defaultBookId}`;
+              if (editedPrices[k] !== undefined) {
+                it.standardPrice = editedPrices[k];
+                changed = true;
+              }
+            });
+            if (changed) {
+              localStorage.setItem('stockflow_goods_catalog_v1', JSON.stringify(items));
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('Lỗi đồng bộ giá vào localStorage:', err);
+      }
+
+      // Bắn event để các tab hoặc màn hình khác cập nhật
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('stockflow:prices_updated'));
+      }
+
       api.success({
         message: 'Lưu thành công',
-        description: `Đã cập nhật ${keys.length} đơn giá sản phẩm.`,
+        description: `Đã cập nhật đơn giá và tự động tính toán lại các bảng giá liên kết theo công thức.`,
       });
 
       setEditedPrices({});
@@ -217,6 +236,43 @@ export default function PriceBooksClient() {
     }
   };
 
+  // Delete Price Book
+  const handleDeletePriceBook = async (id: number) => {
+    const target = priceBooks.find(b => b.priceBookId === id);
+    if (!target) return;
+    if (target.isDefault) {
+      api.error({
+        message: 'Không thể xóa',
+        description: 'Không thể xóa Bảng giá chung mặc định của hệ thống.',
+      });
+      return;
+    }
+
+    if (!window.confirm(`Bạn có chắc chắn muốn xóa bảng giá "${target.priceBookName}" không? Thao tác này không thể hoàn tác.`)) {
+      return;
+    }
+
+    try {
+      await priceBookService.deletePriceBook(id);
+      api.success({
+        message: 'Đã xóa bảng giá',
+        description: `Bảng giá "${target.priceBookName}" đã được xóa thành công.`,
+      });
+
+      setIsModalOpen(false);
+      setEditingPriceBook(null);
+
+      setSelectedPriceBookIds(prev => prev.filter(x => x !== id));
+      await loadPriceBooks();
+      await loadMatrix();
+    } catch {
+      api.error({
+        message: 'Lỗi xóa bảng giá',
+        description: 'Không thể xóa bảng giá này. Vui lòng thử lại.',
+      });
+    }
+  };
+
   // Construct Ant Design Table Columns
   const columns: ColumnsType<PriceBookMatrixItem> = useMemo(() => {
     const baseCols: ColumnsType<PriceBookMatrixItem> = [
@@ -224,7 +280,7 @@ export default function PriceBooksClient() {
         title: 'Mã hàng',
         dataIndex: 'productCode',
         key: 'productCode',
-        width: 130,
+        width: 120,
         fixed: 'left',
         render: (code: string) => (
           <span className="font-mono text-xs font-semibold text-blue-600 hover:underline cursor-pointer">
@@ -249,39 +305,15 @@ export default function PriceBooksClient() {
         title: 'ĐVT',
         dataIndex: 'unitName',
         key: 'unitName',
-        width: 75,
+        width: 70,
         align: 'center',
         render: (u: string) => <span className="text-xs text-slate-600">{u}</span>,
       },
       {
-        title: (
-          <div>
-            <div>Giá vốn</div>
-            <div className="text-[10px] text-slate-400 font-normal">
-              {selectedWarehouseId ? 'Theo kho chọn' : 'Toàn cty'}
-            </div>
-          </div>
-        ),
+        title: 'Giá vốn',
         dataIndex: 'costPrice',
         key: 'costPrice',
-        width: 125,
-        align: 'right',
-        render: (val: number) => (
-          <span className="text-xs font-medium text-slate-700">{formatCurrency(val)}</span>
-        ),
-      },
-      {
-        title: (
-          <div>
-            <div>Giá nhập cuối</div>
-            <div className="text-[10px] text-slate-400 font-normal">
-              {selectedWarehouseId ? 'Theo kho chọn' : 'Lần nhập gần nhất'}
-            </div>
-          </div>
-        ),
-        dataIndex: 'latestPurchasePrice',
-        key: 'latestPurchasePrice',
-        width: 125,
+        width: 120,
         align: 'right',
         render: (val: number) => (
           <span className="text-xs font-medium text-slate-700">{formatCurrency(val)}</span>
@@ -289,60 +321,133 @@ export default function PriceBooksClient() {
       },
     ];
 
+    const defaultBook = priceBooks.find(b => b.isDefault) || priceBooks[0];
+    const defaultBookId = defaultBook?.priceBookId;
+
     // Dynamic columns for each selected Price Book
     selectedPriceBookIds.forEach(bookId => {
       const book = priceBooks.find(b => b.priceBookId === bookId);
       const bookName = book?.priceBookName ?? `Bảng giá #${bookId}`;
+      const isDefaultBook = book?.isDefault === true || bookId === defaultBookId;
 
       baseCols.push({
         title: (
           <div className="flex items-center justify-between gap-1 group">
-            <span className="font-bold text-[#0071BA] truncate">{bookName}</span>
-            <div className="flex items-center gap-1 opacity-80 group-hover:opacity-100">
+            <div className="flex items-center gap-1.5 truncate">
+              <span className="font-bold text-[#0071BA] truncate">{bookName}</span>
+              {isDefaultBook ? (
+                <Tag color="blue" className="text-[10px] m-0 px-1 py-0 leading-tight">Giá chung</Tag>
+              ) : book?.formulaOperator && book?.formulaValue ? (
+                <Tag
+                  color="cyan"
+                  className="text-[10px] m-0 px-1 py-0 leading-tight"
+                  title={`Công thức: Giá chung ${book.formulaOperator} ${book.formulaValue}${book.formulaUnit === 'PERCENT' ? '%' : '₫'}`}
+                >
+                  {book.formulaOperator}{book.formulaValue}{book.formulaUnit === 'PERCENT' ? '%' : '₫'}
+                </Tag>
+              ) : (
+                <Tag color="default" className="text-[10px] m-0 px-1 py-0 leading-tight">Chỉ xem</Tag>
+              )}
+            </div>
+            <div className="flex items-center gap-1 opacity-80 group-hover:opacity-100 shrink-0">
               {book?.formulaBaseType && (
                 <button
                   type="button"
                   title="Tính toán lại theo công thức"
                   onClick={() => handleApplyFormulaForActiveBook(bookId)}
-                  className="p-1 hover:text-[#0071BA] text-slate-400 rounded hover:bg-blue-50 transition"
+                  className="p-1 hover:text-[#0071BA] text-slate-400 rounded hover:bg-blue-50 transition cursor-pointer"
                 >
                   <CalculatorOutlined style={{ fontSize: 13 }} />
                 </button>
               )}
               <button
                 type="button"
-                title="Cài đặt bảng giá này"
+                title="Chỉnh sửa bảng giá này"
                 onClick={() => {
                   setEditingPriceBook(book || null);
                   setIsModalOpen(true);
                 }}
-                className="p-1 hover:text-[#0071BA] text-slate-400 rounded hover:bg-blue-50 transition"
+                className="p-1 hover:text-[#0071BA] text-slate-400 rounded hover:bg-blue-50 transition cursor-pointer"
               >
                 <SettingOutlined style={{ fontSize: 13 }} />
               </button>
+              {!isDefaultBook && (
+                <button
+                  type="button"
+                  title="Xóa bảng giá này"
+                  onClick={() => handleDeletePriceBook(bookId)}
+                  className="p-1 hover:text-rose-600 text-slate-400 rounded hover:bg-rose-50 transition cursor-pointer"
+                >
+                  <DeleteOutlined style={{ fontSize: 13 }} />
+                </button>
+              )}
             </div>
           </div>
         ),
         key: `price_book_${bookId}`,
-        width: 170,
+        width: 185,
         align: 'right',
         render: (_, record) => {
-          const editKey = `${record.productId}_${bookId}`;
-          const isEdited = editKey in editedPrices;
-          const currentVal = isEdited ? editedPrices[editKey] : (record.prices[bookId] ?? 0);
+          if (isDefaultBook) {
+            // Chỉ BẢNG GIÁ CHUNG được phép sửa trực tiếp
+            const editKey = `${record.productId}_${bookId}`;
+            const isEdited = editKey in editedPrices;
+            const currentVal = isEdited ? editedPrices[editKey] : (record.prices[bookId] ?? 0);
+
+            return (
+              <div className="relative">
+                <input
+                  type="text"
+                  value={currentVal ? currencyFormatter.format(currentVal) : '0'}
+                  onChange={e => handlePriceChange(record.productId, bookId, e.target.value)}
+                  className={`h-8 w-full rounded border px-2.5 text-right text-xs font-semibold outline-none transition ${
+                    isEdited
+                      ? 'border-emerald-500 bg-emerald-50/50 text-emerald-800 ring-1 ring-emerald-300'
+                      : 'border-slate-300 bg-white text-slate-800 focus:border-[#0071BA] focus:ring-1 focus:ring-blue-100 hover:border-slate-400'
+                  }`}
+                  placeholder="0"
+                />
+              </div>
+            );
+          }
+
+          // CÁC BẢNG GIÁ KHÁC: TỰ ĐỘNG TÍNH THEO CÔNG THỨC VÀ KHÔNG THỂ SỬA
+          // Tính giá cơ sở từ Bảng giá chung (ưu tiên giá đang được gõ dở ở ô Bảng giá chung)
+          let basePrice = 0;
+          if (defaultBookId) {
+            const defEditKey = `${record.productId}_${defaultBookId}`;
+            if (defEditKey in editedPrices) {
+              basePrice = editedPrices[defEditKey];
+            } else {
+              basePrice = record.prices[defaultBookId] ?? 0;
+            }
+          }
+
+          if (book?.formulaBaseType === 'COST') {
+            basePrice = record.costPrice;
+          }
+
+          // Áp dụng công thức
+          let computedPrice = record.prices[bookId] ?? 0;
+          if (book?.formulaOperator && book?.formulaValue) {
+            let delta = 0;
+            if (book.formulaUnit === 'PERCENT') {
+              delta = basePrice * (book.formulaValue / 100);
+            } else {
+              delta = book.formulaValue;
+            }
+            const res = book.formulaOperator === '-' ? (basePrice - delta) : (basePrice + delta);
+            computedPrice = Math.max(0, Math.round(res));
+          } else if (bookId in record.prices && record.prices[bookId] !== null) {
+            computedPrice = record.prices[bookId]!;
+          }
 
           return (
-            <div className="relative">
-              <input
-                type="text"
-                value={currentVal ? currencyFormatter.format(currentVal) : '0'}
-                onChange={e => handlePriceChange(record.productId, bookId, e.target.value)}
-                className={`h-8 w-full rounded border px-2.5 text-right text-xs font-semibold outline-none transition ${
-                  isEdited
-                    ? 'border-emerald-500 bg-emerald-50/50 text-emerald-800 ring-1 ring-emerald-300'
-                    : 'border-slate-300 bg-white text-slate-800 focus:border-[#0071BA] focus:ring-1 focus:ring-blue-100 hover:border-slate-400'
-                }`}
-              />
+            <div
+              className="h-8 w-full rounded border border-slate-200 bg-slate-50/80 px-2.5 flex items-center justify-end text-right text-xs font-semibold text-slate-700 cursor-not-allowed select-all"
+              title="Giá tự động tính theo công thức từ Giá chung, không thể sửa trực tiếp"
+            >
+              <span>{currencyFormatter.format(computedPrice)} ₫</span>
             </div>
           );
         },
@@ -350,7 +455,7 @@ export default function PriceBooksClient() {
     });
 
     return baseCols;
-  }, [selectedPriceBookIds, priceBooks, selectedWarehouseId, editedPrices]);
+  }, [selectedPriceBookIds, priceBooks, editedPrices]);
 
   const editedCount = Object.keys(editedPrices).length;
 
@@ -367,12 +472,11 @@ export default function PriceBooksClient() {
           setEditingPriceBook(null);
           setIsModalOpen(true);
         }}
-        warehouses={warehouses}
-        selectedWarehouseId={selectedWarehouseId}
-        onSelectWarehouse={id => {
-          setSelectedWarehouseId(id);
-          setPageIndex(1);
+        onEditPriceBook={pb => {
+          setEditingPriceBook(pb);
+          setIsModalOpen(true);
         }}
+        onDeletePriceBook={handleDeletePriceBook}
         categories={categories}
         selectedCategoryId={selectedCategoryId}
         onSelectCategory={id => {
@@ -394,16 +498,11 @@ export default function PriceBooksClient() {
             {/* Title & Count */}
             <div className="flex items-center gap-2">
               <span className="text-sm font-semibold text-slate-800">
-                {priceBooks.find(b => b.priceBookId === selectedPriceBookIds[0])?.priceBookName ?? 'Bảng giá'}
+                Thiết lập giá sản phẩm
               </span>
               <span className="text-xs text-slate-400">
                 ({totalCount} hàng hóa)
               </span>
-              {selectedWarehouseId && (
-                <Tag color="blue" className="ml-2 text-xs">
-                  Kho: {warehouses.find(w => w.warehouseId === selectedWarehouseId)?.warehouseName}
-                </Tag>
-              )}
             </div>
 
             {/* Action Buttons */}
@@ -482,7 +581,7 @@ export default function PriceBooksClient() {
                 },
                 showTotal: (total, range) => `${range[0]}-${range[1]} trong ${total} hàng hóa`,
               }}
-              scroll={{ x: 1000 }}
+              scroll={{ x: 800 }}
               size="middle"
               className="stockflow-pricebooks-table"
             />
@@ -505,6 +604,7 @@ export default function PriceBooksClient() {
           loadPriceBooks();
           loadMatrix();
         }}
+        onDelete={handleDeletePriceBook}
         editingPriceBook={editingPriceBook}
         existingPriceBooks={priceBooks}
       />

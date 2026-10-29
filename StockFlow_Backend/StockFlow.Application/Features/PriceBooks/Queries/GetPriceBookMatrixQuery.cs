@@ -8,6 +8,7 @@ using Microsoft.EntityFrameworkCore;
 using StockFlow.Application.Common;
 using StockFlow.Application.Common.Interfaces;
 using StockFlow.Application.Features.PriceBooks.DTOs;
+using StockFlow.Application.Features.PriceBooks.Services;
 
 namespace StockFlow.Application.Features.PriceBooks.Queries;
 
@@ -44,6 +45,12 @@ public class GetPriceBookMatrixQueryHandler : IRequestHandler<GetPriceBookMatrix
                 targetBookIds.Add(defaultBook.PriceBookId);
             }
         }
+
+        // Lấy thông tin metadata các bảng giá để tính toán công thức
+        var targetBooks = await _context.MstPriceBooks
+            .Where(b => targetBookIds.Contains(b.PriceBookId))
+            .AsNoTracking()
+            .ToDictionaryAsync(b => b.PriceBookId, cancellationToken);
 
         // 2. Query cơ bản danh sách sản phẩm
         var query = _context.MstProducts
@@ -117,7 +124,6 @@ public class GetPriceBookMatrixQueryHandler : IRequestHandler<GetPriceBookMatrix
             .ToDictionary(g => g.Key, g => g.First().Price);
 
         // 5. Lấy đơn giá nhập cuối (Latest Purchase Price) cho danh sách sản phẩm này
-        // Nếu chọn kho cụ thể: ưu tiên phiếu nhập kho đó
         var receiptQuery = _context.DtlGoodsReceiptItems
             .Include(item => item.Gr)
             .Where(item => productIds.Contains(item.ProductId) && item.Gr.ReceivedDate != null);
@@ -155,7 +161,6 @@ public class GetPriceBookMatrixQueryHandler : IRequestHandler<GetPriceBookMatrix
                 stockQty = p.TrxInventoryBalances.Sum(b => b.Quantity ?? 0);
             }
 
-            // Giá nhập cuối: nếu không có trong kho đang lọc, fallback về MovingAverageCost hoặc StandardPrice
             decimal latestPurchasePrice = 0;
             if (latestPurchasePriceMap.TryGetValue(p.ProductId, out var lp))
             {
@@ -168,6 +173,8 @@ public class GetPriceBookMatrixQueryHandler : IRequestHandler<GetPriceBookMatrix
 
             // Dictionary giá theo từng bảng giá
             var prices = new Dictionary<int, decimal?>();
+            decimal standardBasePrice = p.StandardPrice ?? (costPrice > 0 ? Math.Round(costPrice * 1.35m, 0) : 0);
+
             foreach (var bookId in targetBookIds)
             {
                 if (priceMap.TryGetValue((p.ProductId, bookId), out var price))
@@ -176,8 +183,20 @@ public class GetPriceBookMatrixQueryHandler : IRequestHandler<GetPriceBookMatrix
                 }
                 else
                 {
-                    // Nếu là default price book mà chưa có item, dùng StandardPrice
-                    prices[bookId] = p.StandardPrice ?? (costPrice > 0 ? Math.Round(costPrice * 1.35m, 0) : 0);
+                    if (targetBooks.TryGetValue(bookId, out var targetBook) && !string.IsNullOrWhiteSpace(targetBook.FormulaBaseType))
+                    {
+                        decimal sourcePrice = targetBook.FormulaBaseType == "COST" ? costPrice : standardBasePrice;
+                        prices[bookId] = PriceFormulaCalculator.CalculatePrice(
+                            sourcePrice,
+                            targetBook.FormulaOperator,
+                            targetBook.FormulaValue,
+                            targetBook.FormulaUnit
+                        );
+                    }
+                    else
+                    {
+                        prices[bookId] = standardBasePrice;
+                    }
                 }
             }
 

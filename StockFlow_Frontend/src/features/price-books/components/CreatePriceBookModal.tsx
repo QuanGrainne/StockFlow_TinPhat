@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { X, ChevronDown, ChevronUp, Info, Calendar, Check } from 'lucide-react';
+import { X, ChevronDown, ChevronUp, Info, Calendar, Check, Trash2 } from 'lucide-react';
 import { PriceBook, CreatePriceBookPayload, UpdatePriceBookPayload } from '../types';
 import { priceBookService } from '../services/priceBookService';
 import { apiClient } from '@/lib/api/client';
@@ -30,6 +30,7 @@ interface CreatePriceBookModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: (saved: PriceBook) => void;
+  onDelete?: (id: number) => void;
   editingPriceBook?: PriceBook | null;
   existingPriceBooks?: PriceBook[];
 }
@@ -38,6 +39,7 @@ export default function CreatePriceBookModal({
   isOpen,
   onClose,
   onSuccess,
+  onDelete,
   editingPriceBook,
   existingPriceBooks = [],
 }: CreatePriceBookModalProps) {
@@ -394,7 +396,6 @@ export default function CreatePriceBookModal({
                       >
                         <option value="">-- Chọn nguồn giá cơ sở --</option>
                         <option value="COST">Giá vốn (theo kho hoặc toàn cty)</option>
-                        <option value="LATEST_PURCHASE">Giá nhập cuối (theo kho)</option>
                         <option value="STANDARD">Bảng giá chung</option>
                         {existingPriceBooks
                           .filter(pb => !editingPriceBook || pb.priceBookId !== editingPriceBook.priceBookId)
@@ -685,22 +686,41 @@ export default function CreatePriceBookModal({
           )}
 
           {/* Footer Actions */}
-          <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-200">
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={loading}
-              className="h-9 px-4 rounded-lg border border-slate-300 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition disabled:opacity-50"
-            >
-              Bỏ qua
-            </button>
-            <button
-              type="submit"
-              disabled={loading}
-              className="h-9 px-5 rounded-lg bg-[#0071BA] hover:bg-[#005f9d] text-xs font-semibold text-white shadow-xs transition disabled:opacity-50 flex items-center gap-1.5"
-            >
-              {loading ? 'Đang lưu...' : 'Lưu'}
-            </button>
+                    {/* Footer Actions */}
+          <div className="flex items-center justify-between gap-3 pt-3 border-t border-slate-200">
+            {editingPriceBook && !editingPriceBook.isDefault ? (
+              <button
+                type="button"
+                onClick={() => {
+                  if (onDelete && editingPriceBook) {
+                    onDelete(editingPriceBook.priceBookId);
+                  }
+                }}
+                disabled={loading}
+                className="h-9 px-3.5 rounded-lg border border-rose-300 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+              >
+                <Trash2 size={13} />
+                <span>Xóa bảng giá</span>
+              </button>
+            ) : <div />}
+
+            <div className="flex items-center gap-2.5">
+              <button
+                type="button"
+                onClick={onClose}
+                disabled={loading}
+                className="h-9 px-4 rounded-lg border border-slate-300 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition disabled:opacity-50 cursor-pointer"
+              >
+                Bỏ qua
+              </button>
+              <button
+                type="submit"
+                disabled={loading}
+                className="h-9 px-5 rounded-lg bg-[#0071BA] hover:bg-[#005f9d] text-xs font-semibold text-white shadow-xs transition disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
+              >
+                {loading ? 'Đang lưu...' : 'Lưu'}
+              </button>
+            </div>
           </div>
         </form>
       </div>
