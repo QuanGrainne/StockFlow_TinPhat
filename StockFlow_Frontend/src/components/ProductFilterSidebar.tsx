@@ -1052,6 +1052,7 @@ export default function ProductFilterSidebar({
   // Dropdown & Popover open states
   const [categoryOpen, setCategoryOpen] = useState(false);
   const [categorySearch, setCategorySearch] = useState('');
+  const [categoryCoords, setCategoryCoords] = useState<{ top: number; left: number; arrowTop: number } | null>(null);
 
   useEffect(() => {
     if (categoryOpen) {
@@ -1062,6 +1063,36 @@ export default function ProductFilterSidebar({
       );
     }
   }, [categoryOpen, state.categories, state.category]);
+
+  // Tính toán vị trí hiển thị Popover nổi ngoài Sidebar (Chuẩn Ảnh 2 - Không bị đè / không bị cắt)
+  useEffect(() => {
+    if (!categoryOpen || !categoryBoxRef.current) return;
+    const updatePos = () => {
+      if (!categoryBoxRef.current) return;
+      const rect = categoryBoxRef.current.getBoundingClientRect();
+      const popoverWidth = 320;
+      const popoverHeight = 390;
+      let left = rect.right + 12;
+      let top = rect.top - 8;
+
+      if (left + popoverWidth > window.innerWidth - 10) {
+        left = Math.max(10, rect.left - popoverWidth - 10);
+      }
+      if (top + popoverHeight > window.innerHeight) {
+        top = Math.max(10, window.innerHeight - popoverHeight - 10);
+      }
+      const arrowTop = Math.max(14, Math.min(popoverHeight - 24, rect.top - top + 10));
+      setCategoryCoords({ top, left, arrowTop });
+    };
+
+    updatePos();
+    window.addEventListener('resize', updatePos);
+    window.addEventListener('scroll', updatePos, true);
+    return () => {
+      window.removeEventListener('resize', updatePos);
+      window.removeEventListener('scroll', updatePos, true);
+    };
+  }, [categoryOpen]);
   const [stockOpen, setStockOpen] = useState(false);
   const [supplierOpen, setSupplierOpen] = useState(false);
   const [locationOpen, setLocationOpen] = useState(false);
@@ -1121,13 +1152,13 @@ export default function ProductFilterSidebar({
   const currentExpectedPeriodLabel = state.expectedOutOfStockPeriod || 'Toàn thời gian';
 
   return (
-    <div className="relative shrink-0 flex items-start">
+    <div className="relative shrink-0 flex items-start sticky top-0 self-start z-30">
       <aside
         ref={containerRef}
         className={`bg-white border-r border-[#e5e7eb] select-none text-[#262626] transition-all duration-300 relative ${
           isCollapsed
             ? 'w-0 overflow-hidden px-0 py-0 border-r-0 opacity-0'
-            : 'w-[260px] px-4 py-5 overflow-y-auto max-h-[calc(100vh-70px)] opacity-100 rounded-xl shadow-2xs'
+            : 'w-[260px] px-4 py-5 overflow-y-auto max-h-[calc(100vh-100px)] opacity-100 rounded-xl shadow-2xs'
         }`}
       >
         {/* 0. Main Title & Reset */}
@@ -1206,14 +1237,22 @@ export default function ProductFilterSidebar({
               </div>
             </div>
 
-            {/* Category Popover (Chuẩn KiotViet - Ảnh 1) */}
-            {categoryOpen && (
-              <div className="absolute top-0 left-full ml-2 w-72 md:w-80 bg-white rounded-xl border border-slate-200 shadow-2xl z-50 flex flex-col animate-in fade-in zoom-in-95 duration-150">
-                {/* Pointer arrow tip pointing left */}
-                <div className="absolute top-3.5 -left-2 w-0 h-0 border-t-8 border-t-transparent border-b-8 border-b-transparent border-r-8 border-r-white drop-shadow-xs pointer-events-none" />
+            {/* Category Popover Nổi (Chuẩn KiotViet - Ảnh 2 - Render qua Portal để KHÔNG BỊ CẮT) */}
+            {categoryOpen && categoryCoords && typeof document !== 'undefined' && createPortal(
+              <div
+                data-portal-popover="true"
+                style={{ top: categoryCoords.top, left: categoryCoords.left }}
+                className="fixed z-[9999] w-72 md:w-80 bg-white rounded-xl border border-slate-200 shadow-2xl flex flex-col animate-in fade-in zoom-in-95 duration-150 select-none ring-1 ring-black/5"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* Pointer arrow tip pointing left to the button */}
+                <div
+                  style={{ top: categoryCoords.arrowTop }}
+                  className="absolute -left-2 w-4 h-4 bg-white rotate-45 border-l border-b border-slate-200 z-10"
+                />
 
                 {/* Popover Header */}
-                <div className="flex items-center justify-between px-3.5 py-3 border-b border-slate-100 bg-white rounded-t-xl">
+                <div className="flex items-center justify-between px-3.5 py-3 border-b border-slate-100 bg-white rounded-t-xl relative z-20">
                   <span className="text-[14px] font-semibold text-slate-800">Nhóm hàng</span>
                   <button
                     type="button"
@@ -1229,7 +1268,7 @@ export default function ProductFilterSidebar({
                 </div>
 
                 {/* Search input */}
-                <div className="p-3 border-b border-slate-100 bg-white">
+                <div className="p-3 border-b border-slate-100 bg-white relative z-20">
                   <div className="relative">
                     <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                     <input
@@ -1244,7 +1283,7 @@ export default function ProductFilterSidebar({
                 </div>
 
                 {/* Checkbox item list with counts and 6 dots drag icon */}
-                <div className="max-h-60 overflow-y-auto p-2 space-y-1 bg-white">
+                <div className="max-h-60 overflow-y-auto p-2 space-y-1 bg-white relative z-20">
                   {filteredCategories.length > 0 ? (
                     filteredCategories.map((cat) => {
                       const isChecked = tempCategories.includes(cat);
@@ -1283,7 +1322,7 @@ export default function ProductFilterSidebar({
                 </div>
 
                 {/* Footer with "Chọn tất cả" and "Áp dụng" */}
-                <div className="flex items-center justify-between px-3.5 py-2.5 border-t border-slate-100 bg-slate-50/70 rounded-b-xl">
+                <div className="flex items-center justify-between px-3.5 py-2.5 border-t border-slate-100 bg-slate-50/70 rounded-b-xl relative z-20">
                   <button
                     type="button"
                     onClick={() => {
@@ -1311,7 +1350,8 @@ export default function ProductFilterSidebar({
                     Áp dụng
                   </button>
                 </div>
-              </div>
+              </div>,
+              document.body
             )}
           </div>
         </div>

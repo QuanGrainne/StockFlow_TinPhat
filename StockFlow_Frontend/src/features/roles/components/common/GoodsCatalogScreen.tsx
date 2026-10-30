@@ -245,11 +245,11 @@ const KiotSelectWithSearch: React.FC<KiotSelectWithSearchProps> = ({
         />
       </div>
 
-      {/* Dropdown Menu nổi */}
+      {/* Dropdown Menu nổi (Nổi bật - Không bị đè / không bị cắt) */}
       {isOpen && (
-        <div className="absolute z-[999] left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-xl overflow-hidden py-1 text-xs animate-in fade-in zoom-in-95 duration-100">
+        <div className="absolute z-[999] left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl overflow-hidden py-1.5 text-xs animate-in fade-in zoom-in-95 duration-100 ring-1 ring-black/10 min-w-[280px]">
           {/* Thanh tìm kiếm bên trong dropdown có icon kính lúp 🔍 */}
-          <div className="p-2 border-b border-slate-100 bg-slate-50/60">
+          <div className="p-2.5 border-b border-slate-100 bg-slate-50/70">
             <div className="relative">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={13} />
               <input
@@ -264,8 +264,8 @@ const KiotSelectWithSearch: React.FC<KiotSelectWithSearchProps> = ({
             </div>
           </div>
 
-          {/* Danh sách lựa chọn cuộn */}
-          <div className="max-h-52 overflow-y-auto divide-y divide-slate-50">
+          {/* Danh sách lựa chọn cuộn (Chiều cao thoải mái, hiển thị rõ ràng) */}
+          <div className="max-h-60 min-h-[100px] overflow-y-auto divide-y divide-slate-50">
             {/* Lựa chọn xóa / mặc định: Chọn nhóm hàng (Bắt buộc) */}
             {allowClear && (
               <div
@@ -3222,8 +3222,8 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
         </div>
       </div>
 
-      {/* 3. Thanh Bộ Lọc & Tìm Kiếm */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white p-3 rounded-xl border border-slate-200/90 shadow-2xs">
+      {/* 3. Thanh Bộ Lọc & Tìm Kiếm - Cố định ở đỉnh khi cuộn (Sticky Tab Ngang) */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white/95 backdrop-blur-md p-3 rounded-xl border border-slate-200/90 shadow-xs sticky top-0 z-20">
         <div className="flex flex-1 items-center gap-2">
           {/* Nút bật/tắt bộ lọc bên trái (Ảnh 2 & 3) */}
           <button
@@ -3422,12 +3422,12 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
         </div>
       </div>
 
-      {/* 4. Bảng Danh Sách Hàng Hóa Chuẩn StockFlow Master-Detail (Ảnh 1 & Ảnh 2) */}
-      <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs overflow-hidden">
-        <div className="overflow-x-auto">
+      {/* 4. Bảng Danh Sách Hàng Hóa Chuẩn StockFlow Master-Detail (Tiêu đề bảng cố định khi cuộn) */}
+      <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs overflow-hidden flex flex-col">
+        <div className="overflow-auto max-h-[calc(100vh-230px)]">
           <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="border-b border-slate-200 bg-slate-50/80 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+            <thead className="sticky top-0 z-10 bg-slate-100/95 backdrop-blur-xs shadow-2xs">
+              <tr className="border-b border-slate-200 bg-slate-100/95 text-[11px] font-bold text-slate-600 uppercase tracking-wider">
                 {/* 1. Tích ô vuông Header (Checkbox All / Indeterminate) */}
                 <th className="py-3 px-3 w-10 text-center select-none">
                   {selectedItemIds.length > 0 && selectedItemIds.length < filteredGoods.length ? (
@@ -4519,7 +4519,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
             </div>
 
             {/* Modal Body Scrollable */}
-            <div className="p-6 overflow-y-auto space-y-5 text-xs flex-1">
+            <div className="p-6 pb-36 overflow-y-auto space-y-5 text-xs flex-1">
               {modalTab === 'info' && (
                 <>
                   {/* Phần Thông Tin Cơ Bản & Khung Upload Ảnh (Ảnh 1) */}
@@ -4779,8 +4779,8 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                     </div>
                   </div>
 
-                  {/* Accordion 1: Giá vốn, giá bán (Ảnh 1) */}
-                  <div className="border border-slate-200 rounded-xl overflow-hidden shadow-2xs">
+                  {/* Accordion 1: Giá vốn, giá bán (Ảnh 1 - Hỗ trợ overflow-visible để dropdown nổi hoàn toàn) */}
+                  <div className={`border border-slate-200 rounded-xl shadow-2xs ${priceAccordionOpen ? 'overflow-visible' : 'overflow-hidden'}`}>
                     <button
                       type="button"
                       onClick={() => setPriceAccordionOpen(!priceAccordionOpen)}
@@ -4790,7 +4790,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                       {priceAccordionOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                     </button>
                     {priceAccordionOpen && (
-                      <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-4 bg-white border-t border-slate-100">
+                      <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-4 bg-white border-t border-slate-100 overflow-visible">
                         <div>
                           <label className="block font-semibold text-slate-700 mb-1">
                             Giá vốn tại {formWarehouse || warehouseFilter} (VNĐ)
@@ -4851,7 +4851,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                   </div>
 
                   {/* Accordion 2: Tồn kho (Ảnh 1) */}
-                  <div className="border border-slate-200 rounded-xl overflow-hidden shadow-2xs">
+                  <div className={`border border-slate-200 rounded-xl shadow-2xs ${stockAccordionOpen ? 'overflow-visible' : 'overflow-hidden'}`}>
                     <button
                       type="button"
                       onClick={() => setStockAccordionOpen(!stockAccordionOpen)}
@@ -4866,7 +4866,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                       {stockAccordionOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                     </button>
                     {stockAccordionOpen && (
-                      <div className="p-4 grid grid-cols-1 sm:grid-cols-3 gap-4 bg-white border-t border-slate-100">
+                      <div className="p-4 grid grid-cols-1 sm:grid-cols-3 gap-4 bg-white border-t border-slate-100 overflow-visible">
                         <div>
                           <label className="block font-semibold text-slate-700 mb-1">
                             Tồn kho tại {formWarehouse || warehouseFilter}
@@ -4950,8 +4950,8 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                     </button>
                   </div>
 
-                  {/* Accordion 3: Vị trí, trọng lượng, kích thước (Ảnh 1 - Hỗ trợ TỰ NHẬP tự do) */}
-                  <div className="border border-slate-200 rounded-xl overflow-hidden shadow-2xs">
+                  {/* Accordion 3: Vị trí, trọng lượng, kích thước (Ảnh 1 - Hỗ trợ overflow-visible để dropdown nổi hoàn toàn) */}
+                  <div className={`border border-slate-200 rounded-xl shadow-2xs ${specAccordionOpen ? 'overflow-visible' : 'overflow-hidden'}`}>
                     <button
                       type="button"
                       onClick={() => setSpecAccordionOpen(!specAccordionOpen)}
@@ -4966,7 +4966,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                       {specAccordionOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                     </button>
                     {specAccordionOpen && (
-                      <div className="p-4 space-y-3 bg-white border-t border-slate-100">
+                      <div className="p-4 space-y-3 bg-white border-t border-slate-100 overflow-visible">
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                           <div>
                             <KiotSelectWithSearch
