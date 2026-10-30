@@ -440,12 +440,49 @@ export default function PriceBooksClient() {
         key: `price_book_${bookId}`,
         width: 220,
         align: 'right',
-        render: (_, record) => {
+        render: (_, record, index) => {
+          const isAutoUpdate = !isDefaultBook && Boolean(book?.formulaBaseType);
+
+          // 1. Nếu đang BẬT "Tự động cập nhật theo giá chung" (isAutoUpdate = true):
+          // Giá tự động tính theo công thức từ Bảng giá chung, CHƯA ĐƯỢC PHÉP SỬA TRỰC TIẾP
+          if (isAutoUpdate) {
+            let basePrice = 0;
+            if (defaultBookId) {
+              const defEditKey = `${record.productId}_${defaultBookId}`;
+              basePrice = defEditKey in editedPrices ? editedPrices[defEditKey] : (record.prices[defaultBookId] ?? 0);
+            }
+            if (book?.formulaBaseType === 'COST') {
+              basePrice = record.costPrice;
+            }
+
+            let computedPrice = record.prices[bookId] ?? 0;
+            if (book?.formulaOperator && book?.formulaValue) {
+              const delta = book.formulaUnit === 'PERCENT'
+                ? basePrice * (book.formulaValue / 100)
+                : book.formulaValue;
+              computedPrice = Math.max(0, Math.round(book.formulaOperator === '-' ? basePrice - delta : basePrice + delta));
+            }
+
+            return (
+              <div
+                className="h-8 w-full rounded border border-slate-200 bg-slate-50/90 px-2.5 flex items-center justify-end text-right text-xs font-semibold text-slate-600 select-all cursor-not-allowed group/locked"
+                title="Bảng giá đang tự động cập nhật theo Bảng giá chung. Bấm vào biểu tượng ⚙️ ở tiêu đề cột để tắt tự động cập nhật nếu muốn sửa giá tay."
+              >
+                <span>{currencyFormatter.format(computedPrice)} ₫</span>
+              </div>
+            );
+          }
+
+          // 2. Nếu là Bảng giá chung hoặc ĐÃ TẮT tự động cập nhật:
+          // ĐƯỢC PHÉP CHỈNH SỬA TRỰC TIẾP!
           const editKey = `${record.productId}_${bookId}`;
           const isEdited = editKey in editedPrices;
           const currentVal = isEdited ? editedPrices[editKey] : (record.prices[bookId] ?? 0);
           const isPopoverOpen = formulaPopoverCell?.productId === record.productId && formulaPopoverCell?.bookId === bookId;
           const isFocused = focusedCell === editKey;
+
+          // Định vị popup/tooltip: Nếu ở các dòng dưới (index >= 2) thì hiển thị lên TRÊN để không bị thanh cuộn bảng cắt cụt
+          const placeAbove = (index ?? 0) >= 2;
 
           return (
             <div className="relative">
@@ -463,9 +500,13 @@ export default function PriceBooksClient() {
                 placeholder="0"
               />
 
-              {/* Tooltip KiotViet: Hoặc sử dụng Công thức (dành cho bảng giá tùy biến) */}
+              {/* Tooltip KiotViet: Hoặc sử dụng Công thức (dành cho bảng giá đã tắt tự động cập nhật) */}
               {!isDefaultBook && isFocused && !isPopoverOpen && (
-                <div className="absolute right-0 top-full mt-1 z-40 whitespace-nowrap rounded bg-slate-900 px-2 py-1 text-[11px] text-white shadow-lg flex items-center gap-1 animate-in fade-in duration-100">
+                <div
+                  className={`absolute right-0 ${
+                    placeAbove ? 'bottom-full mb-1.5' : 'top-full mt-1.5'
+                  } z-50 whitespace-nowrap rounded bg-slate-900 px-2.5 py-1 text-[11px] text-white shadow-xl flex items-center gap-1 animate-in fade-in duration-100`}
+                >
                   <span>Hoặc sử dụng</span>
                   <button
                     type="button"
@@ -477,12 +518,18 @@ export default function PriceBooksClient() {
                   >
                     Công thức
                   </button>
+                  <div
+                    className={`absolute right-4 w-2 h-2 bg-slate-900 rotate-45 ${
+                      placeAbove ? '-bottom-1' : '-top-1'
+                    }`}
+                  />
                 </div>
               )}
 
               {/* Popover Đặt giá theo công thức */}
               {!isDefaultBook && isPopoverOpen && book && (
                 <InlineFormulaPopover
+                  placement={placeAbove ? 'above' : 'below'}
                   isOpen={isPopoverOpen}
                   onClose={() => setFormulaPopoverCell(null)}
                   product={record}

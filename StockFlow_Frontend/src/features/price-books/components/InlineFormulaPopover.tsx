@@ -5,6 +5,7 @@ import { ChevronDown, ChevronUp, Check, Search } from 'lucide-react';
 import { PriceBook, PriceBookMatrixItem } from '../types';
 
 interface InlineFormulaPopoverProps {
+  placement?: 'above' | 'below';
   isOpen: boolean;
   onClose: () => void;
   product: PriceBookMatrixItem;
@@ -22,6 +23,7 @@ interface InlineFormulaPopoverProps {
 }
 
 export default function InlineFormulaPopover({
+  placement = 'below',
   isOpen,
   onClose,
   product,
@@ -119,7 +121,7 @@ export default function InlineFormulaPopover({
   return (
     <div
       ref={popoverRef}
-      className="absolute right-0 top-full mt-1.5 z-50 w-[380px] rounded-lg border border-slate-200 bg-white p-4 shadow-2xl text-xs text-slate-800 animate-in fade-in duration-150"
+      className={`absolute right-0 ${placement === 'above' ? 'bottom-full mb-2' : 'top-full mt-2'} z-50 w-[380px] rounded-lg border border-slate-200 bg-white p-4 shadow-2xl text-xs text-slate-800 animate-in fade-in duration-150`}
       onClick={e => e.stopPropagation()}
     >
       <div className="flex items-center justify-between pb-2.5 border-b border-slate-100">

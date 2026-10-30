@@ -263,6 +263,7 @@ export default function CreatePriceBookModal({
       setFormulaOperator(editingPriceBook.formulaOperator || '+');
       setFormulaValue(editingPriceBook.formulaValue ?? '');
       setFormulaUnit(editingPriceBook.formulaUnit || 'VND');
+      setAutoUpdateByBase(Boolean(editingPriceBook.formulaBaseType));
 
       setAllowUnlistedProducts(editingPriceBook.allowUnlistedProducts);
       setWarnUnlistedProducts(editingPriceBook.warnUnlistedProducts);
@@ -335,11 +336,11 @@ export default function CreatePriceBookModal({
         effectiveFrom: effectiveFrom ? new Date(effectiveFrom).toISOString() : null,
         effectiveTo: effectiveTo ? new Date(effectiveTo).toISOString() : null,
         isActive,
-        formulaBaseType: formulaBaseType || null,
-        formulaBasePriceBookId: formulaBaseType === 'PRICE_BOOK' ? formulaBasePriceBookId : null,
-        formulaOperator: formulaBaseType ? formulaOperator : null,
-        formulaValue: formulaBaseType ? (formulaValue !== '' ? Number(formulaValue) : 0) : null,
-        formulaUnit: formulaBaseType ? (formulaUnit || 'VND') : null,
+        formulaBaseType: (autoUpdateByBase && formulaBaseType) ? formulaBaseType : null,
+        formulaBasePriceBookId: (autoUpdateByBase && formulaBaseType === 'PRICE_BOOK') ? formulaBasePriceBookId : null,
+        formulaOperator: (autoUpdateByBase && formulaBaseType) ? formulaOperator : null,
+        formulaValue: (autoUpdateByBase && formulaBaseType) ? (formulaValue !== '' ? Number(formulaValue) : 0) : null,
+        formulaUnit: (autoUpdateByBase && formulaBaseType) ? (formulaUnit || 'VND') : null,
         allowUnlistedProducts,
         warnUnlistedProducts: allowUnlistedProducts ? warnUnlistedProducts : false,
         scopeBranchType,
@@ -356,7 +357,7 @@ export default function CreatePriceBookModal({
         const updatePayload: UpdatePriceBookPayload = {
           ...payload,
           priceBookId: editingPriceBook.priceBookId,
-          recalculateFormula: true,
+          recalculateFormula: autoUpdateByBase,
         };
         result = await priceBookService.updatePriceBook(editingPriceBook.priceBookId, updatePayload);
       } else {
