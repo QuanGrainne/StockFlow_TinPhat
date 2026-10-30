@@ -51,6 +51,16 @@ public class ApplyPriceBookFormulaCommandHandler : IRequestHandler<ApplyPriceBoo
         {
             productsQuery = productsQuery.Where(p => request.CategoryIds.Contains(p.CategoryId));
         }
+        else if (!request.AllProducts)
+        {
+            // Chỉ tính lại cho các sản phẩm đã có trong bảng giá
+            var existingIds = await _context.DtlPriceBookItems
+                .Where(i => i.PriceBookId == pb.PriceBookId)
+                .Select(i => i.ProductId)
+                .ToListAsync(cancellationToken);
+
+            productsQuery = productsQuery.Where(p => existingIds.Contains(p.ProductId));
+        }
 
         var products = await productsQuery.ToListAsync(cancellationToken);
 

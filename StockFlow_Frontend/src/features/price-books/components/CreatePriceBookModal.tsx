@@ -208,6 +208,7 @@ export default function CreatePriceBookModal({
 
   const baseNameDisplay = React.useMemo(() => {
     if (formulaBaseType === 'COST') return 'Giá vốn';
+    if (formulaBaseType === 'LATEST_PURCHASE') return 'Giá nhập cuối';
     if (formulaBaseType === 'STANDARD') return 'Bảng giá chung';
     if (formulaBaseType === 'PRICE_BOOK' && formulaBasePriceBookId) {
       const b = existingPriceBooks.find(x => x.priceBookId === formulaBasePriceBookId);
@@ -561,9 +562,10 @@ export default function CreatePriceBookModal({
                               {[
                                 { key: '', label: 'Chọn bảng giá' },
                                 { key: 'COST', label: 'Giá vốn' },
+                                { key: 'LATEST_PURCHASE', label: 'Giá nhập cuối' },
                                 { key: 'STANDARD', label: 'Bảng giá chung' },
                                 ...existingPriceBooks
-                                  .filter(pb => !editingPriceBook || pb.priceBookId !== editingPriceBook.priceBookId)
+                                  .filter(pb => !pb.isDefault && (!editingPriceBook || pb.priceBookId !== editingPriceBook.priceBookId))
                                   .map(pb => ({ key: `PB_${pb.priceBookId}`, label: pb.priceBookName })),
                               ]
                                 .filter(opt => !baseSearchKeyword.trim() || opt.label.toLowerCase().includes(baseSearchKeyword.toLowerCase().trim()))
@@ -573,6 +575,8 @@ export default function CreatePriceBookModal({
                                       ? !formulaBaseType
                                       : opt.key === 'COST'
                                       ? formulaBaseType === 'COST'
+                                      : opt.key === 'LATEST_PURCHASE'
+                                      ? formulaBaseType === 'LATEST_PURCHASE'
                                       : opt.key === 'STANDARD'
                                       ? formulaBaseType === 'STANDARD'
                                       : formulaBaseType === 'PRICE_BOOK' && `PB_${formulaBasePriceBookId}` === opt.key;

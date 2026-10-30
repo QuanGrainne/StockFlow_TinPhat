@@ -10,7 +10,7 @@ import {
   ReloadOutlined,
   DeleteOutlined,
 } from '@ant-design/icons';
-import { Table, Input, Button, Tag, notification } from 'antd';
+import { Table, Input, Button, Tag, notification, Popover, Tooltip } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import PriceBookFilterSidebar from '../components/PriceBookFilterSidebar';
 import CreatePriceBookModal from '../components/CreatePriceBookModal';
@@ -481,80 +481,85 @@ export default function PriceBooksClient() {
           const isPopoverOpen = formulaPopoverCell?.productId === record.productId && formulaPopoverCell?.bookId === bookId;
           const isFocused = focusedCell === editKey;
 
-          // Định vị popup/tooltip: Nếu ở các dòng dưới (index >= 2) thì hiển thị lên TRÊN để không bị thanh cuộn bảng cắt cụt
-          const placeAbove = (index ?? 0) >= 2;
-
           return (
-            <div className="relative">
-              <input
-                type="text"
-                value={currentVal ? currencyFormatter.format(currentVal) : '0'}
-                onFocus={() => setFocusedCell(editKey)}
-                onBlur={() => setTimeout(() => setFocusedCell(prev => prev === editKey ? null : prev), 250)}
-                onChange={e => handlePriceChange(record.productId, bookId, e.target.value)}
-                className={`h-8 w-full rounded border px-2.5 text-right text-xs font-semibold outline-none transition ${
-                  isEdited
-                    ? 'border-emerald-500 bg-emerald-50/50 text-emerald-800 ring-1 ring-emerald-300'
-                    : 'border-slate-300 bg-white text-slate-800 focus:border-[#0071BA] focus:ring-1 focus:ring-blue-100 hover:border-slate-400'
-                }`}
-                placeholder="0"
-              />
-
-              {/* Tooltip KiotViet: Hoặc sử dụng Công thức (dành cho bảng giá đã tắt tự động cập nhật) */}
-              {!isDefaultBook && isFocused && !isPopoverOpen && (
-                <div
-                  className={`absolute right-0 ${
-                    placeAbove ? 'bottom-full mb-1.5' : 'top-full mt-1.5'
-                  } z-50 whitespace-nowrap rounded bg-slate-900 px-2.5 py-1 text-[11px] text-white shadow-xl flex items-center gap-1 animate-in fade-in duration-100`}
-                >
-                  <span>Hoặc sử dụng</span>
-                  <button
-                    type="button"
-                    onMouseDown={e => {
-                      e.preventDefault();
-                      setFormulaPopoverCell({ productId: record.productId, bookId });
+            <Popover
+              open={!isDefaultBook && isPopoverOpen}
+              onOpenChange={visible => {
+                if (!visible) setFormulaPopoverCell(null);
+              }}
+              trigger="click"
+              placement="bottomRight"
+              destroyTooltipOnHide
+              overlayInnerStyle={{ padding: 0 }}
+              getPopupContainer={() => document.body}
+              content={
+                !isDefaultBook && isPopoverOpen && book ? (
+                  <InlineFormulaPopover
+                    isOpen={isPopoverOpen}
+                    onClose={() => setFormulaPopoverCell(null)}
+                    product={record}
+                    priceBook={book}
+                    existingPriceBooks={priceBooks}
+                    totalCount={totalCount}
+                    onApplySingle={newPrice => {
+                      handlePriceChange(record.productId, bookId, newPrice.toString());
                     }}
-                    className="font-bold text-sky-400 hover:text-sky-300 underline cursor-pointer"
-                  >
-                    Công thức
-                  </button>
-                  <div
-                    className={`absolute right-4 w-2 h-2 bg-slate-900 rotate-45 ${
-                      placeAbove ? '-bottom-1' : '-top-1'
-                    }`}
+                    onApplyAll={async formula => {
+                      await priceBookService.updatePriceBook(bookId, {
+                        ...book,
+                        ...formula,
+                        recalculateFormula: true,
+                      });
+                      api.success({
+                        message: 'Áp dụng công thức thành công',
+                        description: `Đã cập nhật công thức và tính lại giá cho các hàng hóa trong "${book.priceBookName}".`,
+                      });
+                      await loadPriceBooks();
+                      await loadMatrix();
+                    }}
                   />
-                </div>
-              )}
-
-              {/* Popover Đặt giá theo công thức */}
-              {!isDefaultBook && isPopoverOpen && book && (
-                <InlineFormulaPopover
-                  placement={placeAbove ? 'above' : 'below'}
-                  isOpen={isPopoverOpen}
-                  onClose={() => setFormulaPopoverCell(null)}
-                  product={record}
-                  priceBook={book}
-                  existingPriceBooks={priceBooks}
-                  totalCount={totalCount}
-                  onApplySingle={newPrice => {
-                    handlePriceChange(record.productId, bookId, newPrice.toString());
-                  }}
-                  onApplyAll={async formula => {
-                    await priceBookService.updatePriceBook(bookId, {
-                      ...book,
-                      ...formula,
-                      recalculateFormula: true,
-                    });
-                    api.success({
-                      message: 'Áp dụng công thức thành công',
-                      description: `Đã cập nhật công thức và tính lại giá cho toàn bộ ${totalCount} hàng hóa trong "${book.priceBookName}".`,
-                    });
-                    await loadPriceBooks();
-                    await loadMatrix();
-                  }}
-                />
-              )}
-            </div>
+                ) : null
+              }
+            >
+              <div className="relative">
+                <Tooltip
+                  open={!isDefaultBook && isFocused && !isPopoverOpen}
+                  placement="bottomRight"
+                  getPopupContainer={() => document.body}
+                  color="#0f172a"
+                  title={
+                    <div className="flex items-center gap-1.5 py-0.5 text-xs text-white">
+                      <span>Hoặc sử dụng</span>
+                      <button
+                        type="button"
+                        onMouseDown={e => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setFormulaPopoverCell({ productId: record.productId, bookId });
+                        }}
+                        className="font-bold text-sky-400 hover:text-sky-300 underline cursor-pointer"
+                      >
+                        Công thức
+                      </button>
+                    </div>
+                  }
+                >
+                  <input
+                    type="text"
+                    value={currentVal ? currencyFormatter.format(currentVal) : '0'}
+                    onFocus={() => setFocusedCell(editKey)}
+                    onBlur={() => setTimeout(() => setFocusedCell(prev => prev === editKey ? null : prev), 250)}
+                    onChange={e => handlePriceChange(record.productId, bookId, e.target.value)}
+                    className={`h-8 w-full rounded border px-2.5 text-right text-xs font-semibold outline-none transition ${
+                      isEdited
+                        ? 'border-emerald-500 bg-emerald-50/50 text-emerald-800 ring-1 ring-emerald-300'
+                        : 'border-slate-300 bg-white text-slate-800 focus:border-[#0071BA] focus:ring-1 focus:ring-blue-100 hover:border-slate-400'
+                    }`}
+                    placeholder="0"
+                  />
+                </Tooltip>
+              </div>
+            </Popover>
           );
         },
       });

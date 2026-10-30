@@ -61,6 +61,7 @@ export default function InlineFormulaPopover({
 
   const baseNameDisplay = useMemo(() => {
     if (baseType === 'COST') return 'Giá vốn';
+    if (baseType === 'LATEST_PURCHASE') return 'Giá nhập cuối';
     if (baseType === 'STANDARD') return 'Bảng giá chung';
     if (baseType === 'PRICE_BOOK' && basePriceBookId) {
       const b = existingPriceBooks.find(x => x.priceBookId === basePriceBookId);
@@ -72,7 +73,7 @@ export default function InlineFormulaPopover({
   // Compute preview price for the current product
   const calculatedPrice = useMemo(() => {
     let base = 0;
-    if (baseType === 'COST') {
+    if (baseType === 'COST' || baseType === 'LATEST_PURCHASE') {
       base = product.costPrice || 0;
     } else if (baseType === 'PRICE_BOOK' && basePriceBookId) {
       base = product.prices[basePriceBookId] ?? 0;
@@ -121,7 +122,7 @@ export default function InlineFormulaPopover({
   return (
     <div
       ref={popoverRef}
-      className={`absolute right-0 ${placement === 'above' ? 'bottom-full mb-2' : 'top-full mt-2'} z-50 w-[380px] rounded-lg border border-slate-200 bg-white p-4 shadow-2xl text-xs text-slate-800 animate-in fade-in duration-150`}
+      className="w-[380px] rounded-lg bg-white p-4 text-xs text-slate-800 shadow-xl"
       onClick={e => e.stopPropagation()}
     >
       <div className="flex items-center justify-between pb-2.5 border-b border-slate-100">
