@@ -18,6 +18,124 @@ interface UserOption {
   fullName: string;
 }
 
+interface MultiSelectScopeInputProps<T extends string | number> {
+  placeholder: string;
+  options: { value: T; label: string }[];
+  selectedValues: T[];
+  onChange: (vals: T[]) => void;
+}
+
+function MultiSelectScopeInput<T extends string | number>({
+  placeholder,
+  options,
+  selectedValues,
+  onChange,
+}: MultiSelectScopeInputProps<T>) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [keyword, setKeyword] = useState('');
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleOutside = (e: MouseEvent) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    if (isOpen) {
+      document.addEventListener('mousedown', handleOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleOutside);
+  }, [isOpen]);
+
+  const filtered = options.filter(opt =>
+    !keyword.trim() || opt.label.toLowerCase().includes(keyword.toLowerCase().trim())
+  );
+
+  return (
+    <div className="relative mt-2" ref={wrapperRef}>
+      <div
+        onClick={() => setIsOpen(!isOpen)}
+        className="min-h-[36px] w-full rounded border border-slate-300 bg-white px-2.5 py-1.5 flex flex-wrap items-center gap-1.5 text-xs cursor-pointer hover:border-[#0071BA] focus-within:border-[#0071BA] transition"
+      >
+        {selectedValues.length === 0 ? (
+          <span className="text-slate-400 select-none">{placeholder}</span>
+        ) : (
+          selectedValues.map(val => {
+            const item = options.find(o => o.value === val);
+            return (
+              <span
+                key={String(val)}
+                className="inline-flex items-center gap-1 rounded bg-slate-100 px-2 py-0.5 text-xs text-slate-800 border border-slate-200 select-none shadow-2xs"
+              >
+                <span>{item?.label || val}</span>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onChange(selectedValues.filter(v => v !== val));
+                  }}
+                  className="text-slate-400 hover:text-rose-600 transition cursor-pointer"
+                >
+                  <X size={11} />
+                </button>
+              </span>
+            );
+          })
+        )}
+      </div>
+
+      {isOpen && (
+        <div className="absolute left-0 top-full mt-1 z-50 w-full rounded-md border border-slate-200 bg-white shadow-xl p-2 text-xs space-y-1 animate-in fade-in duration-100">
+          <div className="relative mb-1">
+            <Search size={13} className="absolute left-2.5 top-2 text-slate-400" />
+            <input
+              type="text"
+              value={keyword}
+              onChange={e => setKeyword(e.target.value)}
+              placeholder="Tìm kiếm..."
+              className="h-7 w-full rounded border border-slate-300 pl-8 pr-2 text-xs outline-none focus:border-[#0071BA]"
+              autoFocus
+            />
+          </div>
+          <div className="max-h-40 overflow-y-auto space-y-0.5">
+            {filtered.map(opt => {
+              const isChecked = selectedValues.includes(opt.value);
+              return (
+                <label
+                  key={String(opt.value)}
+                  className={`flex items-center justify-between px-2 py-1.5 rounded cursor-pointer transition ${
+                    isChecked ? 'bg-blue-50/70 font-semibold text-[#0071BA]' : 'text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={isChecked}
+                      onChange={() => {
+                        if (isChecked) {
+                          onChange(selectedValues.filter(v => v !== opt.value));
+                        } else {
+                          onChange([...selectedValues, opt.value]);
+                        }
+                      }}
+                      className="accent-[#0071BA] rounded"
+                    />
+                    <span>{opt.label}</span>
+                  </div>
+                  {isChecked && <Check size={13} className="text-[#0071BA]" />}
+                </label>
+              );
+            })}
+            {filtered.length === 0 && (
+              <p className="text-slate-400 text-center py-2 italic">Không tìm thấy dữ liệu</p>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 const CUSTOMER_GROUPS = [
   { code: 'WHOLESALE', name: 'Khách buôn / Đại lý sỉ' },
   { code: 'VIP', name: 'Khách hàng thân thiết / VIP' },
@@ -253,24 +371,6 @@ export default function CreatePriceBookModal({
     } finally {
       setLoading(false);
     }
-  };
-
-  const toggleWarehouse = (id: number) => {
-    setSelectedWarehouseIds(prev =>
-      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
-    );
-  };
-
-  const toggleCustomerGroup = (code: string) => {
-    setSelectedCustomerGroupCodes(prev =>
-      prev.includes(code) ? prev.filter(x => x !== code) : [...prev, code]
-    );
-  };
-
-  const toggleUser = (id: number) => {
-    setSelectedUserIds(prev =>
-      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
-    );
   };
 
   return (
@@ -597,100 +697,102 @@ export default function CreatePriceBookModal({
                       </div>
                     </div>
 
-                    {/* 3 Checkboxes mở rộng chuẩn KiotViet */}
-                    <div className="space-y-2 pt-2.5 border-t border-slate-100">
-                      {/* 1. Tự động cập nhật giá theo Bảng giá chung */}
-                      <label className="flex items-center gap-2 cursor-pointer select-none text-xs text-slate-700">
-                        <input
-                          type="checkbox"
-                          checked={autoUpdateByBase}
-                          onChange={e => setAutoUpdateByBase(e.target.checked)}
-                          className="rounded accent-[#0071BA] w-3.5 h-3.5 cursor-pointer"
-                        />
-                        <span>
-                          Tự động cập nhật giá theo <strong>{baseNameDisplay}</strong>
-                        </span>
-                      </label>
-
-                      {/* 2. Thêm hàng hóa từ Bảng giá chung khi tạo bảng giá này */}
-                      <label className="flex items-center gap-2 cursor-pointer select-none text-xs text-slate-700">
-                        <input
-                          type="checkbox"
-                          checked={includeProductsFromBase}
-                          onChange={e => setIncludeProductsFromBase(e.target.checked)}
-                          className="rounded accent-[#0071BA] w-3.5 h-3.5 cursor-pointer"
-                        />
-                        <span>
-                          Thêm hàng hóa từ <strong>{baseNameDisplay}</strong> khi tạo bảng giá này
-                        </span>
-                      </label>
-
-                      {/* 3. Tự động làm tròn giá đến [ đồng v ] ⓘ */}
-                      <div className="flex items-center gap-2 text-xs text-slate-700 select-none relative">
-                        <label className="flex items-center gap-2 cursor-pointer">
+                    {/* 3 Checkboxes mở rộng chuẩn KiotViet - Chỉ hiển thị khi ĐÃ CHỌN nguồn giá */}
+                    {Boolean(formulaBaseType) && (
+                      <div className="space-y-2 pt-2.5 border-t border-slate-100">
+                        {/* 1. Tự động cập nhật giá theo nguồn giá đã chọn */}
+                        <label className="flex items-center gap-2 cursor-pointer select-none text-xs text-slate-700">
                           <input
                             type="checkbox"
-                            checked={autoRounding}
-                            onChange={e => setAutoRounding(e.target.checked)}
+                            checked={autoUpdateByBase}
+                            onChange={e => setAutoUpdateByBase(e.target.checked)}
                             className="rounded accent-[#0071BA] w-3.5 h-3.5 cursor-pointer"
                           />
-                          <span>Tự động làm tròn giá đến</span>
+                          <span>
+                            Tự động cập nhật giá theo <strong>{baseNameDisplay}</strong>
+                          </span>
                         </label>
 
-                        <div className="relative">
-                          <button
-                            type="button"
-                            disabled={!autoRounding}
-                            onClick={() => setIsRoundingOpen(!isRoundingOpen)}
-                            className="inline-flex items-center gap-1 font-semibold text-[#0071BA] hover:underline cursor-pointer disabled:opacity-50"
-                          >
-                            <span>
-                              {
+                        {/* 2. Thêm hàng hóa từ nguồn giá đã chọn khi tạo bảng giá này */}
+                        <label className="flex items-center gap-2 cursor-pointer select-none text-xs text-slate-700">
+                          <input
+                            type="checkbox"
+                            checked={includeProductsFromBase}
+                            onChange={e => setIncludeProductsFromBase(e.target.checked)}
+                            className="rounded accent-[#0071BA] w-3.5 h-3.5 cursor-pointer"
+                          />
+                          <span>
+                            Thêm hàng hóa từ <strong>{baseNameDisplay}</strong> khi tạo bảng giá này
+                          </span>
+                        </label>
+
+                        {/* 3. Tự động làm tròn giá đến [ đồng v ] ⓘ */}
+                        <div className="flex items-center gap-2 text-xs text-slate-700 select-none relative">
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={autoRounding}
+                              onChange={e => setAutoRounding(e.target.checked)}
+                              className="rounded accent-[#0071BA] w-3.5 h-3.5 cursor-pointer"
+                            />
+                            <span>Tự động làm tròn giá đến</span>
+                          </label>
+
+                          <div className="relative">
+                            <button
+                              type="button"
+                              disabled={!autoRounding}
+                              onClick={() => setIsRoundingOpen(!isRoundingOpen)}
+                              className="inline-flex items-center gap-1 font-semibold text-[#0071BA] hover:underline cursor-pointer disabled:opacity-50"
+                            >
+                              <span>
                                 {
-                                  dong: 'đồng',
-                                  chuc: 'chục đồng',
-                                  tram: 'trăm đồng',
-                                  nghin: 'nghìn đồng',
-                                  chuc_nghin: 'chục nghìn đồng',
-                                }[roundingUnit] || 'đồng'
-                              }
-                            </span>
-                            <ChevronDown size={13} className="text-[#0071BA]" />
-                          </button>
+                                  {
+                                    dong: 'đồng',
+                                    chuc: 'chục đồng',
+                                    tram: 'trăm đồng',
+                                    nghin: 'nghìn đồng',
+                                    chuc_nghin: 'chục nghìn đồng',
+                                  }[roundingUnit] || 'đồng'
+                                }
+                              </span>
+                              <ChevronDown size={13} className="text-[#0071BA]" />
+                            </button>
 
-                          {isRoundingOpen && (
-                            <div className="absolute left-0 top-full mt-1 z-50 w-36 rounded-md border border-slate-200 bg-white py-1 shadow-lg text-xs">
-                              {[
-                                { key: 'dong', label: 'đồng' },
-                                { key: 'chuc', label: 'chục đồng' },
-                                { key: 'tram', label: 'trăm đồng' },
-                                { key: 'nghin', label: 'nghìn đồng' },
-                                { key: 'chuc_nghin', label: 'chục nghìn đồng' },
-                              ].map(opt => (
-                                <button
-                                  key={opt.key}
-                                  type="button"
-                                  onClick={() => {
-                                    setRoundingUnit(opt.key);
-                                    setIsRoundingOpen(false);
-                                  }}
-                                  className="flex w-full items-center justify-between px-3 py-1.5 text-left hover:bg-slate-50 transition cursor-pointer"
-                                >
-                                  <span className={roundingUnit === opt.key ? 'font-bold text-[#0071BA]' : 'text-slate-700'}>
-                                    {opt.label}
-                                  </span>
-                                  {roundingUnit === opt.key && <Check size={13} className="text-[#0071BA]" />}
-                                </button>
-                              ))}
-                            </div>
-                          )}
+                            {isRoundingOpen && (
+                              <div className="absolute left-0 top-full mt-1 z-50 w-36 rounded-md border border-slate-200 bg-white py-1 shadow-lg text-xs">
+                                {[
+                                  { key: 'dong', label: 'đồng' },
+                                  { key: 'chuc', label: 'chục đồng' },
+                                  { key: 'tram', label: 'trăm đồng' },
+                                  { key: 'nghin', label: 'nghìn đồng' },
+                                  { key: 'chuc_nghin', label: 'chục nghìn đồng' },
+                                ].map(opt => (
+                                  <button
+                                    key={opt.key}
+                                    type="button"
+                                    onClick={() => {
+                                      setRoundingUnit(opt.key);
+                                      setIsRoundingOpen(false);
+                                    }}
+                                    className="flex w-full items-center justify-between px-3 py-1.5 text-left hover:bg-slate-50 transition cursor-pointer"
+                                  >
+                                    <span className={roundingUnit === opt.key ? 'font-bold text-[#0071BA]' : 'text-slate-700'}>
+                                      {opt.label}
+                                    </span>
+                                    {roundingUnit === opt.key && <Check size={13} className="text-[#0071BA]" />}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+
+                          <span title="Làm tròn giá bán theo đơn vị tiền tệ" className="text-slate-400 cursor-help">
+                            <Info size={13} />
+                          </span>
                         </div>
-
-                        <span title="Làm tròn giá bán theo đơn vị tiền tệ" className="text-slate-400 cursor-help">
-                          <Info size={13} />
-                        </span>
                       </div>
-                    </div>
+                    )}
 
                     <p className="text-[11px] text-slate-500 italic">
                       * Ví dụ: Giá mới = Giá vốn + 20 % hoặc Giá mới = Bảng giá chung - 15,000 VND
@@ -766,13 +868,13 @@ export default function CreatePriceBookModal({
             </div>
           )}
 
-          {/* TAB 2: PHẠM VI ÁP DỤNG */}
+          {/* TAB 2: PHẠM VI ÁP DỤNG CHUẨN KIOTVIET */}
           {activeTab === 'scope' && (
             <div className="space-y-4">
-              {/* Section 1: Chi nhánh / Kho hàng */}
+              {/* Section 1: Chi nhánh */}
               <div className="rounded-lg border border-slate-200 bg-white p-4 space-y-3 text-xs">
                 <span className="block font-bold text-slate-800 uppercase tracking-wide">
-                  Chi nhánh / Kho hàng
+                  Chi nhánh
                 </span>
                 <div className="space-y-2">
                   <label className="flex items-center gap-2 cursor-pointer">
@@ -783,7 +885,7 @@ export default function CreatePriceBookModal({
                       onChange={() => setScopeBranchType('ALL')}
                       className="accent-[#0071BA]"
                     />
-                    <span className="font-medium text-slate-800">Toàn hệ thống (tất cả kho)</span>
+                    <span className="font-medium text-slate-800">Toàn hệ thống</span>
                   </label>
 
                   <label className="flex items-center gap-2 cursor-pointer">
@@ -794,27 +896,17 @@ export default function CreatePriceBookModal({
                       onChange={() => setScopeBranchType('SPECIFIC')}
                       className="accent-[#0071BA]"
                     />
-                    <span className="font-medium text-slate-800">Chi nhánh / Kho cụ thể</span>
+                    <span className="font-medium text-slate-800">Chi nhánh cụ thể</span>
                   </label>
                 </div>
 
                 {scopeBranchType === 'SPECIFIC' && (
-                  <div className="mt-2.5 pt-2.5 border-t border-slate-100 pl-4 grid grid-cols-2 gap-2 max-h-36 overflow-y-auto">
-                    {warehouses.map(w => (
-                      <label key={w.warehouseId} className="flex items-center gap-2 cursor-pointer text-slate-700">
-                        <input
-                          type="checkbox"
-                          checked={selectedWarehouseIds.includes(w.warehouseId)}
-                          onChange={() => toggleWarehouse(w.warehouseId)}
-                          className="accent-[#0071BA] rounded"
-                        />
-                        <span className="truncate">{w.warehouseName}</span>
-                      </label>
-                    ))}
-                    {warehouses.length === 0 && (
-                      <span className="text-slate-400 italic">Chưa tải được danh sách kho</span>
-                    )}
-                  </div>
+                  <MultiSelectScopeInput
+                    placeholder="Chọn chi nhánh"
+                    options={warehouses.map(w => ({ value: w.warehouseId, label: w.warehouseName }))}
+                    selectedValues={selectedWarehouseIds}
+                    onChange={setSelectedWarehouseIds}
+                  />
                 )}
               </div>
 
@@ -832,7 +924,7 @@ export default function CreatePriceBookModal({
                       onChange={() => setScopeCustomerType('ALL')}
                       className="accent-[#0071BA]"
                     />
-                    <span className="font-medium text-slate-800">Tất cả khách hàng</span>
+                    <span className="font-medium text-slate-800">Tất cả</span>
                   </label>
 
                   <label className="flex items-center gap-2 cursor-pointer">
@@ -848,19 +940,12 @@ export default function CreatePriceBookModal({
                 </div>
 
                 {scopeCustomerType === 'SPECIFIC' && (
-                  <div className="mt-2.5 pt-2.5 border-t border-slate-100 pl-4 grid grid-cols-2 gap-2">
-                    {CUSTOMER_GROUPS.map(g => (
-                      <label key={g.code} className="flex items-center gap-2 cursor-pointer text-slate-700">
-                        <input
-                          type="checkbox"
-                          checked={selectedCustomerGroupCodes.includes(g.code)}
-                          onChange={() => toggleCustomerGroup(g.code)}
-                          className="accent-[#0071BA] rounded"
-                        />
-                        <span>{g.name}</span>
-                      </label>
-                    ))}
-                  </div>
+                  <MultiSelectScopeInput
+                    placeholder="Chọn nhóm khách hàng"
+                    options={CUSTOMER_GROUPS.map(g => ({ value: g.code, label: g.name }))}
+                    selectedValues={selectedCustomerGroupCodes}
+                    onChange={setSelectedCustomerGroupCodes}
+                  />
                 )}
               </div>
 
@@ -878,7 +963,7 @@ export default function CreatePriceBookModal({
                       onChange={() => setScopeUserType('ALL')}
                       className="accent-[#0071BA]"
                     />
-                    <span className="font-medium text-slate-800">Tất cả nhân viên / thu ngân</span>
+                    <span className="font-medium text-slate-800">Tất cả</span>
                   </label>
 
                   <label className="flex items-center gap-2 cursor-pointer">
@@ -894,22 +979,12 @@ export default function CreatePriceBookModal({
                 </div>
 
                 {scopeUserType === 'SPECIFIC' && (
-                  <div className="mt-2.5 pt-2.5 border-t border-slate-100 pl-4 grid grid-cols-2 gap-2 max-h-36 overflow-y-auto">
-                    {users.map(u => (
-                      <label key={u.userId} className="flex items-center gap-2 cursor-pointer text-slate-700">
-                        <input
-                          type="checkbox"
-                          checked={selectedUserIds.includes(u.userId)}
-                          onChange={() => toggleUser(u.userId)}
-                          className="accent-[#0071BA] rounded"
-                        />
-                        <span className="truncate">{u.fullName || u.username}</span>
-                      </label>
-                    ))}
-                    {users.length === 0 && (
-                      <span className="text-slate-400 italic">Chưa tải được danh sách nhân viên</span>
-                    )}
-                  </div>
+                  <MultiSelectScopeInput
+                    placeholder="Chọn người tạo giao dịch"
+                    options={users.map(u => ({ value: u.userId, label: u.fullName || u.username }))}
+                    selectedValues={selectedUserIds}
+                    onChange={setSelectedUserIds}
+                  />
                 )}
               </div>
             </div>
