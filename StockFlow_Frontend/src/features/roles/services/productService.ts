@@ -45,6 +45,46 @@ export interface ProductCategoryItem {
   name: string;
 }
 
+
+export interface ImportProductItemPayload {
+  code: string;
+  name: string;
+  type?: string;
+  categoryName?: string;
+  brand?: string;
+  uom?: string;
+  standardPrice?: number;
+  costPrice?: number;
+  stockQuantity?: number;
+  minSafeStock?: number;
+  maxSafeStock?: number;
+  barcode?: string;
+  description?: string;
+  weight?: number;
+  locationName?: string;
+  imageUrl?: string;
+  isActive?: boolean;
+  isDirectSale?: boolean;
+  supplier?: string;
+  warehouseName?: string;
+}
+
+export interface ImportProductsPayload {
+  products: ImportProductItemPayload[];
+  duplicateCodeAction?: 'ERROR' | 'REPLACE_NAME';
+  updateStock?: boolean;
+  updateCostPrice?: boolean;
+  updateDescription?: boolean;
+  targetWarehouse?: string;
+}
+
+export interface ImportProductsResult {
+  importedCount: number;
+  updatedCount: number;
+  totalCount: number;
+  message: string;
+  products: Product[];
+}
 export interface ProductUnitItem {
   id: number;
   code: string;
@@ -131,6 +171,10 @@ export const productService = {
       return [];
     }
   },
+  async createCategory(payload: { categoryName: string; description?: string }): Promise<ProductCategoryItem> {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('stockflow_token') ?? undefined : undefined;
+    return await apiClient.post<ProductCategoryItem>('/api/Products/categories', payload, token);
+  },
 
   async getUnits(): Promise<ProductUnitItem[]> {
     try {
@@ -139,6 +183,16 @@ export const productService = {
     } catch (e) {
       console.warn('API getUnits failed:', e);
       return [];
+    }
+  },
+
+  async importProducts(payload: ImportProductsPayload): Promise<ImportProductsResult> {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('stockflow_token') ?? undefined : undefined;
+    try {
+      return await apiClient.post<ImportProductsResult>('/api/Products/import', payload, token);
+    } catch (e) {
+      console.error('API importProducts failed:', e);
+      throw e;
     }
   },
 };

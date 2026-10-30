@@ -180,3 +180,46 @@ public class UpdateProductRequest
     public List<ProductAttributeDto>? Attributes { get; set; }
     public List<ProductVariantItemDto>? Variants { get; set; }
 }
+
+public class ImportProductItemRequest
+{
+    public string Code { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
+    public string? Type { get; set; } = "FINISHED";
+    public string? CategoryName { get; set; }
+    public string? Brand { get; set; }
+    public string? Uom { get; set; }
+    public decimal? StandardPrice { get; set; }
+    public decimal? CostPrice { get; set; }
+    public decimal? StockQuantity { get; set; }
+    public decimal? MinSafeStock { get; set; }
+    public decimal? MaxSafeStock { get; set; }
+    public string? Barcode { get; set; }
+    public string? Description { get; set; }
+    public decimal? Weight { get; set; }
+    public string? LocationName { get; set; }
+    public string? ImageUrl { get; set; }
+    public bool? IsActive { get; set; } = true;
+    public bool? IsDirectSale { get; set; } = true;
+    public string? Supplier { get; set; }
+    public string? WarehouseName { get; set; }
+}
+
+public class ImportProductsRequest
+{
+    public List<ImportProductItemRequest> Products { get; set; } = new();
+    public string DuplicateCodeAction { get; set; } = "ERROR"; // "ERROR" or "REPLACE_NAME"
+    public bool UpdateStock { get; set; } = false;
+    public bool UpdateCostPrice { get; set; } = false;
+    public bool UpdateDescription { get; set; } = false;
+    public string? TargetWarehouse { get; set; }
+}
+
+public class ImportProductsResultDto
+{
+    public int ImportedCount { get; set; }
+    public int UpdatedCount { get; set; }
+    public int TotalCount { get; set; }
+    public string Message { get; set; } = string.Empty;
+    public List<ProductDto> Products { get; set; } = new();
+}
