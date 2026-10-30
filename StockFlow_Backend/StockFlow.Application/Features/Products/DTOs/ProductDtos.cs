@@ -122,7 +122,6 @@ public class CreateProductRequest
     public string Type { get; set; } = "FINISHED";
     public int? CategoryId { get; set; }
     public string? CategoryName { get; set; }
-    public string? CategoryName { get; set; }
     public int? BaseUnitId { get; set; }
     public string? Uom { get; set; }
     public decimal? StandardPrice { get; set; }

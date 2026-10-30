@@ -95,18 +95,19 @@ public class UpdatePriceBookCommandHandler : IRequestHandler<UpdatePriceBookComm
 
         if (request.RecalculateFormula)
         {
-            // Xóa giá cũ và tính lại theo công thức mới
+            // Chỉ tính lại giá cho các sản phẩm HIỆN CÓ trong bảng giá này, không nạp toàn bộ danh mục sản phẩm khác
             var oldItems = await _context.DtlPriceBookItems
                 .Where(i => i.PriceBookId == pb.PriceBookId)
                 .ToListAsync(cancellationToken);
 
-            _context.DtlPriceBookItems.RemoveRange(oldItems);
-            await _context.SaveChangesAsync(cancellationToken);
+            if (oldItems.Any())
+            {
+                var targetProductIds = oldItems.Select(i => i.ProductId).Distinct().ToList();
+                _context.DtlPriceBookItems.RemoveRange(oldItems);
+                await _context.SaveChangesAsync(cancellationToken);
 
-            // Tái sử dụng logic tính giá
-            var helper = new CreatePriceBookCommandHandler(_context);
-            // Kích hoạt tính lại thông qua ApplyPriceBookFormula
-            await ApplyFormulaForBook(pb, cancellationToken);
+                await ApplyFormulaForBook(pb, targetProductIds, cancellationToken);
+            }
         }
 
         return Result.Success(new PriceBookDto(
@@ -136,12 +137,18 @@ public class UpdatePriceBookCommandHandler : IRequestHandler<UpdatePriceBookComm
         ));
     }
 
-    private async Task ApplyFormulaForBook(MstPriceBook priceBook, CancellationToken cancellationToken)
+    private async Task ApplyFormulaForBook(MstPriceBook priceBook, List<int>? targetProductIds, CancellationToken cancellationToken)
     {
-        var products = await _context.MstProducts
+        var productsQuery = _context.MstProducts
             .Include(p => p.TrxInventoryBalances)
-            .Where(p => p.IsActive != false)
-            .ToListAsync(cancellationToken);
+            .Where(p => p.IsActive != false);
+
+        if (targetProductIds != null)
+        {
+            productsQuery = productsQuery.Where(p => targetProductIds.Contains(p.ProductId));
+        }
+
+        var products = await productsQuery.ToListAsync(cancellationToken);
 
         int? primaryWarehouseId = null;
         if (!string.IsNullOrWhiteSpace(priceBook.ScopeWarehouseIds))

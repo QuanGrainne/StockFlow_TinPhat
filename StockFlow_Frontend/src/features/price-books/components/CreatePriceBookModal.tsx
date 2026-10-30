@@ -1,21 +1,146 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { X, ChevronDown, ChevronUp, Info, Calendar, Check, Trash2 } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { X, ChevronDown, ChevronUp, Info, Calendar, Check, Trash2, Search } from 'lucide-react';
 import { PriceBook, CreatePriceBookPayload, UpdatePriceBookPayload } from '../types';
 import { priceBookService } from '../services/priceBookService';
 import { apiClient } from '@/lib/api/client';
 
 interface WarehouseOption {
   warehouseId: number;
-  warehouseCode: string;
-  warehouseName: string;
+  code?: string;
+  name?: string;
+  warehouseCode?: string;
+  warehouseName?: string;
+  status?: string;
 }
 
 interface UserOption {
-  userId: number;
+  id?: number;
+  userId?: number;
   username: string;
-  fullName: string;
+  fullName?: string;
+  name?: string;
+  code?: string;
+  roleTitle?: string;
+}
+
+interface MultiSelectScopeInputProps<T extends string | number> {
+  placeholder: string;
+  options: { value: T; label: string }[];
+  selectedValues: T[];
+  onChange: (vals: T[]) => void;
+}
+
+function MultiSelectScopeInput<T extends string | number>({
+  placeholder,
+  options,
+  selectedValues,
+  onChange,
+}: MultiSelectScopeInputProps<T>) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [keyword, setKeyword] = useState('');
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleOutside = (e: MouseEvent) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    if (isOpen) {
+      document.addEventListener('mousedown', handleOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleOutside);
+  }, [isOpen]);
+
+  const filtered = options.filter(opt =>
+    !keyword.trim() || opt.label.toLowerCase().includes(keyword.toLowerCase().trim())
+  );
+
+  return (
+    <div className="relative mt-2" ref={wrapperRef}>
+      <div
+        onClick={() => setIsOpen(!isOpen)}
+        className="min-h-[36px] w-full rounded border border-slate-300 bg-white px-2.5 py-1.5 flex flex-wrap items-center gap-1.5 text-xs cursor-pointer hover:border-[#0071BA] focus-within:border-[#0071BA] transition"
+      >
+        {selectedValues.length === 0 ? (
+          <span className="text-slate-400 select-none">{placeholder}</span>
+        ) : (
+          selectedValues.map(val => {
+            const item = options.find(o => o.value === val);
+            return (
+              <span
+                key={String(val)}
+                className="inline-flex items-center gap-1 rounded bg-slate-100 px-2 py-0.5 text-xs text-slate-800 border border-slate-200 select-none shadow-2xs"
+              >
+                <span>{item?.label || val}</span>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onChange(selectedValues.filter(v => v !== val));
+                  }}
+                  className="text-slate-400 hover:text-rose-600 transition cursor-pointer"
+                >
+                  <X size={11} />
+                </button>
+              </span>
+            );
+          })
+        )}
+      </div>
+
+      {isOpen && (
+        <div className="absolute left-0 top-full mt-1 z-50 w-full rounded-md border border-slate-200 bg-white shadow-xl p-2 text-xs space-y-1 animate-in fade-in duration-100">
+          <div className="relative mb-1">
+            <Search size={13} className="absolute left-2.5 top-2 text-slate-400" />
+            <input
+              type="text"
+              value={keyword}
+              onChange={e => setKeyword(e.target.value)}
+              placeholder="Tìm kiếm..."
+              className="h-7 w-full rounded border border-slate-300 pl-8 pr-2 text-xs outline-none focus:border-[#0071BA]"
+              autoFocus
+            />
+          </div>
+          <div className="max-h-40 overflow-y-auto space-y-0.5">
+            {filtered.map(opt => {
+              const isChecked = selectedValues.includes(opt.value);
+              return (
+                <label
+                  key={String(opt.value)}
+                  className={`flex items-center justify-between px-2 py-1.5 rounded cursor-pointer transition ${
+                    isChecked ? 'bg-blue-50/70 font-semibold text-[#0071BA]' : 'text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={isChecked}
+                      onChange={() => {
+                        if (isChecked) {
+                          onChange(selectedValues.filter(v => v !== opt.value));
+                        } else {
+                          onChange([...selectedValues, opt.value]);
+                        }
+                      }}
+                      className="accent-[#0071BA] rounded"
+                    />
+                    <span>{opt.label}</span>
+                  </div>
+                  {isChecked && <Check size={13} className="text-[#0071BA]" />}
+                </label>
+              );
+            })}
+            {filtered.length === 0 && (
+              <p className="text-slate-400 text-center py-2 italic">Không tìm thấy dữ liệu</p>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 const CUSTOMER_GROUPS = [
@@ -60,7 +185,44 @@ export default function CreatePriceBookModal({
   const [formulaBasePriceBookId, setFormulaBasePriceBookId] = useState<number | null>(null);
   const [formulaOperator, setFormulaOperator] = useState<'+' | '-'>('+');
   const [formulaValue, setFormulaValue] = useState<number | ''>('');
-  const [formulaUnit, setFormulaUnit] = useState<'VND' | 'PERCENT'>('PERCENT');
+  const [formulaUnit, setFormulaUnit] = useState<'VND' | 'PERCENT'>('VND');
+
+  // Checkboxes mở rộng dưới công thức giá
+  const [autoUpdateByBase, setAutoUpdateByBase] = useState(true);
+  const [includeProductsFromBase, setIncludeProductsFromBase] = useState(false);
+  const [autoRounding, setAutoRounding] = useState(true);
+  const [roundingUnit, setRoundingUnit] = useState<string>('dong');
+  const [isRoundingOpen, setIsRoundingOpen] = useState(false);
+
+  // Custom searchable dropdown for base price book
+  const [isBaseTypeDropdownOpen, setIsBaseTypeDropdownOpen] = useState(false);
+  const [baseSearchKeyword, setBaseSearchKeyword] = useState('');
+  const baseTypeDropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (baseTypeDropdownRef.current && !baseTypeDropdownRef.current.contains(e.target as Node)) {
+        setIsBaseTypeDropdownOpen(false);
+      }
+    };
+    if (isBaseTypeDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isBaseTypeDropdownOpen]);
+
+  const baseNameDisplay = React.useMemo(() => {
+    if (formulaBaseType === 'COST') return 'Giá vốn';
+    if (formulaBaseType === 'LATEST_PURCHASE') return 'Giá nhập cuối';
+    if (formulaBaseType === 'STANDARD') return 'Bảng giá chung';
+    if (formulaBaseType === 'PRICE_BOOK' && formulaBasePriceBookId) {
+      const b = existingPriceBooks.find(x => x.priceBookId === formulaBasePriceBookId);
+      return b ? b.priceBookName : 'Bảng giá đã chọn';
+    }
+    return 'Chọn bảng giá';
+  }, [formulaBaseType, formulaBasePriceBookId, existingPriceBooks]);
 
   const [allowUnlistedProducts, setAllowUnlistedProducts] = useState(true);
   const [warnUnlistedProducts, setWarnUnlistedProducts] = useState(false);
@@ -89,7 +251,7 @@ export default function CreatePriceBookModal({
       .then(res => setWarehouses(Array.isArray(res) ? res : []))
       .catch(() => {});
 
-    apiClient.get<UserOption[]>('/api/admin/users')
+    apiClient.get<UserOption[]>('/api/staff')
       .then(res => setUsers(Array.isArray(res) ? res : []))
       .catch(() => {});
   }, [isOpen]);
@@ -108,11 +270,8 @@ export default function CreatePriceBookModal({
       setFormulaBasePriceBookId(editingPriceBook.formulaBasePriceBookId);
       setFormulaOperator(editingPriceBook.formulaOperator || '+');
       setFormulaValue(editingPriceBook.formulaValue ?? '');
-      
-      setFormulaUnit('PERCENT');
-      if (editingPriceBook.formulaBaseType) {
-        setExpandFormula(true);
-      }
+      setFormulaUnit(editingPriceBook.formulaUnit === 'PERCENT' ? 'PERCENT' : 'VND');
+      setAutoUpdateByBase(Boolean(editingPriceBook.formulaBaseType));
 
       setAllowUnlistedProducts(editingPriceBook.allowUnlistedProducts);
       setWarnUnlistedProducts(editingPriceBook.warnUnlistedProducts);
@@ -140,7 +299,14 @@ export default function CreatePriceBookModal({
       setFormulaBasePriceBookId(null);
       setFormulaOperator('+');
       setFormulaValue('');
-      setFormulaUnit('PERCENT');
+      setFormulaUnit('VND');
+      setAutoUpdateByBase(true);
+      setIncludeProductsFromBase(false);
+      setAutoRounding(true);
+      setRoundingUnit('dong');
+      setIsRoundingOpen(false);
+      setIsBaseTypeDropdownOpen(false);
+      setBaseSearchKeyword('');
 
       setAllowUnlistedProducts(true);
       setWarnUnlistedProducts(false);
@@ -178,11 +344,11 @@ export default function CreatePriceBookModal({
         effectiveFrom: effectiveFrom ? new Date(effectiveFrom).toISOString() : null,
         effectiveTo: effectiveTo ? new Date(effectiveTo).toISOString() : null,
         isActive,
-        formulaBaseType: formulaBaseType || null,
-        formulaBasePriceBookId: formulaBaseType === 'PRICE_BOOK' ? formulaBasePriceBookId : null,
-        formulaOperator: formulaValue !== '' ? formulaOperator : null,
-        formulaValue: formulaValue !== '' ? Number(formulaValue) : null,
-        formulaUnit: formulaValue !== '' ? 'PERCENT' : null,
+        formulaBaseType: (autoUpdateByBase && formulaBaseType) ? formulaBaseType : null,
+        formulaBasePriceBookId: (autoUpdateByBase && formulaBaseType === 'PRICE_BOOK') ? formulaBasePriceBookId : null,
+        formulaOperator: (autoUpdateByBase && formulaBaseType) ? formulaOperator : null,
+        formulaValue: (autoUpdateByBase && formulaBaseType) ? (formulaValue !== '' ? Number(formulaValue) : 0) : null,
+        formulaUnit: (autoUpdateByBase && formulaBaseType) ? (formulaUnit || 'VND') : null,
         allowUnlistedProducts,
         warnUnlistedProducts: allowUnlistedProducts ? warnUnlistedProducts : false,
         scopeBranchType,
@@ -191,7 +357,7 @@ export default function CreatePriceBookModal({
         scopeCustomerGroupCodes: scopeCustomerType === 'SPECIFIC' ? selectedCustomerGroupCodes : [],
         scopeUserType,
         scopeUserIds: scopeUserType === 'SPECIFIC' ? selectedUserIds : [],
-        autoApplyFormula: true,
+        autoApplyFormula: includeProductsFromBase,
       };
 
       let result: PriceBook;
@@ -199,7 +365,7 @@ export default function CreatePriceBookModal({
         const updatePayload: UpdatePriceBookPayload = {
           ...payload,
           priceBookId: editingPriceBook.priceBookId,
-          recalculateFormula: true,
+          recalculateFormula: autoUpdateByBase,
         };
         result = await priceBookService.updatePriceBook(editingPriceBook.priceBookId, updatePayload);
       } else {
@@ -214,24 +380,6 @@ export default function CreatePriceBookModal({
     } finally {
       setLoading(false);
     }
-  };
-
-  const toggleWarehouse = (id: number) => {
-    setSelectedWarehouseIds(prev =>
-      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
-    );
-  };
-
-  const toggleCustomerGroup = (code: string) => {
-    setSelectedCustomerGroupCodes(prev =>
-      prev.includes(code) ? prev.filter(x => x !== code) : [...prev, code]
-    );
-  };
-
-  const toggleUser = (id: number) => {
-    setSelectedUserIds(prev =>
-      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
-    );
   };
 
   return (
@@ -258,7 +406,7 @@ export default function CreatePriceBookModal({
             onClick={() => setActiveTab('info')}
             className={`pb-2.5 text-sm font-semibold transition border-b-2 mr-6 ${
               activeTab === 'info'
-                ? 'border-[#0070f4] text-[#0070f4]'
+                ? 'border-[#0071BA] text-[#0071BA]'
                 : 'border-transparent text-slate-500 hover:text-slate-800'
             }`}
           >
@@ -269,7 +417,7 @@ export default function CreatePriceBookModal({
             onClick={() => setActiveTab('scope')}
             className={`pb-2.5 text-sm font-semibold transition border-b-2 ${
               activeTab === 'scope'
-                ? 'border-[#0070f4] text-[#0070f4]'
+                ? 'border-[#0071BA] text-[#0071BA]'
                 : 'border-transparent text-slate-500 hover:text-slate-800'
             }`}
           >
@@ -298,7 +446,7 @@ export default function CreatePriceBookModal({
                   value={priceBookName}
                   onChange={e => setPriceBookName(e.target.value)}
                   placeholder="Nhập tên bảng giá (vd: Bảng giá khách VIP, Bảng giá sỉ...)"
-                  className="h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-[#0070f4] focus:ring-2 focus:ring-blue-100"
+                  className="h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-[#0071BA] focus:ring-2 focus:ring-blue-100"
                   required
                 />
               </div>
@@ -308,7 +456,7 @@ export default function CreatePriceBookModal({
                 <button
                   type="button"
                   onClick={() => setExpandValidity(!expandValidity)}
-                  className="flex w-full items-center justify-between px-4 py-3 bg-slate-50/80 hover:bg-slate-100/70 transition text-left"
+                  className="flex w-full items-center justify-between px-4 py-3 bg-slate-50/80 hover:bg-slate-100/70 transition text-left rounded-t-lg"
                 >
                   <span className="text-xs font-bold text-slate-800 tracking-wide uppercase">Hiệu lực</span>
                   {expandValidity ? <ChevronUp size={16} className="text-slate-500" /> : <ChevronDown size={16} className="text-slate-500" />}
@@ -323,14 +471,14 @@ export default function CreatePriceBookModal({
                           type="datetime-local"
                           value={effectiveFrom}
                           onChange={e => setEffectiveFrom(e.target.value)}
-                          className="h-8 rounded border border-slate-300 px-2.5 text-xs text-slate-700 outline-none focus:border-[#0070f4]"
+                          className="h-8 rounded border border-slate-300 px-2.5 text-xs text-slate-700 outline-none focus:border-[#0071BA]"
                         />
                         <span className="text-slate-400">đến</span>
                         <input
                           type="datetime-local"
                           value={effectiveTo}
                           onChange={e => setEffectiveTo(e.target.value)}
-                          className="h-8 rounded border border-slate-300 px-2.5 text-xs text-slate-700 outline-none focus:border-[#0070f4]"
+                          className="h-8 rounded border border-slate-300 px-2.5 text-xs text-slate-700 outline-none focus:border-[#0071BA]"
                         />
                       </div>
                     </div>
@@ -343,7 +491,7 @@ export default function CreatePriceBookModal({
                           name="status_radio"
                           checked={isActive === true}
                           onChange={() => setIsActive(true)}
-                          className="accent-[#0070f4]"
+                          className="accent-[#0071BA]"
                         />
                         <span className="font-medium text-slate-800">Áp dụng</span>
                       </label>
@@ -353,7 +501,7 @@ export default function CreatePriceBookModal({
                           name="status_radio"
                           checked={isActive === false}
                           onChange={() => setIsActive(false)}
-                          className="accent-[#0070f4]"
+                          className="accent-[#0071BA]"
                         />
                         <span className="font-medium text-slate-800">Chưa áp dụng</span>
                       </label>
@@ -363,7 +511,7 @@ export default function CreatePriceBookModal({
               </div>
 
               {/* Accordion: Công thức giá */}
-              <div className="rounded-lg border border-slate-200 bg-white shadow-2xs overflow-hidden">
+              <div className="rounded-lg border border-slate-200 bg-white shadow-2xs">
                 <button
                   type="button"
                   onClick={() => setExpandFormula(!expandFormula)}
@@ -380,119 +528,287 @@ export default function CreatePriceBookModal({
 
                 {expandFormula && (
                   <div className="p-4 border-t border-slate-100 space-y-3 text-xs">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-medium text-slate-700">Giá mới =</span>
+                    {/* Hiển thị trên 1 HÀNG duy nhất chuẩn KiotViet */}
+                    <div className="flex items-center gap-2 flex-nowrap w-full">
+                      <span className="font-medium text-slate-700 shrink-0 whitespace-nowrap text-xs">Giá mới =</span>
 
-                      {/* Dropdown chọn nguồn giá */}
-                      <select
-                        value={formulaBaseType === 'PRICE_BOOK' ? `PB_${formulaBasePriceBookId}` : formulaBaseType}
-                        onChange={e => {
-                          const val = e.target.value;
-                          if (val.startsWith('PB_')) {
-                            setFormulaBaseType('PRICE_BOOK');
-                            setFormulaBasePriceBookId(Number(val.replace('PB_', '')));
-                          } else {
-                            setFormulaBaseType(val);
-                            setFormulaBasePriceBookId(null);
-                          }
-                        }}
-                        className="h-8 rounded border border-slate-300 bg-white px-2.5 text-xs text-slate-800 outline-none focus:border-[#0070f4] min-w-[170px]"
-                      >
-                        <option value="">-- Chọn nguồn giá cơ sở --</option>
-                        <option value="COST">Giá vốn (theo kho hoặc toàn cty)</option>
-                        <option value="STANDARD">Bảng giá chung</option>
-                        {existingPriceBooks
-                          .filter(pb => !editingPriceBook || pb.priceBookId !== editingPriceBook.priceBookId)
-                          .map(pb => (
-                            <option key={pb.priceBookId} value={`PB_${pb.priceBookId}`}>
-                              Bảng giá: {pb.priceBookName}
-                            </option>
-                          ))}
-                      </select>
+                      {/* Dropdown chọn nguồn giá: Chỉ cần Giá vốn và Bảng giá chung */}
+                      <div className="relative shrink-0 w-[170px]" ref={baseTypeDropdownRef}>
+                        <button
+                          type="button"
+                          onClick={() => setIsBaseTypeDropdownOpen(!isBaseTypeDropdownOpen)}
+                          className="h-8 w-full rounded-md border border-slate-300 bg-white px-2.5 flex items-center justify-between text-xs text-slate-700 outline-none focus:border-[#0071BA] cursor-pointer hover:border-[#0071BA] transition"
+                        >
+                          <span className="truncate font-medium">{baseNameDisplay}</span>
+                          {isBaseTypeDropdownOpen ? (
+                            <ChevronUp size={13} className="text-slate-500 shrink-0 ml-1" />
+                          ) : (
+                            <ChevronDown size={13} className="text-slate-500 shrink-0 ml-1" />
+                          )}
+                        </button>
 
-                      {/* Toán tử + / - */}
-                      <div className="inline-flex rounded border border-slate-300 overflow-hidden bg-slate-100">
+                        {isBaseTypeDropdownOpen && (
+                          <div className="absolute left-0 top-full mt-1 z-[100] w-full min-w-[195px] rounded-md border border-slate-200 bg-white shadow-2xl py-2 px-1 text-xs space-y-1 animate-in fade-in duration-100">
+                            {/* Ô tìm kiếm */}
+                            <div className="px-1.5 pb-1 border-b border-slate-100">
+                              <div className="relative">
+                                <Search size={13} className="absolute left-2 top-2 text-slate-400" />
+                                <input
+                                  type="text"
+                                  value={baseSearchKeyword}
+                                  onChange={e => setBaseSearchKeyword(e.target.value)}
+                                  placeholder="Tìm kiếm"
+                                  className="h-7 w-full rounded border border-slate-300 bg-white pl-7 pr-2 text-xs text-slate-700 outline-none focus:border-[#0071BA] placeholder:text-slate-400"
+                                  autoFocus
+                                />
+                              </div>
+                            </div>
+
+                            {/* Danh sách tùy chọn: CHỈ CẦN Giá vốn và Bảng giá chung */}
+                            <div className="max-h-44 overflow-y-auto space-y-0.5">
+                              {[
+                                { key: '', label: 'Chọn bảng giá' },
+                                { key: 'COST', label: 'Giá vốn' },
+                                { key: 'LATEST_PURCHASE', label: 'Giá nhập cuối' },
+                                { key: 'STANDARD', label: 'Bảng giá chung' },
+                                ...existingPriceBooks
+                                  .filter(pb => !pb.isDefault && (!editingPriceBook || pb.priceBookId !== editingPriceBook.priceBookId))
+                                  .map(pb => ({ key: `PB_${pb.priceBookId}`, label: pb.priceBookName })),
+                              ]
+                                .filter(opt => !baseSearchKeyword.trim() || opt.label.toLowerCase().includes(baseSearchKeyword.toLowerCase().trim()))
+                                .map(opt => {
+                                  const isSelected =
+                                    opt.key === ''
+                                      ? !formulaBaseType
+                                      : opt.key === 'COST'
+                                      ? formulaBaseType === 'COST'
+                                      : opt.key === 'LATEST_PURCHASE'
+                                      ? formulaBaseType === 'LATEST_PURCHASE'
+                                      : opt.key === 'STANDARD'
+                                      ? formulaBaseType === 'STANDARD'
+                                      : formulaBaseType === 'PRICE_BOOK' && `PB_${formulaBasePriceBookId}` === opt.key;
+
+                                  return (
+                                    <button
+                                      key={opt.key}
+                                      type="button"
+                                      onClick={() => {
+                                        if (opt.key === '') {
+                                          setFormulaBaseType('');
+                                          setFormulaBasePriceBookId(null);
+                                        } else if (opt.key.startsWith('PB_')) {
+                                          setFormulaBaseType('PRICE_BOOK');
+                                          setFormulaBasePriceBookId(Number(opt.key.replace('PB_', '')));
+                                        } else {
+                                          setFormulaBaseType(opt.key);
+                                          setFormulaBasePriceBookId(null);
+                                        }
+                                        setIsBaseTypeDropdownOpen(false);
+                                        setBaseSearchKeyword('');
+                                      }}
+                                      className={`flex w-full items-center justify-between px-2.5 py-1.5 rounded text-left transition cursor-pointer ${
+                                        isSelected ? 'bg-blue-50/80 font-bold text-[#0071BA]' : 'text-slate-700 hover:bg-slate-100/70'
+                                      }`}
+                                    >
+                                      <span className="truncate">{opt.label}</span>
+                                      {isSelected && <Check size={14} className="text-[#0071BA] shrink-0 ml-1.5" />}
+                                    </button>
+                                  );
+                                })}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Toán tử + / - dạng nút tròn KiotViet */}
+                      <div className="flex items-center gap-1 shrink-0">
                         <button
                           type="button"
                           onClick={() => setFormulaOperator('+')}
-                          className={`px-2.5 py-1 text-xs font-bold transition ${
-                            formulaOperator === '+' ? 'bg-[#0070f4] text-white' : 'text-slate-600 hover:bg-slate-200'
+                          className={`w-7 h-7 rounded-full border flex items-center justify-center text-xs font-bold transition cursor-pointer ${
+                            formulaOperator === '+'
+                              ? 'border-[#0071BA] bg-[#0071BA] text-white shadow-2xs'
+                              : 'border-slate-300 bg-white text-slate-500 hover:border-slate-400'
                           }`}
+                          title="Cộng thêm"
                         >
                           +
                         </button>
                         <button
                           type="button"
                           onClick={() => setFormulaOperator('-')}
-                          className={`px-2.5 py-1 text-xs font-bold transition ${
-                            formulaOperator === '-' ? 'bg-[#0070f4] text-white' : 'text-slate-600 hover:bg-slate-200'
+                          className={`w-7 h-7 rounded-full border flex items-center justify-center text-xs font-bold transition cursor-pointer ${
+                            formulaOperator === '-'
+                              ? 'border-[#0071BA] bg-[#0071BA] text-white shadow-2xs'
+                              : 'border-slate-300 bg-white text-slate-500 hover:border-slate-400'
                           }`}
+                          title="Trừ đi"
                         >
-                          -
+                          –
                         </button>
                       </div>
 
-                      {/* Giá trị điều chỉnh (%) */}
-                      <div className="inline-flex items-center">
+                      {/* Ô nhập giá trị và chọn đơn vị VND / % tích hợp trong 1 ô */}
+                      <div className="flex items-center rounded-md bg-[#f0f2f5] px-2.5 h-8 border border-transparent focus-within:border-[#0071BA] focus-within:bg-white transition flex-1 min-w-[150px]">
                         <input
-                          type="number"
-                          min="0"
-                          step="any"
-                          value={formulaValue}
-                          onChange={e => setFormulaValue(e.target.value ? Number(e.target.value) : '')}
+                          type="text"
+                          inputMode="numeric"
+                          value={
+                            formulaValue === ''
+                              ? ''
+                              : formulaUnit === 'PERCENT'
+                                ? formulaValue
+                                : typeof formulaValue === 'number'
+                                  ? formulaValue.toLocaleString('vi-VN')
+                                  : formulaValue
+                          }
+                          onChange={e => {
+                            const val = e.target.value;
+                            if (formulaUnit === 'PERCENT') {
+                              const normalized = val.replace(/,/g, '.').replace(/[^0-9.]/g, '');
+                              if (normalized === '') {
+                                setFormulaValue('');
+                              } else {
+                                const parsed = parseFloat(normalized);
+                                setFormulaValue(isNaN(parsed) ? '' : parsed);
+                              }
+                            } else {
+                              const rawDigits = val.replace(/[^0-9]/g, '');
+                              setFormulaValue(rawDigits === '' ? '' : Number(rawDigits));
+                            }
+                          }}
                           placeholder="0"
-                          className="h-8 w-20 rounded-l border border-r-0 border-slate-300 px-2.5 text-right text-xs text-slate-800 outline-none focus:border-[#0070f4]"
+                          className="w-full bg-transparent text-right text-xs font-semibold text-slate-800 outline-none placeholder:text-slate-400 pr-2"
                         />
-                        <span className="inline-flex h-8 items-center rounded-r border border-slate-300 bg-slate-100 px-2.5 text-xs font-bold text-slate-700 select-none">
-                          %
-                        </span>
+
+                        {/* Đơn vị VND / % dạng nút KiotViet */}
+                        <div className="flex items-center gap-1 border-l border-slate-300/70 pl-2 text-xs select-none shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => setFormulaUnit('VND')}
+                            className={`px-2 py-0.5 rounded text-xs transition cursor-pointer ${
+                              formulaUnit === 'VND'
+                                ? 'bg-[#0071BA] text-white font-bold shadow-2xs'
+                                : 'text-slate-500 hover:text-slate-700 font-medium'
+                            }`}
+                          >
+                            VND
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setFormulaUnit('PERCENT')}
+                            className={`px-2 py-0.5 rounded text-xs transition cursor-pointer ${
+                              formulaUnit === 'PERCENT'
+                                ? 'bg-[#0071BA] text-white font-bold shadow-2xs'
+                                : 'text-slate-500 hover:text-slate-700 font-medium'
+                            }`}
+                          >
+                            %
+                          </button>
+                        </div>
                       </div>
                     </div>
 
-                    {/* Hộp xem trước kết quả trực tiếp */}
-                    {formulaBaseType && formulaValue !== '' && Number(formulaValue) > 0 ? (
-                      <div className="rounded-lg bg-blue-50/90 border border-blue-200 px-3.5 py-2.5 text-xs text-blue-900 flex flex-wrap items-center justify-between gap-2 shadow-2xs">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="font-bold text-[#0070f4] flex items-center gap-1">
-                            <Info size={13} />
-                            Xem trước:
-                          </span>
+                    {/* 3 Checkboxes mở rộng chuẩn KiotViet - Chỉ hiển thị khi ĐÃ CHỌN nguồn giá */}
+                    {Boolean(formulaBaseType) && (
+                      <div className="space-y-2 pt-2.5 border-t border-slate-100">
+                        {/* 1. Tự động cập nhật giá theo nguồn giá đã chọn */}
+                        <label className="flex items-center gap-2 cursor-pointer select-none text-xs text-slate-700">
+                          <input
+                            type="checkbox"
+                            checked={autoUpdateByBase}
+                            onChange={e => setAutoUpdateByBase(e.target.checked)}
+                            className="rounded accent-[#0071BA] w-3.5 h-3.5 cursor-pointer"
+                          />
                           <span>
-                            Giá mới ={' '}
-                            <strong>
-                              {formulaBaseType === 'COST'
-                                ? 'Giá vốn'
-                                : formulaBaseType === 'PRICE_BOOK'
-                                ? existingPriceBooks?.find(b => b.priceBookId === formulaBasePriceBookId)?.priceBookName || 'Bảng giá gốc'
-                                : 'Bảng giá chung'}
-                            </strong>{' '}
-                            <strong className="text-blue-700 bg-blue-100 px-1.5 py-0.5 rounded font-mono font-bold">
-                              {formulaOperator} {formulaValue}%
-                            </strong>
+                            Tự động cập nhật giá theo <strong>{baseNameDisplay}</strong>
                           </span>
-                        </div>
-                        <div className="text-[11px] text-slate-600 font-mono">
-                          Ví dụ giá gốc 100.000đ →{' '}
-                          <strong className="text-emerald-700 font-bold bg-white px-1.5 py-0.5 rounded border border-emerald-200">
-                            {new Intl.NumberFormat('vi-VN').format(
-                              Math.max(
-                                0,
-                                Math.round(
-                                  formulaOperator === '+'
-                                    ? 100000 + 100000 * (Number(formulaValue) / 100)
-                                    : 100000 - 100000 * (Number(formulaValue) / 100)
-                                )
-                              )
-                            )}{' '}
-                            đ
-                          </strong>
+                        </label>
+
+                        {/* 2. Thêm hàng hóa từ nguồn giá đã chọn khi tạo bảng giá này */}
+                        <label className="flex items-center gap-2 cursor-pointer select-none text-xs text-slate-700">
+                          <input
+                            type="checkbox"
+                            checked={includeProductsFromBase}
+                            onChange={e => setIncludeProductsFromBase(e.target.checked)}
+                            className="rounded accent-[#0071BA] w-3.5 h-3.5 cursor-pointer"
+                          />
+                          <span>
+                            Thêm hàng hóa từ <strong>{baseNameDisplay}</strong> khi tạo bảng giá này
+                          </span>
+                        </label>
+
+                        {/* 3. Tự động làm tròn giá đến [ đồng v ] ⓘ */}
+                        <div className="flex items-center gap-2 text-xs text-slate-700 select-none relative">
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={autoRounding}
+                              onChange={e => setAutoRounding(e.target.checked)}
+                              className="rounded accent-[#0071BA] w-3.5 h-3.5 cursor-pointer"
+                            />
+                            <span>Tự động làm tròn giá đến</span>
+                          </label>
+
+                          <div className="relative">
+                            <button
+                              type="button"
+                              disabled={!autoRounding}
+                              onClick={() => setIsRoundingOpen(!isRoundingOpen)}
+                              className="inline-flex items-center gap-1 font-semibold text-[#0071BA] hover:underline cursor-pointer disabled:opacity-50"
+                            >
+                              <span>
+                                {
+                                  {
+                                    dong: 'đồng',
+                                    chuc: 'chục đồng',
+                                    tram: 'trăm đồng',
+                                    nghin: 'nghìn đồng',
+                                    chuc_nghin: 'chục nghìn đồng',
+                                  }[roundingUnit] || 'đồng'
+                                }
+                              </span>
+                              <ChevronDown size={13} className="text-[#0071BA]" />
+                            </button>
+
+                            {isRoundingOpen && (
+                              <div className="absolute left-0 top-full mt-1 z-50 w-36 rounded-md border border-slate-200 bg-white py-1 shadow-lg text-xs">
+                                {[
+                                  { key: 'dong', label: 'đồng' },
+                                  { key: 'chuc', label: 'chục đồng' },
+                                  { key: 'tram', label: 'trăm đồng' },
+                                  { key: 'nghin', label: 'nghìn đồng' },
+                                  { key: 'chuc_nghin', label: 'chục nghìn đồng' },
+                                ].map(opt => (
+                                  <button
+                                    key={opt.key}
+                                    type="button"
+                                    onClick={() => {
+                                      setRoundingUnit(opt.key);
+                                      setIsRoundingOpen(false);
+                                    }}
+                                    className="flex w-full items-center justify-between px-3 py-1.5 text-left hover:bg-slate-50 transition cursor-pointer"
+                                  >
+                                    <span className={roundingUnit === opt.key ? 'font-bold text-[#0071BA]' : 'text-slate-700'}>
+                                      {opt.label}
+                                    </span>
+                                    {roundingUnit === opt.key && <Check size={13} className="text-[#0071BA]" />}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+
+                          <span title="Làm tròn giá bán theo đơn vị tiền tệ" className="text-slate-400 cursor-help">
+                            <Info size={13} />
+                          </span>
                         </div>
                       </div>
-                    ) : (
-                      <p className="text-[11px] text-slate-500 italic">
-                        * Ví dụ: Giá mới = Bảng giá chung + 15 % (tăng 15%) hoặc Giá mới = Giá vốn + 20 %
-                      </p>
                     )}
+
+                    <p className="text-[11px] text-slate-500 italic">
+                      * Ví dụ: Giá mới = Giá vốn + 20 % hoặc Giá mới = Bảng giá chung - 15,000 VND
+                    </p>
                   </div>
                 )}
               </div>
@@ -518,7 +834,7 @@ export default function CreatePriceBookModal({
                         name="order_rule_radio"
                         checked={allowUnlistedProducts === true}
                         onChange={() => setAllowUnlistedProducts(true)}
-                        className="mt-0.5 accent-[#0070f4]"
+                        className="mt-0.5 accent-[#0071BA]"
                       />
                       <div>
                         <span className="font-medium text-slate-800">
@@ -531,7 +847,7 @@ export default function CreatePriceBookModal({
                                 type="checkbox"
                                 checked={warnUnlistedProducts}
                                 onChange={e => setWarnUnlistedProducts(e.target.checked)}
-                                className="accent-[#0070f4] rounded"
+                                className="accent-[#0071BA] rounded"
                               />
                               <span>Gửi cảnh báo khi thêm hàng hóa không có trong bảng giá</span>
                             </label>
@@ -549,7 +865,7 @@ export default function CreatePriceBookModal({
                           setAllowUnlistedProducts(false);
                           setWarnUnlistedProducts(false);
                         }}
-                        className="mt-0.5 accent-[#0070f4]"
+                        className="mt-0.5 accent-[#0071BA]"
                       />
                       <div className="flex items-center gap-1.5">
                         <span className="font-medium text-slate-800">
@@ -564,13 +880,13 @@ export default function CreatePriceBookModal({
             </div>
           )}
 
-          {/* TAB 2: PHẠM VI ÁP DỤNG */}
+          {/* TAB 2: PHẠM VI ÁP DỤNG CHUẨN KIOTVIET */}
           {activeTab === 'scope' && (
             <div className="space-y-4">
-              {/* Section 1: Chi nhánh / Kho hàng */}
+              {/* Section 1: Chi nhánh / Kho áp dụng */}
               <div className="rounded-lg border border-slate-200 bg-white p-4 space-y-3 text-xs">
                 <span className="block font-bold text-slate-800 uppercase tracking-wide">
-                  Chi nhánh / Kho hàng
+                  Chi nhánh / Kho áp dụng
                 </span>
                 <div className="space-y-2">
                   <label className="flex items-center gap-2 cursor-pointer">
@@ -579,9 +895,9 @@ export default function CreatePriceBookModal({
                       name="scope_branch_radio"
                       checked={scopeBranchType === 'ALL'}
                       onChange={() => setScopeBranchType('ALL')}
-                      className="accent-[#0070f4]"
+                      className="accent-[#0071BA]"
                     />
-                    <span className="font-medium text-slate-800">Toàn hệ thống (tất cả kho)</span>
+                    <span className="font-medium text-slate-800">Toàn hệ thống (Tất cả chi nhánh / kho)</span>
                   </label>
 
                   <label className="flex items-center gap-2 cursor-pointer">
@@ -590,29 +906,22 @@ export default function CreatePriceBookModal({
                       name="scope_branch_radio"
                       checked={scopeBranchType === 'SPECIFIC'}
                       onChange={() => setScopeBranchType('SPECIFIC')}
-                      className="accent-[#0070f4]"
+                      className="accent-[#0071BA]"
                     />
                     <span className="font-medium text-slate-800">Chi nhánh / Kho cụ thể</span>
                   </label>
                 </div>
 
                 {scopeBranchType === 'SPECIFIC' && (
-                  <div className="mt-2.5 pt-2.5 border-t border-slate-100 pl-4 grid grid-cols-2 gap-2 max-h-36 overflow-y-auto">
-                    {warehouses.map(w => (
-                      <label key={w.warehouseId} className="flex items-center gap-2 cursor-pointer text-slate-700">
-                        <input
-                          type="checkbox"
-                          checked={selectedWarehouseIds.includes(w.warehouseId)}
-                          onChange={() => toggleWarehouse(w.warehouseId)}
-                          className="accent-[#0070f4] rounded"
-                        />
-                        <span className="truncate">{w.warehouseName}</span>
-                      </label>
-                    ))}
-                    {warehouses.length === 0 && (
-                      <span className="text-slate-400 italic">Chưa tải được danh sách kho</span>
-                    )}
-                  </div>
+                  <MultiSelectScopeInput
+                    placeholder="Chọn chi nhánh / kho áp dụng"
+                    options={warehouses.map(w => ({
+                      value: w.warehouseId,
+                      label: `${w.name || w.warehouseName || w.code || `Kho #${w.warehouseId}`}${w.code ? ` (${w.code})` : ''}`
+                    }))}
+                    selectedValues={selectedWarehouseIds}
+                    onChange={setSelectedWarehouseIds}
+                  />
                 )}
               </div>
 
@@ -628,9 +937,9 @@ export default function CreatePriceBookModal({
                       name="scope_cust_radio"
                       checked={scopeCustomerType === 'ALL'}
                       onChange={() => setScopeCustomerType('ALL')}
-                      className="accent-[#0070f4]"
+                      className="accent-[#0071BA]"
                     />
-                    <span className="font-medium text-slate-800">Tất cả khách hàng</span>
+                    <span className="font-medium text-slate-800">Tất cả</span>
                   </label>
 
                   <label className="flex items-center gap-2 cursor-pointer">
@@ -639,26 +948,19 @@ export default function CreatePriceBookModal({
                       name="scope_cust_radio"
                       checked={scopeCustomerType === 'SPECIFIC'}
                       onChange={() => setScopeCustomerType('SPECIFIC')}
-                      className="accent-[#0070f4]"
+                      className="accent-[#0071BA]"
                     />
                     <span className="font-medium text-slate-800">Nhóm khách hàng cụ thể</span>
                   </label>
                 </div>
 
                 {scopeCustomerType === 'SPECIFIC' && (
-                  <div className="mt-2.5 pt-2.5 border-t border-slate-100 pl-4 grid grid-cols-2 gap-2">
-                    {CUSTOMER_GROUPS.map(g => (
-                      <label key={g.code} className="flex items-center gap-2 cursor-pointer text-slate-700">
-                        <input
-                          type="checkbox"
-                          checked={selectedCustomerGroupCodes.includes(g.code)}
-                          onChange={() => toggleCustomerGroup(g.code)}
-                          className="accent-[#0070f4] rounded"
-                        />
-                        <span>{g.name}</span>
-                      </label>
-                    ))}
-                  </div>
+                  <MultiSelectScopeInput
+                    placeholder="Chọn nhóm khách hàng"
+                    options={CUSTOMER_GROUPS.map(g => ({ value: g.code, label: g.name }))}
+                    selectedValues={selectedCustomerGroupCodes}
+                    onChange={setSelectedCustomerGroupCodes}
+                  />
                 )}
               </div>
 
@@ -674,9 +976,9 @@ export default function CreatePriceBookModal({
                       name="scope_user_radio"
                       checked={scopeUserType === 'ALL'}
                       onChange={() => setScopeUserType('ALL')}
-                      className="accent-[#0070f4]"
+                      className="accent-[#0071BA]"
                     />
-                    <span className="font-medium text-slate-800">Tất cả nhân viên / thu ngân</span>
+                    <span className="font-medium text-slate-800">Tất cả</span>
                   </label>
 
                   <label className="flex items-center gap-2 cursor-pointer">
@@ -685,29 +987,22 @@ export default function CreatePriceBookModal({
                       name="scope_user_radio"
                       checked={scopeUserType === 'SPECIFIC'}
                       onChange={() => setScopeUserType('SPECIFIC')}
-                      className="accent-[#0070f4]"
+                      className="accent-[#0071BA]"
                     />
                     <span className="font-medium text-slate-800">Người tạo giao dịch cụ thể</span>
                   </label>
                 </div>
 
                 {scopeUserType === 'SPECIFIC' && (
-                  <div className="mt-2.5 pt-2.5 border-t border-slate-100 pl-4 grid grid-cols-2 gap-2 max-h-36 overflow-y-auto">
-                    {users.map(u => (
-                      <label key={u.userId} className="flex items-center gap-2 cursor-pointer text-slate-700">
-                        <input
-                          type="checkbox"
-                          checked={selectedUserIds.includes(u.userId)}
-                          onChange={() => toggleUser(u.userId)}
-                          className="accent-[#0070f4] rounded"
-                        />
-                        <span className="truncate">{u.fullName || u.username}</span>
-                      </label>
-                    ))}
-                    {users.length === 0 && (
-                      <span className="text-slate-400 italic">Chưa tải được danh sách nhân viên</span>
-                    )}
-                  </div>
+                  <MultiSelectScopeInput
+                    placeholder="Chọn người tạo giao dịch"
+                    options={users.map(u => ({
+                      value: u.id ?? u.userId ?? 0,
+                      label: `${u.name || u.fullName || u.username}${u.code ? ` (${u.code})` : ''}${u.roleTitle ? ` - ${u.roleTitle}` : ''}`
+                    }))}
+                    selectedValues={selectedUserIds}
+                    onChange={setSelectedUserIds}
+                  />
                 )}
               </div>
             </div>
@@ -744,7 +1039,7 @@ export default function CreatePriceBookModal({
               <button
                 type="submit"
                 disabled={loading}
-                className="h-9 px-5 rounded-[8px] bg-[#0070f4] hover:bg-[#005ac3] text-xs font-semibold text-white shadow-xs transition disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
+                className="h-9 px-5 rounded-lg bg-[#0071BA] hover:bg-[#005f9d] text-xs font-semibold text-white shadow-xs transition disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
               >
                 {loading ? 'Đang lưu...' : 'Lưu'}
               </button>
