@@ -11,7 +11,7 @@ export interface PriceBook {
   formulaBasePriceBookName: string | null;
   formulaOperator: '+' | '-' | null;
   formulaValue: number | null;
-  formulaUnit: 'VND' | 'PERCENT' | null;
+  formulaUnit: 'VND' | 'PERCENT' | string | null;
   allowUnlistedProducts: boolean;
   warnUnlistedProducts: boolean;
   scopeBranchType: 'ALL' | 'SPECIFIC';
@@ -56,11 +56,11 @@ export interface CreatePriceBookPayload {
   allowUnlistedProducts?: boolean;
   warnUnlistedProducts?: boolean;
   scopeBranchType?: 'ALL' | 'SPECIFIC';
-  scopeWarehouseIds?: number[];
+  scopeWarehouseIds?: number[] | null;
   scopeCustomerType?: 'ALL' | 'SPECIFIC';
-  scopeCustomerGroupCodes?: string[];
+  scopeCustomerGroupCodes?: string[] | null;
   scopeUserType?: 'ALL' | 'SPECIFIC';
-  scopeUserIds?: number[];
+  scopeUserIds?: number[] | null;
   autoApplyFormula?: boolean;
 }
 

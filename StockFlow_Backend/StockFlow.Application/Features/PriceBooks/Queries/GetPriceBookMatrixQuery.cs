@@ -72,6 +72,21 @@ public class GetPriceBookMatrixQueryHandler : IRequestHandler<GetPriceBookMatrix
             query = query.Where(p => p.CategoryId == request.CategoryId.Value);
         }
 
+        // Nếu có bảng giá tùy biến (non-default) được chọn, chỉ hiển thị các sản phẩm đã được thêm vào bảng giá đó
+        var customBookIds = targetBooks.Values
+            .Where(b => !b.IsDefault)
+            .Select(b => b.PriceBookId)
+            .ToList();
+
+        if (customBookIds.Any())
+        {
+            var allowedProductIds = _context.DtlPriceBookItems
+                .Where(i => customBookIds.Contains(i.PriceBookId))
+                .Select(i => i.ProductId);
+
+            query = query.Where(p => allowedProductIds.Contains(p.ProductId));
+        }
+
         // 3. Lọc theo tình trạng tồn kho
         if (!string.IsNullOrWhiteSpace(request.StockCondition) && request.StockCondition != "ALL")
         {

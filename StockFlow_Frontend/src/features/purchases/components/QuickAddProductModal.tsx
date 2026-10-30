@@ -50,7 +50,7 @@ export function QuickAddProductModal({ open, onClose, onSuccess }: QuickAddProdu
       confirmLoading={loading}
       okText="Thêm vào phiếu"
       cancelText="Hủy"
-      okButtonProps={{ style: { backgroundColor: '#0071BA' } }}
+      okButtonProps={{ style: { backgroundColor: '#0070f4' } }}
     >
       <div className="space-y-3 py-2 text-xs">
         <div>

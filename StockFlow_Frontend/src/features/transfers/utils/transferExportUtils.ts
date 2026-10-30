@@ -271,7 +271,7 @@ export function printTransferSlip(
 
         <div class="meta-section">
           <div>Chi nhánh chuyển: ${detail.sourceWarehouseName}</div>
-          <div>Người chuyển: ${detail.createdBy || '0913268079'}</div>
+          <div>Người chuyển: ${detail.createdBy || ''}</div>
           <div>Chi nhánh nhận: ${detail.destWarehouseName}</div>
           <div>Người nhận: ${detail.receivedBy || ''}</div>
         </div>
