@@ -365,17 +365,7 @@ export default function PriceBooksClient() {
         title: 'Giá vốn',
         dataIndex: 'costPrice',
         key: 'costPrice',
-        width: 110,
-        align: 'right',
-        render: (val: number) => (
-          <span className="text-xs font-medium text-slate-700">{formatCurrency(val)}</span>
-        ),
-      },
-      {
-        title: 'Giá nhập cuối',
-        dataIndex: 'latestPurchasePrice',
-        key: 'latestPurchasePrice',
-        width: 110,
+        width: 120,
         align: 'right',
         render: (val: number) => (
           <span className="text-xs font-medium text-slate-700">{formatCurrency(val)}</span>

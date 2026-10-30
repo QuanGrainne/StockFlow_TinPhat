@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { X, ChevronDown, ChevronUp, Info, Calendar, Check, Trash2 } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { X, ChevronDown, ChevronUp, Info, Calendar, Check, Trash2, Search } from 'lucide-react';
 import { PriceBook, CreatePriceBookPayload, UpdatePriceBookPayload } from '../types';
 import { priceBookService } from '../services/priceBookService';
 import { apiClient } from '@/lib/api/client';
@@ -69,15 +69,33 @@ export default function CreatePriceBookModal({
   const [roundingUnit, setRoundingUnit] = useState<string>('dong');
   const [isRoundingOpen, setIsRoundingOpen] = useState(false);
 
+  // Custom searchable dropdown for base price book
+  const [isBaseTypeDropdownOpen, setIsBaseTypeDropdownOpen] = useState(false);
+  const [baseSearchKeyword, setBaseSearchKeyword] = useState('');
+  const baseTypeDropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (baseTypeDropdownRef.current && !baseTypeDropdownRef.current.contains(e.target as Node)) {
+        setIsBaseTypeDropdownOpen(false);
+      }
+    };
+    if (isBaseTypeDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isBaseTypeDropdownOpen]);
+
   const baseNameDisplay = React.useMemo(() => {
     if (formulaBaseType === 'COST') return 'Giá vốn';
-    if (formulaBaseType === 'LATEST_PURCHASE') return 'Giá nhập cuối';
     if (formulaBaseType === 'STANDARD') return 'Bảng giá chung';
     if (formulaBaseType === 'PRICE_BOOK' && formulaBasePriceBookId) {
       const b = existingPriceBooks.find(x => x.priceBookId === formulaBasePriceBookId);
       return b ? b.priceBookName : 'Bảng giá đã chọn';
     }
-    return 'Bảng giá chung';
+    return 'Chọn bảng giá';
   }, [formulaBaseType, formulaBasePriceBookId, existingPriceBooks]);
 
   const [allowUnlistedProducts, setAllowUnlistedProducts] = useState(true);
@@ -160,6 +178,8 @@ export default function CreatePriceBookModal({
       setAutoRounding(true);
       setRoundingUnit('dong');
       setIsRoundingOpen(false);
+      setIsBaseTypeDropdownOpen(false);
+      setBaseSearchKeyword('');
 
       setAllowUnlistedProducts(true);
       setWarnUnlistedProducts(false);
@@ -399,43 +419,101 @@ export default function CreatePriceBookModal({
 
                 {expandFormula && (
                   <div className="p-4 border-t border-slate-100 space-y-3 text-xs">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-medium text-slate-700">Giá mới =</span>
+                    {/* Hiển thị trên 1 HÀNG duy nhất chuẩn KiotViet */}
+                    <div className="flex items-center gap-2 flex-nowrap w-full">
+                      <span className="font-medium text-slate-700 shrink-0 whitespace-nowrap text-xs">Giá mới =</span>
 
-                      {/* Dropdown chọn nguồn giá */}
-                      <select
-                        value={formulaBaseType === 'PRICE_BOOK' ? `PB_${formulaBasePriceBookId}` : formulaBaseType}
-                        onChange={e => {
-                          const val = e.target.value;
-                          if (val.startsWith('PB_')) {
-                            setFormulaBaseType('PRICE_BOOK');
-                            setFormulaBasePriceBookId(Number(val.replace('PB_', '')));
-                          } else {
-                            setFormulaBaseType(val);
-                            setFormulaBasePriceBookId(null);
-                          }
-                        }}
-                        className="h-8 rounded-md border border-slate-300 bg-white px-3 text-xs text-slate-700 outline-none focus:border-[#0071BA] min-w-[160px] cursor-pointer"
-                      >
-                        <option value="">Chọn bảng giá</option>
-                        <option value="COST">Giá vốn</option>
-                        <option value="LATEST_PURCHASE">Giá nhập cuối</option>
-                        <option value="STANDARD">Bảng giá chung</option>
-                        {existingPriceBooks
-                          .filter(pb => !editingPriceBook || pb.priceBookId !== editingPriceBook.priceBookId)
-                          .map(pb => (
-                            <option key={pb.priceBookId} value={`PB_${pb.priceBookId}`}>
-                              {pb.priceBookName}
-                            </option>
-                          ))}
-                      </select>
+                      {/* Dropdown chọn nguồn giá: Chỉ cần Giá vốn và Bảng giá chung */}
+                      <div className="relative shrink-0 w-[170px]" ref={baseTypeDropdownRef}>
+                        <button
+                          type="button"
+                          onClick={() => setIsBaseTypeDropdownOpen(!isBaseTypeDropdownOpen)}
+                          className="h-8 w-full rounded-md border border-slate-300 bg-white px-2.5 flex items-center justify-between text-xs text-slate-700 outline-none focus:border-[#0071BA] cursor-pointer hover:border-[#0071BA] transition"
+                        >
+                          <span className="truncate font-medium">{baseNameDisplay}</span>
+                          {isBaseTypeDropdownOpen ? (
+                            <ChevronUp size={13} className="text-slate-500 shrink-0 ml-1" />
+                          ) : (
+                            <ChevronDown size={13} className="text-slate-500 shrink-0 ml-1" />
+                          )}
+                        </button>
+
+                        {isBaseTypeDropdownOpen && (
+                          <div className="absolute left-0 top-full mt-1 z-50 w-full min-w-[185px] rounded-md border border-slate-200 bg-white shadow-xl py-2 px-1 text-xs space-y-1 animate-in fade-in duration-100">
+                            {/* Ô tìm kiếm */}
+                            <div className="px-1.5 pb-1 border-b border-slate-100">
+                              <div className="relative">
+                                <Search size={13} className="absolute left-2 top-2 text-slate-400" />
+                                <input
+                                  type="text"
+                                  value={baseSearchKeyword}
+                                  onChange={e => setBaseSearchKeyword(e.target.value)}
+                                  placeholder="Tìm kiếm"
+                                  className="h-7 w-full rounded border border-slate-300 bg-white pl-7 pr-2 text-xs text-slate-700 outline-none focus:border-[#0071BA] placeholder:text-slate-400"
+                                  autoFocus
+                                />
+                              </div>
+                            </div>
+
+                            {/* Danh sách tùy chọn: CHỈ CẦN Giá vốn và Bảng giá chung */}
+                            <div className="max-h-44 overflow-y-auto space-y-0.5">
+                              {[
+                                { key: '', label: 'Chọn bảng giá' },
+                                { key: 'COST', label: 'Giá vốn' },
+                                { key: 'STANDARD', label: 'Bảng giá chung' },
+                                ...existingPriceBooks
+                                  .filter(pb => !editingPriceBook || pb.priceBookId !== editingPriceBook.priceBookId)
+                                  .map(pb => ({ key: `PB_${pb.priceBookId}`, label: pb.priceBookName })),
+                              ]
+                                .filter(opt => !baseSearchKeyword.trim() || opt.label.toLowerCase().includes(baseSearchKeyword.toLowerCase().trim()))
+                                .map(opt => {
+                                  const isSelected =
+                                    opt.key === ''
+                                      ? !formulaBaseType
+                                      : opt.key === 'COST'
+                                      ? formulaBaseType === 'COST'
+                                      : opt.key === 'STANDARD'
+                                      ? formulaBaseType === 'STANDARD'
+                                      : formulaBaseType === 'PRICE_BOOK' && `PB_${formulaBasePriceBookId}` === opt.key;
+
+                                  return (
+                                    <button
+                                      key={opt.key}
+                                      type="button"
+                                      onClick={() => {
+                                        if (opt.key === '') {
+                                          setFormulaBaseType('');
+                                          setFormulaBasePriceBookId(null);
+                                        } else if (opt.key.startsWith('PB_')) {
+                                          setFormulaBaseType('PRICE_BOOK');
+                                          setFormulaBasePriceBookId(Number(opt.key.replace('PB_', '')));
+                                        } else {
+                                          setFormulaBaseType(opt.key);
+                                          setFormulaBasePriceBookId(null);
+                                        }
+                                        setIsBaseTypeDropdownOpen(false);
+                                        setBaseSearchKeyword('');
+                                      }}
+                                      className={`flex w-full items-center justify-between px-2.5 py-1.5 rounded text-left transition cursor-pointer ${
+                                        isSelected ? 'bg-blue-50/80 font-bold text-[#0071BA]' : 'text-slate-700 hover:bg-slate-100/70'
+                                      }`}
+                                    >
+                                      <span className="truncate">{opt.label}</span>
+                                      {isSelected && <Check size={14} className="text-[#0071BA] shrink-0 ml-1.5" />}
+                                    </button>
+                                  );
+                                })}
+                            </div>
+                          </div>
+                        )}
+                      </div>
 
                       {/* Toán tử + / - dạng nút tròn KiotViet */}
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-1 shrink-0">
                         <button
                           type="button"
                           onClick={() => setFormulaOperator('+')}
-                          className={`w-6 h-6 rounded-full border flex items-center justify-center text-xs font-bold transition cursor-pointer ${
+                          className={`w-7 h-7 rounded-full border flex items-center justify-center text-xs font-bold transition cursor-pointer ${
                             formulaOperator === '+'
                               ? 'border-[#0071BA] bg-[#0071BA] text-white shadow-2xs'
                               : 'border-slate-300 bg-white text-slate-500 hover:border-slate-400'
@@ -447,7 +525,7 @@ export default function CreatePriceBookModal({
                         <button
                           type="button"
                           onClick={() => setFormulaOperator('-')}
-                          className={`w-6 h-6 rounded-full border flex items-center justify-center text-xs font-bold transition cursor-pointer ${
+                          className={`w-7 h-7 rounded-full border flex items-center justify-center text-xs font-bold transition cursor-pointer ${
                             formulaOperator === '-'
                               ? 'border-[#0071BA] bg-[#0071BA] text-white shadow-2xs'
                               : 'border-slate-300 bg-white text-slate-500 hover:border-slate-400'
@@ -459,7 +537,7 @@ export default function CreatePriceBookModal({
                       </div>
 
                       {/* Ô nhập giá trị và chọn đơn vị VND / % tích hợp trong 1 ô */}
-                      <div className="flex items-center rounded-md bg-[#f0f2f5] px-2.5 h-8 border border-transparent focus-within:border-[#0071BA] focus-within:bg-white transition min-w-[210px]">
+                      <div className="flex items-center rounded-md bg-[#f0f2f5] px-2.5 h-8 border border-transparent focus-within:border-[#0071BA] focus-within:bg-white transition flex-1 min-w-[150px]">
                         <input
                           type="text"
                           inputMode="numeric"
@@ -492,7 +570,7 @@ export default function CreatePriceBookModal({
                         />
 
                         {/* Đơn vị VND / % dạng nút KiotViet */}
-                        <div className="flex items-center gap-1 border-l border-slate-300/70 pl-2 text-xs select-none">
+                        <div className="flex items-center gap-1 border-l border-slate-300/70 pl-2 text-xs select-none shrink-0">
                           <button
                             type="button"
                             onClick={() => setFormulaUnit('VND')}
