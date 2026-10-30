@@ -176,9 +176,9 @@ export default function CreatePriceBookModal({
         isActive,
         formulaBaseType: formulaBaseType || null,
         formulaBasePriceBookId: formulaBaseType === 'PRICE_BOOK' ? formulaBasePriceBookId : null,
-        formulaOperator: formulaValue !== '' ? formulaOperator : null,
-        formulaValue: formulaValue !== '' ? Number(formulaValue) : null,
-        formulaUnit: formulaValue !== '' ? formulaUnit : null,
+        formulaOperator: formulaBaseType ? formulaOperator : null,
+        formulaValue: formulaBaseType ? (formulaValue !== '' ? Number(formulaValue) : 0) : null,
+        formulaUnit: formulaBaseType ? (formulaUnit || 'VND') : null,
         allowUnlistedProducts,
         warnUnlistedProducts: allowUnlistedProducts ? warnUnlistedProducts : false,
         scopeBranchType,
@@ -392,73 +392,107 @@ export default function CreatePriceBookModal({
                             setFormulaBasePriceBookId(null);
                           }
                         }}
-                        className="h-8 rounded border border-slate-300 bg-white px-2.5 text-xs text-slate-800 outline-none focus:border-[#0071BA] min-w-[170px]"
+                        className="h-8 rounded-md border border-slate-300 bg-white px-3 text-xs text-slate-700 outline-none focus:border-[#0071BA] min-w-[160px] cursor-pointer"
                       >
-                        <option value="">-- Chọn nguồn giá cơ sở --</option>
-                        <option value="COST">Giá vốn (theo kho hoặc toàn cty)</option>
+                        <option value="">Chọn bảng giá</option>
+                        <option value="COST">Giá vốn</option>
+                        <option value="LATEST_PURCHASE">Giá nhập cuối</option>
                         <option value="STANDARD">Bảng giá chung</option>
                         {existingPriceBooks
                           .filter(pb => !editingPriceBook || pb.priceBookId !== editingPriceBook.priceBookId)
                           .map(pb => (
                             <option key={pb.priceBookId} value={`PB_${pb.priceBookId}`}>
-                              Bảng giá: {pb.priceBookName}
+                              {pb.priceBookName}
                             </option>
                           ))}
                       </select>
 
-                      {/* Toán tử + / - */}
-                      <div className="inline-flex rounded border border-slate-300 overflow-hidden bg-slate-100">
+                      {/* Toán tử + / - dạng nút tròn KiotViet */}
+                      <div className="flex items-center gap-1.5">
                         <button
                           type="button"
                           onClick={() => setFormulaOperator('+')}
-                          className={`px-2.5 py-1 text-xs font-bold transition ${
-                            formulaOperator === '+' ? 'bg-[#0071BA] text-white' : 'text-slate-600 hover:bg-slate-200'
+                          className={`w-6 h-6 rounded-full border flex items-center justify-center text-xs font-semibold transition cursor-pointer ${
+                            formulaOperator === '+'
+                              ? 'border-[#0071BA] text-[#0071BA] bg-blue-50/70 font-bold'
+                              : 'border-slate-300 text-slate-500 hover:border-slate-400 bg-white'
                           }`}
+                          title="Cộng thêm"
                         >
                           +
                         </button>
                         <button
                           type="button"
                           onClick={() => setFormulaOperator('-')}
-                          className={`px-2.5 py-1 text-xs font-bold transition ${
-                            formulaOperator === '-' ? 'bg-[#0071BA] text-white' : 'text-slate-600 hover:bg-slate-200'
+                          className={`w-6 h-6 rounded-full border flex items-center justify-center text-xs font-semibold transition cursor-pointer ${
+                            formulaOperator === '-'
+                              ? 'border-[#0071BA] text-[#0071BA] bg-blue-50/70 font-bold'
+                              : 'border-slate-300 text-slate-500 hover:border-slate-400 bg-white'
                           }`}
+                          title="Trừ đi"
                         >
-                          -
+                          –
                         </button>
                       </div>
 
-                      {/* Giá trị điều chỉnh */}
-                      <input
-                        type="number"
-                        min="0"
-                        step="any"
-                        value={formulaValue}
-                        onChange={e => setFormulaValue(e.target.value ? Number(e.target.value) : '')}
-                        placeholder="0"
-                        className="h-8 w-24 rounded border border-slate-300 px-2 text-right text-xs text-slate-800 outline-none focus:border-[#0071BA]"
-                      />
+                      {/* Ô nhập giá trị và chọn đơn vị VND / % tích hợp trong 1 ô */}
+                      <div className="flex items-center rounded-md bg-[#f0f2f5] px-3 h-8 border border-transparent focus-within:border-[#0071BA] focus-within:bg-white transition min-w-[210px]">
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          value={
+                            formulaValue === ''
+                              ? ''
+                              : formulaUnit === 'PERCENT'
+                                ? formulaValue
+                                : typeof formulaValue === 'number'
+                                  ? formulaValue.toLocaleString('vi-VN')
+                                  : formulaValue
+                          }
+                          onChange={e => {
+                            const val = e.target.value;
+                            if (formulaUnit === 'PERCENT') {
+                              const normalized = val.replace(/,/g, '.').replace(/[^0-9.]/g, '');
+                              if (normalized === '') {
+                                setFormulaValue('');
+                              } else {
+                                const parsed = parseFloat(normalized);
+                                setFormulaValue(isNaN(parsed) ? '' : parsed);
+                              }
+                            } else {
+                              const rawDigits = val.replace(/[^0-9]/g, '');
+                              setFormulaValue(rawDigits === '' ? '' : Number(rawDigits));
+                            }
+                          }}
+                          placeholder="0"
+                          className="w-full bg-transparent text-right text-xs font-semibold text-slate-800 outline-none placeholder:text-slate-400 pr-3"
+                        />
 
-                      {/* Đơn vị VND / % */}
-                      <div className="inline-flex rounded border border-slate-300 overflow-hidden bg-slate-100">
-                        <button
-                          type="button"
-                          onClick={() => setFormulaUnit('VND')}
-                          className={`px-2 py-1 text-xs font-semibold transition ${
-                            formulaUnit === 'VND' ? 'bg-[#0071BA] text-white' : 'text-slate-600 hover:bg-slate-200'
-                          }`}
-                        >
-                          VND
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setFormulaUnit('PERCENT')}
-                          className={`px-2 py-1 text-xs font-semibold transition ${
-                            formulaUnit === 'PERCENT' ? 'bg-[#0071BA] text-white' : 'text-slate-600 hover:bg-slate-200'
-                          }`}
-                        >
-                          %
-                        </button>
+                        {/* Đơn vị VND / % ngay trong ô nhập */}
+                        <div className="flex items-center gap-2 border-l border-slate-300/70 pl-2.5 text-xs select-none">
+                          <button
+                            type="button"
+                            onClick={() => setFormulaUnit('VND')}
+                            className={`font-semibold cursor-pointer transition ${
+                              formulaUnit === 'VND'
+                                ? 'text-[#0071BA] font-bold'
+                                : 'text-slate-400 hover:text-slate-600'
+                            }`}
+                          >
+                            VND
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setFormulaUnit('PERCENT')}
+                            className={`font-semibold cursor-pointer transition ${
+                              formulaUnit === 'PERCENT'
+                                ? 'text-[#0071BA] font-bold'
+                                : 'text-slate-400 hover:text-slate-600'
+                            }`}
+                          >
+                            %
+                          </button>
+                        </div>
                       </div>
                     </div>
 
