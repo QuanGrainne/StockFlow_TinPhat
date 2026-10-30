@@ -992,13 +992,32 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
     return Array.from(set).filter(Boolean);
   }, [goods]);
 
+  // Quản lý vị trí kho tùy chỉnh (Chuẩn KiotViet - Ảnh 2)
+  const [customLocations, setCustomLocations] = useState<string[]>([]);
+  const [isQuickLocationModalOpen, setIsQuickLocationModalOpen] = useState(false);
+  const [newLocationName, setNewLocationName] = useState('');
+  const [newLocationDesc, setNewLocationDesc] = useState('');
+
   const locationsList = useMemo(() => {
     const set = new Set<string>();
     goods.forEach((g) => {
       if (g.locationName) set.add(g.locationName);
     });
+    customLocations.forEach((l) => set.add(l));
     DEFAULT_LOCATION_OPTIONS.forEach((l) => set.add(l));
     return Array.from(set).filter(Boolean);
+  }, [goods, customLocations]);
+
+  // Thống kê số lượng sản phẩm theo từng nhóm hàng (Ảnh 1)
+  const categoryCounts = useMemo(() => {
+    const map: Record<string, number> = {};
+    goods.forEach((g) => {
+      const cat = g.subCategory || g.category;
+      if (cat) {
+        map[cat] = (map[cat] || 0) + 1;
+      }
+    });
+    return map;
   }, [goods]);
   // Quản lý tích ô vuông các mặt hàng được chọn
   const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
@@ -1874,6 +1893,27 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
     showToast('Đã tạo thương hiệu "' + trimmed + '" thành công!');
   };
 
+  const handleSaveQuickLocation = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const name = newLocationName.trim();
+    if (!name) return;
+
+    setCustomLocations((prev) => Array.from(new Set([...prev, name])));
+    setFormLocation(name);
+    setIsQuickLocationModalOpen(false);
+    setNewLocationName('');
+    setNewLocationDesc('');
+    showToast('Đã tạo vị trí "' + name + '" thành công!');
+  };
+
+  const handleQuickCreateLocationDirect = (name: string) => {
+    if (!name.trim()) return;
+    const trimmed = name.trim();
+    setCustomLocations((prev) => Array.from(new Set([...prev, trimmed])));
+    setFormLocation(trimmed);
+    showToast('Đã tạo vị trí "' + trimmed + '" thành công!');
+  };
+
   const handleOpenCreate = () => {
     setModalMode('create');
     setEditingItem(null);
@@ -2644,12 +2684,19 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
       if (!item.isStarred) return false;
     }
 
-    // ─── 1. Nhóm hàng (Category / SubCategory) ───
-    if (filterSidebarState.category && filterSidebarState.category.trim()) {
-      const cat = filterSidebarState.category.trim().toLowerCase();
-      const matchCat =
-        (item.category && item.category.toLowerCase().includes(cat)) ||
-        (item.subCategory && item.subCategory.toLowerCase().includes(cat));
+    // ─── 1. Nhóm hàng (Category / SubCategory) - Hỗ trợ chọn nhiều nhóm (Multi-select) ───
+    const selectedCats = filterSidebarState.categories && filterSidebarState.categories.length > 0
+      ? filterSidebarState.categories
+      : (filterSidebarState.category?.trim() ? [filterSidebarState.category.trim()] : []);
+
+    if (selectedCats.length > 0) {
+      const matchCat = selectedCats.some((c) => {
+        const catLower = c.trim().toLowerCase();
+        return (
+          (item.category && item.category.toLowerCase().includes(catLower)) ||
+          (item.subCategory && item.subCategory.toLowerCase().includes(catLower))
+        );
+      });
       if (!matchCat) return false;
     }
 
@@ -3013,7 +3060,9 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
           state={filterSidebarState}
           onChange={(patch) => setFilterSidebarState((prev) => ({ ...prev, ...patch }))}
           onCreateCategory={() => { setNewCategoryName(''); setNewCategoryDesc(''); setIsQuickCategoryModalOpen(true); }}
+          onCreateLocation={() => { setNewLocationName(''); setNewLocationDesc(''); setIsQuickLocationModalOpen(true); }}
           categoriesList={categoriesList}
+          categoryCounts={categoryCounts}
           suppliersList={suppliersList}
           locationsList={locationsList}
           isCollapsed={isFilterSidebarCollapsed}
@@ -4909,9 +4958,9 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                       className="w-full px-4 py-3 bg-slate-50/70 hover:bg-slate-50 flex items-center justify-between text-xs font-bold text-slate-800 cursor-pointer select-none"
                     >
                       <div className="text-left">
-                        <div>Vị trí, trọng lượng, kích thước</div>
+                        <div>Vị trí, trọng lượng</div>
                         <div className="text-[11px] text-slate-400 font-normal mt-0.5">
-                          Quản lý việc sắp xếp kho, vị trí bán hàng hoặc quy cách giao hàng
+                          Quản lý việc sắp xếp kho, vị trí bán hàng hoặc trọng lượng hàng hóa
                         </div>
                       </div>
                       {specAccordionOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
@@ -4920,15 +4969,21 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                       <div className="p-4 space-y-3 bg-white border-t border-slate-100">
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                           <div>
-                            <div className="flex items-center justify-between mb-1">
-                              <label className="font-semibold text-slate-700">Vị trí kho</label>
-                              <span className="text-[10px] text-blue-600 font-medium">Tự nhập / chọn</span>
-                            </div>
-                            <CustomCombobox
+                            <KiotSelectWithSearch
+                              label="Vị trí"
+                              onCreateNew={() => {
+                                setNewLocationName('');
+                                setNewLocationDesc('');
+                                setIsQuickLocationModalOpen(true);
+                              }}
+                              createButtonText="Tạo mới"
                               value={formLocation}
                               onChange={setFormLocation}
-                              options={DEFAULT_LOCATION_OPTIONS}
-                              placeholder="Nhập hoặc chọn vị trí (VD: Kệ A-01-T2)..."
+                              options={locationsList}
+                              placeholder="Chọn vị trí"
+                              searchPlaceholder="Tìm kiếm vị trí..."
+                              allowClear={true}
+                              onQuickCreate={handleQuickCreateLocationDirect}
                             />
                           </div>
 
@@ -6175,6 +6230,74 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                       <span>Lưu nhóm hàng</span>
                     </>
                   )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* QUICK MODAL: TẠO MỚI VỊ TRÍ KHO (ẢNH 2) */}
+      {isQuickLocationModalOpen && (
+        <div className="fixed inset-0 z-[1000] bg-black/40 backdrop-blur-[2px] flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-200 bg-slate-50/60">
+              <div className="flex items-center gap-2">
+                <MapPin size={16} className="text-blue-600" />
+                <h3 className="text-sm font-bold text-slate-800">Tạo mới vị trí</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsQuickLocationModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-md transition cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveQuickLocation} className="p-5 space-y-4 text-xs">
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1.5">
+                  Tên vị trí <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  autoFocus
+                  value={newLocationName}
+                  onChange={(e) => setNewLocationName(e.target.value)}
+                  placeholder="VD: Kệ A-01-T2, Khu Vực B, Dãy C..."
+                  required
+                  className="w-full h-9 px-3 rounded-lg border border-slate-300 text-xs text-slate-800 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 font-medium"
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1.5">
+                  Ghi chú / Mô tả vị trí
+                </label>
+                <textarea
+                  rows={2}
+                  value={newLocationDesc}
+                  onChange={(e) => setNewLocationDesc(e.target.value)}
+                  placeholder="Mô tả chi tiết về vị trí này..."
+                  className="w-full p-2.5 rounded-lg border border-slate-300 text-xs text-slate-800 focus:outline-none focus:border-blue-500 font-normal resize-none"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsQuickLocationModalOpen(false)}
+                  className="h-9 px-4 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 font-medium transition cursor-pointer"
+                >
+                  Bỏ qua
+                </button>
+                <button
+                  type="submit"
+                  className="h-9 px-4 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium shadow-sm transition flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Check size={13} />
+                  <span>Lưu vị trí</span>
                 </button>
               </div>
             </form>
