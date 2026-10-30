@@ -11,7 +11,7 @@ export interface PriceBook {
   formulaBasePriceBookName: string | null;
   formulaOperator: '+' | '-' | null;
   formulaValue: number | null;
-  formulaUnit: 'VND' | 'PERCENT' | null;
+  formulaUnit: 'VND' | 'PERCENT' | string | null;
   allowUnlistedProducts: boolean;
   warnUnlistedProducts: boolean;
   scopeBranchType: 'ALL' | 'SPECIFIC';

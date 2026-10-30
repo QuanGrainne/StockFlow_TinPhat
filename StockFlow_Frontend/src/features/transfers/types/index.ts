@@ -50,7 +50,7 @@ export interface TransferFilterState {
   statuses: TransferStatus[];
   matchStatus?: 'ALL' | 'MATCHED' | 'UNMATCHED';
   dateType: 'transfer' | 'received';
-  timeRange: 'this_month' | 'custom' | 'today' | 'this_week';
+  timeRange: string;
   dateFrom?: string;
   dateTo?: string;
   search: string;

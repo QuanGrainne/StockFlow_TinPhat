@@ -82,7 +82,8 @@ public record CreatePurchaseRequest(
     decimal PaidAmount,
     string? PaymentMethod, // "CASH", "BANK_TRANSFER"
     string? Notes,
-    List<CreatePurchaseItemRequest> Items
+    List<CreatePurchaseItemRequest> Items,
+    string? PurchaseCode = null
 );
 
 public record UpdatePurchaseRequest(

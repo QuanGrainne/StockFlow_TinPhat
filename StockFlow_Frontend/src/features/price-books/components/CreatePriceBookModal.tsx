@@ -270,7 +270,7 @@ export default function CreatePriceBookModal({
       setFormulaBasePriceBookId(editingPriceBook.formulaBasePriceBookId);
       setFormulaOperator(editingPriceBook.formulaOperator || '+');
       setFormulaValue(editingPriceBook.formulaValue ?? '');
-      setFormulaUnit(editingPriceBook.formulaUnit || 'VND');
+      setFormulaUnit(editingPriceBook.formulaUnit === 'PERCENT' ? 'PERCENT' : 'VND');
       setAutoUpdateByBase(Boolean(editingPriceBook.formulaBaseType));
 
       setAllowUnlistedProducts(editingPriceBook.allowUnlistedProducts);

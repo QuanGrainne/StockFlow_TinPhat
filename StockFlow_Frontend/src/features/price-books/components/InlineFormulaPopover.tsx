@@ -37,7 +37,7 @@ export default function InlineFormulaPopover({
   const [basePriceBookId, setBasePriceBookId] = useState<number | null>(priceBook.formulaBasePriceBookId || null);
   const [operator, setOperator] = useState<'+' | '-'>(priceBook.formulaOperator || '+');
   const [value, setValue] = useState<number | ''>(priceBook.formulaValue ?? 10);
-  const [unit, setUnit] = useState<'VND' | 'PERCENT'>(priceBook.formulaUnit || 'PERCENT');
+  const [unit, setUnit] = useState<'VND' | 'PERCENT'>(priceBook.formulaUnit === 'VND' ? 'VND' : 'PERCENT');
   const [applyToAll, setApplyToAll] = useState(false);
   const [loading, setLoading] = useState(false);
 
