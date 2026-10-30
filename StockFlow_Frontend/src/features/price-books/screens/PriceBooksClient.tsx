@@ -14,6 +14,7 @@ import { Table, Input, Button, Tag, notification } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import PriceBookFilterSidebar from '../components/PriceBookFilterSidebar';
 import CreatePriceBookModal from '../components/CreatePriceBookModal';
+import AddCategoryToPriceBookModal from '../components/AddCategoryToPriceBookModal';
 import { PriceBook, PriceBookMatrixItem } from '../types';
 import { priceBookService } from '../services/priceBookService';
 import { apiClient } from '@/lib/api/client';
@@ -56,6 +57,7 @@ export default function PriceBooksClient() {
   // Modals
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [editingPriceBook, setEditingPriceBook] = useState<PriceBook | null>(null);
+  const [isAddCategoryModalOpen, setIsAddCategoryModalOpen] = useState<boolean>(false);
 
   // Load initial lookups
   useEffect(() => {
@@ -72,6 +74,10 @@ export default function PriceBooksClient() {
     return priceBooks.find(b => b.isDefault) || priceBooks[0];
   }, [priceBooks]);
   const defaultBookId = defaultBook?.priceBookId;
+
+  const activeCustomBook = useMemo(() => {
+    return priceBooks.find(b => selectedPriceBookIds.includes(b.priceBookId) && !b.isDefault) || null;
+  }, [priceBooks, selectedPriceBookIds]);
 
   // Rule KiotViet:
   // 1. Khi không chọn bảng giá nào: displayedBookIds = [] (hiện Chưa có bảng giá)
@@ -209,6 +215,50 @@ export default function PriceBooksClient() {
       });
     } finally {
       setSavingPrices(false);
+    }
+  };
+
+  // Thêm tất cả hàng hóa vào bảng giá tùy biến
+  const handleAddAllProducts = async () => {
+    if (!activeCustomBook) return;
+    setLoading(true);
+    try {
+      await priceBookService.applyFormula(activeCustomBook.priceBookId, { allProducts: true });
+      api.success({
+        message: 'Cập nhật thành công',
+        description: `Đã thêm tất cả hàng hóa vào bảng giá "${activeCustomBook.priceBookName}".`,
+      });
+      await loadPriceBooks();
+      await loadMatrix();
+    } catch {
+      api.error({
+        message: 'Lỗi',
+        description: 'Không thể thêm hàng hóa vào bảng giá.',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Thêm theo nhóm hàng đã chọn vào bảng giá tùy biến
+  const handleConfirmAddCategories = async (catIds: number[]) => {
+    if (!activeCustomBook || catIds.length === 0) return;
+    setLoading(true);
+    try {
+      await priceBookService.applyFormula(activeCustomBook.priceBookId, { categoryIds: catIds });
+      api.success({
+        message: 'Cập nhật dữ liệu thành công',
+        description: `Đã thêm các nhóm hàng vào bảng giá "${activeCustomBook.priceBookName}".`,
+      });
+      await loadPriceBooks();
+      await loadMatrix();
+    } catch {
+      api.error({
+        message: 'Lỗi',
+        description: 'Không thể thêm nhóm hàng vào bảng giá.',
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -506,8 +556,8 @@ export default function PriceBooksClient() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             {/* Title & Count */}
             <div className="flex items-center gap-2">
-              <span className="text-sm font-semibold text-slate-800">
-                Thiết lập giá sản phẩm
+              <span className="text-sm font-bold text-slate-800">
+                {activeCustomBook ? activeCustomBook.priceBookName : 'Thiết lập giá sản phẩm'}
               </span>
               <span className="text-xs text-slate-400">
                 ({totalCount} hàng hóa)
@@ -599,6 +649,43 @@ export default function PriceBooksClient() {
                     </div>
                     <span className="text-sm font-semibold text-slate-800">Chưa có bảng giá</span>
                   </div>
+                ) : activeCustomBook && matrixItems.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-20 text-center select-none">
+                    <div className="w-24 h-24 rounded-full bg-blue-50/80 flex items-center justify-center mb-3">
+                      <svg
+                        className="w-12 h-12 text-[#0071BA]"
+                        viewBox="0 0 48 48"
+                        fill="none"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <rect x="8" y="14" width="32" height="24" rx="4" stroke="#0071BA" strokeWidth="2.5" fill="#e0f2fe" />
+                        <path d="M8 24h10l3 5h14l3-5h2" stroke="#0071BA" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" fill="white" />
+                        <line x1="16" y1="19" x2="32" y2="19" stroke="#0071BA" strokeWidth="2.5" strokeLinecap="round" />
+                      </svg>
+                    </div>
+                    <span className="text-sm font-bold text-slate-800 mb-1">
+                      Chưa có hàng hóa trong bảng giá
+                    </span>
+                    <p className="text-xs text-slate-500 mb-4 max-w-sm">
+                      Bạn có thể thêm hàng hóa cụ thể hoặc thêm nhanh theo nhóm hàng
+                    </p>
+                    <div className="flex items-center gap-2.5">
+                      <button
+                        type="button"
+                        onClick={handleAddAllProducts}
+                        className="h-8 px-4 rounded-md border border-slate-300 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 transition cursor-pointer shadow-2xs"
+                      >
+                        Thêm tất cả hàng hóa
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setIsAddCategoryModalOpen(true)}
+                        className="h-8 px-4 rounded-md bg-[#0071BA] hover:bg-[#005f9d] text-xs font-semibold text-white transition cursor-pointer shadow-xs"
+                      >
+                        Thêm theo nhóm hàng
+                      </button>
+                    </div>
+                  </div>
                 ) : (
                   <div className="py-12 text-slate-400 text-xs">Không tìm thấy hàng hóa nào phù hợp</div>
                 ),
@@ -635,12 +722,23 @@ export default function PriceBooksClient() {
             message: 'Thành công',
             description: `Bảng giá "${saved.priceBookName}" đã được lưu.`,
           });
+          // Tự động chọn bảng giá mới này trên sidebar theo đúng KiotViet!
+          setSelectedPriceBookIds([saved.priceBookId]);
           loadPriceBooks();
           loadMatrix();
         }}
         onDelete={handleDeletePriceBook}
         editingPriceBook={editingPriceBook}
         existingPriceBooks={priceBooks}
+      />
+
+      {/* MODAL CHỌN NHÓM HÀNG VÀO BẢNG GIÁ */}
+      <AddCategoryToPriceBookModal
+        isOpen={isAddCategoryModalOpen}
+        onClose={() => setIsAddCategoryModalOpen(false)}
+        categories={categories}
+        priceBookName={activeCustomBook?.priceBookName || ''}
+        onConfirm={handleConfirmAddCategories}
       />
     </div>
   );

@@ -62,6 +62,24 @@ export default function CreatePriceBookModal({
   const [formulaValue, setFormulaValue] = useState<number | ''>('');
   const [formulaUnit, setFormulaUnit] = useState<'VND' | 'PERCENT'>('VND');
 
+  // Checkboxes mở rộng dưới công thức giá
+  const [autoUpdateByBase, setAutoUpdateByBase] = useState(true);
+  const [includeProductsFromBase, setIncludeProductsFromBase] = useState(false);
+  const [autoRounding, setAutoRounding] = useState(true);
+  const [roundingUnit, setRoundingUnit] = useState<string>('dong');
+  const [isRoundingOpen, setIsRoundingOpen] = useState(false);
+
+  const baseNameDisplay = React.useMemo(() => {
+    if (formulaBaseType === 'COST') return 'Giá vốn';
+    if (formulaBaseType === 'LATEST_PURCHASE') return 'Giá nhập cuối';
+    if (formulaBaseType === 'STANDARD') return 'Bảng giá chung';
+    if (formulaBaseType === 'PRICE_BOOK' && formulaBasePriceBookId) {
+      const b = existingPriceBooks.find(x => x.priceBookId === formulaBasePriceBookId);
+      return b ? b.priceBookName : 'Bảng giá đã chọn';
+    }
+    return 'Bảng giá chung';
+  }, [formulaBaseType, formulaBasePriceBookId, existingPriceBooks]);
+
   const [allowUnlistedProducts, setAllowUnlistedProducts] = useState(true);
   const [warnUnlistedProducts, setWarnUnlistedProducts] = useState(false);
 
@@ -137,6 +155,11 @@ export default function CreatePriceBookModal({
       setFormulaOperator('+');
       setFormulaValue('');
       setFormulaUnit('VND');
+      setAutoUpdateByBase(true);
+      setIncludeProductsFromBase(false);
+      setAutoRounding(true);
+      setRoundingUnit('dong');
+      setIsRoundingOpen(false);
 
       setAllowUnlistedProducts(true);
       setWarnUnlistedProducts(false);
@@ -187,7 +210,7 @@ export default function CreatePriceBookModal({
         scopeCustomerGroupCodes: scopeCustomerType === 'SPECIFIC' ? selectedCustomerGroupCodes : [],
         scopeUserType,
         scopeUserIds: scopeUserType === 'SPECIFIC' ? selectedUserIds : [],
-        autoApplyFormula: true,
+        autoApplyFormula: includeProductsFromBase,
       };
 
       let result: PriceBook;
@@ -412,10 +435,10 @@ export default function CreatePriceBookModal({
                         <button
                           type="button"
                           onClick={() => setFormulaOperator('+')}
-                          className={`w-6 h-6 rounded-full border flex items-center justify-center text-xs font-semibold transition cursor-pointer ${
+                          className={`w-6 h-6 rounded-full border flex items-center justify-center text-xs font-bold transition cursor-pointer ${
                             formulaOperator === '+'
-                              ? 'border-[#0071BA] text-[#0071BA] bg-blue-50/70 font-bold'
-                              : 'border-slate-300 text-slate-500 hover:border-slate-400 bg-white'
+                              ? 'border-[#0071BA] bg-[#0071BA] text-white shadow-2xs'
+                              : 'border-slate-300 bg-white text-slate-500 hover:border-slate-400'
                           }`}
                           title="Cộng thêm"
                         >
@@ -424,10 +447,10 @@ export default function CreatePriceBookModal({
                         <button
                           type="button"
                           onClick={() => setFormulaOperator('-')}
-                          className={`w-6 h-6 rounded-full border flex items-center justify-center text-xs font-semibold transition cursor-pointer ${
+                          className={`w-6 h-6 rounded-full border flex items-center justify-center text-xs font-bold transition cursor-pointer ${
                             formulaOperator === '-'
-                              ? 'border-[#0071BA] text-[#0071BA] bg-blue-50/70 font-bold'
-                              : 'border-slate-300 text-slate-500 hover:border-slate-400 bg-white'
+                              ? 'border-[#0071BA] bg-[#0071BA] text-white shadow-2xs'
+                              : 'border-slate-300 bg-white text-slate-500 hover:border-slate-400'
                           }`}
                           title="Trừ đi"
                         >
@@ -436,7 +459,7 @@ export default function CreatePriceBookModal({
                       </div>
 
                       {/* Ô nhập giá trị và chọn đơn vị VND / % tích hợp trong 1 ô */}
-                      <div className="flex items-center rounded-md bg-[#f0f2f5] px-3 h-8 border border-transparent focus-within:border-[#0071BA] focus-within:bg-white transition min-w-[210px]">
+                      <div className="flex items-center rounded-md bg-[#f0f2f5] px-2.5 h-8 border border-transparent focus-within:border-[#0071BA] focus-within:bg-white transition min-w-[210px]">
                         <input
                           type="text"
                           inputMode="numeric"
@@ -465,18 +488,18 @@ export default function CreatePriceBookModal({
                             }
                           }}
                           placeholder="0"
-                          className="w-full bg-transparent text-right text-xs font-semibold text-slate-800 outline-none placeholder:text-slate-400 pr-3"
+                          className="w-full bg-transparent text-right text-xs font-semibold text-slate-800 outline-none placeholder:text-slate-400 pr-2"
                         />
 
-                        {/* Đơn vị VND / % ngay trong ô nhập */}
-                        <div className="flex items-center gap-2 border-l border-slate-300/70 pl-2.5 text-xs select-none">
+                        {/* Đơn vị VND / % dạng nút KiotViet */}
+                        <div className="flex items-center gap-1 border-l border-slate-300/70 pl-2 text-xs select-none">
                           <button
                             type="button"
                             onClick={() => setFormulaUnit('VND')}
-                            className={`font-semibold cursor-pointer transition ${
+                            className={`px-2 py-0.5 rounded text-xs transition cursor-pointer ${
                               formulaUnit === 'VND'
-                                ? 'text-[#0071BA] font-bold'
-                                : 'text-slate-400 hover:text-slate-600'
+                                ? 'bg-[#0071BA] text-white font-bold shadow-2xs'
+                                : 'text-slate-500 hover:text-slate-700 font-medium'
                             }`}
                           >
                             VND
@@ -484,15 +507,110 @@ export default function CreatePriceBookModal({
                           <button
                             type="button"
                             onClick={() => setFormulaUnit('PERCENT')}
-                            className={`font-semibold cursor-pointer transition ${
+                            className={`px-2 py-0.5 rounded text-xs transition cursor-pointer ${
                               formulaUnit === 'PERCENT'
-                                ? 'text-[#0071BA] font-bold'
-                                : 'text-slate-400 hover:text-slate-600'
+                                ? 'bg-[#0071BA] text-white font-bold shadow-2xs'
+                                : 'text-slate-500 hover:text-slate-700 font-medium'
                             }`}
                           >
                             %
                           </button>
                         </div>
+                      </div>
+                    </div>
+
+                    {/* 3 Checkboxes mở rộng chuẩn KiotViet */}
+                    <div className="space-y-2 pt-2.5 border-t border-slate-100">
+                      {/* 1. Tự động cập nhật giá theo Bảng giá chung */}
+                      <label className="flex items-center gap-2 cursor-pointer select-none text-xs text-slate-700">
+                        <input
+                          type="checkbox"
+                          checked={autoUpdateByBase}
+                          onChange={e => setAutoUpdateByBase(e.target.checked)}
+                          className="rounded accent-[#0071BA] w-3.5 h-3.5 cursor-pointer"
+                        />
+                        <span>
+                          Tự động cập nhật giá theo <strong>{baseNameDisplay}</strong>
+                        </span>
+                      </label>
+
+                      {/* 2. Thêm hàng hóa từ Bảng giá chung khi tạo bảng giá này */}
+                      <label className="flex items-center gap-2 cursor-pointer select-none text-xs text-slate-700">
+                        <input
+                          type="checkbox"
+                          checked={includeProductsFromBase}
+                          onChange={e => setIncludeProductsFromBase(e.target.checked)}
+                          className="rounded accent-[#0071BA] w-3.5 h-3.5 cursor-pointer"
+                        />
+                        <span>
+                          Thêm hàng hóa từ <strong>{baseNameDisplay}</strong> khi tạo bảng giá này
+                        </span>
+                      </label>
+
+                      {/* 3. Tự động làm tròn giá đến [ đồng v ] ⓘ */}
+                      <div className="flex items-center gap-2 text-xs text-slate-700 select-none relative">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={autoRounding}
+                            onChange={e => setAutoRounding(e.target.checked)}
+                            className="rounded accent-[#0071BA] w-3.5 h-3.5 cursor-pointer"
+                          />
+                          <span>Tự động làm tròn giá đến</span>
+                        </label>
+
+                        <div className="relative">
+                          <button
+                            type="button"
+                            disabled={!autoRounding}
+                            onClick={() => setIsRoundingOpen(!isRoundingOpen)}
+                            className="inline-flex items-center gap-1 font-semibold text-[#0071BA] hover:underline cursor-pointer disabled:opacity-50"
+                          >
+                            <span>
+                              {
+                                {
+                                  dong: 'đồng',
+                                  chuc: 'chục đồng',
+                                  tram: 'trăm đồng',
+                                  nghin: 'nghìn đồng',
+                                  chuc_nghin: 'chục nghìn đồng',
+                                }[roundingUnit] || 'đồng'
+                              }
+                            </span>
+                            <ChevronDown size={13} className="text-[#0071BA]" />
+                          </button>
+
+                          {isRoundingOpen && (
+                            <div className="absolute left-0 top-full mt-1 z-50 w-36 rounded-md border border-slate-200 bg-white py-1 shadow-lg text-xs">
+                              {[
+                                { key: 'dong', label: 'đồng' },
+                                { key: 'chuc', label: 'chục đồng' },
+                                { key: 'tram', label: 'trăm đồng' },
+                                { key: 'nghin', label: 'nghìn đồng' },
+                                { key: 'chuc_nghin', label: 'chục nghìn đồng' },
+                              ].map(opt => (
+                                <button
+                                  key={opt.key}
+                                  type="button"
+                                  onClick={() => {
+                                    setRoundingUnit(opt.key);
+                                    setIsRoundingOpen(false);
+                                  }}
+                                  className="flex w-full items-center justify-between px-3 py-1.5 text-left hover:bg-slate-50 transition cursor-pointer"
+                                >
+                                  <span className={roundingUnit === opt.key ? 'font-bold text-[#0071BA]' : 'text-slate-700'}>
+                                    {opt.label}
+                                  </span>
+                                  {roundingUnit === opt.key && <Check size={13} className="text-[#0071BA]" />}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        <span title="Làm tròn giá bán theo đơn vị tiền tệ" className="text-slate-400 cursor-help">
+                          <Info size={13} />
+                        </span>
                       </div>
                     </div>
 
