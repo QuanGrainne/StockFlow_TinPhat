@@ -8,14 +8,21 @@ import { apiClient } from '@/lib/api/client';
 
 interface WarehouseOption {
   warehouseId: number;
-  warehouseCode: string;
-  warehouseName: string;
+  code?: string;
+  name?: string;
+  warehouseCode?: string;
+  warehouseName?: string;
+  status?: string;
 }
 
 interface UserOption {
-  userId: number;
+  id?: number;
+  userId?: number;
   username: string;
-  fullName: string;
+  fullName?: string;
+  name?: string;
+  code?: string;
+  roleTitle?: string;
 }
 
 interface MultiSelectScopeInputProps<T extends string | number> {
@@ -244,7 +251,7 @@ export default function CreatePriceBookModal({
       .then(res => setWarehouses(Array.isArray(res) ? res : []))
       .catch(() => {});
 
-    apiClient.get<UserOption[]>('/api/admin/users')
+    apiClient.get<UserOption[]>('/api/staff')
       .then(res => setUsers(Array.isArray(res) ? res : []))
       .catch(() => {});
   }, [isOpen]);
@@ -876,10 +883,10 @@ export default function CreatePriceBookModal({
           {/* TAB 2: PHẠM VI ÁP DỤNG CHUẨN KIOTVIET */}
           {activeTab === 'scope' && (
             <div className="space-y-4">
-              {/* Section 1: Chi nhánh */}
+              {/* Section 1: Chi nhánh / Kho áp dụng */}
               <div className="rounded-lg border border-slate-200 bg-white p-4 space-y-3 text-xs">
                 <span className="block font-bold text-slate-800 uppercase tracking-wide">
-                  Chi nhánh
+                  Chi nhánh / Kho áp dụng
                 </span>
                 <div className="space-y-2">
                   <label className="flex items-center gap-2 cursor-pointer">
@@ -890,7 +897,7 @@ export default function CreatePriceBookModal({
                       onChange={() => setScopeBranchType('ALL')}
                       className="accent-[#0071BA]"
                     />
-                    <span className="font-medium text-slate-800">Toàn hệ thống</span>
+                    <span className="font-medium text-slate-800">Toàn hệ thống (Tất cả chi nhánh / kho)</span>
                   </label>
 
                   <label className="flex items-center gap-2 cursor-pointer">
@@ -901,14 +908,17 @@ export default function CreatePriceBookModal({
                       onChange={() => setScopeBranchType('SPECIFIC')}
                       className="accent-[#0071BA]"
                     />
-                    <span className="font-medium text-slate-800">Chi nhánh cụ thể</span>
+                    <span className="font-medium text-slate-800">Chi nhánh / Kho cụ thể</span>
                   </label>
                 </div>
 
                 {scopeBranchType === 'SPECIFIC' && (
                   <MultiSelectScopeInput
-                    placeholder="Chọn chi nhánh"
-                    options={warehouses.map(w => ({ value: w.warehouseId, label: w.warehouseName }))}
+                    placeholder="Chọn chi nhánh / kho áp dụng"
+                    options={warehouses.map(w => ({
+                      value: w.warehouseId,
+                      label: `${w.name || w.warehouseName || w.code || `Kho #${w.warehouseId}`}${w.code ? ` (${w.code})` : ''}`
+                    }))}
                     selectedValues={selectedWarehouseIds}
                     onChange={setSelectedWarehouseIds}
                   />
@@ -986,7 +996,10 @@ export default function CreatePriceBookModal({
                 {scopeUserType === 'SPECIFIC' && (
                   <MultiSelectScopeInput
                     placeholder="Chọn người tạo giao dịch"
-                    options={users.map(u => ({ value: u.userId, label: u.fullName || u.username }))}
+                    options={users.map(u => ({
+                      value: u.id ?? u.userId ?? 0,
+                      label: `${u.name || u.fullName || u.username}${u.code ? ` (${u.code})` : ''}${u.roleTitle ? ` - ${u.roleTitle}` : ''}`
+                    }))}
                     selectedValues={selectedUserIds}
                     onChange={setSelectedUserIds}
                   />

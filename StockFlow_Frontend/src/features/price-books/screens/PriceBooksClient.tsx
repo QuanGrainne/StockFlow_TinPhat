@@ -463,10 +463,20 @@ export default function PriceBooksClient() {
               computedPrice = Math.max(0, Math.round(book.formulaOperator === '-' ? basePrice - delta : basePrice + delta));
             }
 
+            const isLoss = !isDefaultBook && record.costPrice > 0 && computedPrice > 0 && computedPrice < record.costPrice;
+
             return (
               <div
-                className="h-8 w-full rounded border border-slate-200 bg-slate-50/90 px-2.5 flex items-center justify-end text-right text-xs font-semibold text-slate-600 select-all cursor-not-allowed group/locked"
-                title="Bảng giá đang tự động cập nhật theo Bảng giá chung. Bấm vào biểu tượng ⚙️ ở tiêu đề cột để tắt tự động cập nhật nếu muốn sửa giá tay."
+                className={`h-8 w-full rounded border px-2.5 flex items-center justify-end text-right text-xs font-semibold select-all cursor-not-allowed group/locked ${
+                  isLoss
+                    ? 'border-rose-300 bg-rose-50/80 text-rose-600 font-bold'
+                    : 'border-slate-200 bg-slate-50/90 text-slate-600'
+                }`}
+                title={
+                  isLoss
+                    ? `Cảnh báo bán lỗ: Giá bán (${currencyFormatter.format(computedPrice)} ₫) thấp hơn giá vốn (${currencyFormatter.format(record.costPrice)} ₫)`
+                    : 'Bảng giá đang tự động cập nhật theo Bảng giá chung. Bấm vào biểu tượng ⚙️ ở tiêu đề cột để tắt tự động cập nhật nếu muốn sửa giá tay.'
+                }
               >
                 <span>{currencyFormatter.format(computedPrice)} ₫</span>
               </div>
@@ -478,6 +488,7 @@ export default function PriceBooksClient() {
           const editKey = `${record.productId}_${bookId}`;
           const isEdited = editKey in editedPrices;
           const currentVal = isEdited ? editedPrices[editKey] : (record.prices[bookId] ?? 0);
+          const isLoss = !isDefaultBook && record.costPrice > 0 && currentVal > 0 && currentVal < record.costPrice;
           const isPopoverOpen = formulaPopoverCell?.productId === record.productId && formulaPopoverCell?.bookId === bookId;
           const isFocused = focusedCell === editKey;
 
@@ -529,6 +540,11 @@ export default function PriceBooksClient() {
                   color="#0f172a"
                   title={
                     <div className="flex items-center gap-1.5 py-0.5 text-xs text-white">
+                      {isLoss && (
+                        <span className="rounded bg-rose-500 px-1.5 py-0.5 text-[10px] font-bold text-white uppercase tracking-wider">
+                          Bán lỗ
+                        </span>
+                      )}
                       <span>Hoặc sử dụng</span>
                       <button
                         type="button"
@@ -551,11 +567,14 @@ export default function PriceBooksClient() {
                     onBlur={() => setTimeout(() => setFocusedCell(prev => prev === editKey ? null : prev), 250)}
                     onChange={e => handlePriceChange(record.productId, bookId, e.target.value)}
                     className={`h-8 w-full rounded border px-2.5 text-right text-xs font-semibold outline-none transition ${
-                      isEdited
+                      isLoss
+                        ? 'border-rose-400 bg-rose-50 text-rose-600 font-bold ring-1 ring-rose-300 focus:border-rose-500 focus:ring-rose-200'
+                        : isEdited
                         ? 'border-emerald-500 bg-emerald-50/50 text-emerald-800 ring-1 ring-emerald-300'
                         : 'border-slate-300 bg-white text-slate-800 focus:border-[#0071BA] focus:ring-1 focus:ring-blue-100 hover:border-slate-400'
                     }`}
                     placeholder="0"
+                    title={isLoss ? `Cảnh báo bán lỗ: Giá bán (${currencyFormatter.format(currentVal)} ₫) thấp hơn giá vốn (${currencyFormatter.format(record.costPrice)} ₫)` : undefined}
                   />
                 </Tooltip>
               </div>

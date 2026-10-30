@@ -134,9 +134,20 @@ export default function InlineFormulaPopover({
       {/* Giá mới preview */}
       <div className="mt-3 flex items-center justify-between">
         <span className="font-medium text-slate-700">Giá mới</span>
-        <span className="text-sm font-bold text-[#0071BA]">
-          [{calculatedPrice.toLocaleString('vi-VN')}]
-        </span>
+        <div className="flex items-center gap-1.5">
+          {product.costPrice > 0 && calculatedPrice > 0 && calculatedPrice < product.costPrice && (
+            <span className="rounded bg-rose-100 text-rose-600 px-1.5 py-0.5 text-[10px] font-bold">
+              Bán lỗ
+            </span>
+          )}
+          <span className={`text-sm font-bold ${
+            product.costPrice > 0 && calculatedPrice > 0 && calculatedPrice < product.costPrice
+              ? 'text-rose-600'
+              : 'text-[#0071BA]'
+          }`}>
+            [{calculatedPrice.toLocaleString('vi-VN')}]
+          </span>
+        </div>
       </div>
 
       {/* Formula Input Row on 1 Line */}
