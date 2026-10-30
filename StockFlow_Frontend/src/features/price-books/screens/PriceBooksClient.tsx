@@ -15,6 +15,7 @@ import type { ColumnsType } from 'antd/es/table';
 import PriceBookFilterSidebar from '../components/PriceBookFilterSidebar';
 import CreatePriceBookModal from '../components/CreatePriceBookModal';
 import AddCategoryToPriceBookModal from '../components/AddCategoryToPriceBookModal';
+import InlineFormulaPopover from '../components/InlineFormulaPopover';
 import { PriceBook, PriceBookMatrixItem } from '../types';
 import { priceBookService } from '../services/priceBookService';
 import { apiClient } from '@/lib/api/client';
@@ -58,6 +59,8 @@ export default function PriceBooksClient() {
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [editingPriceBook, setEditingPriceBook] = useState<PriceBook | null>(null);
   const [isAddCategoryModalOpen, setIsAddCategoryModalOpen] = useState<boolean>(false);
+  const [formulaPopoverCell, setFormulaPopoverCell] = useState<{ productId: number; bookId: number } | null>(null);
+  const [focusedCell, setFocusedCell] = useState<string | null>(null);
 
   // Load initial lookups
   useEffect(() => {
@@ -437,66 +440,72 @@ export default function PriceBooksClient() {
         width: 185,
         align: 'right',
         render: (_, record) => {
-          if (isDefaultBook) {
-            // Chỉ BẢNG GIÁ CHUNG được phép sửa trực tiếp
-            const editKey = `${record.productId}_${bookId}`;
-            const isEdited = editKey in editedPrices;
-            const currentVal = isEdited ? editedPrices[editKey] : (record.prices[bookId] ?? 0);
-
-            return (
-              <div className="relative">
-                <input
-                  type="text"
-                  value={currentVal ? currencyFormatter.format(currentVal) : '0'}
-                  onChange={e => handlePriceChange(record.productId, bookId, e.target.value)}
-                  className={`h-8 w-full rounded border px-2.5 text-right text-xs font-semibold outline-none transition ${
-                    isEdited
-                      ? 'border-emerald-500 bg-emerald-50/50 text-emerald-800 ring-1 ring-emerald-300'
-                      : 'border-slate-300 bg-white text-slate-800 focus:border-[#0071BA] focus:ring-1 focus:ring-blue-100 hover:border-slate-400'
-                  }`}
-                  placeholder="0"
-                />
-              </div>
-            );
-          }
-
-          // CÁC BẢNG GIÁ KHÁC: TỰ ĐỘNG TÍNH THEO CÔNG THỨC VÀ KHÔNG THỂ SỬA
-          // Tính giá cơ sở từ Bảng giá chung (ưu tiên giá đang được gõ dở ở ô Bảng giá chung)
-          let basePrice = 0;
-          if (defaultBookId) {
-            const defEditKey = `${record.productId}_${defaultBookId}`;
-            if (defEditKey in editedPrices) {
-              basePrice = editedPrices[defEditKey];
-            } else {
-              basePrice = record.prices[defaultBookId] ?? 0;
-            }
-          }
-
-          if (book?.formulaBaseType === 'COST') {
-            basePrice = record.costPrice;
-          }
-
-          // Áp dụng công thức
-          let computedPrice = record.prices[bookId] ?? 0;
-          if (book?.formulaOperator && book?.formulaValue) {
-            let delta = 0;
-            if (book.formulaUnit === 'PERCENT') {
-              delta = basePrice * (book.formulaValue / 100);
-            } else {
-              delta = book.formulaValue;
-            }
-            const res = book.formulaOperator === '-' ? (basePrice - delta) : (basePrice + delta);
-            computedPrice = Math.max(0, Math.round(res));
-          } else if (bookId in record.prices && record.prices[bookId] !== null) {
-            computedPrice = record.prices[bookId]!;
-          }
+          const editKey = `${record.productId}_${bookId}`;
+          const isEdited = editKey in editedPrices;
+          const currentVal = isEdited ? editedPrices[editKey] : (record.prices[bookId] ?? 0);
+          const isPopoverOpen = formulaPopoverCell?.productId === record.productId && formulaPopoverCell?.bookId === bookId;
+          const isFocused = focusedCell === editKey;
 
           return (
-            <div
-              className="h-8 w-full rounded border border-slate-200 bg-slate-50/80 px-2.5 flex items-center justify-end text-right text-xs font-semibold text-slate-700 cursor-not-allowed select-all"
-              title="Giá tự động tính theo công thức từ Giá chung, không thể sửa trực tiếp"
-            >
-              <span>{currencyFormatter.format(computedPrice)} ₫</span>
+            <div className="relative">
+              <input
+                type="text"
+                value={currentVal ? currencyFormatter.format(currentVal) : '0'}
+                onFocus={() => setFocusedCell(editKey)}
+                onBlur={() => setTimeout(() => setFocusedCell(prev => prev === editKey ? null : prev), 250)}
+                onChange={e => handlePriceChange(record.productId, bookId, e.target.value)}
+                className={`h-8 w-full rounded border px-2.5 text-right text-xs font-semibold outline-none transition ${
+                  isEdited
+                    ? 'border-emerald-500 bg-emerald-50/50 text-emerald-800 ring-1 ring-emerald-300'
+                    : 'border-slate-300 bg-white text-slate-800 focus:border-[#0071BA] focus:ring-1 focus:ring-blue-100 hover:border-slate-400'
+                }`}
+                placeholder="0"
+              />
+
+              {/* Tooltip KiotViet: Hoặc sử dụng Công thức (dành cho bảng giá tùy biến) */}
+              {!isDefaultBook && isFocused && !isPopoverOpen && (
+                <div className="absolute right-0 top-full mt-1 z-40 whitespace-nowrap rounded bg-slate-900 px-2 py-1 text-[11px] text-white shadow-lg flex items-center gap-1 animate-in fade-in duration-100">
+                  <span>Hoặc sử dụng</span>
+                  <button
+                    type="button"
+                    onMouseDown={e => {
+                      e.preventDefault();
+                      setFormulaPopoverCell({ productId: record.productId, bookId });
+                    }}
+                    className="font-bold text-sky-400 hover:text-sky-300 underline cursor-pointer"
+                  >
+                    Công thức
+                  </button>
+                </div>
+              )}
+
+              {/* Popover Đặt giá theo công thức */}
+              {!isDefaultBook && isPopoverOpen && book && (
+                <InlineFormulaPopover
+                  isOpen={isPopoverOpen}
+                  onClose={() => setFormulaPopoverCell(null)}
+                  product={record}
+                  priceBook={book}
+                  existingPriceBooks={priceBooks}
+                  totalCount={totalCount}
+                  onApplySingle={newPrice => {
+                    handlePriceChange(record.productId, bookId, newPrice.toString());
+                  }}
+                  onApplyAll={async formula => {
+                    await priceBookService.updatePriceBook(bookId, {
+                      ...book,
+                      ...formula,
+                      recalculateFormula: true,
+                    });
+                    api.success({
+                      message: 'Áp dụng công thức thành công',
+                      description: `Đã cập nhật công thức và tính lại giá cho toàn bộ ${totalCount} hàng hóa trong "${book.priceBookName}".`,
+                    });
+                    await loadPriceBooks();
+                    await loadMatrix();
+                  }}
+                />
+              )}
             </div>
           );
         },
@@ -504,7 +513,7 @@ export default function PriceBooksClient() {
     });
 
     return baseCols;
-  }, [selectedPriceBookIds, priceBooks, editedPrices]);
+  }, [selectedPriceBookIds, priceBooks, editedPrices, formulaPopoverCell, focusedCell, totalCount]);
 
   const editedCount = Object.keys(editedPrices).length;
 

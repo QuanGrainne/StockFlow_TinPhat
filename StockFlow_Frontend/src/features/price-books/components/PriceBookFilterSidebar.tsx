@@ -94,33 +94,9 @@ export default function PriceBookFilterSidebar({
 
   // Toggle selection inside popover
   const handleToggleTemp = (id: number) => {
-    setTempSelectedIds(prev => {
-      const isCurrentlySelected = prev.includes(id);
-
-      if (isCurrentlySelected) {
-        // User wants to uncheck
-        if (id === defaultBookId) {
-          // If custom books are selected, Bảng giá chung must not be lost!
-          const hasCustomBooks = prev.some(x => x !== defaultBookId);
-          if (hasCustomBooks) {
-            // Cannot deselect Bảng giá chung while custom price books are active
-            return prev;
-          }
-          return [];
-        } else {
-          return prev.filter(x => x !== id);
-        }
-      } else {
-        // User wants to check
-        if (id !== defaultBookId && defaultBookId) {
-          // "nếu chọn bảng giá nam thì phải hiện bảng giá chung cạnh nhưng không được mất đi"
-          const next = prev.includes(defaultBookId) ? [...prev, id] : [defaultBookId, ...prev, id];
-          return Array.from(new Set(next));
-        } else {
-          return [...prev, id];
-        }
-      }
-    });
+    setTempSelectedIds(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
   };
 
   const handleToggleAll = () => {
@@ -137,11 +113,7 @@ export default function PriceBookFilterSidebar({
   };
 
   const handleRemovePriceBook = (id: number) => {
-    if (id === defaultBookId) {
-      onSelectPriceBooks([]);
-    } else {
-      onSelectPriceBooks(selectedPriceBookIds.filter(x => x !== id));
-    }
+    onSelectPriceBooks(selectedPriceBookIds.filter(x => x !== id));
   };
 
   const selectedPriceBooks = useMemo(() => {
