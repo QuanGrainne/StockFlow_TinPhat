@@ -68,19 +68,27 @@ export default function PriceBooksClient() {
     loadPriceBooks();
   }, []);
 
+  const defaultBook = useMemo(() => {
+    return priceBooks.find(b => b.isDefault) || priceBooks[0];
+  }, [priceBooks]);
+  const defaultBookId = defaultBook?.priceBookId;
+
+  // Rule KiotViet:
+  // 1. Khi không chọn bảng giá nào: displayedBookIds = [] (hiện Chưa có bảng giá)
+  // 2. Khi chọn bảng giá chung: hiện bảng giá chung
+  // 3. Khi chọn bảng giá nam (hoặc bảng giá khác): phải hiện bảng giá chung cạnh nhưng không được mất đi
+  const displayedBookIds = useMemo(() => {
+    if (selectedPriceBookIds.length === 0) return [];
+    if (!defaultBookId) return selectedPriceBookIds;
+
+    const customIds = selectedPriceBookIds.filter(id => id !== defaultBookId);
+    return [defaultBookId, ...customIds];
+  }, [selectedPriceBookIds, defaultBookId]);
+
   const loadPriceBooks = async () => {
     try {
       const data = await priceBookService.getPriceBooks();
       setPriceBooks(data);
-      if (data.length > 0) {
-        setSelectedPriceBookIds(prev => {
-          if (prev.length > 0) return prev;
-          // Hiển thị mặc định cả bảng giá chung và bảng giá công thức đầu tiên (nếu có)
-          const def = data.find(p => p.isDefault) || data[0];
-          const second = data.find(p => p.priceBookId !== def.priceBookId);
-          return second ? [def.priceBookId, second.priceBookId] : [def.priceBookId];
-        });
-      }
     } catch {
       api.error({
         message: 'Lỗi nạp dữ liệu',
@@ -91,7 +99,12 @@ export default function PriceBooksClient() {
 
   // Fetch Matrix Data
   const loadMatrix = useCallback(async () => {
-    if (selectedPriceBookIds.length === 0 && priceBooks.length > 0) return;
+    if (displayedBookIds.length === 0) {
+      setMatrixItems([]);
+      setTotalCount(0);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
 
     try {
@@ -99,7 +112,7 @@ export default function PriceBooksClient() {
         search: searchKeyword.trim() || undefined,
         categoryId: selectedCategoryId ?? undefined,
         stockCondition,
-        priceBookIds: selectedPriceBookIds,
+        priceBookIds: displayedBookIds,
         page: pageIndex,
         pageSize,
       });
@@ -114,22 +127,11 @@ export default function PriceBooksClient() {
     } finally {
       setLoading(false);
     }
-  }, [searchKeyword, selectedCategoryId, stockCondition, selectedPriceBookIds, pageIndex, pageSize, priceBooks.length, api]);
+  }, [searchKeyword, selectedCategoryId, stockCondition, displayedBookIds, pageIndex, pageSize, api]);
 
   useEffect(() => {
     loadMatrix();
   }, [loadMatrix]);
-
-  // Toggle Price Book visibility
-  const handleTogglePriceBook = (id: number) => {
-    setSelectedPriceBookIds(prev => {
-      if (prev.includes(id)) {
-        if (prev.length === 1) return prev; // Keep at least one
-        return prev.filter(x => x !== id);
-      }
-      return [...prev, id];
-    });
-  };
 
   // Track Inline price edit
   const handlePriceChange = (productId: number, priceBookId: number, rawVal: string) => {
@@ -313,7 +315,17 @@ export default function PriceBooksClient() {
         title: 'Giá vốn',
         dataIndex: 'costPrice',
         key: 'costPrice',
-        width: 120,
+        width: 110,
+        align: 'right',
+        render: (val: number) => (
+          <span className="text-xs font-medium text-slate-700">{formatCurrency(val)}</span>
+        ),
+      },
+      {
+        title: 'Giá nhập cuối',
+        dataIndex: 'latestPurchasePrice',
+        key: 'latestPurchasePrice',
+        width: 110,
         align: 'right',
         render: (val: number) => (
           <span className="text-xs font-medium text-slate-700">{formatCurrency(val)}</span>
@@ -321,11 +333,8 @@ export default function PriceBooksClient() {
       },
     ];
 
-    const defaultBook = priceBooks.find(b => b.isDefault) || priceBooks[0];
-    const defaultBookId = defaultBook?.priceBookId;
-
-    // Dynamic columns for each selected Price Book
-    selectedPriceBookIds.forEach(bookId => {
+    // Dynamic columns for each displayed Price Book (luôn đảm bảo Bảng giá chung ở đầu nếu có bảng giá được chọn)
+    displayedBookIds.forEach(bookId => {
       const book = priceBooks.find(b => b.priceBookId === bookId);
       const bookName = book?.priceBookName ?? `Bảng giá #${bookId}`;
       const isDefaultBook = book?.isDefault === true || bookId === defaultBookId;
@@ -467,7 +476,7 @@ export default function PriceBooksClient() {
       <PriceBookFilterSidebar
         priceBooks={priceBooks}
         selectedPriceBookIds={selectedPriceBookIds}
-        onTogglePriceBook={handleTogglePriceBook}
+        onSelectPriceBooks={setSelectedPriceBookIds}
         onOpenCreateModal={() => {
           setEditingPriceBook(null);
           setIsModalOpen(true);
@@ -557,7 +566,11 @@ export default function PriceBooksClient() {
           />
 
           <div className="text-xs text-slate-500">
-            Hiển thị <strong>{matrixItems.length}</strong> trong <strong>{totalCount}</strong> hàng hóa
+            {displayedBookIds.length === 0 ? (
+              <span>Chưa có bảng giá được chọn</span>
+            ) : (
+              <>Hiển thị <strong>{matrixItems.length}</strong> trong <strong>{totalCount}</strong> hàng hóa</>
+            )}
           </div>
         </div>
 
@@ -566,10 +579,31 @@ export default function PriceBooksClient() {
           <div className="overflow-hidden rounded-lg border border-[#e5e7eb] bg-white shadow-2xs">
             <Table<PriceBookMatrixItem>
               columns={columns}
-              dataSource={matrixItems}
+              dataSource={displayedBookIds.length === 0 ? [] : matrixItems}
               rowKey="productId"
               loading={loading}
-              pagination={{
+              locale={{
+                emptyText: displayedBookIds.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-20 text-center select-none">
+                    <div className="w-24 h-24 rounded-full bg-blue-50/80 flex items-center justify-center mb-3">
+                      <svg
+                        className="w-12 h-12 text-[#0071BA]"
+                        viewBox="0 0 48 48"
+                        fill="none"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <rect x="8" y="14" width="32" height="24" rx="4" stroke="#0071BA" strokeWidth="2.5" fill="#e0f2fe" />
+                        <path d="M8 24h10l3 5h14l3-5h2" stroke="#0071BA" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" fill="white" />
+                        <line x1="16" y1="19" x2="32" y2="19" stroke="#0071BA" strokeWidth="2.5" strokeLinecap="round" />
+                      </svg>
+                    </div>
+                    <span className="text-sm font-semibold text-slate-800">Chưa có bảng giá</span>
+                  </div>
+                ) : (
+                  <div className="py-12 text-slate-400 text-xs">Không tìm thấy hàng hóa nào phù hợp</div>
+                ),
+              }}
+              pagination={displayedBookIds.length === 0 ? false : {
                 current: pageIndex,
                 pageSize: pageSize,
                 total: totalCount,
