@@ -447,7 +447,7 @@ export default function CreatePriceBookModal({
                 <button
                   type="button"
                   onClick={() => setExpandValidity(!expandValidity)}
-                  className="flex w-full items-center justify-between px-4 py-3 bg-slate-50/80 hover:bg-slate-100/70 transition text-left"
+                  className="flex w-full items-center justify-between px-4 py-3 bg-slate-50/80 hover:bg-slate-100/70 transition text-left rounded-t-lg"
                 >
                   <span className="text-xs font-bold text-slate-800 tracking-wide uppercase">Hiệu lực</span>
                   {expandValidity ? <ChevronUp size={16} className="text-slate-500" /> : <ChevronDown size={16} className="text-slate-500" />}
@@ -502,7 +502,7 @@ export default function CreatePriceBookModal({
               </div>
 
               {/* Accordion: Công thức giá */}
-              <div className="rounded-lg border border-slate-200 bg-white shadow-2xs overflow-hidden">
+              <div className="rounded-lg border border-slate-200 bg-white shadow-2xs">
                 <button
                   type="button"
                   onClick={() => setExpandFormula(!expandFormula)}
@@ -539,7 +539,7 @@ export default function CreatePriceBookModal({
                         </button>
 
                         {isBaseTypeDropdownOpen && (
-                          <div className="absolute left-0 top-full mt-1 z-50 w-full min-w-[185px] rounded-md border border-slate-200 bg-white shadow-xl py-2 px-1 text-xs space-y-1 animate-in fade-in duration-100">
+                          <div className="absolute left-0 top-full mt-1 z-[100] w-full min-w-[195px] rounded-md border border-slate-200 bg-white shadow-2xl py-2 px-1 text-xs space-y-1 animate-in fade-in duration-100">
                             {/* Ô tìm kiếm */}
                             <div className="px-1.5 pb-1 border-b border-slate-100">
                               <div className="relative">

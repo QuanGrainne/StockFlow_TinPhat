@@ -384,24 +384,25 @@ export default function PriceBooksClient() {
 
       baseCols.push({
         title: (
-          <div className="flex items-center justify-between gap-1 group">
-            <div className="flex items-center gap-1.5 truncate">
-              <span className="font-bold text-[#0071BA] truncate">{bookName}</span>
+          <div className="flex items-center justify-between gap-1.5 w-full select-none">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span className="font-bold text-[#0071BA] text-xs whitespace-nowrap">
+                {bookName}
+              </span>
               {isDefaultBook ? (
-                <Tag color="blue" className="text-[10px] m-0 px-1 py-0 leading-tight">Giá chung</Tag>
+                <span className="rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-semibold text-[#0071BA] border border-blue-200 whitespace-nowrap">
+                  Giá chung
+                </span>
               ) : book?.formulaOperator && book?.formulaValue ? (
-                <Tag
-                  color="cyan"
-                  className="text-[10px] m-0 px-1 py-0 leading-tight"
-                  title={`Công thức: Giá chung ${book.formulaOperator} ${book.formulaValue}${book.formulaUnit === 'PERCENT' ? '%' : '₫'}`}
+                <span
+                  className="rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700 border border-emerald-200 whitespace-nowrap"
+                  title={`Công thức: ${book.formulaOperator} ${book.formulaValue}${book.formulaUnit === 'PERCENT' ? '%' : '₫'}`}
                 >
                   {book.formulaOperator}{book.formulaValue}{book.formulaUnit === 'PERCENT' ? '%' : '₫'}
-                </Tag>
-              ) : (
-                <Tag color="default" className="text-[10px] m-0 px-1 py-0 leading-tight">Chỉ xem</Tag>
-              )}
+                </span>
+              ) : null}
             </div>
-            <div className="flex items-center gap-1 opacity-80 group-hover:opacity-100 shrink-0">
+            <div className="flex items-center gap-0.5 shrink-0 opacity-70 hover:opacity-100">
               {book?.formulaBaseType && (
                 <button
                   type="button"
@@ -409,7 +410,7 @@ export default function PriceBooksClient() {
                   onClick={() => handleApplyFormulaForActiveBook(bookId)}
                   className="p-1 hover:text-[#0071BA] text-slate-400 rounded hover:bg-blue-50 transition cursor-pointer"
                 >
-                  <CalculatorOutlined style={{ fontSize: 13 }} />
+                  <CalculatorOutlined style={{ fontSize: 12 }} />
                 </button>
               )}
               <button
@@ -421,7 +422,7 @@ export default function PriceBooksClient() {
                 }}
                 className="p-1 hover:text-[#0071BA] text-slate-400 rounded hover:bg-blue-50 transition cursor-pointer"
               >
-                <SettingOutlined style={{ fontSize: 13 }} />
+                <SettingOutlined style={{ fontSize: 12 }} />
               </button>
               {!isDefaultBook && (
                 <button
@@ -430,14 +431,14 @@ export default function PriceBooksClient() {
                   onClick={() => handleDeletePriceBook(bookId)}
                   className="p-1 hover:text-rose-600 text-slate-400 rounded hover:bg-rose-50 transition cursor-pointer"
                 >
-                  <DeleteOutlined style={{ fontSize: 13 }} />
+                  <DeleteOutlined style={{ fontSize: 12 }} />
                 </button>
               )}
             </div>
           </div>
         ),
         key: `price_book_${bookId}`,
-        width: 185,
+        width: 220,
         align: 'right',
         render: (_, record) => {
           const editKey = `${record.productId}_${bookId}`;
@@ -701,7 +702,7 @@ export default function PriceBooksClient() {
                 },
                 showTotal: (total, range) => `${range[0]}-${range[1]} trong ${total} hàng hóa`,
               }}
-              scroll={{ x: 800 }}
+              scroll={{ x: 'max-content' }}
               size="middle"
               className="stockflow-pricebooks-table"
             />
