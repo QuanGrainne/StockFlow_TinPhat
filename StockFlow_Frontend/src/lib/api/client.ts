@@ -46,6 +46,11 @@ async function buildHeaders(token?: string): Promise<HeadersInit> {
   return headers;
 }
 
+export interface ApiClientError extends Error {
+  status?: number;
+  response?: any;
+}
+
 /**
  * Base API client with JWT auth header injection, error handling, and auto-token recovery.
  */
@@ -111,7 +116,10 @@ async function handleResponse<T>(res: Response, retryFn?: () => Promise<T>): Pro
 
     const error = await res.json().catch(() => ({ message: res.statusText }));
     const msg = error?.message || error?.title || `HTTP error ${res.status}`;
-    throw new Error(msg);
+    const customErr = new Error(msg) as ApiClientError;
+    customErr.status = res.status;
+    customErr.response = error;
+    throw customErr;
   }
   if (res.status === 204 || res.headers.get('content-length') === '0') return undefined as unknown as T;
   return res.json() as Promise<T>;

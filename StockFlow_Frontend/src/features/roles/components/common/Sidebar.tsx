@@ -249,6 +249,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
       ],
     },
     {
+      id: 'customers',
+      label: 'Khách hàng',
+      icon: Users,
+      hasDropdown: false,
+    },
+    {
       id: 'suppliers',
       label: 'Nhà cung cấp',
       icon: Building2,
@@ -261,6 +267,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
       hasDropdown: true,
       requiredModule: 'SALES',
       dropdownItems: [
+        {
+          id: 'pos',
+          title: 'Bán hàng tại quầy (POS)',
+          desc: 'Màn hình thu ngân & in hóa đơn K80',
+          icon: ShoppingBag,
+          requiredModule: 'SALES',
+        },
+        {
+          id: 'orders',
+          title: 'Danh sách đơn hàng',
+          desc: 'Quản lý toàn bộ đơn bán hàng',
+          icon: ClipboardList,
+          requiredModule: 'SALES',
+        },
         {
           id: 'sales-dashboard',
           title: 'Tổng quan bán hàng',
@@ -420,6 +440,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
           id: 'manager-partners',
           title: 'Đối tác và hạn mức tín dụng',
           desc: 'Quản trị công nợ khách hàng B2B & NCC',
+          icon: Users,
+          requiredModule: 'PARTNER',
+        },
+        {
+          id: 'customers',
+          title: 'Danh mục Khách hàng',
+          desc: 'Quản trị hồ sơ & phân nhóm khách hàng B2B',
           icon: Users,
           requiredModule: 'PARTNER',
         },
@@ -664,6 +691,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
       ],
     },
     {
+      id: 'customers',
+      label: 'Khách hàng',
+      icon: Users,
+      hasDropdown: false,
+    },
+    {
       id: 'suppliers',
       label: 'Nhà cung cấp',
       icon: Building2,
@@ -709,6 +742,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
           requiredModule: 'TRANSFER',
         },
       ],
+    },
+    {
+      id: 'customers',
+      label: 'Khách hàng',
+      icon: Users,
+      hasDropdown: false,
     },
     {
       id: 'suppliers',
@@ -791,6 +830,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
           requiredModule: 'TRANSFER',
         },
       ],
+    },
+    {
+      id: 'customers',
+      label: 'Khách hàng',
+      icon: Users,
+      hasDropdown: false,
     },
     {
       id: 'suppliers',
@@ -883,6 +928,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
       icon: Package,
       hasDropdown: false,
       requiredModule: 'GOODS',
+    },
+    {
+      id: 'customers',
+      label: 'Khách hàng',
+      icon: Users,
+      hasDropdown: false,
     },
     {
       id: 'suppliers',
