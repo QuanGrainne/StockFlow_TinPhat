@@ -10,6 +10,8 @@ import {
   RotateCcw,
   Search,
   X,
+  GripVertical,
+  Plus,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -69,7 +71,9 @@ type ProductFilterSidebarProps = {
   state: FilterSidebarState;
   onChange: (patch: Partial<FilterSidebarState>) => void;
   onCreateCategory: () => void;
+  onCreateLocation?: () => void;
   categoriesList?: string[];
+  categoryCounts?: Record<string, number>;
   suppliersList?: string[];
   locationsList?: string[];
   isCollapsed?: boolean;
@@ -882,6 +886,7 @@ function MultiSelectPillBox({
   isOpen,
   onToggle,
   onClose,
+  onCreateNew,
 }: {
   label: string;
   placeholder?: string;
@@ -891,6 +896,7 @@ function MultiSelectPillBox({
   isOpen: boolean;
   onToggle: () => void;
   onClose: () => void;
+  onCreateNew?: () => void;
 }) {
   const [search, setSearch] = useState('');
   const boxRef = useRef<HTMLDivElement>(null);
@@ -914,9 +920,20 @@ function MultiSelectPillBox({
 
   return (
     <div ref={boxRef} className="relative">
-      <div className="flex items-center gap-1.5 text-[13px] font-semibold text-slate-800 mb-1.5">
-        <span>{label}</span>
-        {hasSelection && <span className="w-1.5 h-1.5 rounded-full bg-blue-600 inline-block" />}
+      <div className="flex items-center justify-between mb-1.5">
+        <div className="flex items-center gap-1.5 text-[13px] font-semibold text-slate-800">
+          <span>{label}</span>
+          {hasSelection && <span className="w-1.5 h-1.5 rounded-full bg-blue-600 inline-block" />}
+        </div>
+        {onCreateNew && (
+          <button
+            type="button"
+            onClick={onCreateNew}
+            className="text-[13px] font-medium text-blue-600 hover:text-blue-700 hover:underline cursor-pointer transition"
+          >
+            Tạo mới
+          </button>
+        )}
       </div>
 
       {hasSelection ? (
@@ -1060,7 +1077,9 @@ export default function ProductFilterSidebar({
   state,
   onChange,
   onCreateCategory,
+  onCreateLocation,
   categoriesList = DEFAULT_CATEGORIES,
+  categoryCounts = {},
   suppliersList = DEFAULT_SUPPLIERS,
   locationsList = DEFAULT_LOCATIONS,
   isCollapsed = false,
@@ -1072,9 +1091,52 @@ export default function ProductFilterSidebar({
     setMounted(true);
   }, []);
 
+  const [tempCategories, setTempCategories] = useState<string[]>([]);
+  const categoryBoxRef = useRef<HTMLDivElement>(null);
   // Dropdown & Popover open states
   const [categoryOpen, setCategoryOpen] = useState(false);
   const [categorySearch, setCategorySearch] = useState('');
+  const [categoryCoords, setCategoryCoords] = useState<{ top: number; left: number; arrowTop: number } | null>(null);
+
+  useEffect(() => {
+    if (categoryOpen) {
+      setTempCategories(
+        state.categories && state.categories.length > 0
+          ? state.categories
+          : (state.category ? [state.category] : [])
+      );
+    }
+  }, [categoryOpen, state.categories, state.category]);
+
+  // Tính toán vị trí hiển thị Popover nổi ngoài Sidebar (Chuẩn Ảnh 2 - Không bị đè / không bị cắt)
+  useEffect(() => {
+    if (!categoryOpen || !categoryBoxRef.current) return;
+    const updatePos = () => {
+      if (!categoryBoxRef.current) return;
+      const rect = categoryBoxRef.current.getBoundingClientRect();
+      const popoverWidth = 320;
+      const popoverHeight = 390;
+      let left = rect.right + 12;
+      let top = rect.top - 8;
+
+      if (left + popoverWidth > window.innerWidth - 10) {
+        left = Math.max(10, rect.left - popoverWidth - 10);
+      }
+      if (top + popoverHeight > window.innerHeight) {
+        top = Math.max(10, window.innerHeight - popoverHeight - 10);
+      }
+      const arrowTop = Math.max(14, Math.min(popoverHeight - 24, rect.top - top + 10));
+      setCategoryCoords({ top, left, arrowTop });
+    };
+
+    updatePos();
+    window.addEventListener('resize', updatePos);
+    window.addEventListener('scroll', updatePos, true);
+    return () => {
+      window.removeEventListener('resize', updatePos);
+      window.removeEventListener('scroll', updatePos, true);
+    };
+  }, [categoryOpen]);
   const [stockOpen, setStockOpen] = useState(false);
   const [supplierOpen, setSupplierOpen] = useState(false);
   const [locationOpen, setLocationOpen] = useState(false);
@@ -1414,7 +1476,21 @@ export default function ProductFilterSidebar({
 
       {!isCollapsed && (
         <div className="flex-1 min-h-0 p-3.5 space-y-4 overflow-y-auto">
-        {/* 1. Nhóm hàng */}
+          {onResetFilters && (
+            <div className="flex items-center justify-between pb-1">
+              <span className="text-[13px] font-bold text-slate-800">Bộ lọc</span>
+              <button
+                type="button"
+                onClick={onResetFilters}
+                className="text-xs text-[#0070f4] hover:text-[#005ac3] font-medium cursor-pointer flex items-center gap-1 transition hover:underline"
+                title="Đặt lại tất cả bộ lọc"
+              >
+                <RotateCcw size={12} />
+                <span>Đặt lại</span>
+              </button>
+            </div>
+          )}
+        {/* 1. Nhóm hàng (Multi-select Popover Chuẩn KiotViet) */}
         <div>
           <div className="flex items-center justify-between mb-1.5">
             <span className="text-[13px] font-semibold text-slate-800">Nhóm hàng</span>
@@ -1427,7 +1503,7 @@ export default function ProductFilterSidebar({
             </button>
           </div>
 
-          <div className="relative">
+          <div ref={categoryBoxRef} className="relative">
             <div
               onClick={() => {
                 setCategoryOpen(!categoryOpen);
@@ -1446,16 +1522,22 @@ export default function ProductFilterSidebar({
                   : 'border-slate-300 hover:border-slate-400'
               }`}
             >
-              <span className={state.category ? 'text-slate-800 font-medium truncate' : 'text-slate-400 truncate'}>
-                {state.category || 'Chọn nhóm hàng'}
+              <span className={
+                (state.categories && state.categories.length > 0) || state.category
+                  ? 'text-slate-800 font-medium truncate'
+                  : 'text-slate-400 truncate'
+              }>
+                {state.categories && state.categories.length > 1
+                  ? `Đã chọn (${state.categories.length}) nhóm hàng`
+                  : (state.categories?.[0] || state.category || 'Chọn nhóm hàng')}
               </span>
               <div className="flex items-center gap-1 text-slate-400">
-                {state.category && (
+                {((state.categories && state.categories.length > 0) || state.category) && (
                   <button
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
-                      onChange({ category: undefined });
+                      onChange({ categories: [], category: undefined });
                     }}
                     className="hover:text-slate-600 p-0.5"
                   >
@@ -1466,61 +1548,121 @@ export default function ProductFilterSidebar({
               </div>
             </div>
 
-            {/* Category popover */}
-            {categoryOpen && (
-              <div className="absolute top-full left-0 mt-1 w-full bg-white rounded-[6px] border border-slate-200 shadow-lg py-1.5 z-40 animate-in fade-in zoom-in-95 duration-100">
-                <div className="px-2.5 pb-1.5 border-b border-slate-100">
+            {/* Category Popover Nổi (Chuẩn KiotViet - Ảnh 2 - Render qua Portal để KHÔNG BỊ CẮT) */}
+            {categoryOpen && categoryCoords && typeof document !== 'undefined' && createPortal(
+              <div
+                data-portal-popover="true"
+                style={{ top: categoryCoords.top, left: categoryCoords.left }}
+                className="fixed z-[9999] w-72 md:w-80 bg-white rounded-xl border border-slate-200 shadow-2xl flex flex-col animate-in fade-in zoom-in-95 duration-150 select-none ring-1 ring-black/5"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* Pointer arrow tip pointing left to the button */}
+                <div
+                  style={{ top: categoryCoords.arrowTop }}
+                  className="absolute -left-2 w-4 h-4 bg-white rotate-45 border-l border-b border-slate-200 z-10"
+                />
+
+                {/* Popover Header */}
+                <div className="flex items-center justify-between px-3.5 py-3 border-b border-slate-100 bg-white rounded-t-xl relative z-20">
+                  <span className="text-[14px] font-semibold text-slate-800">Nhóm hàng</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCategoryOpen(false);
+                      onCreateCategory();
+                    }}
+                    className="text-xs font-medium text-blue-600 hover:text-blue-700 hover:underline flex items-center gap-1 cursor-pointer"
+                  >
+                    <Plus size={13} />
+                    <span>Tạo mới</span>
+                  </button>
+                </div>
+
+                {/* Search input */}
+                <div className="p-3 border-b border-slate-100 bg-white relative z-20">
                   <div className="relative">
-                    <Search size={13} className="absolute left-2.5 top-2.5 text-slate-400" />
+                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                     <input
                       type="text"
                       autoFocus
                       value={categorySearch}
                       onChange={(e) => setCategorySearch(e.target.value)}
-                      placeholder="Tìm nhóm hàng..."
-                      className="w-full h-7 pl-7 pr-2 text-xs rounded border border-slate-200 bg-slate-50 text-slate-800 placeholder:text-slate-400 outline-none focus:border-blue-500 focus:bg-white"
+                      placeholder="Tìm kiếm"
+                      className="w-full h-8 pl-9 pr-3 text-xs rounded-md border border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white text-slate-800 placeholder-slate-400"
                     />
                   </div>
                 </div>
 
-                <div className="max-h-48 overflow-y-auto py-1">
-                  <div
+                {/* Checkbox item list with counts and 6 dots drag icon */}
+                <div className="max-h-60 overflow-y-auto p-2 space-y-1 bg-white relative z-20">
+                  {filteredCategories.length > 0 ? (
+                    filteredCategories.map((cat) => {
+                      const isChecked = tempCategories.includes(cat);
+                      const count = categoryCounts?.[cat] ?? 0;
+                      return (
+                        <label
+                          key={cat}
+                          className="flex items-center px-2 py-1.5 rounded-md hover:bg-slate-50 cursor-pointer text-xs text-slate-700 select-none group"
+                        >
+                          <div className="text-slate-300 group-hover:text-slate-400 mr-2 flex-shrink-0">
+                            <GripVertical size={13} />
+                          </div>
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={() => {
+                              if (isChecked) {
+                                setTempCategories(tempCategories.filter((c) => c !== cat));
+                              } else {
+                                setTempCategories([...tempCategories, cat]);
+                              }
+                            }}
+                            className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 mr-2.5 cursor-pointer flex-shrink-0"
+                          />
+                          <span className="truncate flex-1 font-normal text-slate-700">
+                            {cat} <span className="text-slate-400 text-[11px]">({count.toLocaleString()})</span>
+                          </span>
+                        </label>
+                      );
+                    })
+                  ) : (
+                    <div className="py-4 text-center text-slate-400 text-xs">
+                      Không tìm thấy nhóm hàng phù hợp
+                    </div>
+                  )}
+                </div>
+
+                {/* Footer with "Chọn tất cả" and "Áp dụng" */}
+                <div className="flex items-center justify-between px-3.5 py-2.5 border-t border-slate-100 bg-slate-50/70 rounded-b-xl relative z-20">
+                  <button
+                    type="button"
                     onClick={() => {
-                      onChange({ category: undefined });
+                      if (tempCategories.length === filteredCategories.length) {
+                        setTempCategories([]);
+                      } else {
+                        setTempCategories(filteredCategories);
+                      }
+                    }}
+                    className="text-xs font-medium text-blue-600 hover:text-blue-700 hover:underline cursor-pointer"
+                  >
+                    {tempCategories.length === filteredCategories.length ? 'Bỏ chọn tất cả' : 'Chọn tất cả'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onChange({
+                        categories: tempCategories,
+                        category: tempCategories.length === 1 ? tempCategories[0] : undefined,
+                      });
                       setCategoryOpen(false);
                     }}
-                    className={`px-3 py-1.5 text-xs cursor-pointer flex items-center justify-between transition ${
-                      !state.category
-                        ? 'bg-blue-50 text-blue-700 font-medium'
-                        : 'text-slate-700 hover:bg-slate-50'
-                    }`}
+                    className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg shadow-sm transition cursor-pointer"
                   >
-                    <span>Tất cả nhóm hàng</span>
-                    {!state.category && <Check size={14} className="text-blue-600 stroke-[2.5]" />}
-                  </div>
-
-                  {filteredCategories.map((cat) => {
-                    const isSelected = state.category === cat;
-                    return (
-                      <div
-                        key={cat}
-                        onClick={() => {
-                          onChange({ category: cat });
-                          setCategoryOpen(false);
-                        }}
-                        className={`px-3 py-1.5 text-xs cursor-pointer flex items-center justify-between transition ${
-                          isSelected
-                            ? 'bg-blue-50 text-blue-700 font-medium'
-                            : 'text-slate-700 hover:bg-slate-50'
-                        }`}
-                      >
-                        <span className="truncate">{cat}</span>
-                        {isSelected && <Check size={14} className="text-blue-600 stroke-[2.5]" />}
-                      </div>
-                    );
-                  })}
+                    Áp dụng
+                  </button>
                 </div>
-              </div>
+              </div>,
+              document.body
             )}
           </div>
         </div>
@@ -1891,7 +2033,7 @@ export default function ProductFilterSidebar({
           onClose={() => setSupplierOpen(false)}
         />
 
-        {/* 7. Vị trí (Multi-select có tag theo Ảnh 2) */}
+        {/* 7. Vị trí (Multi-select có tag theo Ảnh 2 & nút Tạo mới) */}
         <MultiSelectPillBox
           label="Vị trí"
           placeholder="Chọn vị trí"
@@ -1899,6 +2041,7 @@ export default function ProductFilterSidebar({
           options={locationsList}
           onChange={(items) => onChange({ locations: items, location: items[0] })}
           isOpen={locationOpen}
+          onCreateNew={onCreateLocation}
           onToggle={() => {
             setLocationOpen(!locationOpen);
             setSupplierOpen(false);

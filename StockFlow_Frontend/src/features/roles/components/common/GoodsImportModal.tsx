@@ -2,7 +2,8 @@
 'use client';
 
 import React, { useState, useRef } from 'react';
-import { X, Info, Lightbulb, ChevronDown, Check } from 'lucide-react';
+import { X, Info, Lightbulb, ChevronDown, Check, Loader2 } from 'lucide-react';
+import { productService, ImportProductItemPayload } from '../../services/productService';
 import * as XLSX from 'xlsx';
 import { GoodsItem } from './GoodsCatalogScreen';
 
@@ -366,6 +367,7 @@ export default function GoodsImportModal({
   const [selectedStatusBranch, setSelectedStatusBranch] = useState<string>('Kho Tổng Gia Lâm');
   const [updateDescription, setUpdateDescription] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isImporting, setIsImporting] = useState<boolean>(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -543,8 +545,72 @@ export default function GoodsImportModal({
         }
       }
 
-      onImportSuccess(importedCount, file.name, updatedGoodsList);
-      onClose();
+      // Lưu trực tiếp vào CSDL SQL Server thông qua API backend
+      const payloadProducts: ImportProductItemPayload[] = [];
+      for (let i = 1; i < rows.length; i++) {
+        const row = rows[i];
+        if (!row || row.length === 0) continue;
+        const code = String(row[idxMaHang] || '').trim();
+        const name = String(row[idxTenHang] || '').trim();
+        if (!code && !name) continue;
+
+        const productCode = code || `SP${Date.now() + i}`;
+        const productName = name || code;
+        const newCategory = (idxNhomHang !== -1 && row[idxNhomHang] ? String(row[idxNhomHang]) : 'Hàng hóa');
+        const newBrand = idxThuongHieu !== -1 && row[idxThuongHieu] ? String(row[idxThuongHieu]) : '';
+        const newUom = idxDVT !== -1 && row[idxDVT] ? String(row[idxDVT]) : 'Cái';
+        const newSalePrice = idxGiaBan !== -1 ? Number(row[idxGiaBan] || 0) : 0;
+        const newCostPrice = idxGiaVon !== -1 ? Number(row[idxGiaVon] || 0) : 0;
+        const newStock = idxTonKho !== -1 ? Number(row[idxTonKho] || 0) : 0;
+        const newMinStock = idxTonNhoNhat !== -1 ? Number(row[idxTonNhoNhat] || 0) : 0;
+        const newMaxStock = idxTonLonNhat !== -1 ? Number(row[idxTonLonNhat] || 999999999) : 999999999;
+        const newWeight = idxTrongLuong !== -1 ? Number(row[idxTrongLuong] || 0) : 0;
+        const newLocation = idxViTri !== -1 ? String(row[idxViTri] || '') : '';
+        const newDesc = idxMoTa !== -1 ? String(row[idxMoTa] || '') : '';
+        const newImage = idxHinhAnh !== -1 ? String(row[idxHinhAnh] || '') : '';
+        const newIsActive = idxDangKinhDoanh !== -1 ? (Number(row[idxDangKinhDoanh]) === 1) : true;
+        const newIsDirectSale = idxBanTrucTiep !== -1 ? Number(row[idxBanTrucTiep]) === 1 : true;
+
+        payloadProducts.push({
+          code: productCode,
+          name: productName,
+          categoryName: newCategory,
+          brand: newBrand,
+          uom: newUom,
+          standardPrice: newSalePrice,
+          costPrice: newCostPrice,
+          stockQuantity: newStock,
+          minSafeStock: newMinStock,
+          maxSafeStock: newMaxStock,
+          barcode: productCode,
+          description: newDesc,
+          weight: newWeight,
+          locationName: newLocation,
+          imageUrl: newImage,
+          isActive: newIsActive,
+          isDirectSale: newIsDirectSale,
+          warehouseName: costPriceScope === 'BRANCH' ? selectedCostBranch : 'Kho Tổng Gia Lâm',
+        });
+      }
+
+      setIsImporting(true);
+      try {
+        const importRes = await productService.importProducts({
+          products: payloadProducts,
+          duplicateCodeAction,
+          updateStock,
+          updateCostPrice,
+          updateDescription,
+          targetWarehouse: costPriceScope === 'BRANCH' ? selectedCostBranch : 'Kho Tổng Gia Lâm',
+        });
+        onImportSuccess(importRes.totalCount || importRes.importedCount || importedCount, file.name, updatedGoodsList);
+        onClose();
+      } catch (apiErr: any) {
+        console.error('Lỗi API import vào CSDL:', apiErr);
+        setErrorMessage(`Lỗi khi lưu vào cơ sở dữ liệu: ${apiErr?.message || 'Không thể kết nối máy chủ'}`);
+      } finally {
+        setIsImporting(false);
+      }
     } catch (err: any) {
       console.error('Lỗi khi đọc file Excel:', err);
       setErrorMessage(`Đã xảy ra lỗi khi phân tích dữ liệu: ${err.message || 'File không hợp lệ'}`);
@@ -859,10 +925,12 @@ export default function GoodsImportModal({
           />
           <button
             type="button"
+            disabled={isImporting}
             onClick={handleSelectFileClick}
-            className="px-5 py-2.5 text-xs font-semibold text-white bg-[#0070F3] hover:bg-[#005fcf] rounded-lg transition cursor-pointer shadow-xs active:scale-[0.98]"
+            className="px-5 py-2.5 text-xs font-semibold text-white bg-[#0070F3] hover:bg-[#005fcf] disabled:opacity-60 disabled:cursor-not-allowed rounded-lg transition cursor-pointer shadow-xs active:scale-[0.98] flex items-center gap-2"
           >
-            Chọn file dữ liệu
+            {isImporting && <Loader2 size={14} className="animate-spin" />}
+            <span>{isImporting ? 'Đang lưu vào CSDL...' : 'Chọn file dữ liệu'}</span>
           </button>
         </div>
       </div>

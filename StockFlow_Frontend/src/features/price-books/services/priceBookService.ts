@@ -66,7 +66,13 @@ export const priceBookService = {
     return apiClient.put<{ success: boolean; message: string }>(`/api/price-books/${id}/prices`, items);
   },
 
-  async applyFormula(id: number): Promise<{ success: boolean; message: string }> {
-    return apiClient.post<{ success: boolean; message: string }>(`/api/price-books/${id}/apply-formula`, {});
+  async applyFormula(
+    id: number,
+    options?: { categoryIds?: number[]; allProducts?: boolean }
+  ): Promise<{ success: boolean; message: string }> {
+    return apiClient.post<{ success: boolean; message: string }>(
+      `/api/price-books/${id}/apply-formula`,
+      options || {}
+    );
   },
 };

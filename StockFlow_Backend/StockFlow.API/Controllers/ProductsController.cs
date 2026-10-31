@@ -83,6 +83,22 @@ public class ProductsController : ControllerBase
     }
 
     /// <summary>
+    /// Nhập danh sách hàng hóa hàng loạt từ file dữ liệu Excel vào cơ sở dữ liệu.
+    /// </summary>
+    [HttpPost("import")]
+    [ProducesResponseType(typeof(ImportProductsResultDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> ImportProducts([FromBody] ImportProductsRequest request)
+    {
+        var result = await _mediator.Send(new ImportProductsCommand(request));
+        if (!result.IsSuccess)
+        {
+            return BadRequest(new { message = result.Error });
+        }
+        return Ok(result.Value);
+    }
+
+    /// <summary>
     /// Cập nhật thông tin hàng hóa (mã, tên, phân loại, giá vốn, định mức tồn kho, mô tả, trạng thái).
     /// </summary>
     [HttpPut("{id}")]
@@ -138,6 +154,22 @@ public class ProductsController : ControllerBase
     public async Task<IActionResult> GetProductCategories()
     {
         var result = await _mediator.Send(new GetProductCategoriesQuery());
+        return Ok(result.Value);
+    }
+
+    /// <summary>
+    /// Tạo nhanh nhóm danh mục hàng hóa (Category).
+    /// </summary>
+    [HttpPost("categories")]
+    [ProducesResponseType(typeof(ProductCategoryDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> CreateProductCategory([FromBody] CreateCategoryRequest request)
+    {
+        var result = await _mediator.Send(new CreateProductCategoryCommand(request));
+        if (!result.IsSuccess)
+        {
+            return BadRequest(new { message = result.Error });
+        }
         return Ok(result.Value);
     }
 

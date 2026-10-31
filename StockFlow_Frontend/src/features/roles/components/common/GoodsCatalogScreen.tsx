@@ -150,6 +150,184 @@ const CustomCombobox: React.FC<CustomComboboxProps> = ({
   );
 };
 
+// ─── Component Dropdown Nhóm hàng / Thương hiệu Chuẩn KiotViet (Kính lúp & Tạo mới) ───────────
+interface KiotSelectWithSearchProps {
+  label: string;
+  required?: boolean;
+  onCreateNew?: () => void;
+  createButtonText?: string;
+  value: string;
+  onChange: (val: string) => void;
+  options: string[];
+  placeholder?: string;
+  searchPlaceholder?: string;
+  allowClear?: boolean;
+  onQuickCreate?: (val: string) => void;
+  className?: string;
+}
+
+const KiotSelectWithSearch: React.FC<KiotSelectWithSearchProps> = ({
+  label,
+  required = false,
+  onCreateNew,
+  createButtonText = 'Tạo mới',
+  value,
+  onChange,
+  options,
+  placeholder = 'Chọn...',
+  searchPlaceholder = 'Tìm kiếm...',
+  allowClear = true,
+  onQuickCreate,
+  className = '',
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const containerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    if (isOpen) {
+      setTimeout(() => inputRef.current?.focus(), 60);
+    } else {
+      setSearchQuery('');
+    }
+  }, [isOpen]);
+
+  const filteredOptions = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return options;
+    return options.filter((opt) => opt.toLowerCase().includes(q));
+  }, [options, searchQuery]);
+
+  return (
+    <div ref={containerRef} className={`relative w-full ${className}`}>
+      {/* Header dòng trên: Nhãn & Nút 'Tạo mới' màu xanh chuẩn KiotViet */}
+      <div className="flex items-center justify-between mb-1">
+        <label className="block text-xs font-semibold text-slate-700">
+          {label} {required && <span className="text-red-500">*</span>}
+        </label>
+        {onCreateNew && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onCreateNew();
+            }}
+            className="text-xs text-[#0070F3] hover:text-blue-700 font-normal hover:underline cursor-pointer transition select-none"
+          >
+            {createButtonText}
+          </button>
+        )}
+      </div>
+
+      {/* Hộp chọn Trigger chuẩn KiotViet */}
+      <div
+        onClick={() => setIsOpen(!isOpen)}
+        className={`w-full h-9 px-3 rounded-lg border text-xs flex items-center justify-between cursor-pointer bg-white transition select-none ${
+          isOpen ? 'border-blue-500 ring-2 ring-blue-500/15' : 'border-slate-200 hover:border-slate-300'
+        }`}
+      >
+        <span className={`truncate ${value ? 'text-slate-800 font-medium' : 'text-slate-400'}`}>
+          {value || placeholder}
+        </span>
+        <ChevronDown
+          size={14}
+          className={`text-slate-400 transition-transform duration-200 ${isOpen ? 'rotate-180 text-blue-600' : ''}`}
+        />
+      </div>
+
+      {/* Dropdown Menu nổi (Nổi bật - Không bị đè / không bị cắt) */}
+      {isOpen && (
+        <div className="absolute z-[999] left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl overflow-hidden py-1.5 text-xs animate-in fade-in zoom-in-95 duration-100 ring-1 ring-black/10 min-w-[280px]">
+          {/* Thanh tìm kiếm bên trong dropdown có icon kính lúp 🔍 */}
+          <div className="p-2.5 border-b border-slate-100 bg-slate-50/70">
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={13} />
+              <input
+                ref={inputRef}
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder={searchPlaceholder}
+                className="w-full h-8 pl-8 pr-3 text-xs bg-white rounded-md border border-slate-300 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition text-slate-800 placeholder-slate-400"
+                onClick={(e) => e.stopPropagation()}
+              />
+            </div>
+          </div>
+
+          {/* Danh sách lựa chọn cuộn (Chiều cao thoải mái, hiển thị rõ ràng) */}
+          <div className="max-h-60 min-h-[100px] overflow-y-auto divide-y divide-slate-50">
+            {/* Lựa chọn xóa / mặc định: Chọn nhóm hàng (Bắt buộc) */}
+            {allowClear && (
+              <div
+                onClick={() => {
+                  onChange('');
+                  setIsOpen(false);
+                }}
+                className={`px-3 py-2 cursor-pointer transition flex items-center justify-between ${
+                  !value ? 'bg-blue-50/70 text-blue-700 font-medium' : 'text-slate-500 hover:bg-slate-50'
+                }`}
+              >
+                <span>{placeholder}</span>
+                {!value && <Check size={13} className="text-blue-600" />}
+              </div>
+            )}
+
+            {/* Các tùy chọn lọc theo từ khóa */}
+            {filteredOptions.length > 0 ? (
+              filteredOptions.map((opt, idx) => {
+                const isSelected = value === opt;
+                return (
+                  <div
+                    key={idx}
+                    onClick={() => {
+                      onChange(opt);
+                      setIsOpen(false);
+                    }}
+                    className={`px-3 py-2 cursor-pointer transition flex items-center justify-between ${
+                      isSelected ? 'bg-blue-50/70 text-blue-700 font-bold' : 'text-slate-700 hover:bg-blue-50 hover:text-blue-700'
+                    }`}
+                  >
+                    <span className="truncate">{opt}</span>
+                    {isSelected && <Check size={13} className="text-blue-600 flex-shrink-0" />}
+                  </div>
+                );
+              })
+            ) : (
+              <div className="p-3 text-center text-slate-400 text-xs">
+                <div className="mb-1 text-slate-500">Không tìm thấy kết quả</div>
+                {searchQuery.trim() && onQuickCreate && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onQuickCreate(searchQuery.trim());
+                      setIsOpen(false);
+                    }}
+                    className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-700 font-medium hover:underline mt-1 cursor-pointer"
+                  >
+                    <Plus size={12} />
+                    <span>Tạo mới &ldquo;{searchQuery.trim()}&rdquo;</span>
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 export interface GoodsVariantItem {
   id: string;
   attributeValue?: string;
@@ -716,6 +894,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
   const suggestedProductCode = getNextProductCode(goods);
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<'ALL' | 'LOW_STOCK' | 'STARRED'>('ALL');
+  const [dbReloadTrigger, setDbReloadTrigger] = useState<number>(0);
 
   // Bộ lọc bên trái nâng cao kiểu StockFlow (Ảnh 2 & 3)
   const [filterSidebarState, setFilterSidebarState] = useState<FilterSidebarState>(INITIAL_FILTER_STATE);
@@ -763,15 +942,47 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
   }, [filterSidebarState]);
 
   // Danh sách các danh mục, nhà cung cấp, vị trí trích xuất tự động từ dữ liệu thực
+  // Quản lý danh mục & thương hiệu bổ sung linh hoạt (Chuẩn KiotViet)
+  const [customCategories, setCustomCategories] = useState<string[]>([]);
+  const [customBrands, setCustomBrands] = useState<string[]>([]);
+  const [isQuickCategoryModalOpen, setIsQuickCategoryModalOpen] = useState(false);
+  const [isQuickBrandModalOpen, setIsQuickBrandModalOpen] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [newCategoryParent, setNewCategoryParent] = useState('');
+  const [newCategoryDesc, setNewCategoryDesc] = useState('');
+  const [isSavingCategory, setIsSavingCategory] = useState(false);
+  const [newBrandName, setNewBrandName] = useState('');
+
+  // Tải danh mục hiện có từ backend database
+  useEffect(() => {
+    productService.getCategories().then((cats) => {
+      if (Array.isArray(cats) && cats.length > 0) {
+        const names = cats.map((c: any) => c.categoryName || c.name).filter(Boolean);
+        setCustomCategories((prev) => Array.from(new Set([...prev, ...names])));
+      }
+    }).catch(() => {});
+  }, [dbReloadTrigger]);
+
   const categoriesList = useMemo(() => {
     const set = new Set<string>();
     goods.forEach((g) => {
       if (g.category) set.add(g.category);
       if (g.subCategory) set.add(g.subCategory);
     });
+    customCategories.forEach((c) => set.add(c));
     DEFAULT_SUBCATEGORY_OPTIONS.forEach((c) => set.add(c));
     return Array.from(set).filter(Boolean);
-  }, [goods]);
+  }, [goods, customCategories]);
+
+  const brandsList = useMemo(() => {
+    const set = new Set<string>();
+    goods.forEach((g) => {
+      if (g.brand) set.add(g.brand);
+    });
+    customBrands.forEach((b) => set.add(b));
+    DEFAULT_BRAND_OPTIONS.forEach((b) => set.add(b));
+    return Array.from(set).filter(Boolean);
+  }, [goods, customBrands]);
 
   const suppliersList = useMemo(() => {
     const set = new Set<string>();
@@ -782,13 +993,32 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
     return Array.from(set).filter(Boolean);
   }, [goods]);
 
+  // Quản lý vị trí kho tùy chỉnh (Chuẩn KiotViet - Ảnh 2)
+  const [customLocations, setCustomLocations] = useState<string[]>([]);
+  const [isQuickLocationModalOpen, setIsQuickLocationModalOpen] = useState(false);
+  const [newLocationName, setNewLocationName] = useState('');
+  const [newLocationDesc, setNewLocationDesc] = useState('');
+
   const locationsList = useMemo(() => {
     const set = new Set<string>();
     goods.forEach((g) => {
       if (g.locationName) set.add(g.locationName);
     });
+    customLocations.forEach((l) => set.add(l));
     DEFAULT_LOCATION_OPTIONS.forEach((l) => set.add(l));
     return Array.from(set).filter(Boolean);
+  }, [goods, customLocations]);
+
+  // Thống kê số lượng sản phẩm theo từng nhóm hàng (Ảnh 1)
+  const categoryCounts = useMemo(() => {
+    const map: Record<string, number> = {};
+    goods.forEach((g) => {
+      const cat = g.subCategory || g.category;
+      if (cat) {
+        map[cat] = (map[cat] || 0) + 1;
+      }
+    });
+    return map;
   }, [goods]);
   // Quản lý tích ô vuông các mặt hàng được chọn
   const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
@@ -867,8 +1097,8 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
   const [formBarcode, setFormBarcode] = useState('');
   const [formName, setFormName] = useState('');
   const [formCategory, setFormCategory] = useState<'Thành phẩm' | 'Nguyên vật liệu'>('Thành phẩm');
-  const [formSubCategory, setFormSubCategory] = useState('Sữa');
-  const [formBrand, setFormBrand] = useState('Ba Vì Milk');
+  const [formSubCategory, setFormSubCategory] = useState('');
+  const [formBrand, setFormBrand] = useState('');
   const [formUom, setFormUom] = useState('Hộp');
   const [formSpec, setFormSpec] = useState('');
   const [formWarehouse, setFormWarehouse] = useState('Kho Tổng Gia Lâm');
@@ -1602,6 +1832,89 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
     setDetailModalOpen(true);
   };
 
+  const handleSaveQuickCategory = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const name = newCategoryName.trim();
+    if (!name) return;
+
+    setIsSavingCategory(true);
+    try {
+      await productService.createCategory({
+        categoryName: name,
+        description: newCategoryDesc.trim() || undefined,
+      });
+    } catch (err) {
+      console.warn('Backend category creation fallback:', err);
+    } finally {
+      setIsSavingCategory(false);
+    }
+
+    setCustomCategories((prev) => Array.from(new Set([...prev, name])));
+    setFormSubCategory(name);
+    setFormCategory(name as any);
+    setIsQuickCategoryModalOpen(false);
+    setNewCategoryName('');
+    setNewCategoryDesc('');
+    setNewCategoryParent('');
+    showToast('Đã tạo nhóm hàng "' + name + '" thành công!');
+  };
+
+  const handleQuickCreateCategoryDirect = async (name: string) => {
+    if (!name.trim()) return;
+    const trimmed = name.trim();
+    try {
+      await productService.createCategory({
+        categoryName: trimmed,
+      });
+    } catch (err) {
+      console.warn('Backend category creation fallback:', err);
+    }
+    setCustomCategories((prev) => Array.from(new Set([...prev, trimmed])));
+    setFormSubCategory(trimmed);
+    showToast('Đã tạo nhóm hàng "' + trimmed + '" thành công!');
+  };
+
+  const handleSaveQuickBrand = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const name = newBrandName.trim();
+    if (!name) return;
+
+    setCustomBrands((prev) => Array.from(new Set([...prev, name])));
+    setFormBrand(name);
+    setIsQuickBrandModalOpen(false);
+    setNewBrandName('');
+    showToast('Đã tạo thương hiệu "' + name + '" thành công!');
+  };
+
+  const handleQuickCreateBrandDirect = (name: string) => {
+    if (!name.trim()) return;
+    const trimmed = name.trim();
+    setCustomBrands((prev) => Array.from(new Set([...prev, trimmed])));
+    setFormBrand(trimmed);
+    showToast('Đã tạo thương hiệu "' + trimmed + '" thành công!');
+  };
+
+  const handleSaveQuickLocation = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const name = newLocationName.trim();
+    if (!name) return;
+
+    setCustomLocations((prev) => Array.from(new Set([...prev, name])));
+    setFormLocation(name);
+    setIsQuickLocationModalOpen(false);
+    setNewLocationName('');
+    setNewLocationDesc('');
+    showToast('Đã tạo vị trí "' + name + '" thành công!');
+  };
+
+  const handleQuickCreateLocationDirect = (name: string) => {
+    if (!name.trim()) return;
+    const trimmed = name.trim();
+    setCustomLocations((prev) => Array.from(new Set([...prev, trimmed])));
+    setFormLocation(trimmed);
+    showToast('Đã tạo vị trí "' + trimmed + '" thành công!');
+  };
+
   const handleOpenCreate = () => {
     setModalMode('create');
     setEditingItem(null);
@@ -1610,8 +1923,8 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
     setFormBarcode('');
     setFormName('');
     setFormCategory('Thành phẩm');
-    setFormSubCategory('Sữa');
-    setFormBrand('Ba Vì Milk');
+    setFormSubCategory('');
+    setFormBrand('');
     setFormUom('Hộp');
     setFormSpec('');
     const validFacs = permittedFacilities.length > 0 ? permittedFacilities : facilities;
@@ -2372,12 +2685,19 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
       if (!item.isStarred) return false;
     }
 
-    // ─── 1. Nhóm hàng (Category / SubCategory) ───
-    if (filterSidebarState.category && filterSidebarState.category.trim()) {
-      const cat = filterSidebarState.category.trim().toLowerCase();
-      const matchCat =
-        (item.category && item.category.toLowerCase().includes(cat)) ||
-        (item.subCategory && item.subCategory.toLowerCase().includes(cat));
+    // ─── 1. Nhóm hàng (Category / SubCategory) - Hỗ trợ chọn nhiều nhóm (Multi-select) ───
+    const selectedCats = filterSidebarState.categories && filterSidebarState.categories.length > 0
+      ? filterSidebarState.categories
+      : (filterSidebarState.category?.trim() ? [filterSidebarState.category.trim()] : []);
+
+    if (selectedCats.length > 0) {
+      const matchCat = selectedCats.some((c) => {
+        const catLower = c.trim().toLowerCase();
+        return (
+          (item.category && item.category.toLowerCase().includes(catLower)) ||
+          (item.subCategory && item.subCategory.toLowerCase().includes(catLower))
+        );
+      });
       if (!matchCat) return false;
     }
 
@@ -2803,8 +3123,10 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
         <ProductFilterSidebar
           state={filterSidebarState}
           onChange={(patch) => setFilterSidebarState((prev) => ({ ...prev, ...patch }))}
-          onCreateCategory={handleOpenCreate}
+          onCreateCategory={() => { setNewCategoryName(''); setNewCategoryDesc(''); setIsQuickCategoryModalOpen(true); }}
+          onCreateLocation={() => { setNewLocationName(''); setNewLocationDesc(''); setIsQuickLocationModalOpen(true); }}
           categoriesList={categoriesList}
+          categoryCounts={categoryCounts}
           suppliersList={suppliersList}
           locationsList={locationsList}
           isCollapsed={isFilterSidebarCollapsed}
@@ -3992,7 +4314,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
             </div>
 
             {/* Modal Body Scrollable */}
-            <div className="p-6 overflow-y-auto space-y-5 text-xs flex-1">
+            <div className="p-6 pb-36 overflow-y-auto space-y-5 text-xs flex-1">
               {modalTab === 'info' && (
                 <>
                   {/* Phần Thông Tin Cơ Bản & Khung Upload Ảnh (Ảnh 1) */}
@@ -4047,35 +4369,47 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                         />
                       </div>
 
-                      {/* Nhóm hàng & Thương hiệu hỗ trợ TỰ NHẬP tự do hoặc TỰ CHỌN */}
+                      {/* Nhóm hàng & Thương hiệu Chuẩn KiotViet (Ảnh 2) */}
                       <div className="grid grid-cols-2 gap-3">
                         <div>
-                          <div className="flex items-center justify-between mb-1">
-                            <label className="font-semibold text-slate-700">
-                              Nhóm hàng <span className="text-slate-400 font-normal">(Tự nhập / chọn)</span>
-                            </label>
-                            <span className="text-[10px] text-blue-600 font-medium">Gõ tự do</span>
-                          </div>
-                          <CustomCombobox
+                          <KiotSelectWithSearch
+                            label="Nhóm hàng"
+                            required
+                            onCreateNew={() => {
+                              setNewCategoryName('');
+                              setNewCategoryDesc('');
+                              setNewCategoryParent('');
+                              setIsQuickCategoryModalOpen(true);
+                            }}
+                            createButtonText="Tạo mới"
                             value={formSubCategory}
-                            onChange={setFormSubCategory}
-                            options={DEFAULT_SUBCATEGORY_OPTIONS}
-                            placeholder="Nhập hoặc chọn nhóm hàng..."
+                            onChange={(val) => {
+                              setFormSubCategory(val);
+                              setFormCategory(val as any);
+                            }}
+                            options={categoriesList}
+                            placeholder="Chọn nhóm hàng (Bắt buộc)"
+                            searchPlaceholder="Tìm kiếm nhóm hàng..."
+                            allowClear={true}
+                            onQuickCreate={handleQuickCreateCategoryDirect}
                           />
                         </div>
 
                         <div>
-                          <div className="flex items-center justify-between mb-1">
-                            <label className="font-semibold text-slate-700">
-                              Thương hiệu <span className="text-slate-400 font-normal">(Tự nhập / chọn)</span>
-                            </label>
-                            <span className="text-[10px] text-blue-600 font-medium">Gõ tự do</span>
-                          </div>
-                          <CustomCombobox
+                          <KiotSelectWithSearch
+                            label="Thương hiệu"
+                            onCreateNew={() => {
+                              setNewBrandName('');
+                              setIsQuickBrandModalOpen(true);
+                            }}
+                            createButtonText="Tạo mới"
                             value={formBrand}
                             onChange={setFormBrand}
-                            options={DEFAULT_BRAND_OPTIONS}
-                            placeholder="Nhập hoặc chọn thương hiệu..."
+                            options={brandsList}
+                            placeholder="Chọn thương hiệu"
+                            searchPlaceholder="Tìm kiếm thương hiệu..."
+                            allowClear={true}
+                            onQuickCreate={handleQuickCreateBrandDirect}
                           />
                         </div>
                       </div>
@@ -4084,36 +4418,33 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
                           <div className="flex items-center justify-between mb-1">
-                            <label className="font-semibold text-slate-700">
-                              Đơn vị tính cơ bản <span className="text-slate-400 font-normal">(Tự nhập / chọn)</span>
+                            <label className="text-xs font-semibold text-slate-700">
+                              Đơn vị tính cơ bản <span className="text-red-500">*</span>
                             </label>
-                            <span className="text-[10px] text-blue-600 font-medium">ĐVT</span>
                           </div>
                           <CustomCombobox
                             value={formUom}
                             onChange={(val) => {
                               setFormUom(val);
-                              // Đồng bộ tên đơn vị cơ bản trong units
                               setFormUnits((prev) =>
                                 prev.map((u) => (u.isBase ? { ...u, name: val } : u))
                               );
                             }}
                             options={DEFAULT_UOM_OPTIONS}
-                            placeholder="Nhập hoặc chọn ĐVT (VD: Hộp, Tấm, Kg...)"
+                            placeholder="Nhập hoặc chọn ĐVT (VD: Hộp, Tấm, Kg, Cái...)"
                           />
                         </div>
 
                         <div>
                           <div className="flex items-center justify-between mb-1">
-                            <label className="font-semibold text-slate-700">
-                              Nhà cung cấp <span className="text-slate-400 font-normal">(Tự nhập / chọn)</span>
+                            <label className="text-xs font-semibold text-slate-700">
+                              Nhà cung cấp
                             </label>
-                            <span className="text-[10px] text-blue-600 font-medium">NCC</span>
                           </div>
                           <CustomCombobox
                             value={formSupplier}
                             onChange={setFormSupplier}
-                            options={DEFAULT_SUPPLIER_OPTIONS}
+                            options={suppliersList}
                             placeholder="Nhập hoặc chọn NCC (VD: xưởng sỉ)..."
                           />
                         </div>
@@ -4243,8 +4574,8 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                     </div>
                   </div>
 
-                  {/* Accordion 1: Giá vốn, giá bán (Ảnh 1) */}
-                  <div className="border border-slate-200 rounded-xl overflow-hidden shadow-2xs">
+                  {/* Accordion 1: Giá vốn, giá bán (Ảnh 1 - Hỗ trợ overflow-visible để dropdown nổi hoàn toàn) */}
+                  <div className={`border border-slate-200 rounded-xl shadow-2xs ${priceAccordionOpen ? 'overflow-visible' : 'overflow-hidden'}`}>
                     <button
                       type="button"
                       onClick={() => setPriceAccordionOpen(!priceAccordionOpen)}
@@ -4254,7 +4585,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                       {priceAccordionOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                     </button>
                     {priceAccordionOpen && (
-                      <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-4 bg-white border-t border-slate-100">
+                      <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-4 bg-white border-t border-slate-100 overflow-visible">
                         <div>
                           <label className="block font-semibold text-slate-700 mb-1">
                             Giá vốn tại {formWarehouse || warehouseFilter} (VNĐ)
@@ -4315,7 +4646,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                   </div>
 
                   {/* Accordion 2: Tồn kho (Ảnh 1) */}
-                  <div className="border border-slate-200 rounded-xl overflow-hidden shadow-2xs">
+                  <div className={`border border-slate-200 rounded-xl shadow-2xs ${stockAccordionOpen ? 'overflow-visible' : 'overflow-hidden'}`}>
                     <button
                       type="button"
                       onClick={() => setStockAccordionOpen(!stockAccordionOpen)}
@@ -4330,7 +4661,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                       {stockAccordionOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                     </button>
                     {stockAccordionOpen && (
-                      <div className="p-4 grid grid-cols-1 sm:grid-cols-3 gap-4 bg-white border-t border-slate-100">
+                      <div className="p-4 grid grid-cols-1 sm:grid-cols-3 gap-4 bg-white border-t border-slate-100 overflow-visible">
                         <div>
                           <label className="block font-semibold text-slate-700 mb-1">
                             Tồn kho tại {formWarehouse || warehouseFilter}
@@ -4414,34 +4745,40 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                     </button>
                   </div>
 
-                  {/* Accordion 3: Vị trí, trọng lượng, kích thước (Ảnh 1 - Hỗ trợ TỰ NHẬP tự do) */}
-                  <div className="border border-slate-200 rounded-xl overflow-hidden shadow-2xs">
+                  {/* Accordion 3: Vị trí, trọng lượng, kích thước (Ảnh 1 - Hỗ trợ overflow-visible để dropdown nổi hoàn toàn) */}
+                  <div className={`border border-slate-200 rounded-xl shadow-2xs ${specAccordionOpen ? 'overflow-visible' : 'overflow-hidden'}`}>
                     <button
                       type="button"
                       onClick={() => setSpecAccordionOpen(!specAccordionOpen)}
                       className="w-full px-4 py-3 bg-slate-50/70 hover:bg-slate-50 flex items-center justify-between text-xs font-bold text-slate-800 cursor-pointer select-none"
                     >
                       <div className="text-left">
-                        <div>Vị trí, trọng lượng, kích thước</div>
+                        <div>Vị trí, trọng lượng</div>
                         <div className="text-[11px] text-slate-400 font-normal mt-0.5">
-                          Quản lý việc sắp xếp kho, vị trí bán hàng hoặc quy cách giao hàng
+                          Quản lý việc sắp xếp kho, vị trí bán hàng hoặc trọng lượng hàng hóa
                         </div>
                       </div>
                       {specAccordionOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                     </button>
                     {specAccordionOpen && (
-                      <div className="p-4 space-y-3 bg-white border-t border-slate-100">
+                      <div className="p-4 space-y-3 bg-white border-t border-slate-100 overflow-visible">
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                           <div>
-                            <div className="flex items-center justify-between mb-1">
-                              <label className="font-semibold text-slate-700">Vị trí kho</label>
-                              <span className="text-[10px] text-blue-600 font-medium">Tự nhập / chọn</span>
-                            </div>
-                            <CustomCombobox
+                            <KiotSelectWithSearch
+                              label="Vị trí"
+                              onCreateNew={() => {
+                                setNewLocationName('');
+                                setNewLocationDesc('');
+                                setIsQuickLocationModalOpen(true);
+                              }}
+                              createButtonText="Tạo mới"
                               value={formLocation}
                               onChange={setFormLocation}
-                              options={DEFAULT_LOCATION_OPTIONS}
-                              placeholder="Nhập hoặc chọn vị trí (VD: Kệ A-01-T2)..."
+                              options={locationsList}
+                              placeholder="Chọn vị trí"
+                              searchPlaceholder="Tìm kiếm vị trí..."
+                              allowClear={true}
+                              onQuickCreate={handleQuickCreateLocationDirect}
                             />
                           </div>
 
@@ -5600,6 +5937,223 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
         fileName={lastExportedFile?.fileName || ''}
         workbook={lastExportedFile?.workbook || null}
       />
+
+      {/* QUICK MODAL: TẠO MỚI NHÓM HÀNG CHUẨN KIOTVIET (ẢNH 2) */}
+      {isQuickCategoryModalOpen && (
+        <div className="fixed inset-0 z-[1000] bg-black/40 backdrop-blur-[2px] flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-200 bg-slate-50/60">
+              <div className="flex items-center gap-2">
+                <Tag size={16} className="text-blue-600" />
+                <h3 className="text-sm font-bold text-slate-800">Tạo mới nhóm hàng</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsQuickCategoryModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-md transition cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveQuickCategory} className="p-5 space-y-4 text-xs">
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1.5">
+                  Tên nhóm hàng <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  autoFocus
+                  value={newCategoryName}
+                  onChange={(e) => setNewCategoryName(e.target.value)}
+                  placeholder="VD: Phào chỉ trang trí, Tấm PVC cao cấp, Sữa..."
+                  required
+                  className="w-full h-9 px-3 rounded-lg border border-slate-300 text-xs text-slate-800 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 font-medium"
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1.5">
+                  Nhóm cha (Tùy chọn)
+                </label>
+                <select
+                  value={newCategoryParent}
+                  onChange={(e) => setNewCategoryParent(e.target.value)}
+                  className="w-full h-9 px-3 rounded-lg border border-slate-300 text-xs text-slate-800 focus:outline-none focus:border-blue-500 font-medium bg-white"
+                >
+                  <option value="">-- Là nhóm gốc (Không có nhóm cha) --</option>
+                  {categoriesList.map((c, i) => (
+                    <option key={i} value={c}>{c}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1.5">
+                  Ghi chú / Mô tả
+                </label>
+                <textarea
+                  rows={2}
+                  value={newCategoryDesc}
+                  onChange={(e) => setNewCategoryDesc(e.target.value)}
+                  placeholder="Mô tả tóm tắt về nhóm hàng này..."
+                  className="w-full p-2.5 rounded-lg border border-slate-300 text-xs text-slate-800 focus:outline-none focus:border-blue-500 font-normal resize-none"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsQuickCategoryModalOpen(false)}
+                  className="h-9 px-4 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 font-medium transition cursor-pointer"
+                >
+                  Bỏ qua
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingCategory}
+                  className="h-9 px-4 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium shadow-sm transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  {isSavingCategory ? (
+                    <>
+                      <RefreshCw size={13} className="animate-spin" />
+                      <span>Đang lưu...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Check size={13} />
+                      <span>Lưu nhóm hàng</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* QUICK MODAL: TẠO MỚI VỊ TRÍ KHO (ẢNH 2) */}
+      {isQuickLocationModalOpen && (
+        <div className="fixed inset-0 z-[1000] bg-black/40 backdrop-blur-[2px] flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-200 bg-slate-50/60">
+              <div className="flex items-center gap-2">
+                <MapPin size={16} className="text-blue-600" />
+                <h3 className="text-sm font-bold text-slate-800">Tạo mới vị trí</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsQuickLocationModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-md transition cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveQuickLocation} className="p-5 space-y-4 text-xs">
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1.5">
+                  Tên vị trí <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  autoFocus
+                  value={newLocationName}
+                  onChange={(e) => setNewLocationName(e.target.value)}
+                  placeholder="VD: Kệ A-01-T2, Khu Vực B, Dãy C..."
+                  required
+                  className="w-full h-9 px-3 rounded-lg border border-slate-300 text-xs text-slate-800 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 font-medium"
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1.5">
+                  Ghi chú / Mô tả vị trí
+                </label>
+                <textarea
+                  rows={2}
+                  value={newLocationDesc}
+                  onChange={(e) => setNewLocationDesc(e.target.value)}
+                  placeholder="Mô tả chi tiết về vị trí này..."
+                  className="w-full p-2.5 rounded-lg border border-slate-300 text-xs text-slate-800 focus:outline-none focus:border-blue-500 font-normal resize-none"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsQuickLocationModalOpen(false)}
+                  className="h-9 px-4 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 font-medium transition cursor-pointer"
+                >
+                  Bỏ qua
+                </button>
+                <button
+                  type="submit"
+                  className="h-9 px-4 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium shadow-sm transition flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Check size={13} />
+                  <span>Lưu vị trí</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* QUICK MODAL: TẠO MỚI THƯƠNG HIỆU (ẢNH 2) */}
+      {isQuickBrandModalOpen && (
+        <div className="fixed inset-0 z-[1000] bg-black/40 backdrop-blur-[2px] flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-200 bg-slate-50/60">
+              <div className="flex items-center gap-2">
+                <Sparkles size={16} className="text-blue-600" />
+                <h3 className="text-sm font-bold text-slate-800">Tạo mới thương hiệu</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsQuickBrandModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-md transition cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveQuickBrand} className="p-5 space-y-4 text-xs">
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1.5">
+                  Tên thương hiệu <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  autoFocus
+                  value={newBrandName}
+                  onChange={(e) => setNewBrandName(e.target.value)}
+                  placeholder="VD: Vinamilk, Ba Vì Milk, Tín Phát..."
+                  required
+                  className="w-full h-9 px-3 rounded-lg border border-slate-300 text-xs text-slate-800 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 font-medium"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsQuickBrandModalOpen(false)}
+                  className="h-9 px-4 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 font-medium transition cursor-pointer"
+                >
+                  Bỏ qua
+                </button>
+                <button
+                  type="submit"
+                  className="h-9 px-4 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium shadow-sm transition flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Check size={13} />
+                  <span>Lưu thương hiệu</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

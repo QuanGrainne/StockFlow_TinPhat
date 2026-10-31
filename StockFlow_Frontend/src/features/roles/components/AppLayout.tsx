@@ -5,6 +5,7 @@ import { Header } from './common/Header';
 import { Sidebar } from './common/Sidebar';
 import { GoodsCatalogScreen } from './common/GoodsCatalogScreen';
 import SuppliersClient from '@/app/(dashboard)/suppliers/SuppliersClient';
+import CustomersClient from '@/app/(dashboard)/customers/CustomersClient';
 import PurchasesClient from '@/app/(dashboard)/purchases/PurchasesClient';
 import PriceBooksClient from '@/features/price-books/screens/PriceBooksClient';
 import TransfersClient from '@/app/(dashboard)/transfers/TransfersClient';
@@ -43,9 +44,16 @@ const SCREEN_MODULE_MAP: Record<string, string> = {
   'production-logs': 'PROD',
   'goods-catalog': 'GOODS',
   'purchases': 'PURCHASE',
+<<<<<<< Updated upstream
   'transfers': 'TRANSFER',
   'admin-transfers': 'TRANSFER',
   'manager-transfers': 'TRANSFER',
+=======
+  'customers': 'PARTNER',
+  'sales-customers': 'SALES',
+  'manager-customers': 'PARTNER',
+  'admin-customers': 'PARTNER',
+>>>>>>> Stashed changes
 };
 
 // Sales Screens
@@ -161,6 +169,8 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ initialScreen }) => {
   }, [currentRole, activeScreen]);
 
   const handleNavigate = (newScreen: string) => {
+    if (newScreen === 'pos' || newScreen === '/pos') { router.push('/pos'); return; }
+    if (newScreen === 'orders' || newScreen === '/orders') { router.push('/orders'); return; }
     setActiveScreen(newScreen);
     if (typeof window !== 'undefined') {
       localStorage.setItem('stockflow_active_screen', newScreen);
@@ -306,6 +316,12 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ initialScreen }) => {
         return <StaffAccountsScreen initialFilter="ALL" />;
 
       // ─── Common / Goods Catalog / Suppliers / Purchases Screens (Tất cả Role) ───
+      case 'customers':
+      case 'sales-customers':
+      case 'manager-customers':
+      case 'admin-customers':
+        return <CustomersClient onNavigate={handleNavigate} />;
+
       case 'suppliers':
       case 'manager-suppliers':
       case 'admin-suppliers':

@@ -167,15 +167,17 @@ public class PriceBooksController : ControllerBase
         return Ok(new { success = true, message = "Đã lưu thay đổi giá thành công." });
     }
 
+    public record ApplyFormulaRequestDto(List<int>? CategoryIds = null, bool AllProducts = false);
+
     /// <summary>
-    /// Tính toán và áp dụng lại công thức giá cho tất cả sản phẩm trong bảng giá.
+    /// Tính toán và áp dụng lại công thức giá cho tất cả sản phẩm hoặc theo nhóm hàng trong bảng giá.
     /// </summary>
     [HttpPost("{id:int}/apply-formula")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> ApplyFormula(int id)
+    public async Task<IActionResult> ApplyFormula(int id, [FromBody] ApplyFormulaRequestDto? body = null)
     {
-        var result = await _mediator.Send(new ApplyPriceBookFormulaCommand(id));
+        var result = await _mediator.Send(new ApplyPriceBookFormulaCommand(id, body?.CategoryIds, body?.AllProducts ?? false));
         if (!result.IsSuccess)
         {
             return BadRequest(new { message = result.Error });

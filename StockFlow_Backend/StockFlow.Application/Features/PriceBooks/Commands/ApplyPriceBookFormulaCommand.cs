@@ -13,7 +13,11 @@ using StockFlow.Domain.Entities;
 
 namespace StockFlow.Application.Features.PriceBooks.Commands;
 
-public record ApplyPriceBookFormulaCommand(int PriceBookId) : IRequest<Result>;
+public record ApplyPriceBookFormulaCommand(
+    int PriceBookId,
+    List<int>? CategoryIds = null,
+    bool AllProducts = false
+) : IRequest<Result>;
 
 public class ApplyPriceBookFormulaCommandHandler : IRequestHandler<ApplyPriceBookFormulaCommand, Result>
 {
@@ -36,13 +40,29 @@ public class ApplyPriceBookFormulaCommandHandler : IRequestHandler<ApplyPriceBoo
 
         if (string.IsNullOrWhiteSpace(pb.FormulaBaseType))
         {
-            return Result.Failure("Bảng giá này chưa được cấu hình công thức giá.");
+            pb.FormulaBaseType = "STANDARD";
         }
 
-        var products = await _context.MstProducts
+        var productsQuery = _context.MstProducts
             .Include(p => p.TrxInventoryBalances)
-            .Where(p => p.IsActive != false)
-            .ToListAsync(cancellationToken);
+            .Where(p => p.IsActive != false);
+
+        if (!request.AllProducts && request.CategoryIds != null && request.CategoryIds.Any())
+        {
+            productsQuery = productsQuery.Where(p => request.CategoryIds.Contains(p.CategoryId));
+        }
+        else if (!request.AllProducts)
+        {
+            // Chỉ tính lại cho các sản phẩm đã có trong bảng giá
+            var existingIds = await _context.DtlPriceBookItems
+                .Where(i => i.PriceBookId == pb.PriceBookId)
+                .Select(i => i.ProductId)
+                .ToListAsync(cancellationToken);
+
+            productsQuery = productsQuery.Where(p => existingIds.Contains(p.ProductId));
+        }
+
+        var products = await productsQuery.ToListAsync(cancellationToken);
 
         int? primaryWarehouseId = null;
         if (!string.IsNullOrWhiteSpace(pb.ScopeWarehouseIds))
