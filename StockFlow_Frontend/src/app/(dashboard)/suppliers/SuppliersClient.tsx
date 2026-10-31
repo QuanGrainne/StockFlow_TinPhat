@@ -18,10 +18,10 @@ export default function SuppliersClient({}: SuppliersClientProps = {}) {
   const s = useSuppliers();
 
   return (
-    <div className="flex-1 w-full flex flex-col text-[#262626] bg-[#f7f9fa]">
-      <div className="flex-1 flex min-h-[calc(100vh-104px)]">
+    <div className="flex-1 min-w-0 min-h-0 w-full flex flex-col text-[#262626] bg-[#f7f9fa] overflow-hidden">
+      <div className="flex-1 min-h-0 flex overflow-hidden">
         {/* ── 1. Desktop Left Sidebar (260px) ── */}
-        <div className="hidden lg:flex relative shrink-0">
+        <div className="hidden lg:flex relative shrink-0 h-full">
           <SupplierFilterSidebar
             state={s.filterState}
             selectedLocation={s.selectedLocation}
@@ -69,7 +69,7 @@ export default function SuppliersClient({}: SuppliersClientProps = {}) {
         )}
 
         {/* ── 3. Main Content Area ── */}
-        <main className="min-w-0 flex-1 flex flex-col bg-white">
+        <div className="min-w-0 min-h-0 flex-1 flex flex-col overflow-hidden bg-white">
           <SupplierToolbar
             search={s.filterState.search}
             onSearchChange={(search) => s.handleFilterChange({ search })}
@@ -115,7 +115,7 @@ export default function SuppliersClient({}: SuppliersClientProps = {}) {
               s.setPage(1);
             }}
           />
-        </main>
+        </div>
       </div>
 
       {/* ── 4. Floating Bulk Action Bar ── */}

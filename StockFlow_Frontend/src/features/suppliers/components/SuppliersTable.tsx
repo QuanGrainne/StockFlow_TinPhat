@@ -100,16 +100,16 @@ export default function SuppliersTable({
   ];
 
   return (
-    <div className="p-5 flex-1 flex flex-col bg-[#f8fafc]">
+    <div className="flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden bg-white">
       {/* 1. Header stats bar */}
-      <div className="mb-2.5 flex items-center justify-between text-xs sm:text-sm text-slate-600">
+      <div className="px-5 py-2.5 bg-[#f8fafc] border-b border-[#e5e7eb] flex items-center justify-between text-xs text-slate-600 shrink-0">
         <div className="flex items-center gap-2">
           <span>
             Danh sách Nhà cung cấp (
             <strong className="text-slate-900">{filteredCount}</strong> đối tác)
           </span>
           {selectedWarehouse && (
-            <span className="text-xs bg-blue-50 text-[#0071BA] border border-blue-200 px-2 py-0.5 rounded-full font-medium flex items-center gap-1">
+            <span className="text-xs bg-blue-50 text-[#0070f4] border border-blue-200 px-2 py-0.5 rounded-full font-medium flex items-center gap-1">
               <span>Kho: {selectedWarehouse.name}</span>
               <button
                 type="button"
@@ -139,37 +139,36 @@ export default function SuppliersTable({
       </div>
 
       {/* 2. Custom ERP Data Table */}
-      <div className="overflow-hidden rounded-lg border border-[#e5e7eb] bg-white shadow-xs">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm text-slate-800 border-collapse">
-            <thead className="bg-[#fafafa] border-b border-[#e5e7eb] text-xs font-semibold text-slate-500 select-none">
+      <div className="flex-1 min-h-0 overflow-auto">
+        <table className="w-full text-left border-collapse min-w-[950px] text-[13px]">
+            <thead className="bg-[#f7f8f9] sticky top-0 z-20 border-b border-slate-200 text-[12px] font-semibold text-[#677484] shadow-xs select-none">
               <tr>
-                <th className="w-10 px-3 py-2.5 text-center">
+                <th className="sticky top-0 z-20 bg-[#f7f8f9] w-10 px-3 py-2.5 text-center">
                   <input
                     type="checkbox"
-                    className="accent-[#0071BA] cursor-pointer"
+                    className="accent-[#0070f4] cursor-pointer"
                     checked={
                       selectedRowKeys.length === pagedItems.length && pagedItems.length > 0
                     }
                     onChange={(e) => onSelectAll(e.target.checked)}
                   />
                 </th>
-                <th className="w-32 px-3 py-2.5 font-semibold text-[#0071BA]">Mã NCC</th>
-                <th className="px-3 py-2.5 min-w-[200px]">Tên nhà cung cấp</th>
-                <th className="w-32 px-3 py-2.5">Số điện thoại</th>
-                <th className="w-44 px-3 py-2.5">Email</th>
-                <th className="px-3 py-2.5 min-w-[180px]">Địa chỉ</th>
-                <th className="w-36 px-3 py-2.5 text-right font-semibold text-[#0071BA]">
+                <th className="sticky top-0 z-20 bg-[#f7f8f9] w-28 px-3 py-2.5 font-semibold text-[#0070f4]">Mã NCC</th>
+                <th className="sticky top-0 z-20 bg-[#f7f8f9] px-3 py-2.5 min-w-[180px]">Tên nhà cung cấp</th>
+                <th className="sticky top-0 z-20 bg-[#f7f8f9] w-28 px-3 py-2.5">Số điện thoại</th>
+                <th className="sticky top-0 z-20 bg-[#f7f8f9] w-36 px-3 py-2.5">Email</th>
+                <th className="sticky top-0 z-20 bg-[#f7f8f9] px-3 py-2.5 min-w-[160px]">Địa chỉ</th>
+                <th className="sticky top-0 z-20 bg-[#f7f8f9] w-32 px-3 py-2.5 text-right font-semibold text-[#0070f4]">
                   Tổng mua
                 </th>
-                <th className="w-40 px-3 py-2.5 text-right font-semibold">
+                <th className="sticky top-0 z-20 bg-[#f7f8f9] w-36 px-3 py-2.5 text-right font-semibold">
                   {selectedWarehouse ? `Nợ tại ${selectedWarehouse.code}` : 'Nợ cần trả'}
                 </th>
-                <th className="w-36 px-3 py-2.5 text-center">Trạng thái</th>
-                <th className="w-16 px-3 py-2.5 text-center">Thao tác</th>
+                <th className="sticky top-0 z-20 bg-[#f7f8f9] w-32 px-3 py-2.5 text-center">Trạng thái</th>
+                <th className="sticky top-0 z-20 bg-[#f7f8f9] w-14 px-3 py-2.5 text-center">Thao tác</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#f0f0f0]">
+            <tbody className="divide-y divide-slate-100">
               {loading ? (
                 <tr>
                   <td colSpan={10} className="py-20 text-center text-sm text-slate-400">
@@ -194,7 +193,7 @@ export default function SuppliersTable({
                   return (
                     <React.Fragment key={sup.id}>
                       <tr
-                        className={`hover:bg-blue-50/40 transition cursor-pointer select-none ${
+                        className={`hover:bg-[#f7f8f9] transition cursor-pointer select-none border-b border-slate-100 ${
                           isExpanded
                             ? 'bg-[#e6f1fe]/80 font-medium'
                             : isSelected
@@ -205,38 +204,38 @@ export default function SuppliersTable({
                       >
                         {/* Checkbox */}
                         <td
-                          className="px-3 py-3 text-center"
+                          className="py-2.5 px-3 text-center"
                           onClick={(e) => e.stopPropagation()}
                         >
                           <input
                             type="checkbox"
-                            className="accent-[#0071BA] cursor-pointer"
+                            className="accent-[#0070f4] cursor-pointer"
                             checked={isSelected}
                             onChange={(e) => onSelectRow(sup.id, e.target.checked)}
                           />
                         </td>
 
                         {/* Mã NCC */}
-                        <td className="px-3 py-3 font-mono text-xs font-semibold text-[#0071BA]">
+                        <td className="py-2.5 px-3 font-mono text-xs font-semibold text-[#0070f4]">
                           <span className="hover:underline">{sup.code}</span>
                         </td>
 
                         {/* Tên NCC */}
-                        <td className="px-3 py-3 font-medium text-slate-900">{sup.name}</td>
+                        <td className="py-2.5 px-3 font-medium text-slate-900">{sup.name}</td>
 
                         {/* Điện thoại */}
-                        <td className="px-3 py-3 text-xs text-slate-600">{sup.phone || '—'}</td>
+                        <td className="py-2.5 px-3 text-xs text-slate-600">{sup.phone || '—'}</td>
 
                         {/* Email */}
-                        <td className="px-3 py-3 text-xs text-slate-500">{sup.email || '—'}</td>
+                        <td className="py-2.5 px-3 text-xs text-slate-500">{sup.email || '—'}</td>
 
                         {/* Địa chỉ */}
-                        <td className="px-3 py-3 text-xs text-slate-600 truncate max-w-xs">
+                        <td className="py-2.5 px-3 text-xs text-slate-600 truncate max-w-xs">
                           {sup.address || '—'}
                         </td>
 
                         {/* Tổng mua (Thay cho Hạn mức nợ) */}
-                        <td className="px-3 py-3 text-right font-mono text-xs font-semibold text-[#0071BA]">
+                        <td className="py-2.5 px-3 text-right font-mono text-xs font-semibold text-[#0070f4]">
                           {currencyFormatter.format(sup.totalPurchased || 0)} đ
                         </td>
 
@@ -258,7 +257,7 @@ export default function SuppliersTable({
                         </td>
 
                         {/* Trạng thái */}
-                        <td className="px-3 py-3 text-center">
+                        <td className="py-2.5 px-3 text-center">
                           <Tag color={sup.status === 'ACTIVE' ? 'success' : 'default'}>
                             {sup.status === 'ACTIVE' ? 'Đang giao dịch' : 'Ngừng giao dịch'}
                           </Tag>
@@ -266,7 +265,7 @@ export default function SuppliersTable({
 
                         {/* Menu thao tác */}
                         <td
-                          className="px-3 py-3 text-center"
+                          className="py-2.5 px-3 text-center"
                           onClick={(e) => e.stopPropagation()}
                         >
                           <Dropdown
@@ -304,9 +303,9 @@ export default function SuppliersTable({
           </table>
         </div>
 
-        {/* 4. Table Footer with Pagination */}
+        {/* 4. Table Footer with Pagination (Pinned to bottom) */}
         {filteredCount > 0 && (
-          <div className="flex flex-wrap items-center justify-between gap-4 border-t border-[#e5e7eb] bg-[#fafafa] px-4 py-3 text-xs text-slate-600">
+          <div className="flex flex-wrap items-center justify-between gap-4 border-t border-[#e5e7eb] bg-white px-5 py-2.5 text-xs text-slate-600 shrink-0 select-none">
             <div className="flex items-center gap-2">
               <span>
                 Hiển thị <strong>{rangeStart}</strong> - <strong>{rangeEnd}</strong> trên tổng
@@ -360,7 +359,6 @@ export default function SuppliersTable({
             </div>
           </div>
         )}
-      </div>
     </div>
   );
 }

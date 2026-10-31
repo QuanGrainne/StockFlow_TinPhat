@@ -33,7 +33,7 @@ export default function SupplierToolbar({
   onRefresh,
 }: SupplierToolbarProps) {
   return (
-    <div className="border-b border-[#e5e7eb] bg-white px-6 py-3.5">
+    <div className="border-b border-[#e5e7eb] bg-white px-6 py-3.5 shrink-0">
       <div className="flex flex-wrap items-center justify-between gap-4">
         {/* Search Bar */}
         <div className="flex items-center gap-2 flex-1 max-w-[480px]">
@@ -42,7 +42,7 @@ export default function SupplierToolbar({
             <button
               type="button"
               onClick={onToggleSidebar}
-              className="hidden lg:flex h-9 px-3 rounded-[6px] border border-blue-200 bg-blue-50/60 text-sm font-semibold text-[#0071BA] hover:bg-blue-100/70 items-center gap-1.5 shrink-0 shadow-xs transition cursor-pointer"
+              className="hidden lg:flex h-9 px-3 rounded-[6px] border border-blue-200 bg-blue-50/60 text-sm font-semibold text-[#0070f4] hover:bg-blue-100/70 items-center gap-1.5 shrink-0 shadow-xs transition cursor-pointer"
               title="Mở bảng bộ lọc"
             >
               <Filter size={15} />
@@ -89,7 +89,7 @@ export default function SupplierToolbar({
           <button
             type="button"
             onClick={onOpenCreate}
-            className="h-9 px-4 rounded-[6px] bg-[#0071BA] hover:bg-[#005f9d] text-sm font-semibold text-white flex items-center gap-1.5 shadow-xs transition cursor-pointer"
+            className="h-9 px-4 rounded-[6px] bg-[#0070f4] hover:bg-[#005ac3] text-sm font-semibold text-white flex items-center gap-1.5 shadow-xs transition cursor-pointer"
           >
             <Plus size={16} />
             <span>Nhà cung cấp</span>
