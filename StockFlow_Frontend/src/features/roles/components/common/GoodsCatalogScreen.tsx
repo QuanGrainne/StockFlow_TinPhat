@@ -1,4 +1,58 @@
 // src/features/roles/components/common/GoodsCatalogScreen.tsx
+// ─── Hàm Tính Toán Thời Gian Dự Kiến Hết Hàng (Days Until Out Of Stock) ──────────
+export interface DaysUntilOutOfStockResult {
+  days: number | null;
+  label: string;
+  status: 'OUT_OF_STOCK' | 'CRITICAL' | 'WARNING' | 'NORMAL' | 'UNKNOWN';
+}
+
+export function calculateDaysUntilOutOfStock(
+  actualStock: number,
+  minSafeStock: number = 0,
+  stockCardRecent?: { type: string; qtyChange: number; date?: string }[]
+): DaysUntilOutOfStockResult {
+  // 1. Phân tích tốc độ tiêu thụ/xuất kho thực tế
+  let dailyBurnRate = 0;
+  if (stockCardRecent && stockCardRecent.length > 0) {
+    const outbounds = stockCardRecent.filter((tx) => tx.type === 'XUAT' || tx.qtyChange < 0);
+    if (outbounds.length > 0) {
+      const totalOutQty = outbounds.reduce((sum, tx) => sum + Math.abs(tx.qtyChange), 0);
+      dailyBurnRate = totalOutQty / 30; // chu kỳ 30 ngày gần nhất
+    }
+  }
+
+  // 2. Nếu chưa có lịch sử xuất kho nhưng có định mức tồn tối thiểu (> 0)
+  if (dailyBurnRate <= 0 && minSafeStock > 0) {
+    dailyBurnRate = minSafeStock / 14; // chu kỳ dự phòng 14 ngày
+  }
+
+  // 3. Nếu không có căn cứ tốc độ tiêu thụ (chưa bán bao giờ): hiển thị '---'
+  if (dailyBurnRate <= 0) {
+    return {
+      days: null,
+      label: '---',
+      status: 'UNKNOWN',
+    };
+  }
+
+  // 4. Nếu có tốc độ tiêu thụ nhưng tồn kho = 0: hiển thị '0 ngày' (chuẩn theo ảnh mẫu KiotViet)
+  if (actualStock <= 0) {
+    return {
+      days: 0,
+      label: '0 ngày',
+      status: 'OUT_OF_STOCK',
+    };
+  }
+
+  // 5. Nếu còn hàng: tính số ngày = Tồn kho / Tốc độ tiêu thụ ngày
+  const calculatedDays = Math.max(1, Math.round(actualStock / dailyBurnRate));
+  return {
+    days: calculatedDays,
+    label: `${calculatedDays} ngày`,
+    status: calculatedDays <= 3 ? 'CRITICAL' : calculatedDays <= 7 ? 'WARNING' : 'NORMAL',
+  };
+}
+
 // Màn hình Danh mục Hàng hóa & Tồn kho Master Data cho toàn bộ các Role trong hệ thống
 // Hỗ trợ thiết kế Tạo hàng hóa StockFlow chuẩn với Đơn vị tính, Thuộc tính và Ma trận biến thể
 // Hỗ trợ cả TỰ NHẬP (free text) và TỰ CHỌN (dropdown suggestions) cho tất cả các trường dữ liệu
@@ -47,6 +101,9 @@ import {
   Store,
   ArrowDownToLine,
   Globe,
+  ChevronLeft,
+  ChevronsLeft,
+  ChevronsRight,
 } from 'lucide-react';
 import { productService } from '../../services/productService';
 import { adminService } from '../../services/adminService';
@@ -893,6 +950,11 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
   const suggestedProductCode = getNextProductCode(goods);
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<'ALL' | 'LOW_STOCK' | 'STARRED'>('ALL');
+
+  // Phân trang danh mục hàng hóa chuẩn mẫu (15 dòng/trang, điều hướng |<< < [1] > >>|)
+  const [pageSize, setPageSize] = useState<number>(15);
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [pageInput, setPageInput] = useState<string>('1');
   const [dbReloadTrigger, setDbReloadTrigger] = useState<number>(0);
 
   // Bộ lọc bên trái nâng cao kiểu StockFlow (Ảnh 2 & 3)
@@ -1401,7 +1463,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
             };
           });
 
-          // Giữ lại các sản phẩm được lưu ở localStorage mà database backend chưa kịp trả về
+          // Giữ lại và tự động đồng bộ tất cả sản phẩm từ localStorage vào PostgreSQL nếu database còn thiếu
           if (storedStr) {
             try {
               const parsed = JSON.parse(storedStr);
@@ -1413,8 +1475,39 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                       (m.code && sIt.code && m.code.toUpperCase() === sIt.code.toUpperCase()) ||
                       (m.productId && sIt.productId && m.productId === sIt.productId)
                   );
-                  if (!already) {
+                  if (!already && sIt.name) {
                     mergedDbItems.push(sIt);
+                    // Đồng bộ trực tiếp vào database PostgreSQL để đảm bảo 100% hàng hóa được lưu trong DB
+                    productService.createProduct({
+                      code: sIt.code,
+                      name: sIt.name,
+                      type: sIt.category === 'Nguyên vật liệu' ? 'RAW_MATERIAL' : 'FINISHED',
+                      categoryName: sIt.subCategory || sIt.category,
+                      uom: sIt.uom || 'Cái',
+                      standardPrice: sIt.standardPrice,
+                      costPrice: sIt.costPrice,
+                      minSafeStock: sIt.minSafeStock,
+                      maxSafeStock: sIt.maxSafeStock,
+                      barcode: sIt.barcode,
+                      brand: sIt.brand,
+                      description: sIt.specification,
+                      weight: sIt.weight,
+                      dimensions: sIt.dimensions ? JSON.stringify(sIt.dimensions) : undefined,
+                      locationName: sIt.locationName,
+                      isDirectSale: sIt.isDirectSale,
+                      hasRewardPoints: sIt.hasRewardPoints,
+                      imageUrl: sIt.imageUrl,
+                      initialStock: sIt.stockQuantity,
+                      units: sIt.units,
+                      attributes: sIt.attributes,
+                      variants: sIt.variants,
+                      supplier: sIt.supplier,
+                    }).then((created) => {
+                      if (created && (created as any).productId) {
+                        sIt.productId = (created as any).productId;
+                        sIt.id = String((created as any).productId);
+                      }
+                    }).catch((err) => console.warn('Lỗi auto-sync vào PostgreSQL:', err));
                   }
                 });
               }
@@ -2719,18 +2812,17 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
       }
     }
 
-    // ─── 3. Dự kiến hết hàng ───
-    if (filterSidebarState.expectedOutOfStockType === 'custom') {
-      if (itemStock.actual > (itemStock.minSafe || 0)) return false;
-    } else if (filterSidebarState.expectedOutOfStockPeriod && filterSidebarState.expectedOutOfStockPeriod !== 'Toàn thời gian') {
+    // ─── 3. Dự kiến hết hàng (Tính toán dựa trên số ngày thực tế) ───
+    if (filterSidebarState.expectedOutOfStockPeriod && filterSidebarState.expectedOutOfStockPeriod !== 'Toàn thời gian') {
       const p = filterSidebarState.expectedOutOfStockPeriod;
-      if (['Ngày mai', 'Ngày kia', '3 ngày tới'].includes(p)) {
-        if (itemStock.actual > Math.max(0, itemStock.minSafe || 0) + 5) return false;
-      } else if (['5 ngày tới', '7 ngày tới', 'Tuần này', 'Tuần tới'].includes(p)) {
-        if (itemStock.actual > Math.max(0, itemStock.minSafe || 0) + 15) return false;
-      } else if (['2 tuần tới', 'Tháng này', 'Tháng tới', '30 ngày tới', '2 tháng tới', '3 tháng tới'].includes(p)) {
-        if (itemStock.actual > Math.max(0, itemStock.minSafe || 0) + 50) return false;
-      }
+      const runOut = calculateDaysUntilOutOfStock(itemStock.actual, itemStock.minSafe, item.stockCardRecent);
+      if (runOut.days === null) return false;
+      if (['Hôm nay', 'Ngày mai'].includes(p) && runOut.days > 1) return false;
+      if (['3 ngày tới'].includes(p) && runOut.days > 3) return false;
+      if (['5 ngày tới'].includes(p) && runOut.days > 5) return false;
+      if (['7 ngày tới', 'Tuần này', 'Tuần tới'].includes(p) && runOut.days > 7) return false;
+      if (['15 ngày tới', '2 tuần tới'].includes(p) && runOut.days > 15) return false;
+      if (['Tháng này', 'Tháng tới', '30 ngày tới'].includes(p) && runOut.days > 30) return false;
     }
 
     // ─── 4. Thời gian tạo ───
@@ -2850,6 +2942,31 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
     return true;
   });
 
+  // Tự động reset trang về 1 khi từ khóa tìm kiếm hoặc bộ lọc thay đổi
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, categoryFilter, filterSidebarState, warehouseFilter]);
+
+  useEffect(() => {
+    setPageInput(String(currentPage));
+  }, [currentPage]);
+
+  // Tính toán dữ liệu phân trang
+  const totalItems = filteredGoods.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+  const startIndex = (currentPage - 1) * pageSize;
+  const endIndex = Math.min(startIndex + pageSize, totalItems);
+  const displayedGoods = useMemo(() => {
+    return filteredGoods.slice(startIndex, endIndex);
+  }, [filteredGoods, startIndex, endIndex]);
+
+  // Tổng số lượng mã hàng (bao gồm cả các biến thể hàng hóa cùng loại)
+  const totalSkuCount = useMemo(() => {
+    return filteredGoods.reduce((sum, g) => {
+      return sum + (g.variants && g.variants.length > 0 ? g.variants.length : 1);
+    }, 0);
+  }, [filteredGoods]);
+
   // KPI Metrics (Tính toán theo chi nhánh kho đang chọn)
   const totalSku = goods.length;
   const starredCount = goods.filter((g) => g.isStarred).length;
@@ -2875,10 +2992,12 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
   };
 
   const handleToggleSelectAll = () => {
-    if (selectedItemIds.length === filteredGoods.length && filteredGoods.length > 0) {
-      setSelectedItemIds([]);
+    const currentDisplayedIds = displayedGoods.map((g) => g.id);
+    const allCurrentSelected = currentDisplayedIds.length > 0 && currentDisplayedIds.every((id) => selectedItemIds.includes(id));
+    if (allCurrentSelected) {
+      setSelectedItemIds((prev) => prev.filter((id) => !currentDisplayedIds.includes(id)));
     } else {
-      setSelectedItemIds(filteredGoods.map((g) => g.id));
+      setSelectedItemIds((prev) => Array.from(new Set([...prev, ...currentDisplayedIds])));
     }
   };
 
@@ -3428,31 +3547,40 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
           <table className="w-full text-left border-collapse">
             <thead className="sticky top-0 z-10 bg-slate-100/95 backdrop-blur-xs shadow-2xs">
               <tr className="border-b border-slate-200 bg-slate-100/95 text-[11px] font-bold text-slate-600 uppercase tracking-wider">
-                {/* 1. Tích ô vuông Header (Checkbox All / Indeterminate) */}
+                {/* 1. Tích ô vuông Header (Checkbox All / Indeterminate trên trang hiện tại) */}
                 <th className="py-3 px-3 w-10 text-center select-none">
-                  {selectedItemIds.length > 0 && selectedItemIds.length < filteredGoods.length ? (
-                    <div
-                      onClick={handleToggleSelectAll}
-                      className="w-4 h-4 rounded bg-blue-600 border border-blue-600 text-white mx-auto cursor-pointer flex items-center justify-center shadow-2xs transition"
-                      title="Bỏ chọn tất cả"
-                    >
-                      <Minus size={12} strokeWidth={3} />
-                    </div>
-                  ) : selectedItemIds.length > 0 && selectedItemIds.length === filteredGoods.length ? (
-                    <div
-                      onClick={handleToggleSelectAll}
-                      className="w-4 h-4 rounded bg-blue-600 border border-blue-600 text-white mx-auto cursor-pointer flex items-center justify-center shadow-2xs transition"
-                      title="Bỏ chọn tất cả"
-                    >
-                      <Check size={12} strokeWidth={3} />
-                    </div>
-                  ) : (
-                    <div
-                      onClick={handleToggleSelectAll}
-                      className="w-4 h-4 rounded border border-slate-300 hover:border-blue-500 bg-white mx-auto cursor-pointer transition"
-                      title="Chọn tất cả"
-                    />
-                  )}
+                  {(() => {
+                    const pageIds = displayedGoods.map((g) => g.id);
+                    const selOnPage = pageIds.filter((id) => selectedItemIds.includes(id)).length;
+                    if (selOnPage > 0 && selOnPage < pageIds.length) {
+                      return (
+                        <div
+                          onClick={handleToggleSelectAll}
+                          className="w-4 h-4 rounded bg-blue-600 border border-blue-600 text-white mx-auto cursor-pointer flex items-center justify-center shadow-2xs transition"
+                          title="Bỏ chọn trang này"
+                        >
+                          <Minus size={12} strokeWidth={3} />
+                        </div>
+                      );
+                    } else if (selOnPage > 0 && selOnPage === pageIds.length) {
+                      return (
+                        <div
+                          onClick={handleToggleSelectAll}
+                          className="w-4 h-4 rounded bg-blue-600 border border-blue-600 text-white mx-auto cursor-pointer flex items-center justify-center shadow-2xs transition"
+                          title="Bỏ chọn trang này"
+                        >
+                          <Check size={12} strokeWidth={3} />
+                        </div>
+                      );
+                    }
+                    return (
+                      <div
+                        onClick={handleToggleSelectAll}
+                        className="w-4 h-4 rounded border border-slate-300 hover:border-blue-500 bg-white mx-auto cursor-pointer transition"
+                        title="Chọn tất cả hàng hóa trên trang này"
+                      />
+                    );
+                  })()}
                 </th>
 
                 {/* 2. Dấu sao Header (☆ ▾) - Filter / Toggle Starred items */}
@@ -3481,12 +3609,12 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                 <th className="py-3 px-4 text-right min-w-[110px]">TỒN KHO</th>
                 <th className="py-3 px-4 text-right min-w-[90px]">KHÁCH ĐẶT</th>
                 <th className="py-3 px-4 min-w-[130px]">THỜI GIAN TẠO</th>
-                <th className="py-3 px-4 text-center min-w-[110px]">DỰ KIẾN HẾT</th>
+                <th className="py-3 px-4 text-center min-w-[130px]">DỰ KIẾN HẾT HÀNG</th>
                 <th className="py-3 px-4 text-center min-w-[90px]">THAO TÁC</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-xs">
-              {filteredGoods.map((item) => {
+              {displayedGoods.map((item) => {
                 const isExpanded = expandedRowId === item.id;
                 const isSelected = selectedItemIds.includes(item.id);
                 const hasVariants = item.variants && item.variants.length > 0;
@@ -3706,19 +3834,37 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                         {getItemCreatedTime(item)}
                       </td>
 
-                      {/* Dự Kiến Hết Hàng */}
+                      {/* Dự Kiến Hết Hàng (Tính toán chuẩn theo ảnh mẫu) */}
                       <td className="py-3 px-4 text-center text-xs">
-                        {isOutOfStock ? (
-                          <span className="inline-flex items-center gap-1 text-rose-600 font-bold text-[11px] bg-rose-50 px-2 py-0.5 rounded-full border border-rose-200">
-                            <AlertTriangle size={11} /> Hết hàng
-                          </span>
-                        ) : isLowStock ? (
-                          <span className="inline-flex items-center gap-1 text-amber-700 font-bold text-[11px] bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
-                            <Clock size={11} /> Cần nhập gấp
-                          </span>
-                        ) : (
-                          <span className="text-slate-400">---</span>
-                        )}
+                        {(() => {
+                          const runOut = calculateDaysUntilOutOfStock(
+                            itemStock.actual,
+                            itemStock.minSafe,
+                            item.stockCardRecent
+                          );
+                          if (runOut.days === 0) {
+                            return (
+                              <span className="inline-flex items-center gap-1 text-rose-700 font-bold text-[11px] bg-rose-50 px-2 py-0.5 rounded-full border border-rose-200">
+                                <AlertTriangle size={11} /> 0 ngày
+                              </span>
+                            );
+                          }
+                          if (runOut.days !== null) {
+                            if (runOut.status === 'CRITICAL' || runOut.status === 'WARNING') {
+                              return (
+                                <span className="inline-flex items-center gap-1 text-amber-700 font-bold text-[11px] bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
+                                  <Clock size={11} /> {runOut.label}
+                                </span>
+                              );
+                            }
+                            return (
+                              <span className="font-medium text-slate-700 text-xs">
+                                {runOut.label}
+                              </span>
+                            );
+                          }
+                          return <span className="text-slate-400">---</span>;
+                        })()}
                       </td>
 
                       {/* Thao Tác Nhanh */}
@@ -4453,6 +4599,109 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* ─── Thanh Phân Trang Chuẩn Mẫu (Ảnh 1) ─────────────────────────────────── */}
+        <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 bg-white border-t border-slate-200 text-xs text-slate-600 select-none">
+          {/* Khối Trái: Chọn số dòng hiển thị */}
+          <div className="flex items-center gap-2">
+            <span className="text-slate-600 font-medium">Hiển thị</span>
+            <select
+              value={pageSize}
+              onChange={(e) => {
+                const newSize = Number(e.target.value);
+                setPageSize(newSize);
+                setCurrentPage(1);
+              }}
+              className="h-7 px-2 border border-slate-200 rounded-md bg-white text-xs font-medium text-slate-700 focus:outline-none focus:border-blue-500 cursor-pointer shadow-2xs"
+            >
+              <option value={10}>10 dòng</option>
+              <option value={15}>15 dòng</option>
+              <option value={20}>20 dòng</option>
+              <option value={30}>30 dòng</option>
+              <option value={50}>50 dòng</option>
+              <option value={100}>100 dòng</option>
+            </select>
+          </div>
+
+          {/* Khối Giữa: Điều hướng trang |<<  <  [ 1 ]  >  >>| */}
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              disabled={currentPage <= 1}
+              onClick={() => setCurrentPage(1)}
+              title="Trang đầu tiên"
+              className="w-7 h-7 flex items-center justify-center rounded-md border border-slate-200 bg-white text-slate-500 hover:text-blue-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
+            >
+              <ChevronsLeft size={14} />
+            </button>
+            <button
+              type="button"
+              disabled={currentPage <= 1}
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              title="Trang trước"
+              className="w-7 h-7 flex items-center justify-center rounded-md border border-slate-200 bg-white text-slate-500 hover:text-blue-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
+            >
+              <ChevronLeft size={14} />
+            </button>
+            <input
+              type="number"
+              min={1}
+              max={totalPages}
+              value={pageInput}
+              onChange={(e) => setPageInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  const val = parseInt(pageInput, 10);
+                  if (!isNaN(val) && val >= 1 && val <= totalPages) {
+                    setCurrentPage(val);
+                  } else {
+                    setPageInput(String(currentPage));
+                  }
+                }
+              }}
+              onBlur={() => {
+                const val = parseInt(pageInput, 10);
+                if (!isNaN(val) && val >= 1 && val <= totalPages) {
+                  setCurrentPage(val);
+                } else {
+                  setPageInput(String(currentPage));
+                }
+              }}
+              className="w-10 h-7 border border-slate-300 rounded-md text-center text-xs font-bold text-slate-800 bg-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 shadow-2xs [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+            />
+            <button
+              type="button"
+              disabled={currentPage >= totalPages}
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              title="Trang tiếp theo"
+              className="w-7 h-7 flex items-center justify-center rounded-md border border-slate-200 bg-white text-slate-500 hover:text-blue-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
+            >
+              <ChevronRight size={14} />
+            </button>
+            <button
+              type="button"
+              disabled={currentPage >= totalPages}
+              onClick={() => setCurrentPage(totalPages)}
+              title="Trang cuối cùng"
+              className="w-7 h-7 flex items-center justify-center rounded-md border border-slate-200 bg-white text-slate-500 hover:text-blue-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
+            >
+              <ChevronsRight size={14} />
+            </button>
+          </div>
+
+          {/* Khối Phải: Thống kê số lượng hàng hóa và mã hàng */}
+          <div className="text-slate-600 font-medium text-xs">
+            {totalItems > 0 ? (
+              <>
+                <span className="font-semibold text-slate-800">{startIndex + 1} - {endIndex}</span> trong{' '}
+                <span className="font-semibold text-slate-800">{totalItems.toLocaleString('vi-VN')}</span> hàng hóa{' '}
+                <span className="text-slate-500">({totalSkuCount.toLocaleString('vi-VN')} mã hàng)</span>
+              </>
+            ) : (
+              <span>0 - 0 trong 0 hàng hóa (0 mã hàng)</span>
+            )}
+          </div>
         </div>
       </div>
         </div>
