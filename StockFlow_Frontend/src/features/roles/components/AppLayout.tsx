@@ -44,16 +44,13 @@ const SCREEN_MODULE_MAP: Record<string, string> = {
   'production-logs': 'PROD',
   'goods-catalog': 'GOODS',
   'purchases': 'PURCHASE',
-<<<<<<< Updated upstream
   'transfers': 'TRANSFER',
   'admin-transfers': 'TRANSFER',
   'manager-transfers': 'TRANSFER',
-=======
   'customers': 'PARTNER',
   'sales-customers': 'SALES',
   'manager-customers': 'PARTNER',
   'admin-customers': 'PARTNER',
->>>>>>> Stashed changes
 };
 
 // Sales Screens
