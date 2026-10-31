@@ -38,7 +38,7 @@ export function exportSuppliersToXLSX(
       'Số điện thoại': s.phone || '',
       'Email': s.email || '',
       'Địa chỉ': s.address || '',
-      'Hạn mức nợ (VNĐ)': s.creditLimit || 0,
+      'Tổng tiền mua (VNĐ)': s.totalPurchased || 0,
       'Tổng nợ phải trả (VNĐ)': s.currentPayable || 0,
     };
 
@@ -60,7 +60,7 @@ export function exportSuppliersToXLSX(
     { wch: 16 }, // SĐT
     { wch: 25 }, // Email
     { wch: 40 }, // Địa chỉ
-    { wch: 20 }, // Hạn mức
+    { wch: 22 }, // Tổng tiền mua
     { wch: 24 }, // Tổng nợ
   ];
 
