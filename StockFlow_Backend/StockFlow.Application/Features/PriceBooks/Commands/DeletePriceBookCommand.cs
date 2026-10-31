@@ -33,6 +33,10 @@ public class DeletePriceBookCommandHandler : IRequestHandler<DeletePriceBookComm
             return Result.Failure("Không thể xóa 'Bảng giá chung' mặc định của hệ thống.");
         }
 
+        var dependentBooks = await _context.MstPriceBooks.Where(p => p.FormulaBasePriceBookId == request.Id).ToListAsync(cancellationToken);
+        foreach (var dep in dependentBooks) { dep.FormulaBasePriceBookId = null; dep.FormulaBaseType = null; }
+        var items = await _context.DtlPriceBookItems.Where(i => i.PriceBookId == request.Id).ToListAsync(cancellationToken);
+        if (items.Any()) _context.DtlPriceBookItems.RemoveRange(items);
         _context.MstPriceBooks.Remove(pb);
         await _context.SaveChangesAsync(cancellationToken);
 

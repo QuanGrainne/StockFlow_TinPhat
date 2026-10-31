@@ -101,6 +101,7 @@ import {
   Store,
   ArrowDownToLine,
   Globe,
+  Inbox,
   ChevronLeft,
   ChevronsLeft,
   ChevronsRight,
@@ -2826,12 +2827,15 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
     }
 
     // ─── 4. Thời gian tạo ───
-    if (filterSidebarState.createdDateType === 'custom') {
+    if (filterSidebarState.createdDateFrom || filterSidebarState.createdDateTo) {
       const itemDate = parseDateToComparable(item.createdAt);
       if (itemDate) {
         if (filterSidebarState.createdDateFrom) {
           const fromDate = parseDateToComparable(filterSidebarState.createdDateFrom);
-          if (fromDate && itemDate < fromDate) return false;
+          if (fromDate) {
+            const startOfDay = new Date(fromDate.getFullYear(), fromDate.getMonth(), fromDate.getDate(), 0, 0, 0, 0);
+            if (itemDate < startOfDay) return false;
+          }
         }
         if (filterSidebarState.createdDateTo) {
           const toDate = parseDateToComparable(filterSidebarState.createdDateTo);
@@ -3163,7 +3167,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
   };
 
   return (
-    <div className="w-full relative">
+    <div className="flex-1 h-full min-h-0 flex flex-col bg-[#f5f5f5] overflow-hidden select-none text-[13px] text-[#15171a] font-sans relative">
       {/* Toast Notification */}
       {toastMessage && (
         <div className="fixed top-20 right-8 z-50 bg-slate-900 text-white px-4 py-2.5 rounded-lg shadow-xl text-xs font-semibold flex items-center gap-2 animate-in fade-in">
@@ -3172,9 +3176,69 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
         </div>
       )}
 
-      {/* KHỐI LAYOUT CHIA 2 CỘT: BỘ LỌC BÊN TRÁI (Ảnh 2 & 3) + NỘI DUNG CHÍNH (Ảnh 1) */}
-      <div className="flex items-start gap-4 w-full">
-        {/* Bộ lọc bên trái StockFlow - Thu vào kéo ra mượt mà */}
+      {/* 1. Header Toolbar Bar (Chuẩn thiết kế KiotViet giống Chuyển hàng) */}
+      <header className="h-12 bg-white border-b border-slate-200 px-4 flex items-center justify-between gap-3 shrink-0">
+        {/* Left: Title & Search bar */}
+        <div className="flex items-center gap-4 flex-1 max-w-xl">
+          <h1 className="text-[20px] font-bold text-[#15171a] leading-7 tracking-tight whitespace-nowrap">
+            Hàng hóa
+          </h1>
+
+          <div className="relative flex-1">
+            <Search
+              size={14}
+              className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#677484] pointer-events-none"
+            />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Theo mã, tên hàng, mã vạch hoặc thương hiệu..."
+              className="w-full h-8 pl-8 pr-3 rounded-full bg-[#f7f8f9] border border-slate-200 text-[13px] text-[#15171a] placeholder-[#677484] focus:outline-none focus:border-[#0070f4] focus:bg-white transition"
+            />
+          </div>
+        </div>
+
+        {/* Right: Actions */}
+        <div className="flex items-center gap-2">
+          {canManageMaster && (
+            <button
+              type="button"
+              onClick={handleOpenCreate}
+              className="inline-flex items-center gap-1.5 px-3.5 h-8 rounded-[8px] bg-[#0070f4] hover:bg-[#005ac3] text-white font-semibold text-[13px] shadow-xs transition cursor-pointer"
+            >
+              <Plus size={15} className="stroke-[2.5]" />
+              <span>Thêm mới</span>
+            </button>
+          )}
+
+          <button
+            type="button"
+            onClick={() => setIsImportModalOpen(true)}
+            className="inline-flex items-center gap-1 px-3 h-8 rounded-[8px] border border-slate-300 hover:bg-[#f7f8f9] text-[#15171a] font-medium text-[13px] transition cursor-pointer bg-white"
+          >
+            <ArrowDownToLine size={14} className="text-[#677484]" />
+            <span>Import file</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setItemsToExport(filteredGoods);
+              setIsExportModalOpen(true);
+            }}
+            className="inline-flex items-center gap-1 px-3 h-8 rounded-[8px] border border-slate-300 hover:bg-[#f7f8f9] text-[#15171a] font-medium text-[13px] transition cursor-pointer bg-white"
+          >
+            <FileSpreadsheet size={14} className="text-[#677484]" />
+            <span>Xuất file</span>
+            <span className="text-[10px]">▾</span>
+          </button>
+        </div>
+      </header>
+
+      {/* 2. Main Workspace: Sidebar & Table */}
+      <div className="flex-1 min-h-0 flex overflow-hidden">
+        {/* Sidebar bộ lọc bên trái */}
         <ProductFilterSidebar
           state={filterSidebarState}
           onChange={(patch) => setFilterSidebarState((prev) => ({ ...prev, ...patch }))}
@@ -3189,430 +3253,143 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
           onResetFilters={handleResetSidebarFilters}
         />
 
-        {/* Nội dung danh mục hàng hóa - Tự động giãn 100% khi thu gọn */}
-        <div className="flex-1 min-w-0 space-y-6">
-          {/* 1. Header Màn hình */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-xl font-bold text-slate-900 tracking-tight">
-            Danh mục Hàng hóa &amp; Tồn kho
-          </h1>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Quản trị mã sản phẩm, đơn vị tính quy đổi, thuộc tính hương vị/màu sắc và ma trận hàng hóa cùng loại
-          </p>
-        </div>
+        {/* Data Table Workspace */}
+        <div className="flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden bg-white">
 
-        <div className="flex items-center gap-2.5">
-          <button
-            type="button"
-            onClick={handleResetToDefault}
-            title="Khôi phục danh mục hàng hóa mẫu ban đầu"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 transition cursor-pointer shadow-2xs"
-          >
-            <RefreshCw size={14} className="text-slate-500" />
-            <span>Khôi phục mẫu</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setIsImportModalOpen(true)}
-            title="Nhập hàng hóa từ tệp dữ liệu Excel"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 transition cursor-pointer shadow-2xs"
-          >
-            <ArrowDownToLine size={14} className="text-slate-500" />
-            <span>Import file</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              setItemsToExport(filteredGoods);
-              setIsExportModalOpen(true);
-            }}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 transition cursor-pointer shadow-2xs"
-          >
-            <FileSpreadsheet size={14} className="text-slate-500" />
-            <span>Xuất file Excel</span>
-          </button>
-
-          {canManageMaster && (
-            <button
-              type="button"
-              onClick={handleOpenCreate}
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-[#1E56A0] hover:bg-[#184580] text-xs font-semibold text-white transition cursor-pointer shadow-xs"
-            >
-              <Plus size={14} />
-              <span>Thêm hàng hóa mới</span>
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* 2. Thẻ KPI Thống Kê Tổng Quan */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs p-5 flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between text-slate-400 mb-2">
-              <span className="text-[11px] font-bold tracking-wider uppercase text-slate-500">
-                TỔNG DANH MỤC MẶT HÀNG
-              </span>
-              <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
-                <Package size={16} />
-              </div>
-            </div>
-            <div className="text-2xl font-extrabold text-blue-700 font-mono">
-              {totalSku} SKU
-            </div>
-          </div>
-          <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
-            <span className="text-slate-500">Toàn bộ danh mục</span>
-            <span className="font-semibold text-slate-700">100% đang quản lý</span>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs p-5 flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between text-slate-400 mb-2">
-              <span className="text-[11px] font-bold tracking-wider uppercase text-emerald-700">
-                TỒN KHẢ DỤNG
-              </span>
-              <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                <ShieldCheck size={16} />
-              </div>
-            </div>
-            <div className="text-2xl font-extrabold text-emerald-700 font-mono">
-              {totalAvailableQty.toLocaleString('vi-VN')} Đơn vị
-            </div>
-          </div>
-          <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
-            <span className="text-slate-500 truncate max-w-[150px]">
-              Tại {warehouseFilter}
-            </span>
-            <span className="px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold">
-              Sẵn sàng giao
-            </span>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs p-5 flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between text-slate-400 mb-2">
-              <span className="text-[11px] font-bold tracking-wider uppercase text-amber-700">
-                HÀNG ĐANG GIỮ CHỖ
-              </span>
-              <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
-                <Boxes size={16} />
-              </div>
-            </div>
-            <div className="text-2xl font-extrabold text-slate-800 font-mono">
-              {totalReservedQty.toLocaleString('vi-VN')} Đơn vị
-            </div>
-          </div>
-          <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
-            <span className="text-slate-500 truncate max-w-[150px]">
-              Tại {warehouseFilter}
-            </span>
-            <span className="font-semibold text-amber-600">Đang khóa an toàn</span>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs p-5 flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between text-slate-400 mb-2">
-              <span className="text-[11px] font-bold tracking-wider uppercase text-rose-700">
-                CẢNH BÁO TỒN THẤP
-              </span>
-              <div className="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center">
-                <AlertTriangle size={16} />
-              </div>
-            </div>
-            <div className="text-2xl font-extrabold text-rose-600 font-mono">
-              {lowStockCount} SKU
-            </div>
-          </div>
-          <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
-            <span className="text-slate-500 truncate max-w-[150px]">
-              Tại {warehouseFilter}
-            </span>
-            <span className="text-rose-600 font-semibold cursor-pointer" onClick={() => setCategoryFilter('LOW_STOCK')}>
-              Xem cảnh báo &rarr;
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* 3. Thanh Bộ Lọc & Tìm Kiếm - Cố định ở đỉnh khi cuộn (Sticky Tab Ngang) */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white/95 backdrop-blur-md p-3 rounded-xl border border-slate-200/90 shadow-xs sticky top-0 z-20">
-        <div className="flex flex-1 items-center gap-2">
-          {/* Nút bật/tắt bộ lọc bên trái (Ảnh 2 & 3) */}
-          <button
-            type="button"
-            onClick={handleToggleSidebar}
-            className={`inline-flex items-center gap-1.5 px-3 h-9 rounded-lg border text-xs font-semibold transition cursor-pointer shadow-2xs shrink-0 ${
-              !isFilterSidebarCollapsed
-                ? 'border-blue-400 bg-blue-50 text-blue-700'
-                : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-700'
-            }`}
-            title={isFilterSidebarCollapsed ? 'Mở rộng bộ lọc bên trái (ảnh 2, 3)' : 'Thu gọn bộ lọc bên trái'}
-          >
-            <SlidersHorizontal size={14} className={!isFilterSidebarCollapsed ? 'text-blue-600' : 'text-slate-500'} />
-            <span>Bộ lọc</span>
-            {activeFiltersCount > 0 && (
-              <span className="w-4 h-4 rounded-full bg-blue-600 text-white text-[10px] flex items-center justify-center font-bold">
-                {activeFiltersCount}
-              </span>
-            )}
-          </button>
-
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
-            <input
-              type="text"
-              placeholder="Theo mã, tên hàng, mã vạch hoặc thương hiệu..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full h-9 pl-9 pr-3 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500"
-            />
-          </div>
-
-          {activeFiltersCount > 0 && (
-            <button
-              type="button"
-              onClick={handleResetSidebarFilters}
-              className="inline-flex items-center gap-1 px-2.5 h-9 rounded-lg border border-rose-200 bg-rose-50 text-rose-600 hover:bg-rose-100 text-xs font-medium transition cursor-pointer shrink-0"
-              title="Xóa tất cả điều kiện lọc đang áp dụng"
-            >
-              <RotateCcw size={12} />
-              <span>Xóa lọc ({activeFiltersCount})</span>
-            </button>
-          )}
-
-          {selectedItemIds.length > 0 ? (
-            /* Thanh Thao Tác Hàng Loạt Chuẩn StockFlow Khi Tích Chọn Ô Vuông (Ảnh 2) */
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-700 border border-blue-200 rounded-lg text-xs font-bold animate-in fade-in">
-                <span>Đã chọn {selectedItemIds.length}</span>
+          {/* Action Bar khi chọn ít nhất 1 dòng */}
+          {selectedItemIds.length > 0 && (
+            <div className="h-10 px-4 bg-[#e6f1fe] border-b border-blue-200 flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-3">
+                <span className="text-xs font-bold text-[#0070f4]">
+                  Đã chọn {selectedItemIds.length} hàng hóa
+                </span>
                 <button
                   type="button"
                   onClick={handleClearSelection}
-                  className="hover:text-blue-900 transition ml-0.5 cursor-pointer p-0.5 rounded hover:bg-blue-100"
-                  title="Bỏ chọn tất cả"
+                  className="text-xs text-[#677484] hover:text-[#15171a] underline cursor-pointer"
                 >
-                  <X size={13} />
+                  Bỏ chọn
                 </button>
               </div>
 
-              <button
-                type="button"
-                onClick={handleBulkExportExcel}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 transition cursor-pointer shadow-2xs"
-                title="Xuất Excel các mặt hàng đã chọn"
-              >
-                <FileSpreadsheet size={14} className="text-emerald-600" />
-                <span>Xuất file</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={handleBulkPrintBarcode}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 transition cursor-pointer shadow-2xs"
-                title="In tem mã vạch các mặt hàng đã chọn"
-              >
-                <Printer size={14} className="text-slate-600" />
-                <span>In tem mã</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  const first = goods.find((g) => selectedItemIds.includes(g.id));
-                  if (first) handleOpenInboundModal(first);
-                }}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 transition cursor-pointer shadow-2xs"
-                title="Nhập hàng cho các mặt hàng đã chọn"
-              >
-                <ArrowDownToLine size={14} className="text-blue-600" />
-                <span>Nhập hàng</span>
-              </button>
-
-              {/* Menu Thao Tác Khác (...) */}
-              <div className="relative inline-block text-left">
+              <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => setBulkActionMenuOpen(!bulkActionMenuOpen)}
-                  className="h-8 w-8 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 flex items-center justify-center transition cursor-pointer shadow-2xs"
-                  title="Thao tác khác"
+                  onClick={handleBulkExportExcel}
+                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-[6px] border border-slate-300 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 transition cursor-pointer shadow-2xs"
+                  title="Xuất file Excel"
                 >
-                  <MoreHorizontal size={15} />
+                  <FileSpreadsheet size={13} className="text-emerald-600" />
+                  <span>Xuất file</span>
                 </button>
 
-                {bulkActionMenuOpen && (
-                  <div className="absolute left-0 mt-1.5 w-52 bg-white rounded-xl shadow-lg border border-slate-200 py-1.5 z-40 text-xs animate-in fade-in">
-                    <button
-                      type="button"
-                      onClick={() => handleBulkStar(true)}
-                      className="w-full text-left px-3.5 py-2 hover:bg-amber-50 text-slate-700 flex items-center gap-2 transition"
-                    >
-                      <Star size={14} className="text-amber-500 fill-amber-400" />
-                      <span>Đánh dấu sao đã chọn</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleBulkStar(false)}
-                      className="w-full text-left px-3.5 py-2 hover:bg-slate-50 text-slate-700 flex items-center gap-2 transition"
-                    >
-                      <Star size={14} className="text-slate-400" />
-                      <span>Bỏ đánh dấu sao đã chọn</span>
-                    </button>
-                    <div className="my-1 border-t border-slate-100" />
-                    <button
-                      type="button"
-                      onClick={handleBulkDelete}
-                      className="w-full text-left px-3.5 py-2 hover:bg-rose-50 text-rose-600 flex items-center gap-2 transition font-medium"
-                    >
-                      <Trash2 size={14} className="text-rose-500" />
-                      <span>Xóa các mục đã chọn</span>
-                    </button>
-                  </div>
-                )}
+                <button
+                  type="button"
+                  onClick={handleBulkPrintBarcode}
+                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-[6px] border border-slate-300 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 transition cursor-pointer shadow-2xs"
+                  title="In tem mã"
+                >
+                  <Printer size={13} className="text-slate-600" />
+                  <span>In tem mã</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const first = goods.find((g) => selectedItemIds.includes(g.id));
+                    if (first) handleOpenInboundModal(first);
+                  }}
+                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-[6px] border border-slate-300 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 transition cursor-pointer shadow-2xs"
+                  title="Nhập hàng"
+                >
+                  <ArrowDownToLine size={13} className="text-[#0070f4]" />
+                  <span>Nhập hàng</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleBulkDelete}
+                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-[6px] border border-rose-200 bg-rose-50 hover:bg-rose-100 text-xs font-semibold text-rose-600 transition cursor-pointer shadow-2xs"
+                  title="Xóa đã chọn"
+                >
+                  <Trash2 size={13} />
+                  <span>Xóa đã chọn</span>
+                </button>
               </div>
             </div>
-          ) : (
-            <div className="flex items-center p-1 bg-slate-100 rounded-lg text-xs font-medium text-slate-600">
-              <button
-                type="button"
-                onClick={() => setCategoryFilter('ALL')}
-                className={`px-3 py-1 rounded-md transition cursor-pointer ${
-                  categoryFilter === 'ALL' ? 'bg-white text-blue-700 shadow-2xs font-bold' : 'hover:text-slate-900'
-                }`}
-              >
-                Tất cả ({totalSku})
-              </button>
-              <button
-                type="button"
-                onClick={() => setCategoryFilter(categoryFilter === 'STARRED' ? 'ALL' : 'STARRED')}
-                className={`px-3 py-1 rounded-md transition cursor-pointer flex items-center gap-1.5 ${
-                  categoryFilter === 'STARRED' ? 'bg-white text-amber-700 shadow-2xs font-bold' : 'text-slate-600 hover:text-amber-600'
-                }`}
-                title="Lọc các mặt hàng quan tâm được đánh dấu sao"
-              >
-                <Star size={13} className={categoryFilter === 'STARRED' ? 'text-amber-500 fill-amber-400' : 'text-slate-400'} />
-                <span>Đã gắn sao ({starredCount})</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setCategoryFilter('LOW_STOCK')}
-                className={`px-3 py-1 rounded-md transition cursor-pointer flex items-center gap-1 ${
-                  categoryFilter === 'LOW_STOCK' ? 'bg-white text-rose-700 shadow-2xs font-bold' : 'text-rose-600 hover:text-rose-700'
-                }`}
-              >
-                <AlertTriangle size={13} className="text-rose-600" />
-                <span>Cảnh báo tồn thấp ({lowStockCount})</span>
-              </button>
-            </div>
           )}
-        </div>
 
-        <div className="relative w-full sm:w-64 shrink-0">
-          {permittedFacilities.length <= 1 ? (
-            <div
-              className="w-full h-9 px-3 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-800 font-bold flex items-center justify-between select-none"
-              title={`Kho làm việc cố định: ${permittedFacilities[0]?.name || warehouseFilter}`}
-            >
-              <div className="flex items-center gap-2 truncate">
-                <span className="text-blue-600">📍</span>
-                <span className="truncate">{permittedFacilities[0]?.name || warehouseFilter || 'Kho Tổng Gia Lâm'}</span>
-              </div>
-              <span className="text-[10px] text-slate-400 font-normal shrink-0">(Cố định)</span>
-            </div>
-          ) : (
-            <select
-              value={warehouseFilter}
-              onChange={(e) => handleWarehouseFilterChange(e.target.value)}
-              className="w-full h-9 px-3 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-700 focus:outline-none focus:border-blue-500 cursor-pointer font-medium"
-            >
-              {permittedFacilities.map((fac) => (
-                <option key={fac.id || fac.code} value={fac.name}>
-                  📍 {fac.name} ({fac.code})
-                </option>
-              ))}
-            </select>
-          )}
-        </div>
-      </div>
-
-      {/* 4. Bảng Danh Sách Hàng Hóa Chuẩn StockFlow Master-Detail (Tiêu đề bảng cố định khi cuộn) */}
-      <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs overflow-hidden flex flex-col">
-        <div className="overflow-auto max-h-[calc(100vh-230px)]">
-          <table className="w-full text-left border-collapse">
-            <thead className="sticky top-0 z-10 bg-slate-100/95 backdrop-blur-xs shadow-2xs">
-              <tr className="border-b border-slate-200 bg-slate-100/95 text-[11px] font-bold text-slate-600 uppercase tracking-wider">
-                {/* 1. Tích ô vuông Header (Checkbox All / Indeterminate trên trang hiện tại) */}
-                <th className="py-3 px-3 w-10 text-center select-none">
-                  {(() => {
-                    const pageIds = displayedGoods.map((g) => g.id);
-                    const selOnPage = pageIds.filter((id) => selectedItemIds.includes(id)).length;
-                    if (selOnPage > 0 && selOnPage < pageIds.length) {
+          {/* Table Container */}
+          <div className="flex-1 min-h-0 overflow-auto">
+            <table className="w-full text-left border-collapse min-w-[1000px]">
+              <thead className="bg-[#f7f8f9] sticky top-0 z-20 border-b border-slate-200 text-[11px] font-bold text-[#677484] uppercase tracking-wider shadow-xs">
+                <tr>
+                  {/* 1. Tích ô vuông Header (Checkbox All / Indeterminate) */}
+                  <th className="sticky top-0 z-20 bg-[#f7f8f9] py-2.5 px-3 w-10 text-center select-none border-b border-slate-200">
+                    {(() => {
+                      const pageIds = displayedGoods.map((g) => g.id);
+                      const selOnPage = pageIds.filter((id) => selectedItemIds.includes(id)).length;
+                      if (selOnPage > 0 && selOnPage < pageIds.length) {
+                        return (
+                          <div
+                            onClick={handleToggleSelectAll}
+                            className="w-4 h-4 rounded bg-[#0070f4] border border-[#0070f4] text-white mx-auto cursor-pointer flex items-center justify-center shadow-2xs transition"
+                            title="Bỏ chọn trang này"
+                          >
+                            <Minus size={12} strokeWidth={3} />
+                          </div>
+                        );
+                      } else if (selOnPage > 0 && selOnPage === pageIds.length) {
+                        return (
+                          <div
+                            onClick={handleToggleSelectAll}
+                            className="w-4 h-4 rounded bg-[#0070f4] border border-[#0070f4] text-white mx-auto cursor-pointer flex items-center justify-center shadow-2xs transition"
+                            title="Bỏ chọn trang này"
+                          >
+                            <Check size={12} strokeWidth={3} />
+                          </div>
+                        );
+                      }
                       return (
                         <div
                           onClick={handleToggleSelectAll}
-                          className="w-4 h-4 rounded bg-blue-600 border border-blue-600 text-white mx-auto cursor-pointer flex items-center justify-center shadow-2xs transition"
-                          title="Bỏ chọn trang này"
-                        >
-                          <Minus size={12} strokeWidth={3} />
-                        </div>
+                          className="w-4 h-4 rounded border border-slate-300 hover:border-[#0070f4] bg-white mx-auto cursor-pointer transition"
+                          title="Chọn tất cả hàng hóa trên trang này"
+                        />
                       );
-                    } else if (selOnPage > 0 && selOnPage === pageIds.length) {
-                      return (
-                        <div
-                          onClick={handleToggleSelectAll}
-                          className="w-4 h-4 rounded bg-blue-600 border border-blue-600 text-white mx-auto cursor-pointer flex items-center justify-center shadow-2xs transition"
-                          title="Bỏ chọn trang này"
-                        >
-                          <Check size={12} strokeWidth={3} />
-                        </div>
-                      );
-                    }
-                    return (
-                      <div
-                        onClick={handleToggleSelectAll}
-                        className="w-4 h-4 rounded border border-slate-300 hover:border-blue-500 bg-white mx-auto cursor-pointer transition"
-                        title="Chọn tất cả hàng hóa trên trang này"
+                    })()}
+                  </th>
+
+                  {/* 2. Dấu sao Header (☆ ▾) - Filter / Toggle Starred items */}
+                  <th className="sticky top-0 z-20 bg-[#f7f8f9] py-2.5 px-2 w-10 text-center select-none border-b border-slate-200">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCategoryFilter(categoryFilter === 'STARRED' ? 'ALL' : 'STARRED');
+                      }}
+                      className="inline-flex items-center gap-0.5 text-[#677484] hover:text-amber-500 transition cursor-pointer p-0.5 rounded"
+                      title={categoryFilter === 'STARRED' ? "Hiển thị tất cả hàng hóa" : "Chỉ lọc hàng hóa đã đánh dấu sao quan tâm"}
+                    >
+                      <Star
+                        size={14}
+                        className={categoryFilter === 'STARRED' ? "text-amber-500 fill-amber-400" : "text-[#677484] hover:text-amber-400"}
                       />
-                    );
-                  })()}
-                </th>
+                      <ChevronDown size={11} className={categoryFilter === 'STARRED' ? "text-amber-600" : "text-[#677484]"} />
+                    </button>
+                  </th>
 
-                {/* 2. Dấu sao Header (☆ ▾) - Filter / Toggle Starred items */}
-                <th className="py-3 px-2 w-10 text-center select-none">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setCategoryFilter(categoryFilter === 'STARRED' ? 'ALL' : 'STARRED');
-                    }}
-                    className="inline-flex items-center gap-0.5 text-slate-400 hover:text-amber-500 transition cursor-pointer p-0.5 rounded"
-                    title={categoryFilter === 'STARRED' ? "Hiển thị tất cả hàng hóa" : "Chỉ lọc hàng hóa đã đánh dấu sao quan tâm"}
-                  >
-                    <Star
-                      size={15}
-                      className={categoryFilter === 'STARRED' ? "text-amber-500 fill-amber-400" : "text-slate-400 hover:text-amber-400"}
-                    />
-                    <ChevronDown size={11} className={categoryFilter === 'STARRED' ? "text-amber-600" : "text-slate-400"} />
-                  </button>
-                </th>
-
-                <th className="py-3 px-2 w-12 text-center" title="Hình ảnh sản phẩm"></th>
-                <th className="py-3 px-4 min-w-[200px]">MÃ HÀNG</th>
-                <th className="py-3 px-4 min-w-[240px]">TÊN HÀNG</th>
-                <th className="py-3 px-4 text-right min-w-[120px]">GIÁ BÁN</th>
-                <th className="py-3 px-4 text-right min-w-[120px]">GIÁ VỐN</th>
-                <th className="py-3 px-4 text-right min-w-[110px]">TỒN KHO</th>
-                <th className="py-3 px-4 text-right min-w-[90px]">KHÁCH ĐẶT</th>
-                <th className="py-3 px-4 min-w-[130px]">THỜI GIAN TẠO</th>
-                <th className="py-3 px-4 text-center min-w-[130px]">DỰ KIẾN HẾT HÀNG</th>
-                <th className="py-3 px-4 text-center min-w-[90px]">THAO TÁC</th>
-              </tr>
-            </thead>
+                  <th className="sticky top-0 z-20 bg-[#f7f8f9] py-2.5 px-2 w-12 text-center border-b border-slate-200" title="Hình ảnh sản phẩm"></th>
+                  <th className="sticky top-0 z-20 bg-[#f7f8f9] py-2.5 px-4 min-w-[200px] border-b border-slate-200">MÃ HÀNG</th>
+                  <th className="sticky top-0 z-20 bg-[#f7f8f9] py-2.5 px-4 min-w-[240px] border-b border-slate-200">TÊN HÀNG</th>
+                  <th className="sticky top-0 z-20 bg-[#f7f8f9] py-2.5 px-4 text-right min-w-[120px] border-b border-slate-200">GIÁ BÁN</th>
+                  <th className="sticky top-0 z-20 bg-[#f7f8f9] py-2.5 px-4 text-right min-w-[120px] border-b border-slate-200">GIÁ VỐN</th>
+                  <th className="sticky top-0 z-20 bg-[#f7f8f9] py-2.5 px-4 text-right min-w-[110px] border-b border-slate-200">TỒN KHO</th>
+                  <th className="sticky top-0 z-20 bg-[#f7f8f9] py-2.5 px-4 text-right min-w-[90px] border-b border-slate-200">KHÁCH ĐẶT</th>
+                  <th className="sticky top-0 z-20 bg-[#f7f8f9] py-2.5 px-4 min-w-[130px] border-b border-slate-200">THỜI GIAN TẠO</th>
+                  <th className="sticky top-0 z-20 bg-[#f7f8f9] py-2.5 px-4 text-center min-w-[110px] border-b border-slate-200">DỰ KIẾN HẾT</th>
+                  <th className="sticky top-0 z-20 bg-[#f7f8f9] py-2.5 px-4 text-center min-w-[90px] border-b border-slate-200">THAO TÁC</th>
+                </tr>
+              </thead>
             <tbody className="divide-y divide-slate-100 text-xs">
               {displayedGoods.map((item) => {
                 const isExpanded = expandedRowId === item.id;
@@ -4131,7 +3908,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                                     <button
                                       type="button"
                                       onClick={() => handleOpenEdit(item)}
-                                      className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-[#1E56A0] hover:bg-[#184580] text-xs font-semibold text-white transition cursor-pointer shadow-xs"
+                                      className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-[8px] bg-[#0070f4] hover:bg-[#005ac3] text-xs font-semibold text-white transition cursor-pointer shadow-xs"
                                     >
                                       <Edit2 size={13} />
                                       <span>Chỉnh sửa</span>
@@ -4503,7 +4280,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                                       handleOpenEdit(item);
                                       handleOpenConfigModal();
                                     }}
-                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#1E56A0] hover:bg-[#184580] text-xs font-semibold text-white transition cursor-pointer"
+                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[8px] bg-[#0070f4] hover:bg-[#005ac3] text-xs font-semibold text-white transition cursor-pointer"
                                   >
                                     <Plus size={13} />
                                     <span>Thêm hàng hóa cùng loại</span>
@@ -4578,22 +4355,30 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
 
               {filteredGoods.length === 0 && (
                 <tr>
-                  <td colSpan={10} className="py-12 text-center text-slate-500">
-                    <Package size={36} className="mx-auto text-slate-300 mb-2" />
-                    <p className="font-semibold text-slate-700">Không tìm thấy hàng hóa nào phù hợp</p>
-                    <p className="text-xs text-slate-400 mt-1">Vui lòng thay đổi từ khóa tìm kiếm hoặc đặt lại các bộ lọc</p>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSearch('');
-                        handleResetSidebarFilters();
-                        setCategoryFilter('ALL');
-                      }}
-                      className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 text-xs font-semibold transition cursor-pointer"
-                    >
-                      <RotateCcw size={12} />
-                      <span>Đặt lại toàn bộ tìm kiếm &amp; bộ lọc</span>
-                    </button>
+                  <td colSpan={12} className="py-24 text-center">
+                    <div className="flex flex-col items-center justify-center">
+                      <div className="w-16 h-16 rounded-full bg-[#e6f1fe] text-[#0070f4] flex items-center justify-center mb-3">
+                        <Inbox size={32} className="stroke-[1.5]" />
+                      </div>
+                      <h3 className="font-bold text-[#15171a] text-sm mb-1">
+                        Không tìm thấy hàng hóa phù hợp
+                      </h3>
+                      <p className="text-xs text-[#677484] max-w-sm mb-3">
+                        Vui lòng thay đổi từ khóa tìm kiếm hoặc đặt lại các bộ lọc.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSearch('');
+                          handleResetSidebarFilters();
+                          setCategoryFilter('ALL');
+                        }}
+                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-[8px] bg-[#0070f4] hover:bg-[#005ac3] text-white text-xs font-semibold transition cursor-pointer shadow-xs"
+                      >
+                        <RotateCcw size={13} />
+                        <span>Đặt lại bộ lọc</span>
+                      </button>
+                    </div>
                   </td>
                 </tr>
               )}
@@ -4601,11 +4386,11 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
           </table>
         </div>
 
-        {/* ─── Thanh Phân Trang Chuẩn Mẫu (Ảnh 1) ─────────────────────────────────── */}
-        <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 bg-white border-t border-slate-200 text-xs text-slate-600 select-none">
+        {/* ─── Thanh Phân Trang Chuẩn Mẫu ─── */}
+        <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2 bg-white border-t border-slate-200 text-xs text-slate-600 select-none shrink-0">
           {/* Khối Trái: Chọn số dòng hiển thị */}
           <div className="flex items-center gap-2">
-            <span className="text-slate-600 font-medium">Hiển thị</span>
+            <span className="text-[#677484] font-normal">Hiển thị</span>
             <select
               value={pageSize}
               onChange={(e) => {
@@ -4613,7 +4398,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                 setPageSize(newSize);
                 setCurrentPage(1);
               }}
-              className="h-7 px-2 border border-slate-200 rounded-md bg-white text-xs font-medium text-slate-700 focus:outline-none focus:border-blue-500 cursor-pointer shadow-2xs"
+              className="h-7 px-2 border border-slate-300 rounded bg-white text-xs font-medium text-slate-700 focus:outline-none focus:border-[#0070f4] cursor-pointer shadow-2xs"
             >
               <option value={10}>10 dòng</option>
               <option value={15}>15 dòng</option>
@@ -4631,7 +4416,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
               disabled={currentPage <= 1}
               onClick={() => setCurrentPage(1)}
               title="Trang đầu tiên"
-              className="w-7 h-7 flex items-center justify-center rounded-md border border-slate-200 bg-white text-slate-500 hover:text-blue-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
+              className="w-7 h-7 flex items-center justify-center rounded border border-slate-200 bg-white text-slate-500 hover:text-[#0070f4] hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
             >
               <ChevronsLeft size={14} />
             </button>
@@ -4640,7 +4425,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
               disabled={currentPage <= 1}
               onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
               title="Trang trước"
-              className="w-7 h-7 flex items-center justify-center rounded-md border border-slate-200 bg-white text-slate-500 hover:text-blue-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
+              className="w-7 h-7 flex items-center justify-center rounded border border-slate-200 bg-white text-slate-500 hover:text-[#0070f4] hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
             >
               <ChevronLeft size={14} />
             </button>
@@ -4668,14 +4453,14 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                   setPageInput(String(currentPage));
                 }
               }}
-              className="w-10 h-7 border border-slate-300 rounded-md text-center text-xs font-bold text-slate-800 bg-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 shadow-2xs [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+              className="w-10 h-7 border border-slate-300 rounded text-center text-xs font-bold text-slate-800 bg-white focus:outline-none focus:border-[#0070f4] focus:ring-1 focus:ring-[#0070f4] shadow-2xs [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
             />
             <button
               type="button"
               disabled={currentPage >= totalPages}
               onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
               title="Trang tiếp theo"
-              className="w-7 h-7 flex items-center justify-center rounded-md border border-slate-200 bg-white text-slate-500 hover:text-blue-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
+              className="w-7 h-7 flex items-center justify-center rounded border border-slate-200 bg-white text-slate-500 hover:text-[#0070f4] hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
             >
               <ChevronRight size={14} />
             </button>
@@ -4684,28 +4469,30 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
               disabled={currentPage >= totalPages}
               onClick={() => setCurrentPage(totalPages)}
               title="Trang cuối cùng"
-              className="w-7 h-7 flex items-center justify-center rounded-md border border-slate-200 bg-white text-slate-500 hover:text-blue-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
+              className="w-7 h-7 flex items-center justify-center rounded border border-slate-200 bg-white text-slate-500 hover:text-[#0070f4] hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
             >
               <ChevronsRight size={14} />
             </button>
           </div>
 
           {/* Khối Phải: Thống kê số lượng hàng hóa và mã hàng */}
-          <div className="text-slate-600 font-medium text-xs">
+          <div className="text-[#677484] text-xs flex items-center gap-1.5">
             {totalItems > 0 ? (
               <>
-                <span className="font-semibold text-slate-800">{startIndex + 1} - {endIndex}</span> trong{' '}
-                <span className="font-semibold text-slate-800">{totalItems.toLocaleString('vi-VN')}</span> hàng hóa{' '}
-                <span className="text-slate-500">({totalSkuCount.toLocaleString('vi-VN')} mã hàng)</span>
+                <span className="font-semibold text-[#15171a]">{startIndex + 1} - {endIndex}</span> trong{' '}
+                <span className="font-semibold text-[#15171a]">{totalItems.toLocaleString('vi-VN')}</span> hàng hóa{' '}
+                <span className="text-[#677484]">({totalSkuCount.toLocaleString('vi-VN')} mã hàng)</span>
               </>
             ) : (
               <span>0 - 0 trong 0 hàng hóa (0 mã hàng)</span>
             )}
+            {selectedItemIds.length > 0 && (
+              <span className="ml-1 text-[#0070f4] font-semibold">(Đã chọn {selectedItemIds.length})</span>
+            )}
           </div>
         </div>
       </div>
-        </div>
-      </div>
+    </div>
 
       {/* 5. MODAL 1: TẠO HÀNG HÓA MỚI / CHỈNH SỬA (CHÍNH XÁC THEO ẢNH 1) */}
       {editModalOpen && (
@@ -5463,7 +5250,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                   type="button"
                   disabled={isSaving}
                   onClick={() => handleSaveItem(undefined, false)}
-                  className="px-6 py-2 rounded-lg bg-[#1E56A0] hover:bg-[#184580] text-xs font-bold text-white transition cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-1.5"
+                  className="px-6 py-2 rounded-[8px] bg-[#0070f4] hover:bg-[#005ac3] text-xs font-bold text-white transition cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-1.5"
                 >
                   {isSaving && <RefreshCw size={12} className="animate-spin" />}
                   <span>{isSaving ? 'Đang lưu CSDL...' : 'Lưu'}</span>
@@ -6139,7 +5926,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
               <button
                 type="button"
                 onClick={handleApplyConfigModal}
-                className="px-6 py-2 rounded-lg bg-[#1E56A0] hover:bg-[#184580] text-xs font-bold text-white transition cursor-pointer shadow-xs"
+                className="px-6 py-2 rounded-[8px] bg-[#0070f4] hover:bg-[#005ac3] text-xs font-bold text-white transition cursor-pointer shadow-xs"
               >
                 Xong
               </button>

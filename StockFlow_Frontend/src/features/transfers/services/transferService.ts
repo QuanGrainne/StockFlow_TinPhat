@@ -312,6 +312,17 @@ export const transferService = {
           return true;
         });
       }
+      if (filters?.dateFrom || filters?.dateTo) {
+        const isRecDate = filters.dateType === 'received';
+        filtered = filtered.filter((t) => {
+          const raw = isRecDate ? t.receivedDate : t.transferDate;
+          if (!raw) return false;
+          const dStr = raw.substring(0, 10);
+          if (filters.dateFrom && dStr < filters.dateFrom) return false;
+          if (filters.dateTo && dStr > filters.dateTo) return false;
+          return true;
+        });
+      }
       if (filters?.search) {
         const q = filters.search.trim().toLowerCase();
         filtered = filtered.filter(
@@ -346,6 +357,17 @@ export const transferService = {
         const matched = t.isMatched ?? (t.totalReceivedQuantity !== null && t.totalReceivedQuantity !== undefined ? t.totalReceivedQuantity === t.totalQuantity : null);
         if (filters.matchStatus === 'MATCHED') return matched === true;
         if (filters.matchStatus === 'UNMATCHED') return matched === false;
+        return true;
+      });
+    }
+    if (filters?.dateFrom || filters?.dateTo) {
+      const isRecDate = filters.dateType === 'received';
+      list = list.filter((t) => {
+        const raw = isRecDate ? t.receivedDate : t.transferDate;
+        if (!raw) return false;
+        const dStr = raw.substring(0, 10);
+        if (filters.dateFrom && dStr < filters.dateFrom) return false;
+        if (filters.dateTo && dStr > filters.dateTo) return false;
         return true;
       });
     }

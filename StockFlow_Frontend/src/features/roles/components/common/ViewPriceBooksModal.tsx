@@ -193,7 +193,8 @@ export default function ViewPriceBooksModal({
                       formulaLabel = 'Bảng giá chung (Giá gốc)';
                     } else if (pb.formulaOperator && pb.formulaValue) {
                       const baseName = pb.formulaBaseType === 'COST' ? 'Giá vốn' : 'Giá chung';
-                      const unitStr = pb.formulaUnit === 'PERCENT' ? '%' : ' ₫';
+                      const isPercent = pb.formulaUnit === 'PERCENT' || pb.formulaUnit === '%' || pb.formulaUnit?.toUpperCase() === 'PERCENT';
+                      const unitStr = isPercent ? '%' : ' ₫';
                       formulaLabel = `${baseName} ${pb.formulaOperator} ${pb.formulaValue}${unitStr}`;
                     }
 

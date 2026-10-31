@@ -70,6 +70,7 @@ export interface PurchaseDetail {
 export interface CreatePurchasePayload {
   warehouseId?: number;
   partnerId: number;
+  purchaseCode?: string | null;
   externalPoNumber?: string | null;
   receivedDate?: string | null;
   status: 'DRAFT' | 'COMPLETED';

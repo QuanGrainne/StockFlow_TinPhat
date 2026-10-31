@@ -248,53 +248,55 @@ export const ReceiveTransferScreen: React.FC<Props> = ({
   const formattedTransferDate = formatDateTimeVN(transfer.transferDate);
 
   return (
-    <div className="fixed inset-0 z-50 bg-[#F4F6F8] flex flex-col text-xs text-slate-800 select-none animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 bg-[#f5f5f5] flex flex-col text-[13px] text-[#15171a] select-none animate-in fade-in duration-200 font-sans">
       {/* 1. Thanh Topbar Navigation */}
-      <header className="h-14 bg-white border-b border-slate-200 px-4 flex items-center justify-between gap-4 shrink-0 shadow-2xs">
+      <header className="h-12 bg-white border-b border-slate-200 px-4 flex items-center relative shrink-0 shadow-2xs">
         {/* Nút quay lại & Tiêu đề */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 z-10">
           <button
             type="button"
             onClick={onClose}
-            className="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-600 transition cursor-pointer"
+            className="w-8 h-8 rounded-[8px] hover:bg-[#f7f8f9] flex items-center justify-center text-[#677484] hover:text-[#15171a] transition cursor-pointer"
             title="Quay lại danh sách"
           >
             <ArrowLeft size={18} />
           </button>
-          <h1 className="text-sm font-bold text-slate-900 tracking-tight">
+          <h1 className="text-[16px] font-bold text-[#15171a] tracking-tight">
             Chuyển hàng
           </h1>
         </div>
 
-        {/* Ô tìm kiếm F3 */}
-        <div className="flex-1 max-w-xl relative">
-          <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400">
-            <Search size={15} />
+        {/* Ô tìm kiếm căn chính giữa màn hình giống tạo phiếu chuyển */}
+        <div className="absolute left-1/2 -translate-x-1/2 w-full max-w-xl px-4 pointer-events-auto">
+          <div className="relative w-full">
+            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-[#677484] pointer-events-none">
+              <Search size={14} />
+            </div>
+            <input
+              ref={searchInputRef}
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Tìm hàng hóa theo mã hoặc tên"
+              className="w-full h-8 pl-8 pr-4 rounded-full border border-slate-300 bg-[#f7f8f9] text-[13px] text-[#15171a] placeholder-[#677484] focus:outline-none focus:border-[#0070f4] focus:bg-white shadow-2xs transition"
+            />
           </div>
-          <input
-            ref={searchInputRef}
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Tìm hàng hóa theo mã hoặc tên"
-            className="w-full h-9 pl-9 pr-4 rounded-full border border-slate-200 bg-white text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500 shadow-2xs transition"
-          />
         </div>
       </header>
 
       {/* Thông báo Toast */}
       {toastMessage && (
         <div
-          className={`fixed top-16 right-6 z-60 px-4 py-2.5 rounded-xl shadow-lg border text-xs font-semibold flex items-center gap-2 animate-in slide-in-from-top-2 ${
+          className={`fixed top-14 right-6 z-60 px-4 py-2.5 rounded-[8px] shadow-lg border text-xs font-semibold flex items-center gap-2 animate-in slide-in-from-top-2 ${
             toastMessage.type === 'success'
-              ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-              : 'bg-rose-50 text-rose-800 border-rose-200'
+              ? 'bg-[#e6f8ec] text-[#16a34a] border-[#bbf7d0]'
+              : 'bg-[#fef2f2] text-[#fb2c36] border-[#fecaca]'
           }`}
         >
           {toastMessage.type === 'success' ? (
-            <CheckCircle2 size={16} className="text-emerald-600" />
+            <CheckCircle2 size={16} className="text-[#16a34a]" />
           ) : (
-            <AlertCircle size={16} className="text-rose-600" />
+            <AlertCircle size={16} className="text-[#fb2c36]" />
           )}
           <span>{toastMessage.text}</span>
         </div>
@@ -305,18 +307,18 @@ export const ReceiveTransferScreen: React.FC<Props> = ({
         {/* CỘT TRÁI: Tabs & Bảng sản phẩm kiểm đếm */}
         <main className="flex-1 flex flex-col bg-white overflow-hidden border-r border-slate-200">
           {/* Tabs: Tất cả | Khớp | Lệch | Chưa nhận */}
-          <div className="h-11 border-b border-slate-200 px-4 flex items-center gap-6 bg-white shrink-0">
+          <div className="h-10 border-b border-slate-200 px-4 flex items-center gap-6 bg-white shrink-0">
             <button
               type="button"
               onClick={() => setActiveTab('ALL')}
               className={`h-full text-xs font-bold border-b-2 transition cursor-pointer flex items-center gap-1.5 ${
                 activeTab === 'ALL'
-                  ? 'border-blue-600 text-blue-600'
-                  : 'border-transparent text-slate-500 hover:text-slate-700'
+                  ? 'border-[#0070f4] text-[#0070f4]'
+                  : 'border-transparent text-[#677484] hover:text-[#15171a]'
               }`}
             >
               <span>Tất cả</span>
-              <span className="text-[11px] font-semibold text-slate-400">({stats.total})</span>
+              <span className="text-[11px] font-semibold text-[#677484]">({stats.total})</span>
             </button>
 
             <button
@@ -324,12 +326,12 @@ export const ReceiveTransferScreen: React.FC<Props> = ({
               onClick={() => setActiveTab('MATCH')}
               className={`h-full text-xs font-bold border-b-2 transition cursor-pointer flex items-center gap-1.5 ${
                 activeTab === 'MATCH'
-                  ? 'border-blue-600 text-blue-600'
-                  : 'border-transparent text-slate-500 hover:text-slate-700'
+                  ? 'border-[#0070f4] text-[#0070f4]'
+                  : 'border-transparent text-[#677484] hover:text-[#15171a]'
               }`}
             >
               <span>Khớp</span>
-              <span className="text-[11px] font-semibold text-slate-400">({stats.match})</span>
+              <span className="text-[11px] font-semibold text-[#677484]">({stats.match})</span>
             </button>
 
             <button
@@ -337,12 +339,12 @@ export const ReceiveTransferScreen: React.FC<Props> = ({
               onClick={() => setActiveTab('DIFF')}
               className={`h-full text-xs font-bold border-b-2 transition cursor-pointer flex items-center gap-1.5 ${
                 activeTab === 'DIFF'
-                  ? 'border-blue-600 text-blue-600'
-                  : 'border-transparent text-slate-500 hover:text-slate-700'
+                  ? 'border-[#0070f4] text-[#0070f4]'
+                  : 'border-transparent text-[#677484] hover:text-[#15171a]'
               }`}
             >
               <span>Lệch</span>
-              <span className="text-[11px] font-semibold text-slate-400">({stats.diff})</span>
+              <span className="text-[11px] font-semibold text-[#677484]">({stats.diff})</span>
             </button>
 
             <button
@@ -350,12 +352,12 @@ export const ReceiveTransferScreen: React.FC<Props> = ({
               onClick={() => setActiveTab('UNRECEIVED')}
               className={`h-full text-xs font-bold border-b-2 transition cursor-pointer flex items-center gap-1.5 ${
                 activeTab === 'UNRECEIVED'
-                  ? 'border-blue-600 text-blue-600'
-                  : 'border-transparent text-slate-500 hover:text-slate-700'
+                  ? 'border-[#0070f4] text-[#0070f4]'
+                  : 'border-transparent text-[#677484] hover:text-[#15171a]'
               }`}
             >
               <span>Chưa nhận</span>
-              <span className="text-[11px] font-semibold text-slate-400">({stats.unreceived})</span>
+              <span className="text-[11px] font-semibold text-[#677484]">({stats.unreceived})</span>
             </button>
           </div>
 
@@ -375,23 +377,23 @@ export const ReceiveTransferScreen: React.FC<Props> = ({
           {/* Bảng sản phẩm kiểm đếm */}
           <div className="flex-1 overflow-auto">
             <table className="w-full text-left border-collapse">
-              <thead className="bg-[#F8FAFC] border-b border-slate-200 text-[11px] font-bold text-slate-500 sticky top-0 z-10">
+              <thead className="bg-[#f7f8f9] border-b border-slate-200 text-[11px] font-bold text-[#677484] sticky top-0 z-10">
                 <tr>
-                  <th className="py-2.5 px-3 w-12 text-center">STT</th>
-                  <th className="py-2.5 px-3 w-28">Mã hàng</th>
-                  <th className="py-2.5 px-3 min-w-[220px]">Tên hàng</th>
-                  <th className="py-2.5 px-3 w-20 text-center">ĐVT</th>
-                  <th className="py-2.5 px-3 w-20 text-right">Tồn kho</th>
-                  <th className="py-2.5 px-3 w-24 text-right">SL chuyển</th>
-                  <th className="py-2.5 px-3 w-28 text-right">SL nhận</th>
-                  <th className="py-2.5 px-3 w-28 text-right">Giá chuyển</th>
-                  <th className="py-2.5 px-3 w-32 text-right">Thành tiền</th>
+                  <th className="py-2 px-3 w-12 text-center">STT</th>
+                  <th className="py-2 px-3 w-28">Mã hàng</th>
+                  <th className="py-2 px-3 min-w-[220px]">Tên hàng</th>
+                  <th className="py-2 px-3 w-20 text-center">ĐVT</th>
+                  <th className="py-2 px-3 w-20 text-right">Tồn kho</th>
+                  <th className="py-2 px-3 w-24 text-right">SL chuyển</th>
+                  <th className="py-2 px-3 w-28 text-right">SL nhận</th>
+                  <th className="py-2 px-3 w-28 text-right">Giá chuyển</th>
+                  <th className="py-2 px-3 w-32 text-right">Thành tiền</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-xs">
                 {displayedItems.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="py-12 text-center text-slate-400">
+                    <td colSpan={9} className="py-12 text-center text-[#677484]">
                       Không có sản phẩm nào trong danh mục hiển thị
                     </td>
                   </tr>
@@ -404,24 +406,24 @@ export const ReceiveTransferScreen: React.FC<Props> = ({
                     return (
                       <tr
                         key={it.id || it.productId}
-                        className={`hover:bg-slate-50/70 transition ${
-                          isDiff ? 'bg-amber-50/30' : ''
+                        className={`hover:bg-[#f7f8f9] transition ${
+                          isDiff ? 'bg-amber-50/40' : ''
                         }`}
                       >
-                        <td className="py-3 px-3 text-center text-slate-400 font-medium">
+                        <td className="py-2.5 px-3 text-center text-[#677484] font-medium">
                           {idx + 1}
                         </td>
 
-                        <td className="py-3 px-3 font-mono font-medium text-blue-600">
+                        <td className="py-2.5 px-3 font-mono font-medium text-[#0070f4]">
                           {it.productCode}
                         </td>
 
-                        <td className="py-3 px-3">
-                          <div className="flex items-center gap-1 font-medium text-slate-800">
+                        <td className="py-2.5 px-3">
+                          <div className="flex items-center gap-1 font-medium text-[#15171a]">
                             <span>{it.productName}</span>
-                            <Info size={12} className="text-slate-400 cursor-pointer" />
+                            <Info size={12} className="text-[#677484] cursor-pointer" />
                           </div>
-                          <div className="flex items-center gap-1 text-[11px] text-slate-400 mt-0.5">
+                          <div className="flex items-center gap-1 text-[11px] text-[#677484] mt-0.5">
                             <input
                               type="text"
                               value={itemNotes[it.productId] || ''}
@@ -432,21 +434,21 @@ export const ReceiveTransferScreen: React.FC<Props> = ({
                                 }))
                               }
                               placeholder="Ghi chú..."
-                              className="bg-transparent border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:outline-none text-[11px] text-slate-600 w-36"
+                              className="bg-transparent border-b border-transparent hover:border-slate-300 focus:border-[#0070f4] focus:outline-none text-[11px] text-[#15171a] w-36"
                             />
-                            <Pencil size={10} className="text-slate-400" />
+                            <Pencil size={10} className="text-[#677484]" />
                           </div>
                         </td>
 
-                        <td className="py-3 px-3 text-center text-blue-600 font-medium">
-                          {it.unitName || 'quả'}
+                        <td className="py-2.5 px-3 text-center text-[#0070f4] font-medium">
+                          {it.unitName || 'cái'}
                         </td>
 
-                        <td className="py-3 px-3 text-right text-slate-600">
+                        <td className="py-2.5 px-3 text-right text-[#677484]">
                           {it.destStock !== undefined ? it.destStock : 0}
                         </td>
 
-                        <td className="py-3 px-3 text-right font-bold text-slate-700">
+                        <td className="py-2.5 px-3 text-right font-bold text-[#15171a]">
                           {it.transferQuantity}
                         </td>
 
@@ -460,19 +462,19 @@ export const ReceiveTransferScreen: React.FC<Props> = ({
                             onChange={(e) =>
                               handleQtyChange(it.productId, Number(e.target.value))
                             }
-                            className={`w-20 h-7 px-2 text-right rounded-md border text-xs font-bold transition focus:outline-none focus:ring-1 ${
+                            className={`w-20 h-7 px-2 text-right rounded-[6px] border text-xs font-bold transition focus:outline-none ${
                               isDiff
-                                ? 'border-amber-400 bg-amber-50 text-amber-900 focus:ring-amber-500'
-                                : 'border-slate-300 bg-white text-slate-900 focus:ring-blue-500 focus:border-blue-500'
+                                ? 'border-amber-400 bg-amber-50 text-amber-900 focus:ring-1 focus:ring-amber-500'
+                                : 'border-slate-300 bg-white text-[#15171a] focus:border-[#0070f4]'
                             }`}
                           />
                         </td>
 
-                        <td className="py-3 px-3 text-right font-mono text-slate-600">
+                        <td className="py-2.5 px-3 text-right font-mono text-[#677484]">
                           {(it.transferPrice || 0).toLocaleString('vi-VN')}
                         </td>
 
-                        <td className="py-3 px-3 text-right font-mono font-bold text-slate-900">
+                        <td className="py-2.5 px-3 text-right font-mono font-bold text-[#15171a]">
                           {currentLineTotal.toLocaleString('vi-VN')}
                         </td>
                       </tr>
@@ -486,75 +488,75 @@ export const ReceiveTransferScreen: React.FC<Props> = ({
 
         {/* CỘT PHẢI: Sidebar Thông tin phiếu & Nút Nhận hàng */}
         <aside className="w-80 bg-white flex flex-col justify-between shrink-0 shadow-xs border-l border-slate-200">
-          <div className="p-4 space-y-4 overflow-y-auto">
+          <div className="p-4 space-y-3.5 overflow-y-auto">
             {/* User & Date picker */}
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <div className="flex items-center gap-1.5 text-xs text-slate-700 font-medium">
-                <User size={13} className="text-slate-400" />
-                <span>{transfer.createdBy || '0913268079'}</span>
+              <div className="flex items-center gap-1.5 text-xs text-[#15171a] font-medium">
+                <User size={13} className="text-[#677484]" />
+                <span>{transfer.createdBy || 'Quản trị viên'}</span>
               </div>
 
-              <div className="flex items-center gap-1 text-xs text-slate-600">
+              <div className="flex items-center gap-1 text-xs text-[#677484]">
                 <input
                   type="datetime-local"
                   value={receiveDate}
                   min={minReceiveDate}
                   onChange={(e) => setReceiveDate(e.target.value)}
-                  className="h-8 px-2 rounded-lg border border-slate-300 text-[11px] font-mono text-slate-800 bg-white hover:border-blue-500 focus:border-blue-500 focus:outline-none cursor-pointer transition shadow-2xs"
+                  className="h-8 px-2 rounded-[8px] border border-slate-300 text-[11px] font-mono text-[#15171a] bg-white hover:border-[#0070f4] focus:border-[#0070f4] focus:outline-none cursor-pointer transition shadow-2xs"
                   title="Thời gian nhận hàng (phải sau thời gian chuyển hàng)"
                 />
               </div>
             </div>
 
             {/* Thông tin phiếu chuyển */}
-            <div className="space-y-2.5 text-xs">
+            <div className="space-y-2 text-xs">
               <div className="flex items-center justify-between">
-                <span className="text-slate-500">Mã chuyển hàng</span>
-                <span className="font-mono font-bold text-slate-900">{transfer.code}</span>
+                <span className="text-[#677484]">Mã chuyển hàng</span>
+                <span className="font-mono font-bold text-[#15171a]">{transfer.code}</span>
               </div>
 
               <div className="flex items-center justify-between">
-                <span className="text-slate-500">Trạng thái</span>
-                <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-blue-50 text-blue-600 border border-blue-200">
+                <span className="text-[#677484]">Trạng thái</span>
+                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-[#e6f1fe] text-[#0070f4] border border-[#0070f4]/25">
                   {transfer.status === 'RECEIVED' ? 'Đã nhận' : 'Đang chuyển'}
                 </span>
               </div>
 
               <div className="flex items-center justify-between">
-                <span className="text-slate-500">Chi nhánh gửi</span>
-                <span className="font-medium text-slate-800 text-right">{transfer.sourceWarehouseName}</span>
+                <span className="text-[#677484]">Chi nhánh gửi</span>
+                <span className="font-medium text-[#15171a] text-right">{transfer.sourceWarehouseName}</span>
               </div>
 
               <div className="flex items-center justify-between">
-                <span className="text-slate-500">Ngày chuyển</span>
-                <span className="font-mono text-slate-700">{formattedTransferDate}</span>
+                <span className="text-[#677484]">Ngày chuyển</span>
+                <span className="font-mono text-[#677484]">{formattedTransferDate}</span>
               </div>
 
               <div className="flex items-center justify-between">
-                <span className="text-slate-500">Ghi chú</span>
-                <span className="text-slate-400">{transfer.notes || '—'}</span>
+                <span className="text-[#677484]">Ghi chú</span>
+                <span className="text-[#677484]">{transfer.notes || '—'}</span>
               </div>
 
               <div className="flex items-center justify-between pt-1 border-t border-slate-100">
-                <span className="text-slate-500">Tổng số lượng chuyển</span>
-                <span className="font-bold text-slate-800">{totalTransferQty}</span>
+                <span className="text-[#677484]">Tổng số lượng chuyển</span>
+                <span className="font-bold text-[#15171a]">{totalTransferQty}</span>
               </div>
 
               <div className="flex items-center justify-between">
-                <span className="text-slate-500">Tổng số lượng nhận</span>
-                <span className="font-bold text-slate-900 text-sm">{totalReceivedQty}</span>
+                <span className="text-[#677484]">Tổng số lượng nhận</span>
+                <span className="font-bold text-[#15171a] text-sm">{totalReceivedQty}</span>
               </div>
             </div>
 
             {/* Ô ghi chú nhận hàng */}
-            <div className="pt-2">
+            <div className="pt-1">
               <div className="flex items-center justify-between mb-1.5">
-                <div className="flex items-center gap-1.5 text-xs text-slate-700 font-medium">
-                  <Pencil size={12} />
+                <div className="flex items-center gap-1.5 text-xs text-[#15171a] font-medium">
+                  <Pencil size={12} className="text-[#677484]" />
                   <span>Ghi chú</span>
                 </div>
                 {hasShortage && (
-                  <span className="text-[10px] font-bold text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200 animate-pulse">
+                  <span className="text-[10px] font-bold text-[#fb2c36] bg-[#fef2f2] px-1.5 py-0.5 rounded border border-[#fecaca] animate-pulse">
                     * Bắt buộc khi nhận thiếu
                   </span>
                 )}
@@ -568,22 +570,22 @@ export const ReceiveTransferScreen: React.FC<Props> = ({
                     ? "Nhập lý do nhận thiếu hàng (bắt buộc)..."
                     : "Nhập ghi chú kiểm đếm..."
                 }
-                className={`w-full p-2.5 rounded-xl border text-xs text-slate-800 placeholder-slate-400 focus:outline-none transition resize-none ${
+                className={`w-full p-2.5 rounded-[8px] border text-xs text-[#15171a] placeholder-[#677484] focus:outline-none transition resize-none ${
                   hasShortage && !receiveNotes.trim()
-                    ? "border-rose-400 bg-rose-50/40 focus:border-rose-500 focus:ring-1 focus:ring-rose-500"
-                    : "border-slate-300 focus:border-blue-500"
+                    ? "border-[#fb2c36] bg-[#fef2f2]/40 focus:border-[#fb2c36] focus:ring-1 focus:ring-[#fb2c36]"
+                    : "border-slate-300 focus:border-[#0070f4]"
                 }`}
               />
             </div>
           </div>
 
-          {/* Action Buttons: Lưu tạm (Xanh dương) & Nhận hàng (Xanh lá) */}
+          {/* Action Buttons: Lưu tạm (Xanh dương) & Nhận hàng (Secondary Accent) */}
           <div className="p-4 border-t border-slate-200 bg-white grid grid-cols-2 gap-2">
             <button
               type="button"
               disabled={isSubmitting}
               onClick={handleSaveDraft}
-              className="h-10 rounded-xl bg-[#0070F4] hover:bg-blue-600 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer shadow-xs disabled:opacity-50 active:scale-98"
+              className="h-9 rounded-[8px] bg-[#0070f4] hover:bg-[#005ac3] text-white font-semibold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer shadow-xs disabled:opacity-50 active:scale-98"
             >
               <Save size={14} />
               <span>Lưu tạm</span>
@@ -593,7 +595,7 @@ export const ReceiveTransferScreen: React.FC<Props> = ({
               type="button"
               disabled={isSubmitting}
               onClick={handleConfirmReceive}
-              className="h-10 rounded-xl bg-[#00A859] hover:bg-emerald-600 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer shadow-xs disabled:opacity-50 active:scale-98"
+              className="h-9 rounded-[8px] bg-[#005ac3] hover:bg-[#00479b] text-white font-semibold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer shadow-xs disabled:opacity-50 active:scale-98"
             >
               {isSubmitting ? (
                 <Loader2 size={15} className="animate-spin" />
