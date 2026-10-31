@@ -76,7 +76,10 @@ if (app.Environment.IsDevelopment())
 
 app.UseMiddleware<StockFlow.API.Middleware.ExceptionHandlingMiddleware>();
 app.UseCors("AllowFrontend");
-app.UseHttpsRedirection();
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();

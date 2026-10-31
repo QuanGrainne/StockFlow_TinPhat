@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
 using StockFlow.Application.Common.Interfaces;
@@ -1810,6 +1810,18 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
         });
 
         OnModelCreatingPartial(modelBuilder);
+    }
+
+    public async Task<long> GetNextSequenceValueAsync(string sequenceName, CancellationToken cancellationToken = default)
+    {
+        await using var cmd = Database.GetDbConnection().CreateCommand();
+        cmd.CommandText = $"SELECT nextval('{sequenceName}')";
+        if (cmd.Connection!.State != System.Data.ConnectionState.Open)
+        {
+            await cmd.Connection.OpenAsync(cancellationToken);
+        }
+        var result = await cmd.ExecuteScalarAsync(cancellationToken);
+        return Convert.ToInt64(result);
     }
 
     partial void OnModelCreatingPartial(ModelBuilder modelBuilder);
