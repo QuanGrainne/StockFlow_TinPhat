@@ -40,6 +40,10 @@ export const PosCartFooter: React.FC<PosCartFooterProps> = ({
             </span>
           </div>
 
+          <span className="text-[10px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 font-semibold flex items-center gap-1" title="Tự động lưu LocalStorage">
+            <CheckCircle2 size={11} className="text-emerald-600" />
+            <span>Đã lưu LocalStorage</span>
+          </span>
           <button
             type="button"
             onClick={onClearCart}

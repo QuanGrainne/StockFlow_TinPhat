@@ -12,6 +12,8 @@ interface QuickSelectProductModalProps {
   products: PosProduct[];
   categories: PosCategory[];
   onAddToCart: (product: PosProduct) => void;
+  currentPriceBookId?: number;
+  priceMatrix?: Record<number, Record<number, number>>;
 }
 
 const currencyFormatter = new Intl.NumberFormat('vi-VN');
@@ -22,9 +24,18 @@ export const QuickSelectProductModal: React.FC<QuickSelectProductModalProps> = (
   products,
   categories,
   onAddToCart,
+  currentPriceBookId = 1,
+  priceMatrix = {},
 }) => {
   const [search, setSearch] = useState('');
   const [selectedCatId, setSelectedCatId] = useState<number | null>(null);
+
+  const getItemPrice = (prod: PosProduct): number => {
+    if (priceMatrix[prod.productId] && priceMatrix[prod.productId][currentPriceBookId] !== undefined) {
+      return priceMatrix[prod.productId][currentPriceBookId];
+    }
+    return prod.standardPrice;
+  };
 
   const filtered = products.filter((p) => {
     const matchCat = selectedCatId === null || p.categoryId === selectedCatId;
@@ -124,7 +135,7 @@ export const QuickSelectProductModal: React.FC<QuickSelectProductModalProps> = (
 
                 <div className="mt-2.5 pt-2 border-t border-slate-150 flex items-center justify-between">
                   <span className="text-xs font-black text-slate-900">
-                    {currencyFormatter.format(prod.standardPrice)} đ
+                    {currencyFormatter.format(getItemPrice(prod))} đ
                   </span>
                   <button
                     type="button"

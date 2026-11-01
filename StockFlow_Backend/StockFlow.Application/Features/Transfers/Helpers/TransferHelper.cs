@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using System.Security.Cryptography;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
@@ -13,28 +14,38 @@ public static class TransferHelper
     private static readonly Regex CkRegex = new(@"^CK(\d+)$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     /// <summary>
-    /// Tự động sinh mã phiếu chuyển hàng tiếp theo theo định dạng chuẩn KiotViet: CK000001, CK000002...
+    /// Tự động sinh mã phiếu chuyển hàng tiếp theo theo định dạng chuẩn hoặc thiết lập cài đặt hệ thống.
     /// </summary>
     public static async Task<string> GenerateNextTransferCodeAsync(
         IStockFlowDbContext context,
         CancellationToken cancellationToken = default)
     {
-        var existingCodes = await context.TrxStockTransfers
-            .Where(t => t.TransferCode != null && t.TransferCode.StartsWith("CK"))
-            .Select(t => t.TransferCode!)
-            .ToListAsync(cancellationToken);
+        var settings = await context.MstOrderSettings.FirstOrDefaultAsync(s => s.SettingId == 1, cancellationToken);
+        string prefix = string.IsNullOrWhiteSpace(settings?.TransferCodePrefix) ? "CK" : settings.TransferCodePrefix.Trim();
+        string rule = settings?.OrderCodeRule?.ToUpperInvariant() ?? "SEQUENTIAL";
 
-        int maxNumber = 0;
-        foreach (var code in existingCodes)
+        if (rule == "DATETIME")
         {
-            var match = CkRegex.Match(code.Trim());
-            if (match.Success && int.TryParse(match.Groups[1].Value, out int number))
-            {
-                if (number > maxNumber) maxNumber = number;
-            }
+            long seq = await context.GetNextSequenceValueAsync("stockflow.seq_transfer_code", cancellationToken);
+            return $"{prefix}{DateTime.UtcNow:yyMMddHHmm}{(seq % 1000):D2}";
         }
-
-        return $"CK{maxNumber + 1:D6}";
+        else if (rule == "RANDOM")
+        {
+            const string chars = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
+            byte[] randomBytes = new byte[7];
+            RandomNumberGenerator.Fill(randomBytes);
+            char[] charsArr = new char[7];
+            for (int i = 0; i < 7; i++)
+            {
+                charsArr[i] = chars[randomBytes[i] % chars.Length];
+            }
+            return $"{prefix}-{new string(charsArr)}";
+        }
+        else
+        {
+            long seq = await context.GetNextSequenceValueAsync("stockflow.seq_transfer_code", cancellationToken);
+            return $"{prefix}{seq:D6}";
+        }
     }
 
     /// <summary>
