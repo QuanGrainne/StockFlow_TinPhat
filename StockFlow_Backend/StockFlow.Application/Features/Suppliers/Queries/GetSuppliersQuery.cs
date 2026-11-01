@@ -72,34 +72,16 @@ public class GetSuppliersQueryHandler : IRequestHandler<GetSuppliersQuery, Resul
         }
 
         // 5. Lọc theo Chi nhánh / Kho nhập hàng (nếu có chọn kho)
-        Dictionary<int, (decimal TotalPurchased, int ReceiptCount)> branchStats = new();
         if (query.WarehouseId.HasValue && query.WarehouseId.Value > 0)
         {
             var targetWhId = query.WarehouseId.Value;
             var partnerIdsInWh = await _context.TrxGoodsReceipts
-                .Where(r => r.WarehouseId == targetWhId)
+                .Where(r => r.WarehouseId == targetWhId && r.Status != "CANCELLED")
                 .Select(r => r.PartnerId)
                 .Distinct()
                 .ToListAsync(cancellationToken);
 
             dbQuery = dbQuery.Where(p => partnerIdsInWh.Contains(p.PartnerId));
-
-            // Tính số tiền nhập và số phiếu tại kho này
-            var receiptsInWh = await _context.TrxGoodsReceipts
-                .Include(r => r.DtlGoodsReceiptItems)
-                .Where(r => r.WarehouseId == targetWhId)
-                .AsNoTracking()
-                .ToListAsync(cancellationToken);
-
-            branchStats = receiptsInWh
-                .GroupBy(r => r.PartnerId)
-                .ToDictionary(
-                    g => g.Key,
-                    g => (
-                        TotalPurchased: g.Sum(r => r.DtlGoodsReceiptItems.Sum(i => (i.ReceivedQty ?? 0) * (i.UnitLandedCost ?? 0))),
-                        ReceiptCount: g.Count()
-                    )
-                );
         }
 
         // 6. Sắp xếp danh sách
@@ -107,24 +89,46 @@ public class GetSuppliersQueryHandler : IRequestHandler<GetSuppliersQuery, Resul
             .OrderBy(p => p.PartnerId)
             .ToListAsync(cancellationToken);
 
-        // 7. Map sang DTO
+        var partnerIds = partners.Select(p => p.PartnerId).ToList();
+
+        // 7. Thống kê Tổng mua hàng từ các phiếu nhập thực tế (chỉ tính phiếu != CANCELLED)
+        var receiptsQuery = _context.TrxGoodsReceipts
+            .Include(r => r.DtlGoodsReceiptItems)
+            .Where(r => partnerIds.Contains(r.PartnerId) && r.Status != "CANCELLED")
+            .AsNoTracking();
+
+        if (query.WarehouseId.HasValue && query.WarehouseId.Value > 0)
+        {
+            receiptsQuery = receiptsQuery.Where(r => r.WarehouseId == query.WarehouseId.Value);
+        }
+
+        var receipts = await receiptsQuery.ToListAsync(cancellationToken);
+
+        var stats = receipts
+            .GroupBy(r => r.PartnerId)
+            .ToDictionary(
+                g => g.Key,
+                g => (
+                    TotalPurchased: g.Sum(r => r.DtlGoodsReceiptItems.Sum(i => (i.AcceptedQty ?? i.ReceivedQty ?? i.OrderedQty ?? 0) * (i.UnitLandedCost ?? 0))),
+                    ReceiptCount: g.Count()
+                )
+            );
+
+        // 8. Map sang DTO
         var dtos = partners.Select(p =>
         {
+            decimal totalPurchased = 0m;
             decimal? branchPayable = null;
             int? branchReceiptsCount = null;
 
-            if (query.WarehouseId.HasValue && query.WarehouseId.Value > 0)
+            if (stats.TryGetValue(p.PartnerId, out var stat))
             {
-                if (branchStats.TryGetValue(p.PartnerId, out var stat))
+                totalPurchased = stat.TotalPurchased;
+                if (query.WarehouseId.HasValue && query.WarehouseId.Value > 0)
                 {
                     // Công nợ theo chi nhánh được phản ánh từ giá trị phát sinh của kho đó
                     branchPayable = stat.TotalPurchased;
                     branchReceiptsCount = stat.ReceiptCount;
-                }
-                else
-                {
-                    branchPayable = 0m;
-                    branchReceiptsCount = 0;
                 }
             }
 
@@ -141,6 +145,7 @@ public class GetSuppliersQueryHandler : IRequestHandler<GetSuppliersQuery, Resul
                 CurrentPayable: p.CurrentPayable ?? 0m,
                 CurrentDebt: p.CurrentDebt ?? 0m,
                 Status: p.IsActive != false ? "ACTIVE" : "INACTIVE",
+                TotalPurchased: totalPurchased,
                 BranchPayable: branchPayable,
                 BranchReceiptsCount: branchReceiptsCount
             );
