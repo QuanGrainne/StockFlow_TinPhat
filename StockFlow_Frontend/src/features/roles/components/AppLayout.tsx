@@ -9,6 +9,7 @@ import CustomersClient from '@/app/(dashboard)/customers/CustomersClient';
 import PurchasesClient from '@/app/(dashboard)/purchases/PurchasesClient';
 import PriceBooksClient from '@/features/price-books/screens/PriceBooksClient';
 import TransfersClient from '@/app/(dashboard)/transfers/TransfersClient';
+import { OrderSettingsScreen } from '@/features/settings/screens/OrderSettingsScreen';
 import { permissionService } from '../services/permissionService';
 
 interface AppLayoutProps {
@@ -20,6 +21,7 @@ const SCREEN_MODULE_MAP: Record<string, string> = {
   'admin-staff-active': 'AUTH',
   'admin-roles': 'AUTH',
   'admin-matrix': 'AUTH',
+  'admin-order-settings': 'AUTH',
   'admin-warehouse-perms': 'AUTH',
   'admin-warehouse-facilities': 'AUTH',
   'admin-goods': 'GOODS',
@@ -346,6 +348,8 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ initialScreen }) => {
       case 'admin-warehouse-perms':
       case 'admin-warehouse-facilities':
         return <WarehousePermissionsScreen />;
+      case 'admin-order-settings':
+        return <OrderSettingsScreen onNavigate={handleNavigate} />;
       case 'admin-users':
         return <StaffAccountsScreen initialFilter="ALL" />;
 

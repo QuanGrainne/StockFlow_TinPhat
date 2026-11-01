@@ -53,6 +53,8 @@ public class GetPosOrdersQueryHandler : IRequestHandler<GetPosOrdersQuery, Resul
                 OrderCode = o.OrderCode ?? $"HD{o.OrderId:D5}",
                 PartnerName = o.Partner.PartnerName,
                 PartnerPhone = o.Partner.Phone ?? "",
+                SubTotal = o.SubTotal,
+                DiscountAmount = o.DiscountAmount,
                 TotalAmount = o.TotalAmount ?? 0,
                 PaidAmount = o.PaidAmount ?? 0,
                 OutstandingAmount = o.OutstandingAmount ?? 0,

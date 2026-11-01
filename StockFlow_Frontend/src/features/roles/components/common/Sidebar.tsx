@@ -34,6 +34,7 @@ import {
   FileText,
   BookOpen,
   DollarSign,
+  Settings,
 } from 'lucide-react';
 import { permissionService } from '../../services/permissionService';
 
@@ -723,6 +724,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
       hasDropdown: false,
       requiredModule: 'PARTNER',
       requiredFeature: 'feat-suppliers',
+    },
+    {
+      id: 'admin-order-settings',
+      label: 'Thiết lập giao dịch',
+      icon: Settings,
+      hasDropdown: false,
     },
   ];
 

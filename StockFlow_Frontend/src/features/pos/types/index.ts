@@ -1,5 +1,5 @@
 // src/features/pos/types/index.ts
-// Các kiểu dữ liệu cốt lõi cho màn hình bán hàng StockFlow POS (Đã tinh gọn theo ERD hiện hành)
+// Các kiểu dữ liệu cốt lõi cho màn hình bán hàng StockFlow POS
 
 export interface PosProduct {
   id: string;
@@ -30,13 +30,16 @@ export interface CartItem {
   imageUrl?: string | null;
   uom: string;
   unitId: number;
-  unitPrice: number;
+  standardPrice: number; // Giá niêm yết chuẩn
+  unitPrice: number; // Đơn giá sau áp dụng bảng giá
   quantity: number;
   stockQuantity: number;
   minSafeStock?: number | null;
   total: number; // unitPrice * quantity
-  discountPercent?: number;
-  discountAmount?: number;
+  discountType?: 'PERCENT' | 'AMOUNT'; // Loại chiết khấu dòng: % hoặc VNĐ
+  discountValue?: number; // Giá trị nhập (% hoặc VNĐ)
+  discountPercent?: number; // % giảm giá (vd: 2%, 5%, 10%)
+  discountAmount?: number; // Số tiền chiết khấu (standardPrice - unitPrice) * quantity
 }
 
 export interface PosCustomer {
@@ -54,6 +57,23 @@ export interface PosCustomer {
   salesRep?: string;
 }
 
+export interface PosPriceBook {
+  priceBookId: number;
+  priceBookCode: string;
+  priceBookName: string;
+  isActive: boolean;
+  isDefault: boolean;
+}
+
+export interface PosWarehouse {
+  warehouseId: number;
+  code: string;
+  name: string;
+  branchName?: string;
+  address?: string;
+  status: string;
+}
+
 export type PaymentMethod = 'CASH' | 'VIETQR' | 'POS_CARD' | 'DEBT';
 
 export interface PosOrderTab {
@@ -62,13 +82,20 @@ export interface PosOrderTab {
   status: 'PROCESSING' | 'WAITING' | 'COMPLETED';
   items: CartItem[];
   selectedCustomer: PosCustomer | null;
+  priceBookId: number; // ID bảng giá bán đang chọn
+  priceBookName: string; // Tên bảng giá bán đang chọn
   autoPrintK80: boolean;
   warehouseId: number;
   warehouseName: string;
   notes: string;
   paymentMethod: PaymentMethod;
   prepaidAmount: number; // Khách thanh toán trước
-  discountAmount: number; // Số tiền giảm giá nhập tay (VNĐ)
+  discountType?: 'PERCENT' | 'AMOUNT'; // Loại chiết khấu hóa đơn: % hoặc VNĐ
+  discountValue?: number; // Giá trị chiết khấu hóa đơn (% hoặc VNĐ)
+  discountAmount: number; // Số tiền giảm giá hóa đơn quy đổi (VNĐ)
+  vatRate?: number; // Tỷ lệ VAT (mặc định 8%)
+  applyVat?: boolean; // Bật/tắt tính thuế VAT
+  deliveryType?: 'COUNTER' | 'TRUCK' | 'GRAB';
 }
 
 export interface PosCategory {
