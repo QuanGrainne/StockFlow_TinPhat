@@ -44,6 +44,7 @@ const FEATURE_ICONS: Record<string, React.FC<{ size?: number; className?: string
   'feat-roles': ShieldCheck,
   'feat-warehouse-perms': Building2,
   'feat-goods': Package,
+  'feat-customers': Users,
   'feat-transfers': Repeat,
   'feat-sales': ShoppingBag,
   'feat-purchase': ArrowDownToLine,

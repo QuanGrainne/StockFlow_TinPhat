@@ -4,6 +4,19 @@
 import { apiClient } from '@/lib/api/client';
 import { PosProduct, PosCustomer, PosCategory, PosOrderTab, PosPriceBook, PosWarehouse } from '../types';
 
+export interface OrderFilterParams {
+  search?: string;
+  status?: string;
+  warehouseId?: number;
+  fromDate?: string;
+  toDate?: string;
+  returnStatus?: string;
+  paymentMethod?: string;
+  priceBookName?: string;
+  page?: number;
+  pageSize?: number;
+}
+
 export const posService = {
   /**
    * Lấy danh sách sản phẩm từ backend theo kho cụ thể (đồng bộ tồn kho chuẩn POS-014)
@@ -241,6 +254,7 @@ export const posService = {
       discountAmount: orderDiscountAmount,
       totalAmount: Math.round(finalTotal),
       paidAmount: order.prepaidAmount,
+      excessAction: order.excessAction || 'RETURN_CASH',
       vatAmount: 0,
       deliveryFee: 0,
       deliveryType: order.deliveryType || 'COUNTER',
@@ -268,14 +282,27 @@ export const posService = {
   },
 
   /**
-   * Lấy lịch sử các đơn hàng POS gần đây
+   * Lấy lịch sử các đơn hàng POS (hỗ trợ đầy đủ bộ lọc KiotViet và phân trang)
    */
-  async getRecentOrders(): Promise<any[]> {
+  async getRecentOrders(params?: OrderFilterParams): Promise<any> {
     try {
-      return await apiClient.get<any[]>('/api/orders');
+      const sp = new URLSearchParams();
+      if (params?.search && params.search.trim()) sp.append('search', params.search.trim());
+      if (params?.status && params.status !== 'ALL') sp.append('status', params.status);
+      if (params?.warehouseId && params.warehouseId > 0) sp.append('warehouseId', params.warehouseId.toString());
+      if (params?.fromDate) sp.append('fromDate', params.fromDate);
+      if (params?.toDate) sp.append('toDate', params.toDate);
+      if (params?.returnStatus && params.returnStatus !== 'ALL') sp.append('returnStatus', params.returnStatus);
+      if (params?.paymentMethod && params.paymentMethod !== 'ALL') sp.append('paymentMethod', params.paymentMethod);
+      if (params?.priceBookName && params.priceBookName !== 'ALL') sp.append('priceBookName', params.priceBookName);
+      if (params?.page) sp.append('page', params.page.toString());
+      if (params?.pageSize) sp.append('pageSize', params.pageSize.toString());
+
+      const qs = sp.toString() ? `?${sp.toString()}` : '';
+      return await apiClient.get<any>(`/api/orders${qs}`);
     } catch (e) {
       console.error('Lỗi khi tải đơn hàng POS:', e);
-      return [];
+      return { items: [], totalCount: 0 };
     }
   },
 };
