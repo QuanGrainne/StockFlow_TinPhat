@@ -28,7 +28,6 @@ export default function SupplierFormModal({
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [address, setAddress] = useState('');
-  const [creditLimit, setCreditLimit] = useState<number>(0);
   const [payableAmount, setPayableAmount] = useState<number>(0);
   const [isActive, setIsActive] = useState<boolean>(true);
   const [loading, setLoading] = useState(false);
@@ -41,7 +40,6 @@ export default function SupplierFormModal({
       setPhone(supplier.phone || '');
       setEmail(supplier.email || '');
       setAddress(supplier.address || '');
-      setCreditLimit(supplier.creditLimit || 0);
       setPayableAmount(supplier.currentPayable || 0);
       setIsActive(supplier.status !== 'INACTIVE');
     } else {
@@ -50,7 +48,6 @@ export default function SupplierFormModal({
       setPhone('');
       setEmail('');
       setAddress('');
-      setCreditLimit(0);
       setPayableAmount(0);
       setIsActive(true);
     }
@@ -85,7 +82,6 @@ export default function SupplierFormModal({
           phone: phone.trim() || undefined,
           email: email.trim() || undefined,
           address: address.trim() || undefined,
-          creditLimit: creditLimit >= 0 ? creditLimit : 0,
           currentPayable: payableAmount >= 0 ? payableAmount : 0,
           isActive: isActive,
         });
@@ -97,7 +93,6 @@ export default function SupplierFormModal({
           phone: phone.trim() || undefined,
           email: email.trim() || undefined,
           address: address.trim() || undefined,
-          creditLimit: creditLimit >= 0 ? creditLimit : 0,
           initialPayable: payableAmount >= 0 ? payableAmount : 0,
         });
         message.success('Thêm mới Nhà cung cấp thành công!');
@@ -145,7 +140,7 @@ export default function SupplierFormModal({
           </button>
         </div>
       }
-      width={640}
+      width={600}
       destroyOnHidden
       centered
     >
@@ -167,7 +162,7 @@ export default function SupplierFormModal({
               value={code}
               onChange={(e) => setCode(e.target.value)}
               disabled={isEditing}
-              placeholder={isEditing ? code : 'Mặc định mã tự động sinh (NCCxxxxxx)'}
+              placeholder={isEditing ? code : 'Mặc định tự động sinh (NCCxxxxxx)'}
               className={`w-full h-9 px-3 border rounded-[6px] text-sm outline-none transition ${
                 isEditing
                   ? 'bg-slate-100 text-slate-500 border-slate-300 cursor-not-allowed'
@@ -237,44 +232,24 @@ export default function SupplierFormModal({
           />
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
-          {/* Hạn mức nợ */}
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
-              Hạn mức nợ (VNĐ)
-            </label>
-            <input
-              type="number"
-              min={0}
-              step={1000000}
-              value={creditLimit}
-              onChange={(e) => setCreditLimit(Number(e.target.value) || 0)}
-              className="w-full h-9 px-3 border border-slate-300 rounded-[6px] text-sm text-slate-800 bg-white outline-none focus:border-[#0071BA] focus:ring-1 focus:ring-[#0071BA] transition text-right font-mono"
-            />
-            <p className="text-[11px] text-slate-400 mt-1">
-              Hạn mức tối đa công nợ được phép nợ NCC
-            </p>
-          </div>
-
-          {/* Công nợ hiện tại / Nợ ban đầu */}
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
-              {isEditing ? 'Nợ cần trả hiện tại (VNĐ)' : 'Nợ ban đầu phải trả (VNĐ)'}
-            </label>
-            <input
-              type="number"
-              min={0}
-              step={500000}
-              value={payableAmount}
-              onChange={(e) => setPayableAmount(Number(e.target.value) || 0)}
-              className="w-full h-9 px-3 border border-slate-300 rounded-[6px] text-sm text-slate-800 bg-white outline-none focus:border-[#0071BA] focus:ring-1 focus:ring-[#0071BA] transition text-right font-mono text-amber-700 font-semibold"
-            />
-            <p className="text-[11px] text-slate-400 mt-1">
-              {isEditing
-                ? 'Dư nợ thực tế cần thanh toán cho nhà cung cấp'
-                : 'Số dư nợ kỳ trước chuyển sang (nếu có)'}
-            </p>
-          </div>
+        {/* Công nợ hiện tại / Nợ ban đầu */}
+        <div className="pt-1">
+          <label className="block text-xs font-semibold text-slate-700 mb-1">
+            {isEditing ? 'Nợ cần trả hiện tại (VNĐ)' : 'Nợ ban đầu phải trả (VNĐ)'}
+          </label>
+          <input
+            type="number"
+            min={0}
+            step={500000}
+            value={payableAmount}
+            onChange={(e) => setPayableAmount(Number(e.target.value) || 0)}
+            className="w-full h-9 px-3 border border-slate-300 rounded-[6px] text-sm text-slate-800 bg-white outline-none focus:border-[#0071BA] focus:ring-1 focus:ring-[#0071BA] transition text-right font-mono text-amber-700 font-semibold"
+          />
+          <p className="text-[11px] text-slate-400 mt-1">
+            {isEditing
+              ? 'Dư nợ thực tế cần thanh toán cho nhà cung cấp'
+              : 'Số dư nợ kỳ trước chuyển sang (nếu có, mặc định = 0)'}
+          </p>
         </div>
 
         {/* Trạng thái hoạt động (khi cập nhật) */}

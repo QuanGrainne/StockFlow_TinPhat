@@ -25,6 +25,7 @@ public record SupplierDto(
     decimal CurrentPayable,
     decimal CurrentDebt,
     string Status,
+    decimal TotalPurchased = 0m,
     decimal? BranchPayable = null,
     int? BranchReceiptsCount = null
 );

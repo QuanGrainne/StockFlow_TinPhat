@@ -58,7 +58,7 @@ export default function SupplierFilterSidebar({
   return (
     <aside
       className={`relative shrink-0 bg-white border-r border-[#e5e7eb] select-none text-[#262626] transition-all duration-300 ${
-        isCollapsed ? 'w-0 overflow-hidden px-0 py-0' : 'w-[260px] overflow-visible px-4 py-5'
+        isCollapsed ? 'w-0 overflow-hidden px-0 py-0' : 'w-[260px] h-full overflow-y-auto px-4 py-5'
       }`}
     >
       {/* Title & Reset Button */}

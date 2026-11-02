@@ -3,7 +3,7 @@
 
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useSyncExternalStore, useCallback } from 'react';
 
 export interface WarehouseItem {
   warehouseId: number;
@@ -37,7 +37,17 @@ export function getActiveWarehouse(): WarehouseItem {
   return TIN_PHAT_WAREHOUSES[0];
 }
 
+let cachedActiveWarehouse: WarehouseItem | null = null;
+
+function getCachedActiveWarehouse(): WarehouseItem {
+  if (!cachedActiveWarehouse) {
+    cachedActiveWarehouse = getActiveWarehouse();
+  }
+  return cachedActiveWarehouse;
+}
+
 export function setActiveWarehouseGlobal(warehouse: WarehouseItem): void {
+  cachedActiveWarehouse = warehouse;
   if (typeof window === 'undefined') return;
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(warehouse));
@@ -47,33 +57,38 @@ export function setActiveWarehouseGlobal(warehouse: WarehouseItem): void {
   }
 }
 
-export function useActiveWarehouse() {
-  const [activeWarehouse, setActiveWarehouseState] = useState<WarehouseItem>(getActiveWarehouse);
-
-  useEffect(() => {
-    // Đồng bộ state ban đầu từ localStorage sau khi mount
-    setActiveWarehouseState(getActiveWarehouse());
-
-    function handleWarehouseChange(e: Event) {
-      const customEvent = e as CustomEvent<WarehouseItem>;
-      if (customEvent.detail) {
-        setActiveWarehouseState(customEvent.detail);
-      } else {
-        setActiveWarehouseState(getActiveWarehouse());
-      }
+function subscribe(callback: () => void) {
+  function handleWarehouseChange(e: Event) {
+    const customEvent = e as CustomEvent<WarehouseItem>;
+    if (customEvent.detail) {
+      cachedActiveWarehouse = customEvent.detail;
+    } else {
+      cachedActiveWarehouse = getActiveWarehouse();
     }
+    callback();
+  }
 
-    window.addEventListener(EVENT_NAME, handleWarehouseChange);
-    window.addEventListener('storage', handleWarehouseChange);
+  window.addEventListener(EVENT_NAME, handleWarehouseChange);
+  window.addEventListener('storage', handleWarehouseChange);
 
-    return () => {
-      window.removeEventListener(EVENT_NAME, handleWarehouseChange);
-      window.removeEventListener('storage', handleWarehouseChange);
-    };
-  }, []);
+  return () => {
+    window.removeEventListener(EVENT_NAME, handleWarehouseChange);
+    window.removeEventListener('storage', handleWarehouseChange);
+  };
+}
+
+function getSnapshot(): WarehouseItem {
+  return getCachedActiveWarehouse();
+}
+
+function getServerSnapshot(): WarehouseItem {
+  return TIN_PHAT_WAREHOUSES[0];
+}
+
+export function useActiveWarehouse() {
+  const activeWarehouse = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
   const setActiveWarehouse = useCallback((warehouse: WarehouseItem) => {
-    setActiveWarehouseState(warehouse);
     setActiveWarehouseGlobal(warehouse);
   }, []);
 

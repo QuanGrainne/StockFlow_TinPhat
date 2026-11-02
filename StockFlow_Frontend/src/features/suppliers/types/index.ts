@@ -19,7 +19,8 @@ export interface Supplier {
   phone?: string;
   email?: string;
   address?: string;
-  creditLimit: number;
+  creditLimit?: number;
+  totalPurchased: number; // Tổng giá trị hàng đã mua từ NCC
   currentPayable: number; // Công nợ phải trả NCC
   currentDebt: number;
   status: 'ACTIVE' | 'INACTIVE' | string;

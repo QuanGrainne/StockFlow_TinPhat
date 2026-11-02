@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
 using StockFlow.Application.Common.Interfaces;
@@ -98,6 +98,8 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
     public virtual DbSet<MstPriceBook> MstPriceBooks { get; set; }
 
     public virtual DbSet<DtlPriceBookItem> DtlPriceBookItems { get; set; }
+
+    public virtual DbSet<MstOrderSetting> MstOrderSettings { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -265,6 +267,21 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
             entity.Property(e => e.UnitPrice)
                 .HasPrecision(18, 2)
                 .HasColumnName("unit_price");
+            entity.Property(e => e.OriginalPrice)
+                .HasPrecision(18, 2)
+                .HasColumnName("original_price");
+            entity.Property(e => e.DiscountType)
+                .HasMaxLength(20)
+                .HasColumnName("discount_type");
+            entity.Property(e => e.DiscountValue)
+                .HasPrecision(18, 2)
+                .HasColumnName("discount_value");
+            entity.Property(e => e.DiscountAmount)
+                .HasPrecision(18, 2)
+                .HasColumnName("discount_amount");
+            entity.Property(e => e.LineTotal)
+                .HasPrecision(18, 2)
+                .HasColumnName("line_total");
 
             entity.HasOne(d => d.Order).WithMany(p => p.DtlOrderItems)
                 .HasForeignKey(d => d.OrderId)
@@ -1290,6 +1307,18 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
             entity.Property(e => e.TotalAmount)
                 .HasPrecision(18, 2)
                 .HasColumnName("total_amount");
+            entity.Property(e => e.SubTotal)
+                .HasPrecision(18, 2)
+                .HasColumnName("sub_total");
+            entity.Property(e => e.DiscountType)
+                .HasMaxLength(20)
+                .HasColumnName("discount_type");
+            entity.Property(e => e.DiscountValue)
+                .HasPrecision(18, 2)
+                .HasColumnName("discount_value");
+            entity.Property(e => e.DiscountAmount)
+                .HasPrecision(18, 2)
+                .HasColumnName("discount_amount");
 
             entity.HasOne(d => d.ConsolidatedIntoOrder).WithMany(p => p.InverseConsolidatedIntoOrder)
                 .HasForeignKey(d => d.ConsolidatedIntoOrderId)
@@ -1807,6 +1836,43 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
                 .HasForeignKey(d => d.ProductId)
                 .OnDelete(DeleteBehavior.Cascade)
                 .HasConstraintName("fk_dtl_price_book_items_product_id");
+        });
+
+        modelBuilder.Entity<MstOrderSetting>(entity =>
+        {
+            entity.HasKey(e => e.SettingId).HasName("mst_order_settings_pkey");
+
+            entity.ToTable("mst_order_settings", "stockflow");
+
+            entity.Property(e => e.SettingId).HasColumnName("setting_id");
+            entity.Property(e => e.EnableOrderPlacement).HasColumnName("enable_order_placement");
+            entity.Property(e => e.AllowOrderWhenOutOfStock).HasColumnName("allow_order_when_out_of_stock");
+            entity.Property(e => e.AllowSellingReservedStock).HasColumnName("allow_selling_reserved_stock");
+            entity.Property(e => e.AllowTransferringOrderBranch).HasColumnName("allow_transferring_order_branch");
+
+            entity.Property(e => e.AllowNegativeStockSale).HasColumnName("allow_negative_stock_sale");
+            entity.Property(e => e.EnablePrintQuotation).HasColumnName("enable_print_quotation");
+            entity.Property(e => e.ConfirmBeforeCompleteOrder).HasColumnName("confirm_before_complete_order");
+
+            entity.Property(e => e.EnableReturnTimeLimit).HasColumnName("enable_return_time_limit");
+            entity.Property(e => e.ReturnTimeLimitDays).HasColumnName("return_time_limit_days");
+
+            entity.Property(e => e.LockTransactionTime).HasColumnName("lock_transaction_time");
+
+            entity.Property(e => e.OrderCodeRule).HasMaxLength(20).HasColumnName("order_code_rule");
+            entity.Property(e => e.OrderCodePrefix).HasMaxLength(10).HasColumnName("order_code_prefix");
+            entity.Property(e => e.BookingCodePrefix).HasMaxLength(10).HasColumnName("booking_code_prefix");
+            entity.Property(e => e.ReturnCodePrefix).HasMaxLength(10).HasColumnName("return_code_prefix");
+            entity.Property(e => e.TransferCodePrefix).HasMaxLength(10).HasColumnName("transfer_code_prefix");
+
+            entity.Property(e => e.UpdatedAt).HasColumnType("timestamp with time zone").HasColumnName("updated_at");
+            entity.Property(e => e.UpdatedBy).HasColumnName("updated_by");
+
+            entity.HasOne(d => d.UpdatedByUser)
+                .WithMany()
+                .HasForeignKey(d => d.UpdatedBy)
+                .OnDelete(DeleteBehavior.SetNull)
+                .HasConstraintName("fk_mst_order_settings_updated_by");
         });
 
         OnModelCreatingPartial(modelBuilder);

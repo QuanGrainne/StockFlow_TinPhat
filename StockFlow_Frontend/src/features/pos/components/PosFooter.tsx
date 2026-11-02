@@ -17,7 +17,7 @@ export const PosFooter: React.FC = () => {
         {/* Máy in POS-K80 */}
         <div className="flex items-center gap-1.5 font-medium text-emerald-700">
           <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-          <span>Trực tuyến (Máy in POS-K80 Đã kết nối)</span>
+          <span>Trực tuyến (Máy in POS-K80 & LocalStorage Sẵn sàng)</span>
         </div>
 
         {/* Tổng đài hỗ trợ */}

@@ -1,7 +1,7 @@
 // src/features/pos/components/PosHeader.tsx
-// VÙNG A — Thanh điều hướng phía trên (Đã ẩn chọn bảng giá theo yêu cầu)
+// VÙNG A — Thanh điều hướng phía trên (Cho phép chọn Chi nhánh / Kho xuất bán hàng thực tế)
 
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Boxes,
@@ -11,11 +11,12 @@ import {
   Plus,
   X,
   ChevronDown,
-  Clock,
-  History,
   Printer,
+  Warehouse,
+  Check,
+  MapPin,
 } from 'lucide-react';
-import { PosOrderTab } from '../types';
+import { PosOrderTab, PosWarehouse } from '../types';
 
 interface PosHeaderProps {
   tabs: PosOrderTab[];
@@ -27,6 +28,9 @@ interface PosHeaderProps {
   onToggleAutoPrint: (val: boolean) => void;
   onOpenHistory: () => void;
   onOpenShiftClose: () => void;
+  warehouses: PosWarehouse[];
+  selectedWarehouseId: number;
+  onSelectWarehouse: (wh: PosWarehouse) => void;
 }
 
 export const PosHeader: React.FC<PosHeaderProps> = ({
@@ -39,12 +43,34 @@ export const PosHeader: React.FC<PosHeaderProps> = ({
   onToggleAutoPrint,
   onOpenHistory,
   onOpenShiftClose,
+  warehouses,
+  selectedWarehouseId,
+  onSelectWarehouse,
 }) => {
   const router = useRouter();
+  const [warehouseDropdownOpen, setWarehouseDropdownOpen] = useState(false);
+  const warehouseDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Đóng dropdown kho khi click ra ngoài
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        warehouseDropdownRef.current &&
+        !warehouseDropdownRef.current.contains(e.target as Node)
+      ) {
+        setWarehouseDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const currentWarehouse =
+    warehouses.find((w) => w.warehouseId === selectedWarehouseId) || warehouses[0];
 
   return (
     <header className="bg-white border-b border-slate-200 select-none sticky top-0 z-30 shadow-xs">
-      {/* ─── Hàng trên: Logo, Chi nhánh, POS status, Tabs đơn nhanh, Shortcuts, Profile, Về ERP ─── */}
+      {/* ─── Hàng trên: Logo, Chi nhánh & Kho, POS status, Tabs đơn nhanh, Shortcuts, Profile, Về ERP ─── */}
       <div className="h-12 px-3.5 flex items-center justify-between border-b border-slate-150 gap-2">
         {/* Nhóm trái */}
         <div className="flex items-center gap-3">
@@ -59,56 +85,88 @@ export const PosHeader: React.FC<PosHeaderProps> = ({
             </div>
           </div>
 
-          {/* Chi nhánh & Kho */}
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-[6px] bg-slate-50 border border-slate-200 text-xs font-semibold text-slate-700 cursor-pointer hover:bg-slate-100 transition">
-            <span>Chi nhánh chính - Hà Nội</span>
-            <ChevronDown size={13} className="text-slate-400" />
-          </div>
-
-          {/* Trạng thái POS */}
-          <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-[11px] font-semibold text-emerald-700">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-            <span>POS-01 Sẵn sàng</span>
-          </div>
-
-          {/* Phím tắt số đơn (Đơn 1, Đơn 2, Chốt ca, Lịch sử) */}
-          <div className="hidden lg:flex items-center gap-1 ml-1">
-            {tabs.slice(0, 3).map((tab, idx) => {
-              const isActive = tab.id === activeTabId;
-              return (
-                <button
-                  key={tab.id}
-                  type="button"
-                  onClick={() => onSelectTab(tab.id)}
-                  className={`h-7 px-2.5 rounded-[5px] text-xs font-bold transition flex items-center gap-1 cursor-pointer ${
-                    isActive
-                      ? 'bg-[#0F60B6] text-white shadow-xs'
-                      : 'bg-white border border-slate-250 text-slate-700 hover:bg-slate-50'
-                  }`}
-                >
-                  <span className="text-[11px] opacity-80">Đơn</span>
-                  <span>{idx + 1}</span>
-                </button>
-              );
-            })}
-
+          {/* Chi nhánh & Kho Selector */}
+          <div className="relative" ref={warehouseDropdownRef}>
             <button
               type="button"
-              onClick={onOpenShiftClose}
-              className="h-7 px-2 rounded-[5px] bg-white border border-slate-250 hover:bg-slate-50 text-slate-600 text-xs font-medium flex items-center gap-1 transition cursor-pointer"
+              onClick={() => setWarehouseDropdownOpen((prev) => !prev)}
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-[6px] bg-slate-50 border border-slate-200 text-xs font-semibold text-slate-700 cursor-pointer hover:bg-slate-100 hover:border-slate-300 transition"
+              title="Nhấn để chọn Chi nhánh / Kho xuất bán hàng"
             >
-              <Clock size={12} className="text-slate-400" />
-              <span>Chốt ca</span>
+              <Warehouse size={13} className="text-[#0F60B6]" />
+              <div className="flex items-center gap-1">
+                <span className="hidden sm:inline text-slate-600">
+                  {currentWarehouse?.branchName || 'Chi nhánh chính - Hà Nội'}
+                </span>
+                <span className="hidden sm:inline text-slate-400 font-normal">•</span>
+                <span className="text-[#0F60B6] font-bold">
+                  {currentWarehouse?.name || 'Kho Tổng Gia Lâm'}
+                </span>
+              </div>
+              <ChevronDown
+                size={13}
+                className={`text-slate-400 transition-transform duration-150 ${
+                  warehouseDropdownOpen ? 'rotate-180' : ''
+                }`}
+              />
             </button>
 
-            <button
-              type="button"
-              onClick={onOpenHistory}
-              className="h-7 px-2 rounded-[5px] bg-white border border-slate-250 hover:bg-slate-50 text-slate-600 text-xs font-medium flex items-center gap-1 transition cursor-pointer"
-            >
-              <History size={12} className="text-slate-400" />
-              <span>Lịch sử</span>
-            </button>
+            {/* Dropdown Menu Chi nhánh & Kho */}
+            {warehouseDropdownOpen && (
+              <div className="absolute left-0 top-full mt-1.5 w-76 bg-white rounded-[8px] border border-slate-200 shadow-xl z-50 py-1.5 divide-y divide-slate-100 animate-in fade-in zoom-in-95 duration-100">
+                <div className="px-3 py-1.5 bg-slate-50 text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center justify-between">
+                  <span>Chi nhánh & Kho xuất hàng</span>
+                  <span className="text-[10px] font-normal text-slate-400">({warehouses.length} kho)</span>
+                </div>
+                <div className="max-h-64 overflow-y-auto divide-y divide-slate-100">
+                  {warehouses.map((wh) => {
+                    const isSelected = wh.warehouseId === selectedWarehouseId;
+                    return (
+                      <button
+                        key={wh.warehouseId}
+                        type="button"
+                        onClick={() => {
+                          onSelectWarehouse(wh);
+                          setWarehouseDropdownOpen(false);
+                        }}
+                        className={`w-full px-3 py-2 text-left flex items-start justify-between gap-2 transition cursor-pointer hover:bg-blue-50/70 ${
+                          isSelected ? 'bg-blue-50/90' : 'bg-white'
+                        }`}
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-mono text-[10px] px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 font-bold border border-slate-200">
+                              {wh.code}
+                            </span>
+                            <span
+                              className={`text-xs truncate ${
+                                isSelected ? 'font-bold text-[#0F60B6]' : 'font-medium text-slate-800'
+                              }`}
+                            >
+                              {wh.name}
+                            </span>
+                          </div>
+                          <div className="text-[11px] text-slate-500 mt-0.5 font-medium truncate">
+                            {wh.branchName}
+                          </div>
+                          {wh.address && (
+                            <div className="text-[10px] text-slate-400 mt-0.5 truncate flex items-center gap-1">
+                              <MapPin size={10} className="shrink-0 text-slate-400" />
+                              <span className="truncate">{wh.address}</span>
+                            </div>
+                          )}
+                        </div>
+                        {isSelected && (
+                          <div className="w-5 h-5 rounded-full bg-blue-100 text-[#0F60B6] flex items-center justify-center shrink-0 mt-0.5">
+                            <Check size={12} className="stroke-[3]" />
+                          </div>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Phím tắt nhanh trên header */}
@@ -170,7 +228,7 @@ export const PosHeader: React.FC<PosHeaderProps> = ({
         </div>
       </div>
 
-      {/* ─── Hàng dưới: Tab Hóa đơn 1, Hóa đơn 2, Thêm đơn & In K80 (Đã ẩn chọn bảng giá) ─── */}
+      {/* ─── Hàng dưới: Tab Hóa đơn 1, Hóa đơn 2, Thêm đơn & In K80 ─── */}
       <div className="h-10 px-3.5 flex items-center justify-between bg-slate-50/80 gap-3">
         {/* Các tab hóa đơn đang mở */}
         <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1">

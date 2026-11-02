@@ -9,6 +9,7 @@ import CustomersClient from '@/app/(dashboard)/customers/CustomersClient';
 import PurchasesClient from '@/app/(dashboard)/purchases/PurchasesClient';
 import PriceBooksClient from '@/features/price-books/screens/PriceBooksClient';
 import TransfersClient from '@/app/(dashboard)/transfers/TransfersClient';
+import { OrderSettingsScreen } from '@/features/settings/screens/OrderSettingsScreen';
 import { permissionService } from '../services/permissionService';
 
 interface AppLayoutProps {
@@ -20,6 +21,7 @@ const SCREEN_MODULE_MAP: Record<string, string> = {
   'admin-staff-active': 'AUTH',
   'admin-roles': 'AUTH',
   'admin-matrix': 'AUTH',
+  'admin-order-settings': 'AUTH',
   'admin-warehouse-perms': 'AUTH',
   'admin-warehouse-facilities': 'AUTH',
   'admin-goods': 'GOODS',
@@ -44,6 +46,12 @@ const SCREEN_MODULE_MAP: Record<string, string> = {
   'production-logs': 'PROD',
   'goods-catalog': 'GOODS',
   'purchases': 'PURCHASE',
+  'admin-purchases': 'PURCHASE',
+  'manager-purchases': 'PURCHASE',
+  'warehouse-purchases': 'PURCHASE',
+  'suppliers': 'PARTNER',
+  'admin-suppliers': 'PARTNER',
+  'manager-suppliers': 'PARTNER',
   'transfers': 'TRANSFER',
   'admin-transfers': 'TRANSFER',
   'manager-transfers': 'TRANSFER',
@@ -51,6 +59,24 @@ const SCREEN_MODULE_MAP: Record<string, string> = {
   'sales-customers': 'SALES',
   'manager-customers': 'PARTNER',
   'admin-customers': 'PARTNER',
+};
+
+const SCREEN_FEATURE_MAP: Record<string, string> = {
+  'suppliers': 'feat-suppliers',
+  'admin-suppliers': 'feat-suppliers',
+  'manager-suppliers': 'feat-suppliers',
+  'purchases': 'feat-purchase',
+  'admin-purchases': 'feat-purchase',
+  'manager-purchases': 'feat-purchase',
+  'warehouse-purchases': 'feat-purchase',
+  'warehouse-inbound': 'feat-purchase',
+  'manager-landed-cost': 'feat-purchase',
+  'transfers': 'feat-transfers',
+  'admin-transfers': 'feat-transfers',
+  'manager-transfers': 'feat-transfers',
+  'customers': 'feat-partner',
+  'manager-partners': 'feat-partner',
+  'sales-credit-limits': 'feat-partner',
 };
 
 // Sales Screens
@@ -149,11 +175,21 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ initialScreen }) => {
 
   // Lắng nghe cập nhật quyền từ Ma trận phân quyền để tự động chuyển trang nếu màn hình hiện tại bị bỏ quyền
   React.useEffect(() => {
-    const handlePermissionsUpdated = async () => {
+    const checkScreenAccess = async () => {
       const roleCode = `ROLE_${currentRole}`;
       const allowed = await permissionService.getAllowedModuleKeys(roleCode);
+      const allowedFeats = await permissionService.getAllowedFeatures(roleCode);
       const reqMod = SCREEN_MODULE_MAP[activeScreen];
-      if (reqMod && !allowed.has(reqMod)) {
+      const reqFeat = SCREEN_FEATURE_MAP[activeScreen];
+
+      let isPermitted = true;
+      if (reqFeat && !allowedFeats.has(reqFeat)) {
+        isPermitted = false;
+      } else if (reqMod && !allowed.has(reqMod)) {
+        isPermitted = false;
+      }
+
+      if (!isPermitted) {
         const fallback = getDefaultScreenForRole(currentRole);
         setActiveScreen(fallback);
         if (typeof window !== 'undefined') {
@@ -161,8 +197,11 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ initialScreen }) => {
         }
       }
     };
-    window.addEventListener('stockflow_permissions_updated', handlePermissionsUpdated);
-    return () => window.removeEventListener('stockflow_permissions_updated', handlePermissionsUpdated);
+
+    checkScreenAccess();
+
+    window.addEventListener('stockflow_permissions_updated', checkScreenAccess);
+    return () => window.removeEventListener('stockflow_permissions_updated', checkScreenAccess);
   }, [currentRole, activeScreen]);
 
   const handleNavigate = (newScreen: string) => {
@@ -309,6 +348,8 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ initialScreen }) => {
       case 'admin-warehouse-perms':
       case 'admin-warehouse-facilities':
         return <WarehousePermissionsScreen />;
+      case 'admin-order-settings':
+        return <OrderSettingsScreen onNavigate={handleNavigate} />;
       case 'admin-users':
         return <StaffAccountsScreen initialFilter="ALL" />;
 
@@ -385,6 +426,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ initialScreen }) => {
       {activeScreen === 'transfers' || activeScreen.includes('transfers') ||
        activeScreen === 'warehouse-transfer' ||
        activeScreen === 'purchases' || activeScreen.includes('purchases') ||
+       activeScreen === 'suppliers' || activeScreen.includes('suppliers') ||
        activeScreen === 'goods-catalog' || activeScreen === 'products' ||
        activeScreen.includes('goods') || activeScreen.includes('catalog') ||
        activeScreen === 'price-books' || activeScreen === 'admin-price-books' ||
@@ -392,10 +434,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ initialScreen }) => {
         <main className="flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden bg-[#F8FAFC]">
           {renderActiveScreen()}
         </main>
-      ) : activeScreen === 'suppliers' || activeScreen.includes('suppliers') ? (
-        <main className="flex-1 min-w-0 flex flex-col overflow-y-auto bg-[#F8FAFC] p-4 lg:p-6">
-          {renderActiveScreen()}
-        </main>
+      
       ) : (
         <main className="flex-1 min-w-0 overflow-y-auto p-6 lg:p-8 bg-[#F8FAFC]">
           <div className="max-w-7xl mx-auto">{renderActiveScreen()}</div>

@@ -35,14 +35,14 @@ public class GetSupplierByIdQueryHandler : IRequestHandler<GetSupplierByIdQuery,
         var receipts = await _context.TrxGoodsReceipts
             .Include(r => r.Warehouse)
             .Include(r => r.DtlGoodsReceiptItems)
-            .Where(r => r.PartnerId == request.PartnerId)
+            .Where(r => r.PartnerId == request.PartnerId && r.Status != "CANCELLED")
             .OrderByDescending(r => r.ReceivedDate ?? DateTime.MinValue)
             .AsNoTracking()
             .ToListAsync(cancellationToken);
 
         int totalCount = receipts.Count;
         decimal totalAmount = receipts.Sum(r =>
-            r.DtlGoodsReceiptItems.Sum(item => (item.ReceivedQty ?? 0) * (item.UnitLandedCost ?? 0)));
+            r.DtlGoodsReceiptItems.Sum(item => (item.AcceptedQty ?? item.ReceivedQty ?? item.OrderedQty ?? 0) * (item.UnitLandedCost ?? 0)));
 
         var recentReceiptDtos = receipts.Take(10).Select(r =>
         {
