@@ -486,6 +486,21 @@ export const permissionService = {
             localStorage.setItem('stockflow_feature_matrix', JSON.stringify(matrix));
             localStorage.setItem('stockflow_customers_feat_initialized_v1', 'true');
           }
+
+          // One-time initialization: đảm bảo tính năng nhà cung cấp được bật mặc định cho ADMIN, MANAGER, WAREHOUSE
+          if (!localStorage.getItem('stockflow_suppliers_feat_initialized_v2')) {
+            const defaultRolesWithSuppliers = ['ROLE_ADMIN', 'ROLE_MANAGER', 'ROLE_WAREHOUSE'];
+            for (const r of defaultRolesWithSuppliers) {
+              if (Array.isArray(matrix[r]) && !matrix[r].includes('feat-suppliers')) {
+                matrix[r].push('feat-suppliers');
+              }
+            }
+            if (Array.isArray(matrix['ROLE_ADMIN']) && !matrix['ROLE_ADMIN'].includes('feat-purchase')) {
+              matrix['ROLE_ADMIN'].push('feat-purchase');
+            }
+            localStorage.setItem('stockflow_feature_matrix', JSON.stringify(matrix));
+            localStorage.setItem('stockflow_suppliers_feat_initialized_v2', 'true');
+          }
         } catch {}
       }
     }
@@ -610,9 +625,16 @@ export const NAVBAR_FEATURES: NavFeatureConfig[] = [
   {
     id: 'feat-purchase',
     name: 'Quản lý mua hàng & Nhập kho',
-    desc: 'Tiếp nhận đơn mua hàng PO và chi phí Landed Cost',
+    desc: 'Lập phiếu nhập hàng, quản lý đơn mua PO, thanh toán và chi phí mua hàng',
     moduleKey: 'PURCHASE',
-    tabIds: ['warehouse-inbound', 'manager-landed-cost'],
+    tabIds: ['purchases', 'admin-purchases', 'manager-purchases', 'warehouse-purchases', 'warehouse-inbound', 'manager-landed-cost'],
+  },
+  {
+    id: 'feat-suppliers',
+    name: 'Quản lý Nhà cung cấp',
+    desc: 'Hồ sơ nhà cung cấp, công nợ phải trả và lịch sử nhập hàng',
+    moduleKey: 'PARTNER',
+    tabIds: ['suppliers', 'admin-suppliers', 'manager-suppliers'],
   },
   {
     id: 'feat-stock',
@@ -638,9 +660,9 @@ export const NAVBAR_FEATURES: NavFeatureConfig[] = [
   {
     id: 'feat-partner',
     name: 'Đối tác & Hạn mức công nợ',
-    desc: 'Quản lý khách hàng B2B, NCC và xét duyệt ngoại lệ công nợ',
+    desc: 'Quản lý khách hàng B2B, hồ sơ khách hàng và xét duyệt ngoại lệ công nợ',
     moduleKey: 'PARTNER',
-    tabIds: ['manager-partners', 'sales-credit-limits'],
+    tabIds: ['customers', 'manager-partners', 'sales-credit-limits'],
   },
   {
     id: 'feat-fin',
@@ -660,6 +682,7 @@ export const DEFAULT_ROLE_FEATURE_PERMS: Record<string, string[]> = {
     'feat-goods',
     'feat-sales',
     'feat-purchase',
+    'feat-suppliers',
     'feat-stock',
     'feat-prod',
     'feat-bom',
@@ -671,6 +694,7 @@ export const DEFAULT_ROLE_FEATURE_PERMS: Record<string, string[]> = {
     'feat-customers',
     'feat-sales',
     'feat-purchase',
+    'feat-suppliers',
     'feat-stock',
     'feat-prod',
     'feat-bom',
@@ -686,6 +710,7 @@ export const DEFAULT_ROLE_FEATURE_PERMS: Record<string, string[]> = {
   ROLE_WAREHOUSE: [
     'feat-goods',
     'feat-purchase',
+    'feat-suppliers',
     'feat-stock',
     'feat-bom',
   ],

@@ -22,14 +22,14 @@ public interface IStockFlowDbContext
     DbSet<TrxFinancialTransaction> TrxFinancialTransactions { get; }
     DbSet<MstPriceBook> MstPriceBooks { get; }
     DbSet<DtlPriceBookItem> DtlPriceBookItems { get; }
+
+    DbSet<MstOrderSetting> MstOrderSettings { get; }
+    DbSet<TrxOrder> TrxOrders { get; }
     DbSet<DtlOrderItem> DtlOrderItems { get; }
     DbSet<TrxStockTransfer> TrxStockTransfers { get; }
     DbSet<DtlStockTransferItem> DtlStockTransferItems { get; }
     DbSet<TrxStockIssue> TrxStockIssues { get; }
     DbSet<DtlStockIssueItem> DtlStockIssueItems { get; }
-
-    DbSet<TrxOrder> TrxOrders { get; }
-    DbSet<MstOrderSetting> MstOrderSettings { get; }
 
     Task<long> GetNextSequenceValueAsync(string sequenceName, CancellationToken cancellationToken = default);
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);

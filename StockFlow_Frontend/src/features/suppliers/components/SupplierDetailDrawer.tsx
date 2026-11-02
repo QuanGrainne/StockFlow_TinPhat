@@ -160,7 +160,7 @@ export default function SupplierDetailDrawer({
             <div className="bg-white p-3 rounded-lg border border-slate-200 shadow-xs">
               <div className="text-[11px] font-medium text-slate-500 mb-1">Hạn mức nợ</div>
               <div className="text-sm font-bold font-mono text-slate-800">
-                {currencyFormatter.format(detail.creditLimit)} đ
+                {currencyFormatter.format(detail.creditLimit || 0)} đ
               </div>
             </div>
 

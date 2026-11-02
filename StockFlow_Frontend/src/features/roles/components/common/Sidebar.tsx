@@ -263,6 +263,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
       label: 'Nhà cung cấp',
       icon: Building2,
       hasDropdown: false,
+      requiredModule: 'PARTNER',
+      requiredFeature: 'feat-suppliers',
     },
     {
       id: 'sales-orders',
@@ -321,6 +323,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       icon: ArrowDownToLine,
       hasDropdown: true,
       requiredModule: 'PURCHASE',
+      requiredFeature: 'feat-purchase',
       dropdownItems: [
         {
           id: 'purchases',
@@ -328,6 +331,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           desc: 'Quản lý phiếu nhập kho & thanh toán',
           icon: ArrowDownToLine,
           requiredModule: 'PURCHASE',
+          requiredFeature: 'feat-purchase',
         },
         {
           id: 'warehouse-inbound',
@@ -335,13 +339,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
           desc: 'Tiếp nhận đơn mua PO',
           icon: ArrowDownToLine,
           requiredModule: 'PURCHASE',
+          requiredFeature: 'feat-purchase',
         },
         {
           id: 'suppliers',
           title: 'Nhà cung cấp',
           desc: 'Quản lý thông tin & công nợ NCC',
           icon: Building2,
-          requiredModule: 'PURCHASE',
+          requiredModule: 'PARTNER',
+          requiredFeature: 'feat-suppliers',
         },
         {
           id: 'manager-landed-cost',
@@ -349,6 +355,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           desc: 'Phân bổ chi phí cấu thành giá vốn',
           icon: ShoppingBag,
           requiredModule: 'PURCHASE',
+          requiredFeature: 'feat-purchase',
         },
       ],
     },
@@ -461,6 +468,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           desc: 'Hồ sơ nhà cung cấp & công nợ phải trả',
           icon: Building2,
           requiredModule: 'PARTNER',
+          requiredFeature: 'feat-suppliers',
         },
         {
           id: 'sales-credit-limits',
@@ -602,6 +610,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
           title: 'Nhà cung cấp',
           desc: 'Quản lý thông tin & công nợ NCC',
           icon: Building2,
+          requiredModule: 'PARTNER',
+          requiredFeature: 'feat-suppliers',
         },
         {
           id: 'manager-cashflow',
@@ -618,6 +628,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       icon: ArrowDownToLine,
       hasDropdown: true,
       requiredModule: 'PURCHASE',
+      requiredFeature: 'feat-purchase',
       dropdownItems: [
         {
           id: 'purchases',
@@ -625,6 +636,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           desc: 'Quản lý phiếu nhập kho & thanh toán',
           icon: ArrowDownToLine,
           requiredModule: 'PURCHASE',
+          requiredFeature: 'feat-purchase',
         },
         {
           id: 'manager-landed-cost',
@@ -632,12 +644,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
           desc: 'Phân bổ chi phí cấu thành giá vốn MAC',
           icon: ShoppingBag,
           requiredModule: 'PURCHASE',
+          requiredFeature: 'feat-purchase',
         },
         {
           id: 'suppliers',
           title: 'Nhà cung cấp',
           desc: 'Danh mục hồ sơ nhà cung cấp',
           icon: Building2,
+          requiredModule: 'PARTNER',
+          requiredFeature: 'feat-suppliers',
         },
       ],
     },
@@ -722,6 +737,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
       label: 'Nhà cung cấp',
       icon: Building2,
       hasDropdown: false,
+      requiredModule: 'PARTNER',
+      requiredFeature: 'feat-suppliers',
     },
     {
       id: 'admin-order-settings',
@@ -783,6 +800,26 @@ export const Sidebar: React.FC<SidebarProps> = ({
       label: 'Nhà cung cấp',
       icon: Building2,
       hasDropdown: false,
+      requiredModule: 'PARTNER',
+      requiredFeature: 'feat-suppliers',
+    },
+    {
+      id: 'warehouse-inbound',
+      label: 'Mua hàng',
+      icon: ArrowDownToLine,
+      hasDropdown: true,
+      requiredModule: 'PURCHASE',
+      requiredFeature: 'feat-purchase',
+      dropdownItems: [
+        {
+          id: 'purchases',
+          title: 'Nhập hàng',
+          desc: 'Quản lý phiếu nhập kho & thanh toán',
+          icon: ArrowDownToLine,
+          requiredModule: 'PURCHASE',
+          requiredFeature: 'feat-purchase',
+        },
+      ],
     },
     {
       id: 'sales-orders',
@@ -873,6 +910,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
       label: 'Nhà cung cấp',
       icon: Building2,
       hasDropdown: false,
+      requiredModule: 'PARTNER',
+      requiredFeature: 'feat-suppliers',
     },
     {
       id: 'warehouse-inbound',
@@ -880,6 +919,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       icon: ArrowDownToLine,
       hasDropdown: true,
       requiredModule: 'PURCHASE',
+      requiredFeature: 'feat-purchase',
       dropdownItems: [
         {
           id: 'purchases',
@@ -887,6 +927,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           desc: 'Quản lý phiếu nhập kho & thanh toán',
           icon: ArrowDownToLine,
           requiredModule: 'PURCHASE',
+          requiredFeature: 'feat-purchase',
         },
         {
           id: 'warehouse-inbound',
@@ -894,13 +935,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
           desc: 'Đối chiếu chứng từ giấy PO',
           icon: ArrowDownToLine,
           requiredModule: 'PURCHASE',
+          requiredFeature: 'feat-purchase',
         },
         {
           id: 'suppliers',
           title: 'Nhà cung cấp',
           desc: 'Quản lý thông tin & công nợ NCC',
           icon: Building2,
-          requiredModule: 'PURCHASE',
+          requiredModule: 'PARTNER',
+          requiredFeature: 'feat-suppliers',
         },
       ],
     },
@@ -973,6 +1016,26 @@ export const Sidebar: React.FC<SidebarProps> = ({
       label: 'Nhà cung cấp',
       icon: Building2,
       hasDropdown: false,
+      requiredModule: 'PARTNER',
+      requiredFeature: 'feat-suppliers',
+    },
+    {
+      id: 'warehouse-inbound',
+      label: 'Mua hàng',
+      icon: ArrowDownToLine,
+      hasDropdown: true,
+      requiredModule: 'PURCHASE',
+      requiredFeature: 'feat-purchase',
+      dropdownItems: [
+        {
+          id: 'purchases',
+          title: 'Nhập hàng',
+          desc: 'Quản lý phiếu nhập kho & thanh toán',
+          icon: ArrowDownToLine,
+          requiredModule: 'PURCHASE',
+          requiredFeature: 'feat-purchase',
+        },
+      ],
     },
     {
       id: 'production-import',
