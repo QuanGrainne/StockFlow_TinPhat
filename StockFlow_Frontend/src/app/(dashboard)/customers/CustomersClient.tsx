@@ -210,9 +210,9 @@ export default function CustomersClient({ onNavigate }: CustomersClientProps = {
     });
   };
 
-  // Gửi SMS / Zalo ZNS
+  // Gửi tin nhắn SMS
   const handleBatchMessage = () => {
-    message.info(`Chuẩn bị gửi thông báo Zalo ZNS/SMS đến ${selectedRowKeys.length} khách hàng.`);
+    message.info(`Chuẩn bị gửi thông báo SMS đến ${selectedRowKeys.length} khách hàng.`);
   };
 
   // Nhập Excel
@@ -385,7 +385,7 @@ export default function CustomersClient({ onNavigate }: CustomersClientProps = {
               className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-medium shadow-2xs cursor-pointer"
             >
               <MessageSquare size={13} className="text-[#1E56A0]" />
-              Gửi SMS/Zalo ZNS
+              Gửi tin nhắn SMS
             </button>
 
             <button
