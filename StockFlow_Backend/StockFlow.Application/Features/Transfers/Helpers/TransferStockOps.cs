@@ -52,14 +52,15 @@ public static class TransferStockOps
     /// </summary>
     public static async Task<decimal> OutboundAsync(
         IStockFlowDbContext context, int warehouseId, MstProduct product, decimal qty,
-        string transactionType, int transferId, int userId, CancellationToken ct)
+        string transactionType, int transferId, int userId, CancellationToken ct,
+        string referenceType = ReferenceType)
     {
         var rows = await BalancesAsync(context, warehouseId, product.ProductId, ct);
         var cost = CostOf(rows, product);
         if (qty <= 0) return cost;
 
         var products = new Dictionary<int, MstProduct> { [product.ProductId] = product };
-        var reference = new PurchaseStockOps.StockRef(transactionType, ReferenceType, transferId, userId);
+        var reference = new PurchaseStockOps.StockRef(transactionType, referenceType, transferId, userId);
         var remaining = qty;
         foreach (var b in rows.Where(b => (b.Quantity ?? 0) > 0).OrderByDescending(b => b.Quantity).ToList())
         {
@@ -82,13 +83,14 @@ public static class TransferStockOps
     /// <summary>Cộng tồn vào dòng mặc định của kho theo giá vốn bình quân gia quyền.</summary>
     public static Task InboundAsync(
         IStockFlowDbContext context, int warehouseId, MstProduct product, decimal qty, decimal unitCost,
-        string transactionType, int transferId, int userId, CancellationToken ct)
+        string transactionType, int transferId, int userId, CancellationToken ct,
+        string referenceType = ReferenceType)
     {
         if (qty <= 0) return Task.CompletedTask;
         var products = new Dictionary<int, MstProduct> { [product.ProductId] = product };
         return PurchaseStockOps.InboundAsync(context,
             new PurchaseStockOps.StockKey(warehouseId, product.ProductId, null, null),
             qty, unitCost, products,
-            new PurchaseStockOps.StockRef(transactionType, ReferenceType, transferId, userId), ct);
+            new PurchaseStockOps.StockRef(transactionType, referenceType, transferId, userId), ct);
     }
 }

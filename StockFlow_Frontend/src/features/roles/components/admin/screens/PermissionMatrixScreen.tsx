@@ -20,6 +20,7 @@ import {
   Sliders,
   BarChart3,
   Repeat,
+  ClipboardCheck,
 } from 'lucide-react';
 import { UserRole, RoleDefinition } from '../../../types';
 import { adminService, NAVBAR_FEATURES } from '../../../services/adminService';
@@ -46,6 +47,7 @@ const FEATURE_ICONS: Record<string, React.FC<{ size?: number; className?: string
   'feat-goods': Package,
   'feat-customers': Users,
   'feat-transfers': Repeat,
+  'feat-stocktake': ClipboardCheck,
   'feat-sales': ShoppingBag,
   'feat-purchase': ArrowDownToLine,
   'feat-suppliers': Building2,

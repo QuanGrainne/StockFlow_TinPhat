@@ -459,6 +459,9 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
             entity.Property(e => e.SystemQty)
                 .HasPrecision(18, 2)
                 .HasColumnName("system_qty");
+            entity.Property(e => e.UnitCost)
+                .HasPrecision(18, 4)
+                .HasColumnName("unit_cost");
 
             entity.HasOne(d => d.ApprovedByNavigation).WithMany(p => p.DtlStocktakeItemApprovedByNavigations)
                 .HasForeignKey(d => d.ApprovedBy)
@@ -1688,6 +1691,10 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
             entity.Property(e => e.StocktakeDate)
                 .HasColumnType("timestamp without time zone")
                 .HasColumnName("stocktake_date");
+            entity.Property(e => e.BalancedDate)
+                .HasColumnType("timestamp without time zone")
+                .HasColumnName("balanced_date");
+            entity.Property(e => e.BalancedBy).HasColumnName("balanced_by");
             entity.Property(e => e.WarehouseId).HasColumnName("warehouse_id");
 
             entity.HasOne(d => d.ConductedByNavigation).WithMany(p => p.TrxStocktakes)

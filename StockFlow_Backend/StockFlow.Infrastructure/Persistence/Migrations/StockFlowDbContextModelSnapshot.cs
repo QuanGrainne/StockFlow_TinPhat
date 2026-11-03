@@ -635,6 +635,11 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                         .HasColumnType("numeric(18,2)")
                         .HasColumnName("system_qty");
 
+                    b.Property<decimal?>("UnitCost")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("unit_cost");
+
                     b.HasKey("StocktakeItemId")
                         .HasName("dtl_stocktake_items_pkey");
 
@@ -2633,6 +2638,14 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                         .HasColumnName("stocktake_id");
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("StocktakeId"));
+
+                    b.Property<int?>("BalancedBy")
+                        .HasColumnType("integer")
+                        .HasColumnName("balanced_by");
+
+                    b.Property<DateTime?>("BalancedDate")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("balanced_date");
 
                     b.Property<int>("ConductedBy")
                         .HasColumnType("integer")
