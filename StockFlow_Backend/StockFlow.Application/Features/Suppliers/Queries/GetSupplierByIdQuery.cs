@@ -181,7 +181,8 @@ public class GetSupplierByIdQueryHandler : IRequestHandler<GetSupplierByIdQuery,
             .Select(r =>
             {
                 var total = SupplierDebtCalculator.ReceiptTotal(r);
-                var paid = paidByReceipt.GetValueOrDefault(r.GrId);
+                // "Đã trả trước" gồm tiền đã thanh toán + phần trả hàng nhập đã trừ vào công nợ của phiếu
+                var paid = paidByReceipt.GetValueOrDefault(r.GrId) + returnOffsets.OffsetByReceipt.GetValueOrDefault(r.GrId);
                 return new SupplierOpenReceiptDto(
                     ReceiptId: r.GrId,
                     ReceiptNumber: r.GrCode ?? $"PN{r.GrId:D6}",
