@@ -74,7 +74,7 @@ export interface PosWarehouse {
   status: string;
 }
 
-export type PaymentMethod = 'CASH' | 'VIETQR' | 'POS_CARD' | 'DEBT';
+export type PaymentMethod = 'CASH' | 'VIETQR' | 'POS_CARD' | 'DEBT' | 'WALLET';
 
 export interface PosOrderTab {
   id: string; // e.g. 'order-1', 'order-2'
@@ -90,6 +90,7 @@ export interface PosOrderTab {
   notes: string;
   paymentMethod: PaymentMethod;
   prepaidAmount: number; // Khách thanh toán trước
+  excessAction?: 'RETURN_CASH' | 'RECORD_DEBT'; // Xử lý tiền thừa: Trả khách hay Ghi công nợ
   discountType?: 'PERCENT' | 'AMOUNT'; // Loại chiết khấu hóa đơn: % hoặc VNĐ
   discountValue?: number; // Giá trị chiết khấu hóa đơn (% hoặc VNĐ)
   discountAmount: number; // Số tiền giảm giá hóa đơn quy đổi (VNĐ)

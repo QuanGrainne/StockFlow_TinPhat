@@ -17,7 +17,7 @@ public record CreatePosOrderCommand(CreatePosOrderRequest Request) : IRequest<Re
 
 public class CreatePosOrderCommandValidator : AbstractValidator<CreatePosOrderCommand>
 {
-    private static readonly string[] AllowedPaymentMethods = { "CASH", "VIETQR", "POS_CARD", "DEBT" };
+    private static readonly string[] AllowedPaymentMethods = { "CASH", "VIETQR", "POS_CARD", "DEBT", "WALLET" };
 
     public CreatePosOrderCommandValidator()
     {
@@ -29,7 +29,7 @@ public class CreatePosOrderCommandValidator : AbstractValidator<CreatePosOrderCo
 
         RuleFor(x => x.Request.PaymentMethod)
             .Must(m => AllowedPaymentMethods.Contains(m?.ToUpper()))
-            .WithMessage("Phương thức thanh toán không hợp lệ (PAY-001). Chỉ chấp nhận: Tiền mặt, VietQR, Quẹt thẻ POS hoặc Ghi công nợ.");
+            .WithMessage("Phương thức thanh toán không hợp lệ (PAY-001). Chỉ chấp nhận: Tiền mặt, VietQR, Quẹt thẻ POS, Ví hoặc Ghi công nợ.");
 
         RuleFor(x => x.Request.Items)
             .NotEmpty().WithMessage("Đơn hàng phải có ít nhất 1 sản phẩm (AMT-001).");
@@ -346,13 +346,36 @@ public class CreatePosOrderCommandHandler : IRequestHandler<CreatePosOrderComman
         }
 
         // 7. Tính toán thanh toán, tiền thừa và công nợ (PAY-001 -> PAY-020, CUS-006 -> CUS-010)
-        decimal actualReceived = Math.Min(req.PaidAmount, finalTotal);
-        decimal changeAmount = Math.Max(0, req.PaidAmount - finalTotal);
-        decimal outstanding = Math.Max(0, finalTotal - actualReceived);
-
-        // Khách lẻ (Mã KH00000 hoặc tên chứa "Khách lẻ") tuyệt đối không được ghi nợ
         bool isWalkIn = customer.PartnerCode == "KH00000"
                      || (customer.PartnerName != null && customer.PartnerName.Contains("Khách lẻ"));
+
+        bool isRecordDebtExcess = !isWalkIn && string.Equals(req.ExcessAction, "RECORD_DEBT", StringComparison.OrdinalIgnoreCase);
+        decimal rawChangeAmount = Math.Max(0, req.PaidAmount - finalTotal);
+        decimal actualReceived;
+        decimal changeAmount;
+        decimal outstanding;
+
+        if (req.PaidAmount >= finalTotal)
+        {
+            if (isRecordDebtExcess && rawChangeAmount > 0)
+            {
+                actualReceived = req.PaidAmount; // Thu ngân thực nhận toàn bộ tiền khách đưa để trừ công nợ
+                changeAmount = 0; // Không thối lại tiền mặt
+                outstanding = 0;
+            }
+            else
+            {
+                actualReceived = finalTotal;
+                changeAmount = rawChangeAmount; // Thối tiền thừa cho khách tại quầy
+                outstanding = 0;
+            }
+        }
+        else
+        {
+            actualReceived = req.PaidAmount;
+            changeAmount = 0;
+            outstanding = finalTotal - actualReceived;
+        }
 
         if (isWalkIn && outstanding > 0)
         {
@@ -412,126 +435,198 @@ public class CreatePosOrderCommandHandler : IRequestHandler<CreatePosOrderComman
         string clientReqTag = !string.IsNullOrWhiteSpace(req.ClientRequestId) ? $" [REQ:{req.ClientRequestId}]" : "";
         string finalNotes = $"{req.Notes ?? ""}{clientReqTag}".Trim();
 
-        var order = new TrxOrder
-        {
-            OrderCode = orderCode,
-            PartnerId = req.PartnerId,
-            Status = isCompleted ? "COMPLETED" : (isPendingBooking ? "PENDING" : "DRAFT"),
-            SubTotal = serverSubTotal,
-            DiscountType = orderDiscountType,
-            DiscountValue = orderDiscountValue,
-            DiscountAmount = orderDiscountAmount,
-            TotalAmount = finalTotal,
-            PaidAmount = actualReceived,
-            OutstandingAmount = outstanding,
-            PaymentStatus = paymentStatus,
-            CreatedBy = currentUserId,
-            OrderDate = finalOrderDate,
-            Notes = string.IsNullOrWhiteSpace(finalNotes) ? null : finalNotes
-        };
+var dbContext = _context as DbContext;
+        using var transaction = dbContext != null ? await dbContext.Database.BeginTransactionAsync(cancellationToken) : null;
 
-        _context.TrxOrders.Add(order);
-        await _context.SaveChangesAsync(cancellationToken);
-
-        // 9. Thêm chi tiết đơn hàng DtlOrderItems kèm chiết khấu cấp dòng
-        foreach (var c in calculatedItems)
+        try
         {
-            var item = c.RequestItem;
-            var prod = c.Product;
-            var orderItem = new DtlOrderItem
+            var order = new TrxOrder
             {
-                OrderId = order.OrderId,
-                ProductId = item.ProductId,
-                Quantity = item.Quantity,
-                UnitId = item.UnitId > 0 ? item.UnitId : prod.BaseUnitId,
-                OriginalPrice = c.OriginalPrice,
-                DiscountType = c.DiscountType,
-                DiscountValue = c.DiscountValue,
-                DiscountAmount = c.DiscountAmount,
-                UnitPrice = c.UnitPrice,
-                LineTotal = c.LineTotal
+                OrderCode = orderCode,
+                PartnerId = req.PartnerId,
+                Status = isCompleted ? "COMPLETED" : (isPendingBooking ? "PENDING" : "DRAFT"),
+                SubTotal = serverSubTotal,
+                DiscountType = orderDiscountType,
+                DiscountValue = orderDiscountValue,
+                DiscountAmount = orderDiscountAmount,
+                TotalAmount = finalTotal,
+                PaidAmount = actualReceived,
+                OutstandingAmount = outstanding,
+                PaymentStatus = paymentStatus,
+                CreatedBy = currentUserId,
+                OrderDate = finalOrderDate,
+                Notes = string.IsNullOrWhiteSpace(finalNotes) ? null : finalNotes
             };
-            _context.DtlOrderItems.Add(orderItem);
 
-            // 10. Trừ tồn kho và ghi nhật ký xuất kho
+            _context.TrxOrders.Add(order);
+            await _context.SaveChangesAsync(cancellationToken);
+
+            // 9. Thêm chi tiết đơn hàng DtlOrderItems kèm chiết khấu cấp dòng
+            var addedOrderItems = new List<(DtlOrderItem OrderItem, PosOrderItemRequest RequestItem, MstProduct Product)>();
+            foreach (var c in calculatedItems)
+            {
+                var item = c.RequestItem;
+                var prod = c.Product;
+                var orderItem = new DtlOrderItem
+                {
+                    OrderId = order.OrderId,
+                    ProductId = item.ProductId,
+                    Quantity = item.Quantity,
+                    UnitId = item.UnitId > 0 ? item.UnitId : prod.BaseUnitId,
+                    OriginalPrice = c.OriginalPrice,
+                    DiscountType = c.DiscountType,
+                    DiscountValue = c.DiscountValue,
+                    DiscountAmount = c.DiscountAmount,
+                    UnitPrice = c.UnitPrice,
+                    LineTotal = c.LineTotal
+                };
+                _context.DtlOrderItems.Add(orderItem);
+                addedOrderItems.Add((orderItem, item, prod));
+            }
+
+            await _context.SaveChangesAsync(cancellationToken);
+
+            // 10. Tạo Phiếu xuất kho chính thức (TrxStockIssue) và chi tiết xuất kho (DtlStockIssueItem)
+            TrxStockIssue? stockIssue = null;
             if (req.IssueStockNow && isCompleted)
             {
-                if (balanceMap.TryGetValue(item.ProductId, out var balance))
+                string stockIssueCode = await _codeGenerator.GenerateCodeAsync("STOCK_ISSUE", settings, cancellationToken);
+                stockIssue = new TrxStockIssue
                 {
-                    balance.Quantity = (balance.Quantity ?? 0) - item.Quantity;
-                    balance.LastUpdated = finalOrderDate;
-                }
-                else
+                    IssueCode = stockIssueCode,
+                    IssueType = "SALES",
+                    SalesOrderId = order.OrderId,
+                    WarehouseId = req.WarehouseId,
+                    RequestedBy = 1,
+                    ProcessedBy = 1,
+                    RequestedDate = finalOrderDate,
+                    ProcessedDate = finalOrderDate,
+                    Status = "COMPLETED"
+                };
+                _context.TrxStockIssues.Add(stockIssue);
+                await _context.SaveChangesAsync(cancellationToken);
+
+                foreach (var (orderItem, item, prod) in addedOrderItems)
                 {
-                    var newBalance = new TrxInventoryBalance
+                    var stockIssueItem = new DtlStockIssueItem
+                    {
+                        StockIssueId = stockIssue.StockIssueId,
+                        OrderItemId = orderItem.OrderItemId,
+                        RequestedQty = item.Quantity,
+                        ActualIssuedQty = item.Quantity
+                    };
+                    _context.DtlStockIssueItems.Add(stockIssueItem);
+
+                    // Trừ tồn kho tại kho xuất
+                    if (balanceMap.TryGetValue(item.ProductId, out var balance))
+                    {
+                        balance.Quantity = (balance.Quantity ?? 0) - item.Quantity;
+                        balance.LastUpdated = finalOrderDate;
+                    }
+                    else
+                    {
+                        var newBalance = new TrxInventoryBalance
+                        {
+                            WarehouseId = req.WarehouseId,
+                            ProductId = item.ProductId,
+                            Quantity = -item.Quantity,
+                            LastUpdated = finalOrderDate
+                        };
+                        _context.TrxInventoryBalances.Add(newBalance);
+                        balanceMap[item.ProductId] = newBalance;
+                    }
+
+                    // Ghi lịch sử biến động thẻ kho trỏ tới phiếu xuất kho
+                    _context.TrxInventoryTransactions.Add(new TrxInventoryTransaction
                     {
                         WarehouseId = req.WarehouseId,
                         ProductId = item.ProductId,
+                        TransactionType = "ISSUE_SALE",
                         Quantity = -item.Quantity,
-                        LastUpdated = finalOrderDate
-                    };
-                    _context.TrxInventoryBalances.Add(newBalance);
-                    balanceMap[item.ProductId] = newBalance;
+                        ReferenceType = "STOCK_ISSUE",
+                        ReferenceId = stockIssue.StockIssueId,
+                        TransactionDate = finalOrderDate,
+                        CreatedBy = 1
+                    });
                 }
+            }
 
-                _context.TrxInventoryTransactions.Add(new TrxInventoryTransaction
+            // 11. Cập nhật dư nợ khách hàng
+            if (outstanding > 0 && isCompleted)
+            {
+                // Khách trả thiếu -> Ghi nợ phát sinh
+                customer.CurrentDebt = (customer.CurrentDebt ?? 0) + outstanding;
+            }
+            else if (isRecordDebtExcess && rawChangeAmount > 0 && isCompleted)
+            {
+                // Khách trả thừa và chọn "Tính vào công nợ" -> Ghi có giảm nợ cũ hoặc cọc đơn sau
+                customer.CurrentDebt = (customer.CurrentDebt ?? 0) - rawChangeAmount;
+            }
+
+            // 12. Ghi nhận giao dịch tài chính (Phiếu thu)
+            if (actualReceived > 0 && isCompleted)
+            {
+                string desc = isRecordDebtExcess && rawChangeAmount > 0
+                    ? $"Thu tiền bán hàng hóa đơn POS {order.OrderCode} ({req.PaymentMethod}) - Cấn trừ {rawChangeAmount:N0} đ vào công nợ"
+                    : $"Thu tiền bán hàng hóa đơn POS {order.OrderCode} ({req.PaymentMethod})";
+
+                _context.TrxFinancialTransactions.Add(new TrxFinancialTransaction
                 {
-                    WarehouseId = req.WarehouseId,
-                    ProductId = item.ProductId,
-                    TransactionType = "ISSUE_SALE",
-                    Quantity = -item.Quantity,
+                    PartnerId = customer.PartnerId,
+                    TxType = "RECEIPT",
+                    Amount = actualReceived,
+                    PaymentMethod = req.PaymentMethod,
                     ReferenceType = "SALES_ORDER",
                     ReferenceId = order.OrderId,
                     TransactionDate = finalOrderDate,
-                    CreatedBy = currentUserId
+CreatedBy = currentUserId,
+                    Status = "COMPLETED",
+                    Description = desc
                 });
             }
-        }
 
-        // 11. Cập nhật dư nợ khách hàng
-        if (outstanding > 0 && isCompleted)
-        {
-            customer.CurrentDebt = (customer.CurrentDebt ?? 0) + outstanding;
-        }
+            await _context.SaveChangesAsync(cancellationToken);
 
-        // 12. Ghi nhận giao dịch tài chính (Phiếu thu)
-        if (actualReceived > 0 && isCompleted)
-        {
-            _context.TrxFinancialTransactions.Add(new TrxFinancialTransaction
+            if (transaction != null)
             {
+                await transaction.CommitAsync(cancellationToken);
+            }
+
+            string excessNote = isRecordDebtExcess && rawChangeAmount > 0
+                ? $" (Đã giảm {rawChangeAmount:N0} đ nợ cho khách, dư nợ mới: {customer.CurrentDebt:N0} đ)"
+                : (outstanding > 0 ? $" (Ghi nợ {outstanding:N0} đ, dư nợ mới: {customer.CurrentDebt:N0} đ)" : "");
+            string stockIssueMsg = stockIssue != null ? $" kèm phiếu xuất kho {stockIssue.IssueCode}" : "";
+
+            return Result<PosOrderResultDto>.Success(new PosOrderResultDto
+            {
+                OrderId = order.OrderId,
+                OrderCode = order.OrderCode,
                 PartnerId = customer.PartnerId,
-                TxType = "RECEIPT",
-                Amount = actualReceived,
-                PaymentMethod = req.PaymentMethod,
-                ReferenceType = "SALES_ORDER",
-                ReferenceId = order.OrderId,
-                TransactionDate = finalOrderDate,
-                CreatedBy = currentUserId,
-                Status = "COMPLETED",
-                Description = $"Thu tiền bán hàng hóa đơn POS {order.OrderCode} ({req.PaymentMethod})"
+                PartnerName = customer.PartnerName ?? "",
+                SubTotal = serverSubTotal,
+                DiscountType = orderDiscountType,
+                DiscountValue = orderDiscountValue,
+                DiscountAmount = orderDiscountAmount,
+                TotalAmount = finalTotal,
+                PaidAmount = actualReceived,
+                ChangeAmount = changeAmount,
+                OutstandingAmount = outstanding,
+                PaymentStatus = paymentStatus,
+                Status = order.Status,
+                OrderDate = order.OrderDate ?? DateTime.UtcNow,
+                StockIssueId = stockIssue?.StockIssueId,
+                StockIssueCode = stockIssue?.IssueCode,
+                CustomerCurrentDebt = customer.CurrentDebt ?? 0,
+                Message = $"Tạo đơn hàng POS thành công{stockIssueMsg}!{excessNote}"
             });
         }
-
-        await _context.SaveChangesAsync(cancellationToken);
-
-        return Result<PosOrderResultDto>.Success(new PosOrderResultDto
+        catch
         {
-            OrderId = order.OrderId,
-            OrderCode = order.OrderCode,
-            PartnerId = customer.PartnerId,
-            PartnerName = customer.PartnerName ?? "",
-            SubTotal = serverSubTotal,
-            DiscountType = orderDiscountType,
-            DiscountValue = orderDiscountValue,
-            DiscountAmount = orderDiscountAmount,
-            TotalAmount = finalTotal,
-            PaidAmount = actualReceived,
-            ChangeAmount = changeAmount,
-            OutstandingAmount = outstanding,
-            PaymentStatus = paymentStatus,
-            Status = order.Status,
-            OrderDate = order.OrderDate ?? DateTime.UtcNow,
-            Message = "Tạo đơn hàng POS thành công!"
-        });
+            if (transaction != null)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+            }
+            throw;
+        }
     }
 }

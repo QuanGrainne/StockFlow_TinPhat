@@ -814,9 +814,9 @@ export default function PosPage() {
           message.success(`Đã lưu tạm đơn hàng ${generatedCode}`);
           updateCurrentTab((t) => ({ ...t, status: 'WAITING' }));
         } else {
-          message.success(`Thanh toán thành công đơn hàng ${generatedCode}!`);
+          message.success(result?.message || `Thanh toán thành công đơn hàng ${generatedCode}!`);
 
-          // Lưu bản chụp chi tiết hóa đơn trước khi dọn giỏ hàng
+          // 1. Lưu bản chụp chi tiết hóa đơn trước khi reset giỏ hàng để in nhiệt K80
           setPrintOrderData({
             ...currentTab,
             code: generatedCode,
@@ -827,22 +827,40 @@ export default function PosPage() {
             setPrintModalOpen(true);
           }
 
-          // Đánh dấu đơn hoàn thành và làm mới giỏ hàng
-          updateCurrentTab((t) => ({
-            ...t,
-            status: 'COMPLETED',
-            items: [],
-            prepaidAmount: 0,
-            discountAmount: 0,
-          }));
-
-          // Làm mới số lượng tồn kho sau khi xuất bán thành công
+          // 2. Làm mới danh sách khách hàng (cập nhật công nợ mới) và tồn kho thực tế từ backend
           try {
-            const freshProds = await posService.getProducts(undefined, selectedCategoryId || undefined, currentTab.warehouseId);
+            const [freshCusts, freshProds] = await Promise.all([
+              posService.getCustomers(),
+              posService.getProducts(undefined, selectedCategoryId || undefined, currentTab.warehouseId),
+            ]);
+            setCustomers(freshCusts);
             setProducts(freshProds);
           } catch (e) {
-            console.warn('Lỗi làm mới tồn kho:', e);
+            console.warn('Lỗi làm mới dữ liệu sau thanh toán:', e);
           }
+
+          // 3. Reset giao diện về màn hình trạng thái ban đầu sạch sẽ
+          const defaultPb = priceBooks.find((p) => p.isDefault) || priceBooks[0] || {
+            priceBookId: 1,
+            priceBookName: 'Bảng giá chung',
+          };
+          updateCurrentTab((t) => ({
+            ...t,
+            status: 'PROCESSING',
+            items: [],
+            selectedCustomer: null, // Reset về Khách lẻ tại quầy
+            priceBookId: defaultPb.priceBookId,
+            priceBookName: defaultPb.priceBookName,
+            paymentMethod: 'CASH', // Reset về phương thức Tiền mặt mặc định
+            prepaidAmount: 0,
+            discountType: 'AMOUNT',
+            discountValue: 0,
+            discountAmount: 0,
+            excessAction: 'RETURN_CASH',
+            notes: '',
+            applyVat: false,
+            vatRate: 0,
+          }));
         }
       } catch (err: any) {
         console.error('Lỗi khi thanh toán đơn hàng:', err);
@@ -1055,6 +1073,7 @@ export default function PosPage() {
             onChangePriceBook={handleChangePriceBook}
             onChangePaymentMethod={(pm) => updateCurrentTab((t) => ({ ...t, paymentMethod: pm }))}
             onChangePrepaidAmount={(amt) => updateCurrentTab((t) => ({ ...t, prepaidAmount: amt }))}
+            onChangeExcessAction={(action) => updateCurrentTab((t) => ({ ...t, excessAction: action }))}
             onChangeDiscountAmount={(amt) => updateCurrentTab((t) => ({ ...t, discountAmount: amt }))}
             onChangeOrderDiscount={(type, val, amt) => updateCurrentTab((t) => ({ ...t, discountType: type, discountValue: val, discountAmount: amt }))}
             onSubmitPayment={handleSubmitPayment}

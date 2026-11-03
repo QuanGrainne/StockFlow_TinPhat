@@ -10,6 +10,7 @@ import PurchasesClient from '@/app/(dashboard)/purchases/PurchasesClient';
 import PurchaseReturnsClient from '@/app/(dashboard)/purchase-returns/PurchaseReturnsClient';
 import PriceBooksClient from '@/features/price-books/screens/PriceBooksClient';
 import TransfersClient from '@/app/(dashboard)/transfers/TransfersClient';
+import OrdersClient from '@/app/(dashboard)/orders/OrdersClient';
 import { OrderSettingsScreen } from '@/features/settings/screens/OrderSettingsScreen';
 import { permissionService } from '../services/permissionService';
 
@@ -35,6 +36,8 @@ const SCREEN_MODULE_MAP: Record<string, string> = {
   'manager-reports': 'FIN',
   'manager-production': 'PROD',
   'sales-orders': 'SALES',
+  'orders': 'SALES',
+  'sales-orders-management': 'SALES',
   'sales-consolidate': 'SALES',
   'sales-credit-limits': 'PARTNER',
   'sales-returns': 'SALES',
@@ -175,12 +178,34 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ initialScreen }) => {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [hasImportedProductionPlan, setHasImportedProductionPlan] = useState(false);
 
-  // Khôi phục role và screen từ localStorage khi reload trang
+  // Khôi phục role và screen từ localStorage khi reload trang, đồng thời xác thực quyền truy cập
   React.useEffect(() => {
-    const role = getStoredRole();
-    const screen = initialScreen || getStoredScreen(role);
-    setCurrentRole(role);
-    setActiveScreen(screen);
+    const checkInitialAccess = async () => {
+      const role = getStoredRole();
+      const screen = initialScreen || getStoredScreen(role);
+      setCurrentRole(role);
+
+      const roleCode = `ROLE_${role}`;
+      const allowed = await permissionService.getAllowedModuleKeys(roleCode);
+      const allowedFeatures = await permissionService.getAllowedFeatures(roleCode);
+      const reqMod = SCREEN_MODULE_MAP[screen];
+
+      const isFeatureForbidden =
+        (screen === 'customers' || screen.includes('customers')) &&
+        !allowedFeatures.has('feat-customers');
+
+      if ((reqMod && !allowed.has(reqMod)) || isFeatureForbidden) {
+        const fallback = getDefaultScreenForRole(role);
+        setActiveScreen(fallback);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('stockflow_active_screen', fallback);
+        }
+      } else {
+        setActiveScreen(screen);
+      }
+    };
+
+    checkInitialAccess();
   }, [initialScreen]);
 
   // Lắng nghe cập nhật quyền từ Ma trận phân quyền để tự động chuyển trang nếu màn hình hiện tại bị bỏ quyền
@@ -190,6 +215,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ initialScreen }) => {
     const checkScreenAccess = async () => {
       const roleCode = `ROLE_${currentRole}`;
       const allowed = await permissionService.getAllowedModuleKeys(roleCode);
+
       const allowedFeats = await permissionService.getAllowedFeatures(roleCode);
       if (stale) return;
       const reqMod = SCREEN_MODULE_MAP[activeScreen];
@@ -225,11 +251,22 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ initialScreen }) => {
 
   const handleNavigate = (newScreen: string) => {
     if (newScreen === 'pos' || newScreen === '/pos') { router.push('/pos'); return; }
-    if (newScreen === 'orders' || newScreen === '/orders') { router.push('/orders'); return; }
+    if (newScreen === 'orders' || newScreen === '/orders' || newScreen === 'sales-orders-management') {
+      setActiveScreen('orders');
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('stockflow_active_screen', 'orders');
+        if (!window.location.pathname.includes('/orders')) {
+          window.history.pushState(null, '', '/orders');
+        }
+      }
+      return;
+    }
     setActiveScreen(newScreen);
     if (typeof window !== 'undefined') {
       localStorage.setItem('stockflow_active_screen', newScreen);
-      if (newScreen === 'suppliers' || newScreen === '/suppliers') {
+      if (newScreen === 'customers' || newScreen === '/customers') {
+        window.history.pushState(null, '', '/customers');
+      } else if (newScreen === 'suppliers' || newScreen === '/suppliers') {
         window.history.pushState(null, '', '/suppliers');
       } else if (newScreen === 'purchases' || newScreen === '/purchases') {
         window.history.pushState(null, '', '/purchases');
@@ -239,7 +276,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ initialScreen }) => {
         window.history.pushState(null, '', '/products');
       } else if (newScreen === 'transfers' || newScreen === '/transfers' || newScreen === 'admin-transfers' || newScreen === 'manager-transfers') {
         window.history.pushState(null, '', '/transfers');
-      } else if (window.location.pathname.includes('/suppliers') || window.location.pathname.includes('/purchases') || window.location.pathname.includes('/purchase-returns') || window.location.pathname.includes('/products') || window.location.pathname.includes('/transfers')) {
+      } else if (window.location.pathname.includes('/suppliers') || window.location.pathname.includes('/purchases') || window.location.pathname.includes('/purchase-returns') || window.location.pathname.includes('/products') || window.location.pathname.includes('/transfers') || window.location.pathname.includes('/customers')) {
         window.history.pushState(null, '', '/dashboard');
       }
     }
@@ -271,6 +308,9 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ initialScreen }) => {
       // ─── Sales Screens ───
       case 'sales-dashboard':
         return <SalesDashboard onNavigate={handleNavigate} />;
+      case 'orders':
+      case 'sales-orders-management':
+        return <OrdersClient onNavigate={handleNavigate} />;
       case 'sales-orders':
         return <PendingOrdersScreen onNavigate={handleNavigate} />;
       case 'sales-consolidate':
@@ -461,7 +501,10 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ initialScreen }) => {
         <main className="flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden bg-[#F8FAFC]">
           {renderActiveScreen()}
         </main>
-      
+      ) : activeScreen === 'orders' || activeScreen.includes('orders') ? (
+        <main className="flex-1 min-w-0 overflow-y-auto bg-[#F4F6F9]">
+          {renderActiveScreen()}
+        </main>
       ) : (
         <main className="flex-1 min-w-0 overflow-y-auto p-6 lg:p-8 bg-[#F8FAFC]">
           <div className="max-w-7xl mx-auto">{renderActiveScreen()}</div>

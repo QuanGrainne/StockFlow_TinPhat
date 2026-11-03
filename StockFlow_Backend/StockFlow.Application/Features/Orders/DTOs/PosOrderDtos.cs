@@ -21,13 +21,14 @@ public class CreatePosOrderRequest
 {
     public int PartnerId { get; set; }
     public int WarehouseId { get; set; } = 3; // Default Kho Tổng Gia Lâm (K001)
-    public string PaymentMethod { get; set; } = "CASH"; // CASH, VIETQR, POS_CARD, DEBT
+    public string PaymentMethod { get; set; } = "CASH"; // CASH, VIETQR, POS_CARD, DEBT, WALLET
     public decimal SubTotal { get; set; }
     public string DiscountType { get; set; } = "AMOUNT"; // "PERCENT" hoặc "AMOUNT"
     public decimal DiscountValue { get; set; }
     public decimal DiscountAmount { get; set; }
     public decimal TotalAmount { get; set; }
     public decimal PaidAmount { get; set; }
+    public string ExcessAction { get; set; } = "RETURN_CASH"; // "RETURN_CASH" (trả tiền thừa) hoặc "RECORD_DEBT" (tính vào công nợ)
     public decimal VatAmount { get; set; }
     public decimal DeliveryFee { get; set; }
     public string DeliveryType { get; set; } = "COUNTER"; // COUNTER, TRUCK, GRAB
@@ -56,6 +57,9 @@ public class PosOrderResultDto
     public string PaymentStatus { get; set; } = string.Empty;
     public string Status { get; set; } = string.Empty;
     public DateTime OrderDate { get; set; }
+    public int? StockIssueId { get; set; }
+    public string? StockIssueCode { get; set; }
+    public decimal CustomerCurrentDebt { get; set; }
     public string Message { get; set; } = string.Empty;
 }
 
@@ -74,4 +78,9 @@ public class PosOrderSummaryDto
     public string Status { get; set; } = string.Empty;
     public DateTime? OrderDate { get; set; }
     public int TotalItems { get; set; }
+    public int? WarehouseId { get; set; }
+    public string WarehouseName { get; set; } = string.Empty;
+    public string PaymentMethod { get; set; } = string.Empty;
+    public bool HasReturn { get; set; }
+    public string? Notes { get; set; }
 }

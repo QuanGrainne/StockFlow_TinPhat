@@ -36,6 +36,11 @@ public class TransactionCodeGenerator : ITransactionCodeGenerator
                 prefix = string.IsNullOrWhiteSpace(settings.TransferCodePrefix) ? "CK" : settings.TransferCodePrefix.Trim();
                 sequenceName = "stockflow.seq_transfer_code";
                 break;
+            case "STOCK_ISSUE":
+            case "ISSUE":
+                prefix = "XK";
+                sequenceName = "stockflow.seq_stock_issue_code";
+                break;
             case "ORDER":
             case "POS":
             default:
