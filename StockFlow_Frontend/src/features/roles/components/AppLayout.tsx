@@ -10,6 +10,7 @@ import PurchasesClient from '@/app/(dashboard)/purchases/PurchasesClient';
 import PurchaseReturnsClient from '@/app/(dashboard)/purchase-returns/PurchaseReturnsClient';
 import PriceBooksClient from '@/features/price-books/screens/PriceBooksClient';
 import TransfersClient from '@/app/(dashboard)/transfers/TransfersClient';
+import StocktakesClient from '@/app/(dashboard)/stocktakes/StocktakesClient';
 import OrdersClient from '@/app/(dashboard)/orders/OrdersClient';
 import { OrderSettingsScreen } from '@/features/settings/screens/OrderSettingsScreen';
 import { permissionService } from '../services/permissionService';
@@ -60,6 +61,7 @@ const SCREEN_MODULE_MAP: Record<string, string> = {
   'transfers': 'STOCK',
   'admin-transfers': 'STOCK',
   'manager-transfers': 'STOCK',
+  'stocktakes': 'STOCK',
   'customers': 'PARTNER',
   'sales-customers': 'SALES',
   'manager-customers': 'PARTNER',
@@ -80,6 +82,7 @@ const SCREEN_FEATURE_MAP: Record<string, string> = {
   'transfers': 'feat-transfers',
   'admin-transfers': 'feat-transfers',
   'manager-transfers': 'feat-transfers',
+  'stocktakes': 'feat-stocktake',
   'customers': 'feat-partner',
   'manager-partners': 'feat-partner',
   'sales-credit-limits': 'feat-partner',
@@ -276,7 +279,9 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ initialScreen }) => {
         window.history.pushState(null, '', '/products');
       } else if (newScreen === 'transfers' || newScreen === '/transfers' || newScreen === 'admin-transfers' || newScreen === 'manager-transfers') {
         window.history.pushState(null, '', '/transfers');
-      } else if (window.location.pathname.includes('/suppliers') || window.location.pathname.includes('/purchases') || window.location.pathname.includes('/purchase-returns') || window.location.pathname.includes('/products') || window.location.pathname.includes('/transfers') || window.location.pathname.includes('/customers')) {
+      } else if (newScreen === 'stocktakes' || newScreen === '/stocktakes') {
+        window.history.pushState(null, '', '/stocktakes');
+      } else if (window.location.pathname.includes('/stocktakes') || window.location.pathname.includes('/suppliers') || window.location.pathname.includes('/purchases') || window.location.pathname.includes('/purchase-returns') || window.location.pathname.includes('/products') || window.location.pathname.includes('/transfers') || window.location.pathname.includes('/customers')) {
         window.history.pushState(null, '', '/dashboard');
       }
     }
@@ -450,6 +455,9 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ initialScreen }) => {
       case 'price-books':
         return <PriceBooksClient />;
 
+      case 'stocktakes':
+        return <StocktakesClient />;
+
       case 'transfers':
       case 'admin-transfers':
       case 'manager-transfers':
@@ -497,6 +505,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ initialScreen }) => {
        activeScreen === 'goods-catalog' || activeScreen === 'products' ||
        activeScreen.includes('goods') || activeScreen.includes('catalog') ||
        activeScreen === 'price-books' || activeScreen === 'admin-price-books' ||
+       activeScreen === 'stocktakes' ||
        activeScreen.includes('price-book') ? (
         <main className="flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden bg-[#F8FAFC]">
           {renderActiveScreen()}

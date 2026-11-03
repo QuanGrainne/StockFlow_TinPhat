@@ -35,6 +35,8 @@ type PurchaseFilterSidebarProps = {
   statusLabels?: Partial<Record<PurchaseStatus, string>>;
   /** Ẩn bộ lọc Nhà cung cấp (màn Trả hàng nhập không có) */
   hideSupplierFilter?: boolean;
+  /** Ẩn bộ lọc Chi nhánh (VD Phiếu kiểm kho: luôn theo Kho làm việc) */
+  hideWarehouseFilter?: boolean;
 };
 
 // ─── Status options ───────────────────────────────────────────────────────────
@@ -91,6 +93,7 @@ export default function PurchaseFilterSidebar({
   activeWarehouse,
   statusLabels,
   hideSupplierFilter = false,
+  hideWarehouseFilter = false,
 }: PurchaseFilterSidebarProps) {
   const [mounted, setMounted] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -454,7 +457,7 @@ export default function PurchaseFilterSidebar({
       {!isCollapsed && (
         <div className="flex-1 min-h-0 p-3.5 space-y-4 overflow-y-auto">
           {/* ── 1. Chi nhánh (Multi-select dropdown theo đúng ảnh thiết kế) ── */}
-          <div ref={warehouseRef} className="relative">
+          <div ref={warehouseRef} className={hideWarehouseFilter ? 'hidden' : 'relative'}>
             <div className="text-[11px] font-bold text-[#677484] mb-1.5 uppercase tracking-wide">
               Chi nhánh
             </div>
@@ -591,7 +594,7 @@ export default function PurchaseFilterSidebar({
           </div>
 
           {/* Divider */}
-          <div className="border-t border-slate-100" />
+          <div className={hideWarehouseFilter ? 'hidden' : 'border-t border-slate-100'} />
 
           {/* ── 2. Trạng thái (Checkbox theo đúng yêu cầu) ── */}
           <div>

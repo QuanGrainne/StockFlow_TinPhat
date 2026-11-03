@@ -19,6 +19,12 @@ public partial class TrxStocktake
 
     public string? Notes { get; set; }
 
+    /// <summary>Thời điểm cân bằng kho (hoàn thành phiếu kiểm)</summary>
+    public DateTime? BalancedDate { get; set; }
+
+    /// <summary>Người cân bằng kho</summary>
+    public int? BalancedBy { get; set; }
+
     public virtual SecUser ConductedByNavigation { get; set; } = null!;
 
     public virtual ICollection<DtlStocktakeItem> DtlStocktakeItems { get; set; } = new List<DtlStocktakeItem>();

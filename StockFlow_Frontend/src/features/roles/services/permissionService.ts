@@ -461,6 +461,16 @@ export const permissionService = {
             localStorage.setItem('stockflow_feature_matrix', JSON.stringify(matrix));
             localStorage.setItem('stockflow_customers_feat_initialized_v1', 'true');
           }
+          // One-time: bật tính năng Kiểm kho mặc định cho ADMIN, MANAGER, WAREHOUSE (ma trận đã lưu từ trước chưa có)
+          if (!localStorage.getItem('stockflow_stocktake_feat_initialized_v1')) {
+            for (const r of ['ROLE_ADMIN', 'ROLE_MANAGER', 'ROLE_WAREHOUSE']) {
+              if (Array.isArray(matrix[r]) && !matrix[r].includes('feat-stocktake')) {
+                matrix[r].push('feat-stocktake');
+              }
+            }
+            localStorage.setItem('stockflow_feature_matrix', JSON.stringify(matrix));
+            localStorage.setItem('stockflow_stocktake_feat_initialized_v1', 'true');
+          }
           if (!localStorage.getItem('stockflow_suppliers_feat_initialized_v2')) {
             const defaultRolesWithSuppliers = ['ROLE_ADMIN', 'ROLE_MANAGER', 'ROLE_WAREHOUSE'];
             for (const r of defaultRolesWithSuppliers) {
@@ -597,6 +607,15 @@ export const NAVBAR_FEATURES: NavFeatureConfig[] = [
     tabIds: ['transfers', 'admin-transfers', 'manager-transfers', 'sales-transfers', 'warehouse-transfers', 'warehouse-transfer'],
   },
   {
+    id: 'feat-stocktake',
+    name: 'Kiểm kho',
+    desc: 'Lập phiếu kiểm kê, gộp phiếu và cân bằng tồn kho thực tế tại kho',
+    moduleKey: 'STOCKTAKE',
+    // API /api/Stocktakes yêu cầu quyền STOCK_* (thuộc phân hệ Quản lý kho)
+    backendModuleKey: 'STOCK',
+    tabIds: ['stocktakes'],
+  },
+  {
     id: 'feat-sales',
     name: 'Quản lý bán hàng',
     desc: 'Đơn hàng chờ xử lý, gộp đơn B2B và quản lý hàng trả',
@@ -662,6 +681,7 @@ export const DEFAULT_ROLE_FEATURE_PERMS: Record<string, string[]> = {
     'feat-warehouse-perms',
     'feat-goods',
     'feat-transfers',
+    'feat-stocktake',
     'feat-sales',
     'feat-purchase',
     'feat-suppliers',
@@ -675,6 +695,7 @@ export const DEFAULT_ROLE_FEATURE_PERMS: Record<string, string[]> = {
     'feat-goods',
     'feat-customers',
     'feat-transfers',
+    'feat-stocktake',
     'feat-sales',
     'feat-purchase',
     'feat-suppliers',
@@ -693,6 +714,7 @@ export const DEFAULT_ROLE_FEATURE_PERMS: Record<string, string[]> = {
   ROLE_WAREHOUSE: [
     'feat-goods',
     'feat-transfers', // UC-33: nhân viên kho lập phiếu chuyển và xác nhận nhận hàng
+    'feat-stocktake',
     'feat-purchase',
     'feat-suppliers',
     'feat-stock',

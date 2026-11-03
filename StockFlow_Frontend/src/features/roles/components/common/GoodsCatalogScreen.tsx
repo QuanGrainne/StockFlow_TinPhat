@@ -1816,7 +1816,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
         const now = new Date();
         const entry = {
           date: `${now.toLocaleDateString('vi-VN')} ${now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}`,
-          docCode: `DC-${g.code}`,
+          docCode: result.stocktakeCode ?? `DC-${g.code}`,
           type: (result.delta >= 0 ? 'NHAP' : 'XUAT') as 'NHAP' | 'XUAT',
           typeName,
           qtyChange: result.delta,
@@ -1883,7 +1883,10 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
         inboundTargetWarehouse,
         inboundType === 'ADD' ? `Nhập hàng vào ${inboundTargetWarehouse}` : `Cân chỉnh tồn tại ${inboundTargetWarehouse}`
       );
-      showToast(`Đã cập nhật tồn kho "${inboundItem.name}" tại ${inboundTargetWarehouse}: ${result.previousQuantity.toLocaleString('vi-VN')} → ${result.newQuantity.toLocaleString('vi-VN')}`);
+      showToast(
+        `Đã cập nhật tồn kho "${inboundItem.name}" tại ${inboundTargetWarehouse}: ${result.previousQuantity.toLocaleString('vi-VN')} → ${result.newQuantity.toLocaleString('vi-VN')}` +
+          (result.stocktakeCode ? ` (phiếu kiểm kho ${result.stocktakeCode})` : '')
+      );
       setInboundModalOpen(false);
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Không thể cập nhật tồn kho. Vui lòng thử lại.');
