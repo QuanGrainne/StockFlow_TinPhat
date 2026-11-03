@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace StockFlow.Domain.Entities;
@@ -22,6 +22,30 @@ public partial class MstProduct
     public decimal? ReorderPoint { get; set; }
 
     public decimal? MovingAverageCost { get; set; }
+
+    public string? Barcode { get; set; }
+
+    public string? Brand { get; set; }
+
+    public decimal? StandardPrice { get; set; }
+
+    public decimal? MinSafeStock { get; set; }
+
+    public decimal? MaxSafeStock { get; set; }
+
+    public decimal? Weight { get; set; }
+
+    public string? Dimensions { get; set; }
+
+    public string? LocationName { get; set; }
+
+    public bool? IsDirectSale { get; set; } = true;
+
+    public bool? HasRewardPoints { get; set; } = true;
+
+    public string? ImageUrl { get; set; }
+
+    public string? VariantsJson { get; set; }
 
     public bool? IsActive { get; set; }
 
@@ -62,5 +86,7 @@ public partial class MstProduct
     public virtual ICollection<TrxProductionMaterialRequirement> TrxProductionMaterialRequirements { get; set; } = new List<TrxProductionMaterialRequirement>();
 
     public virtual ICollection<TrxProductionOrder> TrxProductionOrders { get; set; } = new List<TrxProductionOrder>();
+
+    public virtual ICollection<DtlPriceBookItem> DtlPriceBookItems { get; set; } = new List<DtlPriceBookItem>();
 }
 

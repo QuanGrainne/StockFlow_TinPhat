@@ -18,6 +18,7 @@ public static class DependencyInjection
     {
         // PostgreSQL via Npgsql
         services.AddDbContext<StockFlowDbContext>(options =>
+        {
             options.UseNpgsql(
                 configuration.GetConnectionString("StockFlowDb"),
                 npgsql =>
@@ -25,8 +26,21 @@ public static class DependencyInjection
                     npgsql.MigrationsAssembly(typeof(StockFlowDbContext).Assembly.FullName);
                     npgsql.MigrationsHistoryTable("__EFMigrationsHistory", "stockflow");
                 }
-            )
-        );
+            );
+            options.ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning));
+        });
+
+        // DbContext interface mapping
+        services.AddScoped<StockFlow.Application.Common.Interfaces.IStockFlowDbContext>(sp =>
+            sp.GetRequiredService<StockFlowDbContext>());
+
+        // Auth & Identity services
+        services.AddHttpContextAccessor();
+        services.AddScoped<StockFlow.Application.Common.Interfaces.IPasswordHasher, Services.BcryptPasswordHasher>();
+        services.AddScoped<StockFlow.Application.Common.Interfaces.IJwtTokenGenerator, Services.JwtTokenGenerator>();
+        services.AddScoped<StockFlow.Application.Common.Interfaces.ICurrentUserService, Services.CurrentUserService>();
+        services.AddScoped<StockFlow.Application.Common.Interfaces.IUserPermissionService, Services.UserPermissionService>();
+        services.AddScoped<StockFlow.Application.Common.Interfaces.ITransactionCodeGenerator, Services.TransactionCodeGenerator>();
 
         // Unit of Work
         services.AddScoped<IUnitOfWork, UnitOfWork>();

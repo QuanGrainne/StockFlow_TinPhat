@@ -2,6 +2,9 @@ using Microsoft.EntityFrameworkCore;
 using StockFlow.Application;
 using StockFlow.Infrastructure;
 
+// Support PostgreSQL timestamp without time zone with DateTime.UtcNow/DateTime.Now
+AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
+
 var builder = WebApplication.CreateBuilder(args);
 
 // ─── Services ────────────────────────────────────────────────────────────────
@@ -60,7 +63,20 @@ builder.Services.AddAuthentication(Microsoft.AspNetCore.Authentication.JwtBearer
         };
     });
 
-builder.Services.AddAuthorization();
+// Mặc định MỌI endpoint đều yêu cầu đăng nhập (trừ endpoint gắn [AllowAnonymous] như login/health).
+// Quyền theo chức năng gắn bằng [RequirePermission("MODULE_ACTION")] trên từng action.
+builder.Services.AddAuthorization(options =>
+{
+    options.FallbackPolicy = new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder()
+        .RequireAuthenticatedUser()
+        .Build();
+});
+builder.Services.AddScoped<Microsoft.AspNetCore.Authorization.IAuthorizationHandler,
+    StockFlow.API.Authorization.PermissionAuthorizationHandler>();
+builder.Services.AddScoped<Microsoft.AspNetCore.Authorization.IAuthorizationHandler,
+    StockFlow.API.Authorization.AdminAuthorizationHandler>();
+builder.Services.AddSingleton<Microsoft.AspNetCore.Authorization.IAuthorizationMiddlewareResultHandler,
+    StockFlow.API.Authorization.JsonAuthorizationResultHandler>();
 
 // ─── Pipeline ─────────────────────────────────────────────────────────────────
 var app = builder.Build();
@@ -73,7 +89,10 @@ if (app.Environment.IsDevelopment())
 
 app.UseMiddleware<StockFlow.API.Middleware.ExceptionHandlingMiddleware>();
 app.UseCors("AllowFrontend");
-app.UseHttpsRedirection();
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
@@ -87,11 +106,13 @@ using (var scope = app.Services.CreateScope())
         var dbContext = scope.ServiceProvider.GetRequiredService<StockFlow.Infrastructure.Persistence.StockFlowDbContext>();
         logger.LogInformation("Applying EF Core database migrations if any pending...");
         await dbContext.Database.MigrateAsync();
-        logger.LogInformation("Database is up to date.");
+        logger.LogInformation("Seeding initial database records if required...");
+        await StockFlow.Infrastructure.Persistence.DatabaseSeeder.SeedAsync(dbContext);
+        logger.LogInformation("Database is up to date and seeded.");
     }
     catch (Exception ex)
     {
-        logger.LogError(ex, "An error occurred while migrating the database.");
+        logger.LogError(ex, "An error occurred while migrating/seeding the database.");
     }
 }
 

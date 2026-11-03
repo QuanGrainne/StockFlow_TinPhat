@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace StockFlow.Domain.Entities;
@@ -16,6 +16,16 @@ public partial class DtlOrderItem
     public int UnitId { get; set; }
 
     public decimal? UnitPrice { get; set; }
+
+    public decimal OriginalPrice { get; set; }
+
+    public string DiscountType { get; set; } = "AMOUNT";
+
+    public decimal DiscountValue { get; set; }
+
+    public decimal DiscountAmount { get; set; }
+
+    public decimal LineTotal { get; set; }
 
     public virtual ICollection<DtlReturnRequestItem> DtlReturnRequestItems { get; set; } = new List<DtlReturnRequestItem>();
 

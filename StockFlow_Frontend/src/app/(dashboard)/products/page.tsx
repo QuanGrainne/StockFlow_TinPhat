@@ -1,8 +1,21 @@
-﻿export default function productsPage() {
-  return (
-    <div>
-      <h1 className="text-2xl font-semibold text-gray-900">Sản phẩm</h1>
-      <p className="text-gray-500 mt-2">Tính năng đang được xây dựng...</p>
-    </div>
-  );
+// src/app/(dashboard)/products/page.tsx
+'use client';
+
+import dynamic from 'next/dynamic';
+
+const AppLayout = dynamic(
+  () => import('@/features/roles/components/AppLayout').then((mod) => mod.AppLayout),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex h-screen items-center justify-center bg-[#f7f9fa] text-sm text-slate-400">
+        Đang tải Danh mục Hàng hóa &amp; Tồn kho...
+      </div>
+    ),
+  }
+);
+
+export default function ProductsPage() {
+  return <AppLayout initialScreen="goods-catalog" />;
 }
+

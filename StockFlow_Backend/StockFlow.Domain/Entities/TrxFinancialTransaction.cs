@@ -27,6 +27,12 @@ public partial class TrxFinancialTransaction
 
     public string? Description { get; set; }
 
+    /// <summary>
+    /// Mã chứng từ (VD: phiếu chi trả NCC "PC000001"). Một phiếu chi phân bổ vào nhiều phiếu nhập
+    /// sẽ có nhiều dòng cùng mã. Null với khoản trả ngay khi hoàn thành phiếu nhập.
+    /// </summary>
+    public string? TxCode { get; set; }
+
     public virtual SecUser CreatedByNavigation { get; set; } = null!;
 
     public virtual MstBusinessPartner Partner { get; set; } = null!;

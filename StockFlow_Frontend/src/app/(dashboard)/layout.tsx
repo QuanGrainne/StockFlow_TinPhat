@@ -1,17 +1,14 @@
-// Dashboard group layout — includes sidebar navigation
-// Full sidebar implementation will be in shared/components/layout/Sidebar.tsx
+// src/app/(dashboard)/layout.tsx
+// Đã xóa thanh Navbar cũ bên trên theo yêu cầu để đồng nhất với kiến trúc layout mới
+
+import React from 'react';
+
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex h-screen bg-gray-100">
-      {/* Sidebar placeholder */}
-      <aside className="w-64 bg-gray-900 text-white flex-shrink-0">
-        <div className="p-4">
-          <h2 className="text-xl font-bold">StockFlow</h2>
-        </div>
-        {/* Nav items will go here */}
-      </aside>
-      {/* Main content */}
-      <main className="flex-1 overflow-auto p-6">{children}</main>
+    <div className="min-h-screen bg-[#F7FAFC] flex flex-col text-slate-800 font-sans">
+      <main className="flex-1 w-full flex flex-col">
+        {children}
+      </main>
     </div>
   );
 }

@@ -1,8 +1,10 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f8fafc;
+  --foreground: #0f172a;
+  --primary: #1d4ed8;
+  --primary-hover: #1e40af;
 }
 
 @theme inline {
@@ -12,15 +14,63 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+.stockflow-products-table .ant-table-thead > tr > th {
+  background: #e8f2ff;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.stockflow-products-table .ant-table-thead > tr > th::before {
+  display: none;
+}
+
+.stockflow-purchases-table .ant-table-thead > tr > th {
+  background: #e8f2ff;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.stockflow-purchases-table .ant-table-thead > tr > th::before {
+  display: none;
+}
+
+/* Custom smooth hover dropdown for navigation tabs */
+.tab-dropdown-menu {
+  display: none;
+}
+
+.tab-dropdown-group:hover .tab-dropdown-menu,
+.tab-dropdown-menu.is-open {
+  display: block !important;
+  animation: dropdownFadeIn 0.12s ease-out;
+}
+
+.tab-dropdown-group:hover .tab-chevron,
+.tab-chevron.is-open {
+  transform: rotate(180deg);
+}
+
+@keyframes dropdownFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }

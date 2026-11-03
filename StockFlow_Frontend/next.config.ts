@@ -12,6 +12,18 @@ const nextConfig: NextConfig = {
       },
     },
   },
+  async redirects() {
+    return [
+      {
+        source: '/products/pricing',
+        destination: '/products/price-books',
+        permanent: true,
+      },
+    ];
+  },
+  experimental: {
+    agentUpgrade: "security",
+  },
 };
 
 export default nextConfig;

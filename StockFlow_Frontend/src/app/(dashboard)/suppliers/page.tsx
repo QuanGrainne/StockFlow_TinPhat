@@ -1,8 +1,19 @@
-﻿export default function suppliersPage() {
-  return (
-    <div>
-      <h1 className="text-2xl font-semibold text-gray-900">Nhà cung cấp</h1>
-      <p className="text-gray-500 mt-2">Tính năng đang được xây dựng...</p>
-    </div>
-  );
+'use client';
+
+import dynamic from 'next/dynamic';
+
+const AppLayout = dynamic(
+  () => import('@/features/roles/components/AppLayout').then((mod) => mod.AppLayout),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex h-screen items-center justify-center bg-[#f7f9fa] text-sm text-slate-400">
+        Đang tải trang Nhà cung cấp...
+      </div>
+    ),
+  }
+);
+
+export default function SuppliersPage() {
+  return <AppLayout initialScreen="suppliers" />;
 }

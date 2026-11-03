@@ -1,8 +1,4 @@
-// Auth group layout — no sidebar, centers content
+// Auth group layout — no navbar/sidebar
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <main className="min-h-screen flex items-center justify-center bg-gray-50">
-      {children}
-    </main>
-  );
+  return <>{children}</>;
 }
