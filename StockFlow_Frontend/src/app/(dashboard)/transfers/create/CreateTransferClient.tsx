@@ -33,7 +33,10 @@ import { AddFromCategoryPopover } from '@/features/purchases/components/AddFromC
 import { NumberInput } from '@/components/inputs/NumberInput';
 
 // Bố cục cột bảng hàng hóa (cùng kiểu màn Nhập hàng): Xóa | STT | Mã | Tên | ĐVT | Tồn kho | Tồn kho nhận | SL | Giá | Thành tiền
-const TRANSFER_GRID = '36px 44px 110px minmax(170px,1fr) 70px 90px 110px 90px 110px 110px';
+/** Tiền tố mã khi sao chép phiếu (giống phiếu nhập / kiểm kho) — khi lưu hệ thống tự sinh mã mới */
+const COPY_CODE_PREFIX = 'Copy_';
+
+const TRANSFER_GRID ='36px 44px 110px minmax(170px,1fr) 70px 90px 110px 90px 110px 110px';
 const TRANSFER_TABLE_MIN_WIDTH = 36 + 44 + 110 + 170 + 70 + 90 + 110 + 90 + 110 + 110 + 24;
 
 interface CreateItemRow {
@@ -53,6 +56,7 @@ export default function CreateTransferClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const editTransferId = searchParams.get('id');
+  const copyTransferId = searchParams.get('copy');
 
   const { activeWarehouse, setActiveWarehouse, warehouses: allWarehouses } = useActiveWarehouse();
   const [facilities, setFacilities] = useState<WarehouseFacility[]>([]);
@@ -208,6 +212,61 @@ export default function CreateTransferClient() {
     }
     loadEditData();
   }, [editTransferId]);
+
+  // Sao chép phiếu (?copy=<id>): tạo phiếu tạm mới từ phiếu cũ (VD phiếu nhập sai đã hủy).
+  // Kho gửi = Kho làm việc hiện tại; mã hiện "Copy_CK..." (khi lưu hệ thống tự sinh mã mới);
+  // tồn kho 2 đầu + giá chuyển lấy lại theo thời điểm hiện tại.
+  useEffect(() => {
+    if (!copyTransferId || editTransferId) return;
+    let alive = true;
+    (async () => {
+      try {
+        const detail = await transferService.getTransferById(Number(copyTransferId));
+        if (!alive) return;
+        const sourceId = activeWarehouse?.warehouseId ?? detail.sourceWarehouseId;
+        const destId = detail.destWarehouseId !== sourceId ? detail.destWarehouseId : '';
+        setTransferCode(`${COPY_CODE_PREFIX}${detail.code}`);
+        setDestWarehouseId(destId);
+        // Bỏ phần ghi chú phát sinh sau khi xuất ([Nhận hàng]: ..., [Lý do hủy]: ...)
+        setNotes((detail.notes || '').split(/\s*\|?\s*\[(?:Nhận hàng|Lý do hủy)\]:/)[0].trim());
+        setStatus('DRAFT');
+
+        const fresh = await Promise.all(
+          detail.items.map((it) =>
+            transferService
+              .getProductsForTransfer(sourceId, destId || undefined, it.productCode)
+              .then((list) => list.find((p) => p.productId === it.productId))
+              .catch(() => undefined)
+          )
+        );
+        if (!alive) return;
+        setItems(
+          detail.items.map((it, i) => {
+            const f = fresh[i];
+            const price = f ? f.costPrice : it.transferPrice;
+            return {
+              productId: it.productId,
+              productCode: it.productCode,
+              productName: it.productName,
+              unitName: it.unitName,
+              sourceStock: f ? f.sourceStock : 0,
+              destStock: f ? f.destStock : 0,
+              transferQuantity: it.transferQuantity,
+              transferPrice: price,
+              lineTotal: it.transferQuantity * price,
+              notes: it.notes,
+            };
+          })
+        );
+      } catch (err) {
+        if (alive) showToast(err instanceof Error ? err.message : 'Không tải được phiếu cần sao chép', 'error');
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [copyTransferId, editTransferId]);
 
   // Handle Global F3 Shortcut to focus product search
   useEffect(() => {
@@ -540,7 +599,11 @@ export default function CreateTransferClient() {
     setIsSubmitting(true);
     try {
       const payload = {
-        transferCode: transferCode.trim() || undefined,
+        // Mã "Copy_..." chỉ để nhận biết phiếu sao chép → để trống cho hệ thống tự sinh mã mới
+        transferCode:
+          transferCode.trim() && !transferCode.trim().toLowerCase().startsWith(COPY_CODE_PREFIX.toLowerCase())
+            ? transferCode.trim()
+            : undefined,
         sourceWarehouseId: Number(sourceWarehouseId),
         destWarehouseId: Number(destWarehouseId),
         transferDate: transferDateTime

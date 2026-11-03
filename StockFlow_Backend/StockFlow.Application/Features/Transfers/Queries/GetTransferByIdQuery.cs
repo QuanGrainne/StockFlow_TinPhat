@@ -101,8 +101,21 @@ public class GetTransferByIdQueryHandler : IRequestHandler<GetTransferByIdQuery,
                 ReceivedQuantity: rec,
                 TransferPrice: price,
                 LineTotal: lineTotal,
-                Notes: null
+                Notes: item.Notes,
+                ReceiveNotes: item.ReceiveNotes
             ));
+        }
+
+        // Người nhận = người ghi thẻ kho nhập chuyển (TRANSFER_IN) của phiếu này
+        string? receivedByName = null;
+        if (t.ReceivedDate.HasValue)
+        {
+            receivedByName = await _context.TrxInventoryTransactions
+                .AsNoTracking()
+                .Where(x => x.ReferenceType == "TRANSFER" && x.ReferenceId == t.StockTransferId && x.TransactionType == "TRANSFER_IN")
+                .OrderBy(x => x.TransactionId)
+                .Select(x => x.CreatedByNavigation.FullName ?? x.CreatedByNavigation.Username)
+                .FirstOrDefaultAsync(cancellationToken);
         }
 
         var detail = new TransferDetailDto(
@@ -123,7 +136,9 @@ public class GetTransferByIdQueryHandler : IRequestHandler<GetTransferByIdQuery,
             TotalReceivedQuantity: string.Equals(t.Status, "RECEIVED", StringComparison.OrdinalIgnoreCase) ? totalReceived : null,
             TotalAmount: totalAmount,
             Notes: t.Notes,
-            Items: itemDtos
+            Items: itemDtos,
+            ReceivedByName: receivedByName,
+            ReceiveNotes: t.ReceiveNotes
         );
 
         return Result.Success(detail);
