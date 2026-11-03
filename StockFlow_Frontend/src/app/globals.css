@@ -36,6 +36,24 @@ body {
   display: none;
 }
 
+/* Thiết lập giá: header bảng giống các màn Nhập hàng / Trả hàng nhập / Chuyển hàng */
+.ant-table-wrapper.stockflow-pricebooks-table .ant-table-thead > tr > th {
+  background: #f7f8f9;
+  color: #677484;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.ant-table-wrapper.stockflow-pricebooks-table .ant-table-thead > tr > th::before {
+  display: none;
+}
+
+.ant-table-wrapper.stockflow-pricebooks-table .ant-table-tbody > tr > td {
+  font-size: 13px;
+}
+
 .stockflow-purchases-table .ant-table-thead > tr > th {
   background: #e8f2ff;
   color: #334155;

@@ -1,16 +1,10 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import {
-  SearchOutlined,
-  PlusOutlined,
-  SaveOutlined,
-  CalculatorOutlined,
-  SettingOutlined,
-  ReloadOutlined,
-  DeleteOutlined,
-} from '@ant-design/icons';
-import { Table, Input, Button, Tag, notification, Popover, Tooltip } from 'antd';
+import { CalculatorOutlined, SettingOutlined, DeleteOutlined } from '@ant-design/icons';
+import { Table, notification, Popover, Tooltip } from 'antd';
+import { FileDown, Plus, Save, Search } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import type { ColumnsType } from 'antd/es/table';
 import PriceBookFilterSidebar from '../components/PriceBookFilterSidebar';
 import CreatePriceBookModal from '../components/CreatePriceBookModal';
@@ -59,6 +53,7 @@ export default function PriceBooksClient() {
   // Inline edited prices: key is `${productId}_${priceBookId}` => newPrice
   const [editedPrices, setEditedPrices] = useState<Record<string, number>>({});
   const [savingPrices, setSavingPrices] = useState<boolean>(false);
+  const [exporting, setExporting] = useState<boolean>(false);
 
   // Modals
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
@@ -603,11 +598,126 @@ export default function PriceBooksClient() {
 
   const editedCount = Object.keys(editedPrices).length;
 
+  // Giá hiển thị của 1 hàng trên 1 bảng giá (giống ô trên bảng): bảng tự động theo công thức thì tính lại từ giá chung / giá vốn
+  const priceFor = (record: PriceBookMatrixItem, bookId: number): number => {
+    const book = priceBooks.find(b => b.priceBookId === bookId);
+    const isDefaultBook = book?.isDefault === true || bookId === defaultBookId;
+    if (!isDefaultBook && book?.formulaBaseType && book.formulaOperator && book.formulaValue) {
+      const base =
+        book.formulaBaseType === 'COST' ? record.costPrice : defaultBookId ? (record.prices[defaultBookId] ?? 0) : 0;
+      const delta = book.formulaUnit === 'PERCENT' ? base * (book.formulaValue / 100) : book.formulaValue;
+      return Math.max(0, Math.round(book.formulaOperator === '-' ? base - delta : base + delta));
+    }
+    return record.prices[bookId] ?? 0;
+  };
+
+  // Xuất file Excel toàn bộ hàng hóa theo bộ lọc đang chọn (mọi trang), mỗi bảng giá 1 cột
+  const handleExportExcel = async () => {
+    if (displayedBookIds.length === 0) {
+      api.warning({ message: 'Chưa chọn bảng giá', description: 'Vui lòng chọn ít nhất một bảng giá để xuất file.' });
+      return;
+    }
+    setExporting(true);
+    try {
+      const all: PriceBookMatrixItem[] = [];
+      for (let page = 1; page <= 200; page++) {
+        const res = await priceBookService.getPriceMatrix({
+          warehouseId: activeWarehouseId,
+          search: searchKeyword.trim() || undefined,
+          categoryId: selectedCategoryId ?? undefined,
+          stockCondition,
+          priceBookIds: displayedBookIds,
+          page,
+          pageSize: 100,
+        });
+        all.push(...res.items);
+        if (all.length >= res.totalCount || res.items.length === 0) break;
+      }
+      const rows = all.map(it => {
+        const row: Record<string, string | number> = {
+          'Mã hàng': it.productCode,
+          'Tên hàng': it.productName,
+          'Nhóm hàng': it.categoryName,
+          'ĐVT': it.unitName,
+          'Giá vốn': Math.round(it.costPrice),
+        };
+        displayedBookIds.forEach(id => {
+          const name = priceBooks.find(b => b.priceBookId === id)?.priceBookName ?? `Bảng giá #${id}`;
+          row[name] = priceFor(it, id);
+        });
+        return row;
+      });
+      const ws = XLSX.utils.json_to_sheet(rows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'ThietLapGia');
+      XLSX.writeFile(wb, `ThietLapGia_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    } catch {
+      api.error({ message: 'Lỗi xuất file', description: 'Không thể tải dữ liệu bảng giá để xuất file.' });
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
-    <div className="flex min-h-[calc(100vh-56px)] bg-[#f7f9fa]">
+    <div className="flex-1 h-full min-h-0 flex flex-col bg-[#f5f5f5] overflow-hidden text-[13px] text-[#15171a] font-sans">
       {contextHolder}
 
-      {/* LEFT FILTER SIDEBAR */}
+      {/* 1. Header: tiêu đề + tìm kiếm | + Bảng giá, Xuất file (giống Nhập hàng / Trả hàng nhập) */}
+      <header className="h-12 bg-white border-b border-slate-200 px-4 flex items-center justify-between gap-3 shrink-0">
+        <div className="flex items-center gap-4 flex-1 max-w-xl">
+          <h1 className="text-[20px] font-bold leading-7 tracking-tight whitespace-nowrap">Thiết lập giá</h1>
+          <div className="relative flex-1">
+            <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#677484] pointer-events-none" />
+            <input
+              type="text"
+              value={searchKeyword}
+              onChange={e => {
+                setSearchKeyword(e.target.value);
+                setPageIndex(1);
+              }}
+              placeholder="Theo mã, tên hàng hóa"
+              className="w-full h-8 pl-8 pr-3 rounded-full bg-[#f7f8f9] border border-slate-200 text-[13px] placeholder-[#677484] focus:outline-none focus:border-[#0070f4] focus:bg-white transition"
+            />
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {editedCount > 0 && (
+            <button
+              type="button"
+              disabled={savingPrices}
+              onClick={handleSavePrices}
+              className="inline-flex items-center gap-1.5 px-3.5 h-8 rounded-[8px] bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-[13px] cursor-pointer disabled:opacity-60"
+            >
+              <Save size={14} />
+              <span>{savingPrices ? 'Đang lưu...' : `Lưu thay đổi (${editedCount})`}</span>
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => {
+              setEditingPriceBook(null);
+              setIsModalOpen(true);
+            }}
+            className="inline-flex items-center gap-1.5 px-3.5 h-8 rounded-[8px] bg-[#0070f4] hover:bg-[#005ac3] text-white font-semibold text-[13px] shadow-xs transition cursor-pointer"
+          >
+            <Plus size={15} className="stroke-[2.5]" />
+            <span>Bảng giá</span>
+          </button>
+          <button
+            type="button"
+            disabled={exporting}
+            onClick={handleExportExcel}
+            className="inline-flex items-center gap-1 px-3 h-8 rounded-[8px] border border-slate-300 hover:bg-[#f7f8f9] font-medium text-[13px] bg-white cursor-pointer disabled:opacity-60"
+          >
+            <FileDown size={14} className="text-[#677484]" />
+            <span>{exporting ? 'Đang xuất...' : 'Xuất file'}</span>
+          </button>
+        </div>
+      </header>
+
+      <div className="flex-1 min-h-0 flex overflow-hidden">
+      {/* 2. Bộ lọc */}
       <PriceBookFilterSidebar
         priceBooks={priceBooks}
         selectedPriceBookIds={selectedPriceBookIds}
@@ -634,84 +744,16 @@ export default function PriceBooksClient() {
         }}
       />
 
-      {/* MAIN CONTENT AREA */}
-      <main className="min-w-0 flex-1 flex flex-col bg-white">
-        {/* Toolbar / Action Bar */}
-        <div className="border-b border-[#e5e7eb] bg-white px-6 py-3.5">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            {/* Title & Count */}
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-bold text-slate-800">
-                {activeCustomBook ? activeCustomBook.priceBookName : 'Thiết lập giá sản phẩm'}
-              </span>
-              <span className="text-xs text-slate-400">
-                ({totalCount} hàng hóa)
-              </span>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex items-center gap-2">
-              {editedCount > 0 && (
-                <Button
-                  type="primary"
-                  icon={<SaveOutlined />}
-                  loading={savingPrices}
-                  onClick={handleSavePrices}
-                  className="!bg-emerald-600 hover:!bg-emerald-700 font-medium"
-                >
-                  Lưu thay đổi ({editedCount})
-                </Button>
-              )}
-
-              <Button
-                icon={<ReloadOutlined />}
-                onClick={() => loadMatrix()}
-                className="text-slate-600"
-              >
-                Tải lại
-              </Button>
-
-              <Button
-                type="primary"
-                icon={<PlusOutlined />}
-                onClick={() => {
-                  setEditingPriceBook(null);
-                  setIsModalOpen(true);
-                }}
-                className="!bg-[#0071BA] hover:!bg-[#005f9d] font-medium"
-              >
-                + Bảng giá
-              </Button>
-            </div>
+      {/* 3. Bảng giá */}
+      <main className="min-w-0 flex-1 flex flex-col bg-white overflow-hidden">
+        {activeCustomBook && (
+          <div className="px-4 py-2 border-b border-slate-200 text-[12px] text-[#677484]">
+            Đang xem bảng giá <strong className="text-[#15171a]">{activeCustomBook.priceBookName}</strong> ({totalCount} hàng hóa)
           </div>
-        </div>
-
-        {/* Search Bar */}
-        <div className="px-6 py-3 bg-white border-b border-slate-100 flex flex-wrap items-center justify-between gap-3">
-          <Input
-            allowClear
-            prefix={<SearchOutlined className="text-slate-400" />}
-            placeholder="Tìm theo mã hoặc tên hàng..."
-            value={searchKeyword}
-            onChange={e => {
-              setSearchKeyword(e.target.value);
-              setPageIndex(1);
-            }}
-            className="w-full sm:w-[360px] h-[34px] rounded-md text-xs"
-          />
-
-          <div className="text-xs text-slate-500">
-            {displayedBookIds.length === 0 ? (
-              <span>Chưa có bảng giá được chọn</span>
-            ) : (
-              <>Hiển thị <strong>{matrixItems.length}</strong> trong <strong>{totalCount}</strong> hàng hóa</>
-            )}
-          </div>
-        </div>
-
+        )}
         {/* Table Area */}
-        <div className="flex-1 bg-[#f8fafc] p-6">
-          <div className="overflow-hidden rounded-lg border border-[#e5e7eb] bg-white shadow-2xs">
+        <div className="flex-1 min-h-0 overflow-auto">
+          <div>
             <Table<PriceBookMatrixItem>
               columns={columns}
               dataSource={displayedBookIds.length === 0 ? [] : matrixItems}
@@ -794,6 +836,7 @@ export default function PriceBooksClient() {
           </div>
         </div>
       </main>
+      </div>
 
       {/* CREATE / EDIT PRICE BOOK MODAL */}
       <CreatePriceBookModal

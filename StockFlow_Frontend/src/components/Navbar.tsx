@@ -27,7 +27,6 @@ const NAV_ITEMS: NavItem[] = [
       { label: 'Chuyển hàng', href: '/transfers' },
     ],
   },
-  { label: 'Nhà cung cấp', href: '/suppliers' },
   {
     label: 'Mua hàng',
     children: [
