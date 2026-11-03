@@ -50,32 +50,37 @@ export default function ViewPriceBooksModal({
     let isMounted = true;
     setLoading(true);
 
-    Promise.all([
-      priceBookService.getPriceBooks(),
-      item.code
-        ? priceBookService.getPriceMatrix({ search: item.code, pageSize: 5 }).catch(() => null)
-        : Promise.resolve(null),
-    ])
-      .then(([books, matrixRes]) => {
-        if (!isMounted) return;
-        setPriceBooks(books || []);
+    const loadPrices = async () => {
+      const books = (await priceBookService.getPriceBooks()) || [];
+      // Lấy giá của hàng hóa trên TẤT CẢ bảng giá (không truyền priceBookIds thì backend chỉ trả về bảng giá chung)
+      const matrixRes = item.code && books.length > 0
+        ? await priceBookService
+            .getPriceMatrix({ search: item.code, pageSize: 5, priceBookIds: books.map((b) => b.priceBookId) })
+            .catch(() => null)
+        : null;
+      return { books, matrixRes };
+    };
 
-        if (matrixRes && matrixRes.items && matrixRes.items.length > 0) {
-          const matched = matrixRes.items.find(
-            (m) =>
-              m.productCode.toUpperCase() === (item.code || '').toUpperCase() ||
-              (item.productId && m.productId === item.productId)
-          );
-          if (matched && matched.prices) {
-            const mapped: Record<number, number> = {};
-            for (const [k, v] of Object.entries(matched.prices)) {
-              if (v !== null && v !== undefined) {
-                mapped[Number(k)] = v;
-              }
+    loadPrices()
+      .then(({ books, matrixRes }) => {
+        if (!isMounted) return;
+        setPriceBooks(books);
+
+        const mapped: Record<number, number> = {};
+        const matched = matrixRes?.items?.find(
+          (m) =>
+            m.productCode.toUpperCase() === (item.code || '').toUpperCase() ||
+            (item.productId && m.productId === item.productId)
+        );
+        if (matched?.prices) {
+          for (const [k, v] of Object.entries(matched.prices)) {
+            if (v !== null && v !== undefined) {
+              mapped[Number(k)] = v;
             }
-            setDbPrices(mapped);
           }
         }
+        // Luôn ghi đè để không hiện giá của hàng hóa mở trước đó
+        setDbPrices(mapped);
       })
       .catch((err) => {
         console.warn('Lỗi tải danh sách bảng giá:', err);

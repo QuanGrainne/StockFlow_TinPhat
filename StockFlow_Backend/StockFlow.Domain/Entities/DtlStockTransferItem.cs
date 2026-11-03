@@ -23,6 +23,9 @@ public partial class DtlStockTransferItem
 
     public decimal? ReceivedQuantity { get; set; }
 
+    /// <summary>Giá vốn kho xuất tại thời điểm xuất chuyển (giá trị chuyển / giá nhập vào kho nhận)</summary>
+    public decimal? UnitCost { get; set; }
+
     public virtual MstWarehouseLocation? DestLocation { get; set; }
 
     public virtual MstInventoryLot? Lot { get; set; }

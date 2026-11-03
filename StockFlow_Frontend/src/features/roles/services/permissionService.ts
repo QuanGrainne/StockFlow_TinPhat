@@ -298,7 +298,9 @@ export const permissionService = {
           token
         );
       } catch (err) {
-        console.warn('API updateWarehousePermissions failed, saving locally:', err);
+        // Không lưu tạm phía client khi server từ chối (VD: 403 không phải Admin) để tránh hiển thị sai trạng thái.
+        console.error('API updateWarehousePermissions failed:', err);
+        throw err;
       }
     }
 
@@ -347,18 +349,8 @@ export const permissionService = {
       roleDefinitions.push(created);
       return created;
     } catch (e) {
-      console.warn('API createRole failed, fallback to local state:', e);
-      const fallbackRole: RoleDefinition = {
-        id: `ROLE-${Date.now()}`,
-        name: payload.name,
-        code: payload.code.toUpperCase().startsWith('ROLE_') ? payload.code.toUpperCase() : `ROLE_${payload.code.toUpperCase()}`,
-        rank: payload.rank || `Rank #${roleDefinitions.length + 1}`,
-        isSystem: false,
-        description: payload.description || 'Vai trò tùy biến mở rộng.',
-        staffCount: 0,
-      };
-      roleDefinitions.push(fallbackRole);
-      return fallbackRole;
+      console.error('API createRole failed:', e);
+      throw e;
     }
   },
 
@@ -372,17 +364,8 @@ export const permissionService = {
       }
       return updated;
     } catch (e) {
-      console.warn('API updateRole failed, fallback to local state:', e);
-      const idx = roleDefinitions.findIndex(r => r.id === idOrCode || r.code === idOrCode);
-      if (idx !== -1) {
-        roleDefinitions[idx] = {
-          ...roleDefinitions[idx],
-          name: payload.name,
-          description: payload.description || roleDefinitions[idx].description,
-        };
-        return roleDefinitions[idx];
-      }
-      return null;
+      console.error('API updateRole failed:', e);
+      throw e;
     }
   },
 
@@ -430,19 +413,21 @@ export const permissionService = {
   },
 
   async savePermissionMatrix(roleCode: string, modules: PermissionMatrixModule[]): Promise<boolean> {
+    // Lưu lên server trước; chỉ cập nhật cache/giao diện khi server chấp nhận (backend mới là nơi chặn quyền).
+    const token = typeof window !== 'undefined' ? localStorage.getItem('stockflow_token') ?? undefined : undefined;
+    try {
+      await apiClient.put(`/api/Roles/${encodeURIComponent(roleCode)}/permissions`, modules, token);
+    } catch (e) {
+      console.error(`API savePermissionMatrix for ${roleCode} failed:`, e);
+      throw e;
+    }
+
     permissionMatrices[roleCode] = JSON.parse(JSON.stringify(modules));
     if (typeof window !== 'undefined') {
       localStorage.setItem(`stockflow_perms_${roleCode}`, JSON.stringify(modules));
       window.dispatchEvent(new CustomEvent('stockflow_permissions_updated', { detail: { roleCode, modules } }));
     }
-    try {
-      const token = typeof window !== 'undefined' ? localStorage.getItem('stockflow_token') ?? undefined : undefined;
-      await apiClient.put(`/api/Roles/${encodeURIComponent(roleCode)}/permissions`, modules, token);
-      return true;
-    } catch (e) {
-      console.warn(`API savePermissionMatrix for ${roleCode} failed, fallback to local cache:`, e);
-      return true;
-    }
+    return true;
   },
 
   async getAllowedModuleKeys(roleCode: string): Promise<Set<string>> {
@@ -465,16 +450,6 @@ export const permissionService = {
       if (saved) {
         try {
           matrix = JSON.parse(saved);
-          // One-time cleanup: đảm bảo tính năng chuyển hàng không bị tự động bật mặc định
-          if (!localStorage.getItem('stockflow_transfers_default_cleaned_v2')) {
-            for (const r in matrix) {
-              if (Array.isArray(matrix[r])) {
-                matrix[r] = matrix[r].filter((id: string) => id !== 'feat-transfers');
-              }
-            }
-            localStorage.setItem('stockflow_feature_matrix', JSON.stringify(matrix));
-            localStorage.setItem('stockflow_transfers_default_cleaned_v2', 'true');
-          }
           // One-time initialization: đảm bảo tính năng khách hàng được bật mặc định cho ADMIN, MANAGER, SALES
           if (!localStorage.getItem('stockflow_customers_feat_initialized_v1')) {
             const defaultRolesWithCustomers = ['ROLE_ADMIN', 'ROLE_MANAGER', 'ROLE_SALES'];
@@ -486,8 +461,6 @@ export const permissionService = {
             localStorage.setItem('stockflow_feature_matrix', JSON.stringify(matrix));
             localStorage.setItem('stockflow_customers_feat_initialized_v1', 'true');
           }
-
-          // One-time initialization: đảm bảo tính năng nhà cung cấp được bật mặc định cho ADMIN, MANAGER, WAREHOUSE
           if (!localStorage.getItem('stockflow_suppliers_feat_initialized_v2')) {
             const defaultRolesWithSuppliers = ['ROLE_ADMIN', 'ROLE_MANAGER', 'ROLE_WAREHOUSE'];
             for (const r of defaultRolesWithSuppliers) {
@@ -519,10 +492,11 @@ export const permissionService = {
 
     // Đồng bộ sang từng Role cho Backend & localStorage
     for (const [roleCode, featureIds] of Object.entries(matrix)) {
+      // Dùng mã phân hệ backend (backendModuleKey) nếu khác mã hiển thị, VD Chuyển hàng → STOCK
       const permittedModuleKeys = new Set(
         NAVBAR_FEATURES
           .filter(f => featureIds.includes(f.id))
-          .map(f => f.moduleKey)
+          .map(f => f.backendModuleKey ?? f.moduleKey)
       );
 
       const modules: PermissionMatrixModule[] = INITIAL_PERMISSION_MODULES.map(m => {
@@ -569,6 +543,11 @@ export interface NavFeatureConfig {
   name: string;
   desc: string;
   moduleKey: string;
+  /**
+   * Mã phân hệ trong ma trận quyền backend (PermissionConstants: AUTH, BOM, PARTNER, PURCHASE,
+   * SALES, STOCK, PROD, FIN, GOODS). Chỉ khai báo khi moduleKey hiển thị không trùng mã backend.
+   */
+  backendModuleKey?: string;
   tabIds: string[];
 }
 
@@ -613,6 +592,8 @@ export const NAVBAR_FEATURES: NavFeatureConfig[] = [
     name: 'Chuyển hàng (Chuyển kho)',
     desc: 'Tạo phiếu chuyển kho, theo dõi hàng đang chuyển và xác nhận nhập kho đích',
     moduleKey: 'TRANSFER',
+    // API /api/Transfers yêu cầu quyền STOCK_* (UC-33 thuộc phân hệ Quản lý kho)
+    backendModuleKey: 'STOCK',
     tabIds: ['transfers', 'admin-transfers', 'manager-transfers', 'sales-transfers', 'warehouse-transfers', 'warehouse-transfer'],
   },
   {
@@ -680,6 +661,7 @@ export const DEFAULT_ROLE_FEATURE_PERMS: Record<string, string[]> = {
     'feat-roles',
     'feat-warehouse-perms',
     'feat-goods',
+    'feat-transfers',
     'feat-sales',
     'feat-purchase',
     'feat-suppliers',
@@ -692,6 +674,7 @@ export const DEFAULT_ROLE_FEATURE_PERMS: Record<string, string[]> = {
   ROLE_MANAGER: [
     'feat-goods',
     'feat-customers',
+    'feat-transfers',
     'feat-sales',
     'feat-purchase',
     'feat-suppliers',
@@ -709,6 +692,7 @@ export const DEFAULT_ROLE_FEATURE_PERMS: Record<string, string[]> = {
   ],
   ROLE_WAREHOUSE: [
     'feat-goods',
+    'feat-transfers', // UC-33: nhân viên kho lập phiếu chuyển và xác nhận nhận hàng
     'feat-purchase',
     'feat-suppliers',
     'feat-stock',

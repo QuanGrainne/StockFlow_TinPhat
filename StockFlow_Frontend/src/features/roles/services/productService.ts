@@ -91,7 +91,31 @@ export interface ProductUnitItem {
   name: string;
 }
 
+/** Nhập thêm (ADD) hoặc cân chỉnh (SET) tồn kho tại 1 kho */
+export interface AdjustProductStockPayload {
+  warehouseId: number;
+  quantity: number;
+  mode: 'ADD' | 'SET';
+  note?: string;
+}
+
+export interface ProductStockAdjustmentResult {
+  productId: number;
+  warehouseId: number;
+  warehouseCode: string;
+  warehouseName: string;
+  previousQuantity: number;
+  newQuantity: number;
+  delta: number;
+  unitCost: number;
+}
+
 export const productService = {
+  /** Điều chỉnh tồn kho thật trong DB (ghi thẻ kho, giữ nguyên giá vốn) */
+  adjustStock(id: number | string, payload: AdjustProductStockPayload): Promise<ProductStockAdjustmentResult> {
+    return apiClient.post<ProductStockAdjustmentResult>(`/api/Products/${id}/stock-adjustments`, payload);
+  },
+
   async getProducts(params?: {
     search?: string;
     type?: string;
@@ -149,6 +173,13 @@ export const productService = {
       console.warn('API updateProduct failed, falling back to local persistence:', e);
       throw e;
     }
+  },
+
+  /** Đảo trạng thái kinh doanh; trả về trạng thái mới (true = đang kinh doanh) */
+  async toggleProductStatus(id: number | string): Promise<boolean> {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('stockflow_token') ?? undefined : undefined;
+    const res = await apiClient.patch<{ isActive: boolean }>(`/api/Products/${id}/toggle-status`, undefined, token);
+    return res.isActive;
   },
 
   async deleteProduct(id: number | string): Promise<boolean> {

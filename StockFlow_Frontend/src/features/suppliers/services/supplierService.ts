@@ -7,6 +7,8 @@ import {
   SupplierDetail,
   CreateSupplierPayload,
   UpdateSupplierPayload,
+  CreateSupplierPaymentPayload,
+  SupplierPaymentResult,
 } from '../types';
 
 export const supplierService = {
@@ -18,6 +20,8 @@ export const supplierService = {
     debtStatus?: string;
     status?: string;
     warehouseId?: number | string;
+    fromDate?: string;
+    toDate?: string;
   }): Promise<Supplier[]> {
     try {
       const query = new URLSearchParams();
@@ -32,6 +36,13 @@ export const supplierService = {
       }
       if (params?.warehouseId && params.warehouseId !== 'ALL' && Number(params.warehouseId) > 0) {
         query.append('warehouseId', String(params.warehouseId));
+      }
+      // Lọc theo thời gian phát sinh nhập hàng (YYYY-MM-DD)
+      if (params?.fromDate) {
+        query.append('fromDate', params.fromDate);
+      }
+      if (params?.toDate) {
+        query.append('toDate', params.toDate);
       }
 
       const qs = query.toString() ? `?${query.toString()}` : '';
@@ -129,5 +140,10 @@ export const supplierService = {
       console.error(`Lỗi khi xóa Nhà cung cấp #${id}:`, e);
       throw e;
     }
+  },
+
+  /** Tạo phiếu chi thanh toán nợ NCC (PC000001...), có phân bổ vào phiếu nhập */
+  async createSupplierPayment(id: number, payload: CreateSupplierPaymentPayload): Promise<SupplierPaymentResult> {
+    return apiClient.post<SupplierPaymentResult>(`/api/Suppliers/${id}/payments`, payload);
   },
 };

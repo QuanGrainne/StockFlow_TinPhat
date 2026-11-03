@@ -61,7 +61,32 @@ public record PurchaseDetailDto(
     decimal DebtAmount,
     string? PaymentMethod,
     string? Notes,
-    List<PurchaseItemDto> Items
+    List<PurchaseItemDto> Items,
+    decimal TotalGoodsAmount = 0,   // Tổng tiền hàng (trước giảm giá phiếu)
+    decimal DiscountAmount = 0,     // Giảm giá phiếu
+    List<PurchasePaymentDto>? Payments = null,
+    List<PurchaseReturnSummaryDto>? Returns = null,
+    decimal ReturnOffsetAmount = 0  // Trả hàng nhập được trừ vào công nợ của phiếu này
+);
+
+/// <summary>Lịch sử trả hàng của phiếu nhập (các phiếu trả hàng nhập THN lập từ phiếu này).</summary>
+public record PurchaseReturnSummaryDto(
+    int PurchaseReturnId,
+    string ReturnCode,
+    DateTime? ReturnDate,
+    string CreatedByName,
+    decimal TotalAmount,
+    string Status
+);
+
+/// <summary>Lịch sử thanh toán của phiếu nhập (trả lúc nhập + các phiếu chi PC phân bổ vào phiếu).</summary>
+public record PurchasePaymentDto(
+    string Code,
+    DateTime? PaymentDate,
+    string CreatedByName,
+    string PaymentMethod,
+    string Status,
+    decimal Amount
 );
 
 public record CreatePurchaseItemRequest(
@@ -83,7 +108,8 @@ public record CreatePurchaseRequest(
     string? PaymentMethod, // "CASH", "BANK_TRANSFER"
     string? Notes,
     List<CreatePurchaseItemRequest> Items,
-    string? PurchaseCode = null
+    string? PurchaseCode = null,
+    decimal DiscountAmount = 0 // Giảm giá toàn phiếu (VND)
 );
 
 public record UpdatePurchaseRequest(
@@ -91,7 +117,8 @@ public record UpdatePurchaseRequest(
     string? ExternalPoNumber,
     DateTime? ReceivedDate,
     string? Notes,
-    List<CreatePurchaseItemRequest> Items
+    List<CreatePurchaseItemRequest> Items,
+    decimal DiscountAmount = 0 // Giảm giá toàn phiếu (VND)
 );
 
 public record CompletePurchaseRequest(

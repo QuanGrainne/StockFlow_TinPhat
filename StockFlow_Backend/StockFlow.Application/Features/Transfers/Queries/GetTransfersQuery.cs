@@ -25,10 +25,12 @@ public record GetTransfersQuery(
 public class GetTransfersQueryHandler : IRequestHandler<GetTransfersQuery, Result<List<TransferListDto>>>
 {
     private readonly IStockFlowDbContext _context;
+    private readonly ICurrentUserService _currentUserService;
 
-    public GetTransfersQueryHandler(IStockFlowDbContext context)
+    public GetTransfersQueryHandler(IStockFlowDbContext context, ICurrentUserService currentUserService)
     {
         _context = context;
+        _currentUserService = currentUserService;
     }
 
     public async Task<Result<List<TransferListDto>>> Handle(GetTransfersQuery request, CancellationToken cancellationToken)
@@ -58,6 +60,10 @@ public class GetTransfersQueryHandler : IRequestHandler<GetTransfersQuery, Resul
         {
             query = query.Where(t => request.WarehouseIds.Contains(t.SourceWarehouseId) || request.WarehouseIds.Contains(t.DestWarehouseId));
         }
+
+        // 3b. Cô lập dữ liệu kho: luôn giới hạn trong các kho người dùng được phân quyền (Admin = mọi kho hoạt động)
+        var authorizedWarehouseIds = await _currentUserService.GetAuthorizedWarehouseIdsAsync(cancellationToken);
+        query = query.Where(t => authorizedWarehouseIds.Contains(t.SourceWarehouseId) || authorizedWarehouseIds.Contains(t.DestWarehouseId));
 
         // 4. Lọc theo trạng thái
         if (!string.IsNullOrWhiteSpace(request.Status) && !request.Status.Equals("ALL", StringComparison.OrdinalIgnoreCase))
@@ -115,7 +121,7 @@ public class GetTransfersQueryHandler : IRequestHandler<GetTransfersQuery, Resul
             {
                 var qty = item.Quantity ?? 0;
                 var rec = item.ReceivedQuantity ?? 0;
-                var price = item.Product?.MovingAverageCost ?? item.Product?.StandardPrice ?? 0;
+                var price = item.UnitCost ?? item.Product?.MovingAverageCost ?? 0;
 
                 totalQty += qty;
                 totalReceived += rec;

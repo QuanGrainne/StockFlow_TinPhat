@@ -58,3 +58,9 @@ yarn-error.log*
 Thumbs.db
 desktop.ini
 graphify-out
+
+# graphify knowledge graph output
+graphify-out/
+
+# Claude Code per-machine settings
+.claude/settings.local.json

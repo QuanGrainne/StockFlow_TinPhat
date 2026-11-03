@@ -30,7 +30,8 @@ public class GetProductCategoriesQueryHandler : IRequestHandler<GetProductCatego
             CategoryName: c.CategoryName ?? $"Danh mục #{c.CategoryId}",
             Description: c.Description,
             IsActive: c.IsActive ?? true,
-            ProductCount: c.MstProducts.Count
+            ProductCount: c.MstProducts.Count,
+            ActiveProductCount: c.MstProducts.Count(p => p.IsActive != false)
         )).ToList();
 
         return Result.Success(result);

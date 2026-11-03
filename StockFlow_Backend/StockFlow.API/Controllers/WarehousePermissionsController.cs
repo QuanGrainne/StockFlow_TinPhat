@@ -4,12 +4,12 @@ using Microsoft.AspNetCore.Mvc;
 using StockFlow.Application.Features.WarehousePermissions.Commands;
 using StockFlow.Application.Features.WarehousePermissions.DTOs;
 using StockFlow.Application.Features.WarehousePermissions.Queries;
+using StockFlow.API.Authorization;
 
 namespace StockFlow.API.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-[AllowAnonymous]
 public class WarehousePermissionsController : ControllerBase
 {
     private readonly IMediator _mediator;
@@ -24,6 +24,7 @@ public class WarehousePermissionsController : ControllerBase
     /// </summary>
     [HttpGet]
     [ProducesResponseType(typeof(List<WarehouseStaffAccessDto>), StatusCodes.Status200OK)]
+    [RequirePermission("AUTH_READ")]
     public async Task<IActionResult> GetWarehousePermissions([FromQuery] string? search, [FromQuery] string? warehouseFilter)
     {
         var result = await _mediator.Send(new GetWarehousePermissionsQuery(search, warehouseFilter));
@@ -48,6 +49,7 @@ public class WarehousePermissionsController : ControllerBase
     [ProducesResponseType(typeof(WarehouseStaffAccessDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [RequireAdmin]
     public async Task<IActionResult> UpdateWarehouseAccess(int userId, [FromBody] UpdateWarehouseAccessRequest request)
     {
         var result = await _mediator.Send(new UpdateWarehouseAccessCommand(userId, request));
@@ -68,6 +70,7 @@ public class WarehousePermissionsController : ControllerBase
     [HttpPost("facilities")]
     [ProducesResponseType(typeof(WarehouseFacilityDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [RequireAdmin]
     public async Task<IActionResult> CreateWarehouseFacility([FromBody] CreateWarehouseRequest request)
     {
         var result = await _mediator.Send(new CreateWarehouseCommand(request));
@@ -84,6 +87,7 @@ public class WarehousePermissionsController : ControllerBase
     [HttpPut("facilities/{warehouseId}")]
     [ProducesResponseType(typeof(WarehouseFacilityDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [RequireAdmin]
     public async Task<IActionResult> UpdateWarehouseFacility(int warehouseId, [FromBody] UpdateWarehouseRequest request)
     {
         var result = await _mediator.Send(new UpdateWarehouseCommand(warehouseId, request));

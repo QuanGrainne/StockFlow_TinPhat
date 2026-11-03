@@ -4,12 +4,12 @@ using Microsoft.AspNetCore.Mvc;
 using StockFlow.Application.Features.Admin.Commands;
 using StockFlow.Application.Features.Admin.DTOs;
 using StockFlow.Application.Features.Admin.Queries;
+using StockFlow.API.Authorization;
 
 namespace StockFlow.API.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-[AllowAnonymous]
 public class StaffController : ControllerBase
 {
     private readonly IMediator _mediator;
@@ -24,6 +24,7 @@ public class StaffController : ControllerBase
     /// </summary>
     [HttpGet]
     [ProducesResponseType(typeof(List<StaffDto>), StatusCodes.Status200OK)]
+    [RequirePermission("AUTH_READ")]
     public async Task<IActionResult> GetStaffList([FromQuery] string? search, [FromQuery] string? status, [FromQuery] string? department)
     {
         var result = await _mediator.Send(new GetStaffListQuery(search, status, department));
@@ -36,6 +37,7 @@ public class StaffController : ControllerBase
     [HttpPost]
     [ProducesResponseType(typeof(StaffDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [RequireAdmin]
     public async Task<IActionResult> CreateStaff([FromBody] CreateStaffRequest request)
     {
         var result = await _mediator.Send(new CreateStaffCommand(request));
@@ -52,6 +54,7 @@ public class StaffController : ControllerBase
     [HttpPut("{id}")]
     [ProducesResponseType(typeof(StaffDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [RequireAdmin]
     public async Task<IActionResult> UpdateStaff(int id, [FromBody] UpdateStaffRequest request)
     {
         var result = await _mediator.Send(new UpdateStaffCommand(id, request));
@@ -69,6 +72,7 @@ public class StaffController : ControllerBase
     [HttpPut("{id}/toggle-status")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [RequireAdmin]
     public async Task<IActionResult> ToggleStaffStatus(int id)
     {
         var result = await _mediator.Send(new ToggleStaffStatusCommand(id));
@@ -85,6 +89,7 @@ public class StaffController : ControllerBase
     [HttpPost("{id}/reset-password")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [RequireAdmin]
     public async Task<IActionResult> ResetStaffPassword(int id)
     {
         var result = await _mediator.Send(new ResetStaffPasswordCommand(id));

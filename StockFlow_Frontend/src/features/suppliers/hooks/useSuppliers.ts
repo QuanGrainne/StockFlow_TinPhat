@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { message, Modal } from 'antd';
 import { supplierService } from '../services/supplierService';
 import { exportSuppliersToXLSX } from '../utils/exportExcel';
+import { parseSuppliersFromExcel } from '../utils/importExcel';
 import {
   Supplier,
   SupplierDetail,
@@ -23,6 +24,9 @@ export function useSuppliers() {
     debtStatus: 'ALL',
     status: 'ALL',
     warehouseId: 'ALL',
+    timeRange: 'all_time',
+    dateFrom: '',
+    dateTo: '',
   });
   const [selectedLocation, setSelectedLocation] = useState<string>('ALL');
   const [warehousesList, setWarehousesList] = useState<WarehouseOption[]>([]);
@@ -63,8 +67,11 @@ export function useSuppliers() {
         debtStatus: filterState.debtStatus,
         status: filterState.status,
         warehouseId: filterState.warehouseId,
+        fromDate: filterState.dateFrom,
+        toDate: filterState.dateTo,
       });
-      setSuppliers(data);
+      // Nhà cung cấp mới tạo (ID lớn nhất) luôn nằm trên đầu danh sách
+      setSuppliers([...data].sort((a, b) => b.partnerId - a.partnerId));
     } catch (e: any) {
       message.error(e?.message || 'Không thể tải danh sách nhà cung cấp từ máy chủ.');
     } finally {
@@ -74,7 +81,7 @@ export function useSuppliers() {
 
   useEffect(() => {
     loadSuppliers();
-  }, [filterState.debtStatus, filterState.status, filterState.warehouseId]);
+  }, [filterState.debtStatus, filterState.status, filterState.warehouseId, filterState.dateFrom, filterState.dateTo]);
 
   // 3. Lọc dữ liệu client-side (địa chỉ/tỉnh thành & từ khóa tìm kiếm)
   const filteredSuppliers = useMemo(() => {
@@ -150,6 +157,22 @@ export function useSuppliers() {
     }
   };
 
+  // 6b. Sau khi thanh toán / thay đổi công nợ: tải lại chi tiết NCC đang mở + danh sách
+  const handlePaymentCreated = async (partnerId: number, voucherCode: string) => {
+    message.success(`Đã tạo phiếu chi ${voucherCode}`);
+    try {
+      const detail = await supplierService.getSupplierById(partnerId);
+      setDetailsCache((prev) => ({ ...prev, [partnerId]: detail }));
+    } catch {
+      setDetailsCache((prev) => {
+        const next = { ...prev };
+        delete next[partnerId];
+        return next;
+      });
+    }
+    loadSuppliers();
+  };
+
   // 7. Handlers lọc
   const handleFilterChange = (patch: Partial<SupplierFilterState>) => {
     setFilterState((prev) => ({ ...prev, ...patch }));
@@ -162,6 +185,9 @@ export function useSuppliers() {
       debtStatus: 'ALL',
       status: 'ALL',
       warehouseId: 'ALL',
+      timeRange: 'all_time',
+      dateFrom: '',
+      dateTo: '',
     });
     setSelectedLocation('ALL');
     setPage(1);
@@ -231,6 +257,58 @@ export function useSuppliers() {
       selectedWarehouse ? selectedWarehouse.name : undefined
     );
     message.success(`Đã xuất thành công file Excel (${filteredSuppliers.length} nhà cung cấp)!`);
+  };
+
+  // 8b. Import danh sách nhà cung cấp từ file Excel (định dạng giống file Xuất file)
+  const [importing, setImporting] = useState<boolean>(false);
+  const handleImportExcel = async (file: File) => {
+    setImporting(true);
+    try {
+      const { rows, skippedNoName } = await parseSuppliersFromExcel(file);
+      const existingCodes = new Set(suppliers.map((s) => s.code.toUpperCase()));
+
+      let created = 0;
+      const skippedExisting: number[] = [];
+      const failed: string[] = [];
+
+      // Tạo tuần tự để mã NCC tự sinh không bị trùng
+      for (const row of rows) {
+        if (row.payload.code && existingCodes.has(row.payload.code.toUpperCase())) {
+          skippedExisting.push(row.rowNumber);
+          continue;
+        }
+        try {
+          await supplierService.createSupplier(row.payload);
+          created++;
+          if (row.payload.code) existingCodes.add(row.payload.code.toUpperCase());
+        } catch (err) {
+          failed.push(`Dòng ${row.rowNumber}: ${err instanceof Error ? err.message : 'lỗi không xác định'}`);
+        }
+      }
+
+      const notes = [
+        skippedExisting.length ? `${skippedExisting.length} dòng trùng mã đã có` : '',
+        skippedNoName.length ? `${skippedNoName.length} dòng thiếu tên` : '',
+        failed.length ? `${failed.length} dòng lỗi` : '',
+      ].filter(Boolean);
+
+      if (created > 0) {
+        message.success(
+          `Đã import ${created} nhà cung cấp${notes.length ? ` (bỏ qua: ${notes.join(', ')})` : ''}.`
+        );
+        loadSuppliers();
+      } else {
+        message.warning(`Không có nhà cung cấp nào được import${notes.length ? `: ${notes.join(', ')}` : ''}.`);
+      }
+      if (failed.length > 0) {
+        console.warn('Import nhà cung cấp - các dòng lỗi:', failed);
+        message.error(failed.slice(0, 3).join(' | '));
+      }
+    } catch (err) {
+      message.error(err instanceof Error ? err.message : 'Không đọc được file Excel.');
+    } finally {
+      setImporting(false);
+    }
   };
 
   // 9. Handlers Thao tác hàng loạt (Bulk Actions)
@@ -324,6 +402,7 @@ export function useSuppliers() {
     loadingDetailId,
     loadSuppliers,
     handleRowClick,
+    handlePaymentCreated,
     handleFilterChange,
     handleResetFilters,
     handleOpenCreate,
@@ -331,6 +410,8 @@ export function useSuppliers() {
     handleToggleStatus,
     handleDelete,
     handleExportExcel,
+    importing,
+    handleImportExcel,
     handleBulkExportExcel,
     handleBulkChangeStatus,
   };

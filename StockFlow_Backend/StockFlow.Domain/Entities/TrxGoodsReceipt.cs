@@ -23,6 +23,9 @@ public partial class TrxGoodsReceipt
 
     public string? Notes { get; set; }
 
+    /// <summary>Giảm giá toàn phiếu (VND), đã phân bổ vào UnitLandedCost của từng dòng.</summary>
+    public decimal? DiscountAmount { get; set; }
+
     public virtual ICollection<DtlGoodsReceiptItem> DtlGoodsReceiptItems { get; set; } = new List<DtlGoodsReceiptItem>();
 
     public virtual MstBusinessPartner Partner { get; set; } = null!;

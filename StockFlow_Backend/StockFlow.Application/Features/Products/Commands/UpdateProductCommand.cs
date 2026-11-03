@@ -110,12 +110,40 @@ public class UpdateProductCommandHandler : IRequestHandler<UpdateProductCommand,
 
         if (req.CostPrice.HasValue)
         {
-            product.MovingAverageCost = req.CostPrice.Value;
+            // Giá vốn hiển thị theo từng kho lấy từ TrxInventoryBalances.UnitCost → phải cập nhật cả các dòng tồn,
+            // nếu chỉ sửa MovingAverageCost thì màn hình vẫn hiện giá vốn cũ của kho.
+            var newCost = Math.Max(0, req.CostPrice.Value);
+            var scopeIds = req.CostWarehouseIds?.Where(id => id > 0).Distinct().ToList();
+            var applyAll = scopeIds == null || scopeIds.Count == 0;
+
+            foreach (var balance in product.TrxInventoryBalances)
+            {
+                if (applyAll || scopeIds!.Contains(balance.WarehouseId))
+                {
+                    balance.UnitCost = newCost;
+                    balance.LastUpdated = DateTime.UtcNow;
+                }
+            }
+
+            if (applyAll || product.TrxInventoryBalances.All(b => scopeIds!.Contains(b.WarehouseId)))
+            {
+                product.MovingAverageCost = newCost;
+            }
         }
 
         if (req.StandardPrice.HasValue)
         {
             product.StandardPrice = req.StandardPrice.Value;
+
+            // Giữ dòng Bảng giá chung (nếu đã có) khớp với Giá bán mới
+            var defaultBookItem = await _context.DtlPriceBookItems
+                .Where(i => i.ProductId == product.ProductId && i.PriceBook.IsDefault)
+                .FirstOrDefaultAsync(cancellationToken);
+            if (defaultBookItem != null)
+            {
+                defaultBookItem.Price = req.StandardPrice.Value;
+                defaultBookItem.UpdatedAt = DateTime.UtcNow;
+            }
         }
 
         if (req.MinSafeStock.HasValue)

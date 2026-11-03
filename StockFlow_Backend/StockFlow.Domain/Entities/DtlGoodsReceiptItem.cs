@@ -25,6 +25,12 @@ public partial class DtlGoodsReceiptItem
 
     public decimal? UnitLandedCost { get; set; }
 
+    /// <summary>Đơn giá nhập gốc (trước giảm giá dòng và giảm giá phiếu). Null với dữ liệu cũ.</summary>
+    public decimal? UnitPrice { get; set; }
+
+    /// <summary>% giảm giá của dòng (0–100). Null với dữ liệu cũ.</summary>
+    public decimal? DiscountPercent { get; set; }
+
     public int? LocationId { get; set; }
 
     public int? LotId { get; set; }

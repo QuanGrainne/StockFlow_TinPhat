@@ -72,7 +72,7 @@ public class GetProductsQueryHandler : IRequestHandler<GetProductsQuery, Result<
         if (!string.IsNullOrWhiteSpace(query.Status) && query.Status != "ALL")
         {
             if (query.Status.Equals("ACTIVE", StringComparison.OrdinalIgnoreCase))
-                productsQuery = productsQuery.Where(p => p.IsActive == true);
+                productsQuery = productsQuery.Where(p => p.IsActive != false); // NULL coi như đang kinh doanh (khớp Status hiển thị)
             else if (query.Status.Equals("INACTIVE", StringComparison.OrdinalIgnoreCase) || query.Status.Equals("LOCKED", StringComparison.OrdinalIgnoreCase))
                 productsQuery = productsQuery.Where(p => p.IsActive == false);
         }

@@ -141,7 +141,7 @@ public class GetPriceBookMatrixQueryHandler : IRequestHandler<GetPriceBookMatrix
         // 5. Lấy đơn giá nhập cuối (Latest Purchase Price) cho danh sách sản phẩm này
         var receiptQuery = _context.DtlGoodsReceiptItems
             .Include(item => item.Gr)
-            .Where(item => productIds.Contains(item.ProductId) && item.Gr.ReceivedDate != null);
+            .Where(item => productIds.Contains(item.ProductId) && item.Gr.ReceivedDate != null && item.Gr.Status == "COMPLETED");
 
         if (request.WarehouseId.HasValue && request.WarehouseId.Value > 0)
         {
@@ -166,9 +166,14 @@ public class GetPriceBookMatrixQueryHandler : IRequestHandler<GetPriceBookMatrix
 
             if (request.WarehouseId.HasValue && request.WarehouseId.Value > 0)
             {
-                var bal = p.TrxInventoryBalances.FirstOrDefault(b => b.WarehouseId == request.WarehouseId.Value);
-                costPrice = bal?.UnitCost ?? p.MovingAverageCost ?? 0;
-                stockQty = bal?.Quantity ?? 0;
+                // Một kho có thể có nhiều dòng tồn (vị trí / lô): cộng dồn SL, giá vốn bình quân theo SL dương
+                var bals = p.TrxInventoryBalances.Where(b => b.WarehouseId == request.WarehouseId.Value).ToList();
+                stockQty = bals.Sum(b => b.Quantity ?? 0);
+                var positive = bals.Where(b => (b.Quantity ?? 0) > 0).ToList();
+                var positiveQty = positive.Sum(b => b.Quantity ?? 0);
+                costPrice = positiveQty > 0
+                    ? Math.Round(positive.Sum(b => (b.Quantity ?? 0) * (b.UnitCost ?? 0)) / positiveQty, 2)
+                    : bals.Select(b => b.UnitCost).FirstOrDefault(c => c.HasValue && c.Value > 0) ?? p.MovingAverageCost ?? 0;
             }
             else
             {
@@ -188,11 +193,18 @@ public class GetPriceBookMatrixQueryHandler : IRequestHandler<GetPriceBookMatrix
 
             // Dictionary giá theo từng bảng giá
             var prices = new Dictionary<int, decimal?>();
-            decimal standardBasePrice = p.StandardPrice ?? (costPrice > 0 ? Math.Round(costPrice * 1.35m, 0) : 0);
+            // Bảng giá chung = Giá bán của hàng hóa (MstProducts.StandardPrice), cùng công thức với Danh mục hàng hóa.
+            // Không đọc dòng đã lưu của bảng giá chung: sửa giá ở form hàng hóa không cập nhật dòng đó nên có thể đã cũ.
+            var productCost = p.MovingAverageCost ?? 0;
+            decimal standardBasePrice = p.StandardPrice ?? (productCost > 0 ? Math.Round(productCost * 1.35m, 0) : 0);
 
             foreach (var bookId in targetBookIds)
             {
-                if (priceMap.TryGetValue((p.ProductId, bookId), out var price))
+                if (targetBooks.TryGetValue(bookId, out var currentBook) && currentBook.IsDefault)
+                {
+                    prices[bookId] = standardBasePrice;
+                }
+                else if (priceMap.TryGetValue((p.ProductId, bookId), out var price))
                 {
                     prices[bookId] = price;
                 }

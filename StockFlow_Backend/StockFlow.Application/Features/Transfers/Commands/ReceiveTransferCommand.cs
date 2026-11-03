@@ -22,10 +22,12 @@ public record ReceiveTransferCommand(
 public class ReceiveTransferCommandHandler : IRequestHandler<ReceiveTransferCommand, Result<TransferDetailDto>>
 {
     private readonly IStockFlowDbContext _context;
+    private readonly ICurrentUserService _currentUserService;
 
-    public ReceiveTransferCommandHandler(IStockFlowDbContext context)
+    public ReceiveTransferCommandHandler(IStockFlowDbContext context, ICurrentUserService currentUserService)
     {
         _context = context;
+        _currentUserService = currentUserService;
     }
 
     public async Task<Result<TransferDetailDto>> Handle(ReceiveTransferCommand command, CancellationToken cancellationToken)
@@ -37,6 +39,12 @@ public class ReceiveTransferCommandHandler : IRequestHandler<ReceiveTransferComm
         if (transfer == null)
         {
             return Result.Failure<TransferDetailDto>("Không tìm thấy phiếu chuyển hàng.");
+        }
+
+        // Cô lập dữ liệu kho (UC-33): xác nhận nhận hàng cho kho nhận này
+        if (!await _currentUserService.HasWarehouseAccessAsync(transfer.DestWarehouseId, cancellationToken))
+        {
+            return Result.Failure<TransferDetailDto>("Bạn không có quyền xác nhận nhận hàng cho kho nhận này.");
         }
 
         if (!string.Equals(transfer.Status, "IN_TRANSIT", StringComparison.OrdinalIgnoreCase))
@@ -66,9 +74,9 @@ public class ReceiveTransferCommandHandler : IRequestHandler<ReceiveTransferComm
         }
 
         var productIds = transfer.DtlStockTransferItems.Select(i => i.ProductId).Distinct().ToList();
-        var destBalances = await _context.TrxInventoryBalances
-            .Where(b => b.WarehouseId == transfer.DestWarehouseId && productIds.Contains(b.ProductId))
-            .ToListAsync(cancellationToken);
+        var products = await _context.MstProducts
+            .Where(p => productIds.Contains(p.ProductId))
+            .ToDictionaryAsync(p => p.ProductId, cancellationToken);
 
         var receivedDate = TransferHelper.GetVietnamTime(command.Request.ReceivedDate);
 
@@ -80,7 +88,7 @@ public class ReceiveTransferCommandHandler : IRequestHandler<ReceiveTransferComm
             );
         }
 
-        // 2. Duyệt các mặt hàng và CHỈ cộng đúng actualReceived (SL_Nhận) vào kho nhận
+        // 2. CHỈ cộng đúng SL_Nhận vào kho nhận, theo giá vốn lúc xuất → giá vốn kho nhận tính lại bình quân
         foreach (var item in transfer.DtlStockTransferItems)
         {
             var reqItem = command.Request.Items?.FirstOrDefault(ri =>
@@ -90,40 +98,14 @@ public class ReceiveTransferCommandHandler : IRequestHandler<ReceiveTransferComm
             decimal actualReceived = reqItem != null ? Math.Max(0, reqItem.ReceivedQuantity) : (item.Quantity ?? 0);
             item.ReceivedQuantity = actualReceived;
 
-            // Cộng vào tồn kho tại chi nhánh nhận (CHỈ cộng SL_Nhận)
-            if (actualReceived > 0)
-            {
-                var balance = destBalances.FirstOrDefault(b => b.ProductId == item.ProductId);
-                if (balance != null)
-                {
-                    balance.Quantity = (balance.Quantity ?? 0) + actualReceived;
-                    balance.LastUpdated = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
-                }
-                else
-                {
-                    var newBalance = new TrxInventoryBalance
-                    {
-                        WarehouseId = transfer.DestWarehouseId,
-                        ProductId = item.ProductId,
-                        Quantity = actualReceived,
-                        LastUpdated = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
-                    };
-                    await _context.TrxInventoryBalances.AddAsync(newBalance, cancellationToken);
-                }
+            var product = products[item.ProductId];
+            var unitCost = item.UnitCost
+                ?? (await TransferStockOps.WarehouseStockAsync(_context, transfer.SourceWarehouseId, product, cancellationToken)).UnitCost;
+            item.UnitCost = unitCost;
 
-                // Ghi nhận giao dịch nhập chuyển kho (TRANSFER_IN) đúng bằng SL_Nhận
-                var trx = new TrxInventoryTransaction
-                {
-                    WarehouseId = transfer.DestWarehouseId,
-                    ProductId = item.ProductId,
-                    TransactionType = "TRANSFER_IN",
-                    Quantity = actualReceived,
-                    ReferenceType = "TRANSFER",
-                    TransactionDate = receivedDate,
-                    CreatedBy = command.UserId,
-                };
-                await _context.TrxInventoryTransactions.AddAsync(trx, cancellationToken);
-            }
+            await TransferStockOps.InboundAsync(
+                _context, transfer.DestWarehouseId, product, actualReceived, unitCost,
+                "TRANSFER_IN", transfer.StockTransferId, command.UserId, cancellationToken);
         }
 
         transfer.Status = "RECEIVED";

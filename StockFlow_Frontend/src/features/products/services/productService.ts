@@ -21,9 +21,28 @@ export interface BackendProduct {
   barcode?: string | null;
   brand?: string | null;
   description?: string | null;
+  imageUrl?: string | null;
+}
+
+/** Nhóm hàng (GET /api/Products/categories → ProductCategoryDto) */
+export interface BackendProductCategory {
+  categoryId: number;
+  categoryName: string;
+  description?: string | null;
+  isActive: boolean;
+  /** Tổng số hàng hóa thuộc nhóm (kể cả ngừng kinh doanh) */
+  productCount: number;
+  /** Số hàng hóa đang kinh doanh (API cũ chưa có trường này) */
+  activeProductCount?: number;
 }
 
 export const productService = {
+  /** Danh sách nhóm hàng kèm số lượng hàng hóa trong nhóm */
+  async getCategories(): Promise<BackendProductCategory[]> {
+    const data = await apiClient.get<BackendProductCategory[]>('/api/Products/categories');
+    return Array.isArray(data) ? data : [];
+  },
+
   /**
    * Lấy danh sách hàng hóa từ CSDL (hỗ trợ tìm kiếm, lọc theo kho để lấy đúng tồn kho và giá vốn tại kho đó)
    */

@@ -2,7 +2,47 @@
 // Tiện ích xuất dữ liệu Nhà cung cấp ra định dạng chuẩn Excel (.xlsx)
 
 import * as XLSX from 'xlsx';
-import { Supplier } from '../types';
+import { Supplier, SupplierRecentReceipt, SupplierDebtLedgerEntry } from '../types';
+import { formatDateTimeVN } from '@/features/transfers/utils/dateUtils';
+
+const RECEIPT_STATUS_LABEL: Record<string, string> = {
+  COMPLETED: 'Đã nhập hàng',
+  DRAFT: 'Phiếu tạm',
+  CANCELLED: 'Đã hủy',
+};
+
+function writeSheet(rows: Record<string, string | number>[], cols: number[], sheetName: string, fileName: string) {
+  const worksheet = XLSX.utils.json_to_sheet(rows);
+  worksheet['!cols'] = cols.map((wch) => ({ wch }));
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+  XLSX.writeFile(workbook, fileName);
+}
+
+/** Xuất tab "Lịch sử nhập/trả hàng" của một nhà cung cấp */
+export function exportSupplierReceiptsToXLSX(supplier: Supplier, receipts: SupplierRecentReceipt[]) {
+  const rows = receipts.map((r) => ({
+    'Mã phiếu': r.receiptNumber,
+    'Thời gian': formatDateTimeVN(r.receiptDate),
+    'Người tạo': r.createdByName || '',
+    'Chi nhánh': r.warehouseName || '',
+    'Tổng cộng': r.totalAmount,
+    'Trạng thái': RECEIPT_STATUS_LABEL[(r.status || 'COMPLETED').toUpperCase()] ?? r.status ?? '',
+  }));
+  writeSheet(rows, [16, 18, 24, 24, 16, 14], 'Lịch sử nhập hàng', `lich_su_nhap_hang_${supplier.code}.xlsx`);
+}
+
+/** Xuất tab "Nợ cần trả nhà cung cấp" (sổ công nợ) của một nhà cung cấp */
+export function exportSupplierLedgerToXLSX(supplier: Supplier, ledger: SupplierDebtLedgerEntry[]) {
+  const rows = ledger.map((l) => ({
+    'Mã phiếu': l.code,
+    'Thời gian': l.date ? formatDateTimeVN(l.date) : '',
+    'Loại': l.typeLabel,
+    'Giá trị': l.amount,
+    'Nợ cần trả nhà cung cấp': l.balanceAfter,
+  }));
+  writeSheet(rows, [16, 18, 22, 16, 24], 'Nợ cần trả NCC', `cong_no_${supplier.code}.xlsx`);
+}
 
 /**
  * Xuất danh sách nhà cung cấp ra file Microsoft Excel (.xlsx) chuẩn

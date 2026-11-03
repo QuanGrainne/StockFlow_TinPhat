@@ -108,7 +108,12 @@ export const WarehousePermissionsScreen: React.FC = () => {
 
   const handleSavePerms = async () => {
     if (!selectedStaff) return;
-    await adminService.updateWarehousePermissions(selectedStaff.id, selectedWarehouses);
+    try {
+      await adminService.updateWarehousePermissions(selectedStaff.id, selectedWarehouses);
+    } catch (err) {
+      alert('Không thể cập nhật phân quyền kho: ' + (err instanceof Error ? err.message : String(err)));
+      return;
+    }
 
     // Đồng bộ session người dùng đang đăng nhập nếu đúng nhân sự này
     if (typeof window !== 'undefined') {

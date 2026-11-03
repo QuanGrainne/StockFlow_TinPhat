@@ -69,6 +69,10 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
 
     public virtual DbSet<TrxGoodsReceipt> TrxGoodsReceipts { get; set; }
 
+    public virtual DbSet<TrxPurchaseReturn> TrxPurchaseReturns { get; set; }
+
+    public virtual DbSet<DtlPurchaseReturnItem> DtlPurchaseReturnItems { get; set; }
+
     public virtual DbSet<TrxInboundCost> TrxInboundCosts { get; set; }
 
     public virtual DbSet<TrxInventoryBalance> TrxInventoryBalances { get; set; }
@@ -170,6 +174,12 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
             entity.Property(e => e.UnitLandedCost)
                 .HasPrecision(18, 4)
                 .HasColumnName("unit_landed_cost");
+            entity.Property(e => e.UnitPrice)
+                .HasPrecision(18, 4)
+                .HasColumnName("unit_price");
+            entity.Property(e => e.DiscountPercent)
+                .HasPrecision(9, 4)
+                .HasColumnName("discount_percent");
 
             entity.HasOne(d => d.Gr).WithMany(p => p.DtlGoodsReceiptItems)
                 .HasForeignKey(d => d.GrId)
@@ -381,6 +391,9 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
             entity.Property(e => e.IssuedQuantity)
                 .HasPrecision(18, 2)
                 .HasColumnName("issued_quantity");
+            entity.Property(e => e.UnitCost)
+                .HasPrecision(18, 4)
+                .HasColumnName("unit_cost");
             entity.Property(e => e.LotId).HasColumnName("lot_id");
             entity.Property(e => e.ProductId).HasColumnName("product_id");
             entity.Property(e => e.Quantity)
@@ -570,6 +583,8 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
                 .HasMaxLength(100)
                 .HasColumnName("email");
             entity.Property(e => e.IsActive).HasColumnName("is_active");
+            entity.Property(e => e.CreatedAt).HasColumnName("created_at");
+            entity.Property(e => e.CreatedBy).HasColumnName("created_by");
             entity.Property(e => e.PartnerCode)
                 .HasMaxLength(30)
                 .HasColumnName("partner_code");
@@ -987,6 +1002,9 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
             entity.Property(e => e.TxType)
                 .HasMaxLength(20)
                 .HasColumnName("tx_type");
+            entity.Property(e => e.TxCode)
+                .HasMaxLength(30)
+                .HasColumnName("tx_code");
 
             entity.HasOne(d => d.CreatedByNavigation).WithMany(p => p.TrxFinancialTransactions)
                 .HasForeignKey(d => d.CreatedBy)
@@ -1094,6 +1112,9 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
                 .HasMaxLength(20)
                 .HasColumnName("status");
             entity.Property(e => e.WarehouseId).HasColumnName("warehouse_id");
+            entity.Property(e => e.DiscountAmount)
+                .HasPrecision(18, 2)
+                .HasColumnName("discount_amount");
 
             entity.HasOne(d => d.Partner).WithMany(p => p.TrxGoodsReceipts)
                 .HasForeignKey(d => d.PartnerId)
@@ -1873,6 +1894,78 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
                 .HasForeignKey(d => d.UpdatedBy)
                 .OnDelete(DeleteBehavior.SetNull)
                 .HasConstraintName("fk_mst_order_settings_updated_by");
+        });
+
+        // Trả hàng nhập (trả hàng cho nhà cung cấp)
+        modelBuilder.Entity<TrxPurchaseReturn>(entity =>
+        {
+            entity.HasKey(e => e.PurchaseReturnId).HasName("trx_purchase_returns_pkey");
+            entity.ToTable("trx_purchase_returns", "stockflow");
+            entity.HasIndex(e => e.ReturnCode, "uq_trx_purchase_returns_code").IsUnique();
+            entity.HasIndex(e => e.GrId, "ix_trx_purchase_returns_gr_id");
+
+            entity.Property(e => e.PurchaseReturnId).HasColumnName("purchase_return_id");
+            entity.Property(e => e.ReturnCode).HasMaxLength(30).HasColumnName("return_code");
+            entity.Property(e => e.GrId).HasColumnName("gr_id");
+            entity.Property(e => e.WarehouseId).HasColumnName("warehouse_id");
+            entity.Property(e => e.PartnerId).HasColumnName("partner_id");
+            entity.Property(e => e.ReturnDate).HasColumnType("timestamp without time zone").HasColumnName("return_date");
+            entity.Property(e => e.Status).HasMaxLength(20).HasColumnName("status");
+            entity.Property(e => e.DiscountAmount).HasPrecision(18, 2).HasColumnName("discount_amount");
+            entity.Property(e => e.TotalAmount).HasPrecision(18, 2).HasColumnName("total_amount");
+            entity.Property(e => e.RefundAmount).HasPrecision(18, 2).HasColumnName("refund_amount");
+            entity.Property(e => e.PaymentMethod).HasMaxLength(20).HasColumnName("payment_method");
+            entity.Property(e => e.Notes).HasMaxLength(500).HasColumnName("notes");
+            entity.Property(e => e.CreatedBy).HasColumnName("created_by");
+            entity.Property(e => e.CreatedAt).HasColumnType("timestamp without time zone").HasColumnName("created_at");
+
+            entity.HasOne(d => d.Gr).WithMany()
+                .HasForeignKey(d => d.GrId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("fk_trx_purchase_returns_gr_id");
+            entity.HasOne(d => d.Warehouse).WithMany()
+                .HasForeignKey(d => d.WarehouseId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("fk_trx_purchase_returns_warehouse_id");
+            entity.HasOne(d => d.Partner).WithMany()
+                .HasForeignKey(d => d.PartnerId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("fk_trx_purchase_returns_partner_id");
+            entity.HasOne(d => d.CreatedByNavigation).WithMany()
+                .HasForeignKey(d => d.CreatedBy)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("fk_trx_purchase_returns_created_by");
+        });
+
+        modelBuilder.Entity<DtlPurchaseReturnItem>(entity =>
+        {
+            entity.HasKey(e => e.PrItemId).HasName("dtl_purchase_return_items_pkey");
+            entity.ToTable("dtl_purchase_return_items", "stockflow");
+            entity.HasIndex(e => e.PurchaseReturnId, "ix_dtl_purchase_return_items_return_id");
+            entity.HasIndex(e => e.GrItemId, "ix_dtl_purchase_return_items_gr_item_id");
+
+            entity.Property(e => e.PrItemId).HasColumnName("pr_item_id");
+            entity.Property(e => e.PurchaseReturnId).HasColumnName("purchase_return_id");
+            entity.Property(e => e.ProductId).HasColumnName("product_id");
+            entity.Property(e => e.GrItemId).HasColumnName("gr_item_id");
+            entity.Property(e => e.Quantity).HasPrecision(18, 4).HasColumnName("quantity");
+            entity.Property(e => e.ImportPrice).HasPrecision(18, 4).HasColumnName("import_price");
+            entity.Property(e => e.ReturnPrice).HasPrecision(18, 4).HasColumnName("return_price");
+            entity.Property(e => e.LotId).HasColumnName("lot_id");
+            entity.Property(e => e.LocationId).HasColumnName("location_id");
+
+            entity.HasOne(d => d.PurchaseReturn).WithMany(p => p.DtlPurchaseReturnItems)
+                .HasForeignKey(d => d.PurchaseReturnId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("fk_dtl_purchase_return_items_return_id");
+            entity.HasOne(d => d.Product).WithMany()
+                .HasForeignKey(d => d.ProductId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("fk_dtl_purchase_return_items_product_id");
+            entity.HasOne(d => d.GrItem).WithMany()
+                .HasForeignKey(d => d.GrItemId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("fk_dtl_purchase_return_items_gr_item_id");
         });
 
         OnModelCreatingPartial(modelBuilder);

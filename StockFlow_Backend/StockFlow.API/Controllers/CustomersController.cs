@@ -4,12 +4,12 @@ using Microsoft.AspNetCore.Mvc;
 using StockFlow.Application.Features.Customers.Commands;
 using StockFlow.Application.Features.Customers.DTOs;
 using StockFlow.Application.Features.Customers.Queries;
+using StockFlow.API.Authorization;
 
 namespace StockFlow.API.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-[AllowAnonymous]
 public class CustomersController : ControllerBase
 {
     private readonly IMediator _mediator;
@@ -25,6 +25,7 @@ public class CustomersController : ControllerBase
     /// </summary>
     [HttpGet]
     [ProducesResponseType(typeof(List<CustomerDto>), StatusCodes.Status200OK)]
+    [RequirePermission("PARTNER_READ")]
     public async Task<IActionResult> GetCustomers(
         [FromQuery] string? search,
         [FromQuery] string? debtStatus,
@@ -43,6 +44,7 @@ public class CustomersController : ControllerBase
     /// </summary>
     [HttpGet("stats")]
     [ProducesResponseType(typeof(CustomerStatsDto), StatusCodes.Status200OK)]
+    [RequirePermission("PARTNER_READ")]
     public async Task<IActionResult> GetCustomerStats()
     {
         var result = await _mediator.Send(new GetCustomerStatsQuery());
@@ -59,6 +61,7 @@ public class CustomersController : ControllerBase
     [HttpGet("{id}")]
     [ProducesResponseType(typeof(CustomerDetailDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [RequirePermission("PARTNER_READ")]
     public async Task<IActionResult> GetCustomerById(int id)
     {
         var result = await _mediator.Send(new GetCustomerByIdQuery(id));
@@ -76,6 +79,7 @@ public class CustomersController : ControllerBase
     [ProducesResponseType(typeof(CustomerDto), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
+    [RequirePermission("PARTNER_CREATE")]
     public async Task<IActionResult> CreateCustomer([FromBody] CreateCustomerRequest request)
     {
         var result = await _mediator.Send(new CreateCustomerCommand(request));
@@ -108,6 +112,7 @@ public class CustomersController : ControllerBase
     [HttpPut("{id}")]
     [ProducesResponseType(typeof(CustomerDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [RequirePermission("PARTNER_UPDATE")]
     public async Task<IActionResult> UpdateCustomer(int id, [FromBody] UpdateCustomerRequest request)
     {
         var result = await _mediator.Send(new UpdateCustomerCommand(id, request));
@@ -122,6 +127,7 @@ public class CustomersController : ControllerBase
     /// Đổi trạng thái giao dịch (ACTIVE <-> INACTIVE).
     /// </summary>
     [HttpPatch("{id}/toggle-status")]
+    [RequirePermission("PARTNER_UPDATE")]
     public async Task<IActionResult> ToggleCustomerStatus(int id)
     {
         var result = await _mediator.Send(new ToggleCustomerStatusCommand(id));
@@ -136,6 +142,7 @@ public class CustomersController : ControllerBase
     /// Cập nhật trạng thái hàng loạt cho nhiều khách hàng.
     /// </summary>
     [HttpPatch("batch-status")]
+    [RequirePermission("PARTNER_UPDATE")]
     public async Task<IActionResult> BatchUpdateCustomerStatus([FromBody] BatchCustomerStatusRequest request)
     {
         var result = await _mediator.Send(new BatchCustomerStatusCommand(request));
@@ -150,6 +157,7 @@ public class CustomersController : ControllerBase
     /// Xóa hoặc ngừng hoạt động Khách hàng.
     /// </summary>
     [HttpDelete("{id}")]
+    [RequirePermission("PARTNER_DELETE")]
     public async Task<IActionResult> DeleteCustomer(int id)
     {
         var result = await _mediator.Send(new DeleteCustomerCommand(id));

@@ -108,6 +108,11 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                         .HasColumnType("numeric(18,2)")
                         .HasColumnName("defective_qty");
 
+                    b.Property<decimal?>("DiscountPercent")
+                        .HasPrecision(9, 4)
+                        .HasColumnType("numeric(9,4)")
+                        .HasColumnName("discount_percent");
+
                     b.Property<int>("GrId")
                         .HasColumnType("integer")
                         .HasColumnName("gr_id");
@@ -143,6 +148,11 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                         .HasPrecision(18, 4)
                         .HasColumnType("numeric(18,4)")
                         .HasColumnName("unit_landed_cost");
+
+                    b.Property<decimal?>("UnitPrice")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("unit_price");
 
                     b.HasKey("GrItemId")
                         .HasName("dtl_goods_receipt_items_pkey");
@@ -248,9 +258,35 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("OrderItemId"));
 
+                    b.Property<decimal>("DiscountAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("discount_amount");
+
+                    b.Property<string>("DiscountType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("discount_type");
+
+                    b.Property<decimal>("DiscountValue")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("discount_value");
+
+                    b.Property<decimal>("LineTotal")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("line_total");
+
                     b.Property<int>("OrderId")
                         .HasColumnType("integer")
                         .HasColumnName("order_id");
+
+                    b.Property<decimal>("OriginalPrice")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("original_price");
 
                     b.Property<int>("ProductId")
                         .HasColumnType("integer")
@@ -317,6 +353,62 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("dtl_price_book_items", "stockflow");
+                });
+
+            modelBuilder.Entity("StockFlow.Domain.Entities.DtlPurchaseReturnItem", b =>
+                {
+                    b.Property<int>("PrItemId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("pr_item_id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("PrItemId"));
+
+                    b.Property<int?>("GrItemId")
+                        .HasColumnType("integer")
+                        .HasColumnName("gr_item_id");
+
+                    b.Property<decimal?>("ImportPrice")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("import_price");
+
+                    b.Property<int?>("LocationId")
+                        .HasColumnType("integer")
+                        .HasColumnName("location_id");
+
+                    b.Property<int?>("LotId")
+                        .HasColumnType("integer")
+                        .HasColumnName("lot_id");
+
+                    b.Property<int>("ProductId")
+                        .HasColumnType("integer")
+                        .HasColumnName("product_id");
+
+                    b.Property<int>("PurchaseReturnId")
+                        .HasColumnType("integer")
+                        .HasColumnName("purchase_return_id");
+
+                    b.Property<decimal>("Quantity")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("quantity");
+
+                    b.Property<decimal?>("ReturnPrice")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("return_price");
+
+                    b.HasKey("PrItemId")
+                        .HasName("dtl_purchase_return_items_pkey");
+
+                    b.HasIndex("ProductId");
+
+                    b.HasIndex(new[] { "GrItemId" }, "ix_dtl_purchase_return_items_gr_item_id");
+
+                    b.HasIndex(new[] { "PurchaseReturnId" }, "ix_dtl_purchase_return_items_return_id");
+
+                    b.ToTable("dtl_purchase_return_items", "stockflow");
                 });
 
             modelBuilder.Entity("StockFlow.Domain.Entities.DtlReturnRequestItem", b =>
@@ -459,6 +551,11 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                     b.Property<int>("StockTransferId")
                         .HasColumnType("integer")
                         .HasColumnName("stock_transfer_id");
+
+                    b.Property<decimal?>("UnitCost")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("unit_cost");
 
                     b.HasKey("TransferItemId")
                         .HasName("dtl_stock_transfer_items_pkey");
@@ -653,6 +750,14 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(255)")
                         .HasColumnName("address");
 
+                    b.Property<DateTime?>("CreatedAt")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<int?>("CreatedBy")
+                        .HasColumnType("integer")
+                        .HasColumnName("created_by");
+
                     b.Property<decimal?>("CreditLimit")
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)")
@@ -738,6 +843,101 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                     b.HasIndex("ProductId");
 
                     b.ToTable("mst_inventory_lots", "stockflow");
+                });
+
+            modelBuilder.Entity("StockFlow.Domain.Entities.MstOrderSetting", b =>
+                {
+                    b.Property<int>("SettingId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("setting_id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("SettingId"));
+
+                    b.Property<bool>("AllowNegativeStockSale")
+                        .HasColumnType("boolean")
+                        .HasColumnName("allow_negative_stock_sale");
+
+                    b.Property<bool>("AllowOrderWhenOutOfStock")
+                        .HasColumnType("boolean")
+                        .HasColumnName("allow_order_when_out_of_stock");
+
+                    b.Property<bool>("AllowSellingReservedStock")
+                        .HasColumnType("boolean")
+                        .HasColumnName("allow_selling_reserved_stock");
+
+                    b.Property<bool>("AllowTransferringOrderBranch")
+                        .HasColumnType("boolean")
+                        .HasColumnName("allow_transferring_order_branch");
+
+                    b.Property<string>("BookingCodePrefix")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("booking_code_prefix");
+
+                    b.Property<bool>("ConfirmBeforeCompleteOrder")
+                        .HasColumnType("boolean")
+                        .HasColumnName("confirm_before_complete_order");
+
+                    b.Property<bool>("EnableOrderPlacement")
+                        .HasColumnType("boolean")
+                        .HasColumnName("enable_order_placement");
+
+                    b.Property<bool>("EnablePrintQuotation")
+                        .HasColumnType("boolean")
+                        .HasColumnName("enable_print_quotation");
+
+                    b.Property<bool>("EnableReturnTimeLimit")
+                        .HasColumnType("boolean")
+                        .HasColumnName("enable_return_time_limit");
+
+                    b.Property<bool>("LockTransactionTime")
+                        .HasColumnType("boolean")
+                        .HasColumnName("lock_transaction_time");
+
+                    b.Property<string>("OrderCodePrefix")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("order_code_prefix");
+
+                    b.Property<string>("OrderCodeRule")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("order_code_rule");
+
+                    b.Property<string>("ReturnCodePrefix")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("return_code_prefix");
+
+                    b.Property<int>("ReturnTimeLimitDays")
+                        .HasColumnType("integer")
+                        .HasColumnName("return_time_limit_days");
+
+                    b.Property<string>("TransferCodePrefix")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("transfer_code_prefix");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<int?>("UpdatedBy")
+                        .HasColumnType("integer")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("SettingId")
+                        .HasName("mst_order_settings_pkey");
+
+                    b.HasIndex("UpdatedBy");
+
+                    b.ToTable("mst_order_settings", "stockflow");
                 });
 
             modelBuilder.Entity("StockFlow.Domain.Entities.MstPriceBook", b =>
@@ -1432,6 +1632,11 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp without time zone")
                         .HasColumnName("transaction_date");
 
+                    b.Property<string>("TxCode")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("tx_code");
+
                     b.Property<string>("TxType")
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)")
@@ -1540,6 +1745,11 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                         .HasColumnName("gr_id");
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("GrId"));
+
+                    b.Property<decimal?>("DiscountAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("discount_amount");
 
                     b.Property<string>("ExternalPoNumber")
                         .HasMaxLength(50)
@@ -1826,6 +2036,22 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("created_by");
 
+                    b.Property<decimal>("DiscountAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("discount_amount");
+
+                    b.Property<string>("DiscountType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("discount_type");
+
+                    b.Property<decimal>("DiscountValue")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("discount_value");
+
                     b.Property<string>("Notes")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)")
@@ -1863,6 +2089,11 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)")
                         .HasColumnName("status");
+
+                    b.Property<decimal>("SubTotal")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("sub_total");
 
                     b.Property<decimal?>("TotalAmount")
                         .HasPrecision(18, 2)
@@ -2061,6 +2292,91 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                     b.HasIndex("ReportedBy");
 
                     b.ToTable("trx_production_reports", "stockflow");
+                });
+
+            modelBuilder.Entity("StockFlow.Domain.Entities.TrxPurchaseReturn", b =>
+                {
+                    b.Property<int>("PurchaseReturnId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("purchase_return_id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("PurchaseReturnId"));
+
+                    b.Property<DateTime?>("CreatedAt")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<int>("CreatedBy")
+                        .HasColumnType("integer")
+                        .HasColumnName("created_by");
+
+                    b.Property<decimal?>("DiscountAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("discount_amount");
+
+                    b.Property<int?>("GrId")
+                        .HasColumnType("integer")
+                        .HasColumnName("gr_id");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("notes");
+
+                    b.Property<int>("PartnerId")
+                        .HasColumnType("integer")
+                        .HasColumnName("partner_id");
+
+                    b.Property<string>("PaymentMethod")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("payment_method");
+
+                    b.Property<decimal?>("RefundAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("refund_amount");
+
+                    b.Property<string>("ReturnCode")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("return_code");
+
+                    b.Property<DateTime?>("ReturnDate")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("return_date");
+
+                    b.Property<string>("Status")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.Property<decimal?>("TotalAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("total_amount");
+
+                    b.Property<int>("WarehouseId")
+                        .HasColumnType("integer")
+                        .HasColumnName("warehouse_id");
+
+                    b.HasKey("PurchaseReturnId")
+                        .HasName("trx_purchase_returns_pkey");
+
+                    b.HasIndex("CreatedBy");
+
+                    b.HasIndex("PartnerId");
+
+                    b.HasIndex("WarehouseId");
+
+                    b.HasIndex(new[] { "GrId" }, "ix_trx_purchase_returns_gr_id");
+
+                    b.HasIndex(new[] { "ReturnCode" }, "uq_trx_purchase_returns_code")
+                        .IsUnique();
+
+                    b.ToTable("trx_purchase_returns", "stockflow");
                 });
 
             modelBuilder.Entity("StockFlow.Domain.Entities.TrxReturnProcessing", b =>
@@ -2271,6 +2587,10 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)")
                         .HasColumnName("notes");
+
+                    b.Property<DateTime?>("ReceivedDate")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("received_date");
 
                     b.Property<int>("SourceWarehouseId")
                         .HasColumnType("integer")
@@ -2529,6 +2849,33 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                     b.Navigation("Product");
                 });
 
+            modelBuilder.Entity("StockFlow.Domain.Entities.DtlPurchaseReturnItem", b =>
+                {
+                    b.HasOne("StockFlow.Domain.Entities.DtlGoodsReceiptItem", "GrItem")
+                        .WithMany()
+                        .HasForeignKey("GrItemId")
+                        .HasConstraintName("fk_dtl_purchase_return_items_gr_item_id");
+
+                    b.HasOne("StockFlow.Domain.Entities.MstProduct", "Product")
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .IsRequired()
+                        .HasConstraintName("fk_dtl_purchase_return_items_product_id");
+
+                    b.HasOne("StockFlow.Domain.Entities.TrxPurchaseReturn", "PurchaseReturn")
+                        .WithMany("DtlPurchaseReturnItems")
+                        .HasForeignKey("PurchaseReturnId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_dtl_purchase_return_items_return_id");
+
+                    b.Navigation("GrItem");
+
+                    b.Navigation("Product");
+
+                    b.Navigation("PurchaseReturn");
+                });
+
             modelBuilder.Entity("StockFlow.Domain.Entities.DtlReturnRequestItem", b =>
                 {
                     b.HasOne("StockFlow.Domain.Entities.DtlOrderItem", "OrderItem")
@@ -2732,6 +3079,17 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_mst_inventory_lots_product_id");
 
                     b.Navigation("Product");
+                });
+
+            modelBuilder.Entity("StockFlow.Domain.Entities.MstOrderSetting", b =>
+                {
+                    b.HasOne("StockFlow.Domain.Entities.SecUser", "UpdatedByUser")
+                        .WithMany()
+                        .HasForeignKey("UpdatedBy")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_mst_order_settings_updated_by");
+
+                    b.Navigation("UpdatedByUser");
                 });
 
             modelBuilder.Entity("StockFlow.Domain.Entities.MstPriceBook", b =>
@@ -3166,6 +3524,40 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                     b.Navigation("ReportedByNavigation");
                 });
 
+            modelBuilder.Entity("StockFlow.Domain.Entities.TrxPurchaseReturn", b =>
+                {
+                    b.HasOne("StockFlow.Domain.Entities.SecUser", "CreatedByNavigation")
+                        .WithMany()
+                        .HasForeignKey("CreatedBy")
+                        .IsRequired()
+                        .HasConstraintName("fk_trx_purchase_returns_created_by");
+
+                    b.HasOne("StockFlow.Domain.Entities.TrxGoodsReceipt", "Gr")
+                        .WithMany()
+                        .HasForeignKey("GrId")
+                        .HasConstraintName("fk_trx_purchase_returns_gr_id");
+
+                    b.HasOne("StockFlow.Domain.Entities.MstBusinessPartner", "Partner")
+                        .WithMany()
+                        .HasForeignKey("PartnerId")
+                        .IsRequired()
+                        .HasConstraintName("fk_trx_purchase_returns_partner_id");
+
+                    b.HasOne("StockFlow.Domain.Entities.MstWarehouse", "Warehouse")
+                        .WithMany()
+                        .HasForeignKey("WarehouseId")
+                        .IsRequired()
+                        .HasConstraintName("fk_trx_purchase_returns_warehouse_id");
+
+                    b.Navigation("CreatedByNavigation");
+
+                    b.Navigation("Gr");
+
+                    b.Navigation("Partner");
+
+                    b.Navigation("Warehouse");
+                });
+
             modelBuilder.Entity("StockFlow.Domain.Entities.TrxReturnProcessing", b =>
                 {
                     b.HasOne("StockFlow.Domain.Entities.SecUser", "ProcessedByNavigation")
@@ -3570,6 +3962,11 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("StockFlow.Domain.Entities.TrxProductionReport", b =>
                 {
                     b.Navigation("TrxFinishedGoodsReceipt");
+                });
+
+            modelBuilder.Entity("StockFlow.Domain.Entities.TrxPurchaseReturn", b =>
+                {
+                    b.Navigation("DtlPurchaseReturnItems");
                 });
 
             modelBuilder.Entity("StockFlow.Domain.Entities.TrxReturnRequest", b =>

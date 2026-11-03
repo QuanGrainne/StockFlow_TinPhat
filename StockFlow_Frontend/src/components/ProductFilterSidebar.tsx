@@ -94,7 +94,8 @@ export const INITIAL_FILTER_STATE: FilterSidebarState = {
   locations: [],
   productTypes: [],
   directSale: 'all',
-  businessStatus: 'all',
+  // Mặc định chỉ hiện hàng đang kinh doanh (giống KiotViet)
+  businessStatus: 'active',
   channelLinked: 'all',
 };
 
