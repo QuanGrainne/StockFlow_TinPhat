@@ -71,7 +71,10 @@ public class CreateTransferCommandHandler : IRequestHandler<CreateTransferComman
 
         // 2. Sinh mã phiếu chuyển
         string finalCode;
-        if (string.IsNullOrWhiteSpace(req.TransferCode) || req.TransferCode.Trim().Equals("Mã phiếu tự động", StringComparison.OrdinalIgnoreCase))
+        // Mã trống / placeholder / "Copy_CK..." (phiếu sao chép) → tự sinh mã mới
+        if (string.IsNullOrWhiteSpace(req.TransferCode)
+            || req.TransferCode.Trim().Equals("Mã phiếu tự động", StringComparison.OrdinalIgnoreCase)
+            || req.TransferCode.Trim().StartsWith("Copy_", StringComparison.OrdinalIgnoreCase))
         {
             finalCode = await TransferHelper.GenerateNextTransferCodeAsync(_context, cancellationToken);
         }
@@ -118,7 +121,8 @@ public class CreateTransferCommandHandler : IRequestHandler<CreateTransferComman
                 ProductId = it.ProductId,
                 Quantity = it.Quantity,
                 IssuedQuantity = 0,
-                ReceivedQuantity = null
+                ReceivedQuantity = null,
+                Notes = string.IsNullOrWhiteSpace(it.Notes) ? null : it.Notes.Trim(),
             }, cancellationToken);
         }
         await _context.SaveChangesAsync(cancellationToken);

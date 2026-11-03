@@ -23,6 +23,9 @@ public partial class TrxStockTransfer
 
     public string? Notes { get; set; }
 
+    /// <summary>Ghi chú của chi nhánh nhận (lúc nhận hàng / sửa sau)</summary>
+    public string? ReceiveNotes { get; set; }
+
     public virtual SecUser CreatedByNavigation { get; set; } = null!;
 
     public virtual MstWarehouse DestWarehouse { get; set; } = null!;

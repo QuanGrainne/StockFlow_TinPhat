@@ -394,6 +394,12 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
             entity.Property(e => e.UnitCost)
                 .HasPrecision(18, 4)
                 .HasColumnName("unit_cost");
+            entity.Property(e => e.Notes)
+                .HasMaxLength(500)
+                .HasColumnName("notes");
+            entity.Property(e => e.ReceiveNotes)
+                .HasMaxLength(500)
+                .HasColumnName("receive_notes");
             entity.Property(e => e.LotId).HasColumnName("lot_id");
             entity.Property(e => e.ProductId).HasColumnName("product_id");
             entity.Property(e => e.Quantity)
@@ -1639,6 +1645,9 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
             entity.Property(e => e.Notes)
                 .HasMaxLength(500)
                 .HasColumnName("notes");
+            entity.Property(e => e.ReceiveNotes)
+                .HasMaxLength(500)
+                .HasColumnName("receive_notes");
             entity.Property(e => e.SourceWarehouseId).HasColumnName("source_warehouse_id");
             entity.Property(e => e.Status)
                 .HasMaxLength(20)

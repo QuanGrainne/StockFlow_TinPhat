@@ -81,7 +81,8 @@ public class UpdateTransferCommandHandler : IRequestHandler<UpdateTransferComman
                 ProductId = it.ProductId,
                 Quantity = it.Quantity,
                 IssuedQuantity = 0,
-                ReceivedQuantity = null
+                ReceivedQuantity = null,
+                Notes = string.IsNullOrWhiteSpace(it.Notes) ? null : it.Notes.Trim(),
             };
             await _context.DtlStockTransferItems.AddAsync(item, cancellationToken);
         }

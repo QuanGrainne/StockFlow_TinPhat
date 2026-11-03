@@ -530,6 +530,11 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("lot_id");
 
+                    b.Property<string>("Notes")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("notes");
+
                     b.Property<int>("ProductId")
                         .HasColumnType("integer")
                         .HasColumnName("product_id");
@@ -538,6 +543,11 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)")
                         .HasColumnName("quantity");
+
+                    b.Property<string>("ReceiveNotes")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("receive_notes");
 
                     b.Property<decimal?>("ReceivedQuantity")
                         .HasPrecision(18, 2)
@@ -2592,6 +2602,11 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)")
                         .HasColumnName("notes");
+
+                    b.Property<string>("ReceiveNotes")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("receive_notes");
 
                     b.Property<DateTime?>("ReceivedDate")
                         .HasColumnType("timestamp without time zone")
