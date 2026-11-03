@@ -475,6 +475,19 @@ export const permissionService = {
             localStorage.setItem('stockflow_feature_matrix', JSON.stringify(matrix));
             localStorage.setItem('stockflow_transfers_default_cleaned_v2', 'true');
           }
+          // One-time initialization: đảm bảo tính năng khách hàng được bật mặc định cho ADMIN, MANAGER, SALES
+          if (!localStorage.getItem('stockflow_customers_feat_initialized_v1')) {
+            const defaultRolesWithCustomers = ['ROLE_ADMIN', 'ROLE_MANAGER', 'ROLE_SALES'];
+            for (const r of defaultRolesWithCustomers) {
+              if (Array.isArray(matrix[r]) && !matrix[r].includes('feat-customers')) {
+                matrix[r].push('feat-customers');
+              }
+            }
+            localStorage.setItem('stockflow_feature_matrix', JSON.stringify(matrix));
+            localStorage.setItem('stockflow_customers_feat_initialized_v1', 'true');
+          }
+
+          // One-time initialization: đảm bảo tính năng nhà cung cấp được bật mặc định cho ADMIN, MANAGER, WAREHOUSE
           if (!localStorage.getItem('stockflow_suppliers_feat_initialized_v2')) {
             const defaultRolesWithSuppliers = ['ROLE_ADMIN', 'ROLE_MANAGER', 'ROLE_WAREHOUSE'];
             for (const r of defaultRolesWithSuppliers) {
@@ -589,6 +602,13 @@ export const NAVBAR_FEATURES: NavFeatureConfig[] = [
     tabIds: ['admin-goods', 'admin-price-books', 'price-books', 'warehouse-goods', 'production-goods', 'goods-catalog'],
   },
   {
+    id: 'feat-customers',
+    name: 'Quản lý khách hàng',
+    desc: 'Hồ sơ khách hàng, phân nhóm đối tác, lịch sử mua hàng và công nợ phải thu',
+    moduleKey: 'PARTNER',
+    tabIds: ['customers', 'sales-customers', 'manager-customers', 'admin-customers'],
+  },
+  {
     id: 'feat-transfers',
     name: 'Chuyển hàng (Chuyển kho)',
     desc: 'Tạo phiếu chuyển kho, theo dõi hàng đang chuyển và xác nhận nhập kho đích',
@@ -656,6 +676,7 @@ export const NAVBAR_FEATURES: NavFeatureConfig[] = [
 export const DEFAULT_ROLE_FEATURE_PERMS: Record<string, string[]> = {
   ROLE_ADMIN: [
     'feat-staff',
+    'feat-customers',
     'feat-roles',
     'feat-warehouse-perms',
     'feat-goods',
@@ -670,6 +691,7 @@ export const DEFAULT_ROLE_FEATURE_PERMS: Record<string, string[]> = {
   ],
   ROLE_MANAGER: [
     'feat-goods',
+    'feat-customers',
     'feat-sales',
     'feat-purchase',
     'feat-suppliers',
@@ -681,6 +703,7 @@ export const DEFAULT_ROLE_FEATURE_PERMS: Record<string, string[]> = {
   ],
   ROLE_SALES: [
     'feat-goods',
+    'feat-customers',
     'feat-sales',
     'feat-partner',
   ],

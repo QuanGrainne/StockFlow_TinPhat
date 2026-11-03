@@ -255,8 +255,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
       label: 'Khách hàng',
       icon: Users,
       hasDropdown: false,
+      requiredFeature: 'feat-customers',
       requiredModule: 'PARTNER',
-      requiredFeature: 'feat-partner',
     },
     {
       id: 'suppliers',
@@ -459,6 +459,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           title: 'Danh mục Khách hàng',
           desc: 'Quản trị hồ sơ & phân nhóm khách hàng B2B',
           icon: Users,
+          requiredFeature: 'feat-customers',
           requiredModule: 'PARTNER',
         },
         {
@@ -525,6 +526,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
       hasDropdown: true,
       requiredModule: 'SALES',
       dropdownItems: [
+        {
+          id: 'pos',
+          title: 'Bán hàng tại quầy (POS)',
+          desc: 'Màn hình thu ngân & in hóa đơn K80',
+          icon: ShoppingBag,
+          requiredModule: 'SALES',
+        },
+        {
+          id: 'orders',
+          title: 'Danh sách đơn hàng',
+          desc: 'Quản lý toàn bộ đơn bán hàng',
+          icon: ClipboardList,
+          requiredModule: 'SALES',
+        },
         {
           id: 'sales-dashboard',
           title: 'Tổng quan bán hàng',
@@ -714,8 +729,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
       label: 'Khách hàng',
       icon: Users,
       hasDropdown: false,
+      requiredFeature: 'feat-customers',
       requiredModule: 'PARTNER',
-      requiredFeature: 'feat-partner',
     },
     {
       id: 'suppliers',
@@ -777,8 +792,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
       label: 'Khách hàng',
       icon: Users,
       hasDropdown: false,
+      requiredFeature: 'feat-customers',
       requiredModule: 'PARTNER',
-      requiredFeature: 'feat-partner',
     },
     {
       id: 'suppliers',
@@ -887,8 +902,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
       label: 'Khách hàng',
       icon: Users,
       hasDropdown: false,
+      requiredFeature: 'feat-customers',
       requiredModule: 'PARTNER',
-      requiredFeature: 'feat-partner',
     },
     {
       id: 'suppliers',
@@ -993,8 +1008,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
       label: 'Khách hàng',
       icon: Users,
       hasDropdown: false,
+      requiredFeature: 'feat-customers',
       requiredModule: 'PARTNER',
-      requiredFeature: 'feat-partner',
     },
     {
       id: 'suppliers',
@@ -1086,12 +1101,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
       if (allowedChildren.length === 0) return null;
     }
 
-    // 2. Kiểm tra quyền của chính Tab cha
+    // 2. Kiểm tra quyền requiredFeature của chính Tab cha
     if (tab.requiredFeature) {
       if (!allowedFeatures || !allowedFeatures.has(tab.requiredFeature)) {
         return null;
       }
     }
+
+    // 3. Kiểm tra quyền của chính Tab cha
     if (tab.requiredModule) {
       if (allowedFeatures && allowedFeatures.size > 0) {
         const hasFeature = allowedFeatures.has(tab.id) || allowedFeatures.has(tab.requiredModule);
@@ -1115,6 +1132,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     .filter((t): t is TabConfig => t !== null);
 
   const isTabActive = (tab: TabConfig) => {
+    if (tab.id === 'customers' && (activeScreen === 'customers' || activeScreen.includes('customers'))) return true;
     if (tab.id === 'suppliers' && (activeScreen === 'suppliers' || activeScreen.includes('suppliers'))) return true;
     if (tab.id === 'purchases' && (activeScreen === 'purchases' || activeScreen.includes('purchases'))) return true;
     if (tab.id === 'transfers' && (activeScreen === 'transfers' || activeScreen.includes('transfers'))) return true;
@@ -1126,7 +1144,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     if (tab.id === 'admin-warehouse-perms' && activeScreen === 'admin-warehouse-facilities') return true;
     if (tab.id === 'manager-production' && activeScreen === 'manager-bom') return true;
     if (tab.id === 'manager-partners' && activeScreen === 'manager-cashflow') return true;
-    if (tab.id === 'sales-orders' && (activeScreen === 'sales-orders' || activeScreen === 'sales-consolidate' || activeScreen === 'sales-returns')) return true;
+    if (tab.id === 'sales-orders' && (activeScreen === 'sales-orders' || activeScreen === 'orders' || activeScreen.includes('orders') || activeScreen === 'sales-consolidate' || activeScreen === 'sales-returns')) return true;
     if (tab.id === 'warehouse-inbound' && (activeScreen === 'warehouse-inbound' || activeScreen === 'purchases' || activeScreen.includes('purchases') || activeScreen === 'manager-landed-cost')) return true;
     if (tab.id === 'warehouse-overview' && (activeScreen === 'warehouse-overview' || activeScreen === 'warehouse-outbound' || activeScreen === 'warehouse-transfer' || activeScreen === 'warehouse-audit' || activeScreen === 'warehouse-returns')) return true;
     if (tab.id === 'production-orders' && (activeScreen === 'production-orders' || activeScreen === 'production-import' || activeScreen === 'production-logs')) return true;

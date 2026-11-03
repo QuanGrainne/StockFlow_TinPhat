@@ -10,7 +10,7 @@ import {
   CreditCard,
   QrCode,
   Banknote,
-  FileSpreadsheet,
+  Wallet,
   Printer,
   Save,
   CheckCircle2,
@@ -29,6 +29,7 @@ interface PosPaymentPanelProps {
   onChangePriceBook: (priceBookId: number) => void;
   onChangePaymentMethod: (method: PaymentMethod) => void;
   onChangePrepaidAmount: (amount: number) => void;
+  onChangeExcessAction?: (action: 'RETURN_CASH' | 'RECORD_DEBT') => void;
   onChangeDiscountAmount: (amount: number) => void;
   onChangeOrderDiscount?: (type: 'PERCENT' | 'AMOUNT', value: number, amount: number) => void;
   onSubmitPayment: (type: 'PAY_AND_PRINT' | 'STOCK_ISSUE_ONLY' | 'DRAFT') => Promise<void>;
@@ -51,6 +52,7 @@ export const PosPaymentPanel: React.FC<PosPaymentPanelProps> = ({
   onChangePriceBook,
   onChangePaymentMethod,
   onChangePrepaidAmount,
+  onChangeExcessAction,
   onChangeDiscountAmount,
   onChangeOrderDiscount,
   onSubmitPayment,
@@ -283,6 +285,29 @@ export const PosPaymentPanel: React.FC<PosPaymentPanelProps> = ({
                   {currencyFormatter.format(currentCustomer.currentDebt)} đ
                 </span>
               </div>
+              {/* Dự kiến dư nợ sau khi hoàn tất đơn hàng */}
+              {remainingDebt > 0 && (
+                <div className="flex justify-between text-rose-700 bg-rose-50/80 px-1.5 py-0.5 rounded border border-rose-200/60 font-semibold">
+                  <span>Dư nợ sau đơn này:</span>
+                  <span className="font-bold">
+                    {currencyFormatter.format(currentCustomer.currentDebt + remainingDebt)} đ
+                    <span className="text-[10px] font-normal text-rose-500 ml-1">
+                      (+{currencyFormatter.format(remainingDebt)})
+                    </span>
+                  </span>
+                </div>
+              )}
+              {changeAmount > 0 && order.excessAction === 'RECORD_DEBT' && (
+                <div className="flex justify-between text-[#0F60B6] bg-blue-50/80 px-1.5 py-0.5 rounded border border-blue-200/60 font-semibold">
+                  <span>Dư nợ sau đơn này:</span>
+                  <span className="font-bold">
+                    {currencyFormatter.format(currentCustomer.currentDebt - changeAmount)} đ
+                    <span className="text-[10px] font-normal text-blue-500 ml-1">
+                      (-{currencyFormatter.format(changeAmount)})
+                    </span>
+                  </span>
+                </div>
+              )}
               <div className="flex justify-between">
                 <span className="text-slate-500">Hạn mức tín dụng:</span>
                 <span className="font-bold text-slate-800">
@@ -440,13 +465,6 @@ export const PosPaymentPanel: React.FC<PosPaymentPanelProps> = ({
           </div>
         )}
 
-        {/* Chi phí giao hàng / Kỹ thuật */}
-        <div className="flex justify-between items-center text-slate-500">
-          <span className="font-medium">Chi phí giao hàng / Kỹ thuật:</span>
-          <span className="font-semibold text-emerald-600 text-xs">
-            Miễn phí
-          </span>
-        </div>
 
         {/* Khối Highlight Lớn: KHÁCH CẦN THANH TOÁN (AMT-008) */}
         <div className="p-3 rounded-[6px] bg-blue-50/60 border border-blue-200/80 flex items-center justify-between">
@@ -531,21 +549,21 @@ export const PosPaymentPanel: React.FC<PosPaymentPanelProps> = ({
             <span>Quẹt thẻ POS</span>
           </button>
 
-          {/* Ghi công nợ */}
+          {/* Ví */}
           <button
             type="button"
             onClick={() => {
-              onChangePaymentMethod('DEBT');
-              onChangePrepaidAmount(0); // Không trả trước, ghi nợ toàn bộ
+              onChangePaymentMethod('WALLET');
+              onChangePrepaidAmount(finalTotal);
             }}
             className={`h-8 rounded-[5px] text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
-              order.paymentMethod === 'DEBT'
+              order.paymentMethod === 'WALLET'
                 ? 'bg-[#0F60B6] text-white shadow-xs'
                 : 'bg-white border border-slate-300 text-slate-700 hover:bg-slate-50'
             }`}
           >
-            <FileSpreadsheet size={15} />
-            <span>Ghi công nợ</span>
+            <Wallet size={15} />
+            <span>Ví</span>
           </button>
         </div>
       </div>
@@ -591,34 +609,72 @@ export const PosPaymentPanel: React.FC<PosPaymentPanelProps> = ({
           </span>
         </div>
 
-        {/* Tiền thừa trả khách (PAY-007) */}
+        {/* Xử lý khi khách trả dư: Chọn 1 trong 2 Radio (Tiền thừa trả khách hoặc Tính vào công nợ) */}
         {changeAmount > 0 && (
-          <div className="flex justify-between items-center text-[11px] pt-1 text-emerald-700 bg-emerald-50 px-2.5 py-1.5 rounded border border-emerald-200">
-            <span className="font-bold flex items-center gap-1">
-              <CheckCircle2 size={13} className="text-emerald-600" />
-              Tiền thừa trả lại khách:
-            </span>
-            <span className="font-black text-xs text-emerald-700">
-              {currencyFormatter.format(changeAmount)} đ
-            </span>
+          <div className="p-2 rounded-[5px] bg-slate-50 border border-slate-200 space-y-1.5 text-xs">
+            <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">
+              Xử lý tiền thừa ({currencyFormatter.format(changeAmount)} đ):
+            </div>
+            <div className="space-y-1.5">
+              {/* Radio 1: Tiền thừa trả khách */}
+              <label className="flex items-center justify-between cursor-pointer p-1.5 rounded-[4px] bg-white border border-slate-200 hover:border-[#0F60B6] transition">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="radio"
+                    name="excessAction"
+                    value="RETURN_CASH"
+                    checked={(order.excessAction || 'RETURN_CASH') === 'RETURN_CASH'}
+                    onChange={() => onChangeExcessAction?.('RETURN_CASH')}
+                    className="w-3.5 h-3.5 text-[#0F60B6] accent-[#0F60B6] cursor-pointer"
+                  />
+                  <span className="font-semibold text-slate-700">Tiền thừa trả khách</span>
+                </div>
+                <span className="font-bold text-emerald-600">
+                  {currencyFormatter.format(changeAmount)} đ
+                </span>
+              </label>
+
+              {/* Radio 2: Tính vào công nợ */}
+              <label
+                className={`flex items-center justify-between p-1.5 rounded-[4px] border transition ${
+                  isWalkIn
+                    ? 'bg-slate-100 border-slate-200 opacity-60 cursor-not-allowed'
+                    : 'bg-white border border-slate-200 hover:border-[#0F60B6] cursor-pointer'
+                }`}
+                title={isWalkIn ? 'Khách lẻ không có tài khoản công nợ' : 'Ghi có để trừ nợ cũ hoặc cọc mua sau'}
+              >
+                <div className="flex items-center gap-2">
+                  <input
+                    type="radio"
+                    name="excessAction"
+                    value="RECORD_DEBT"
+                    disabled={isWalkIn}
+                    checked={!isWalkIn && order.excessAction === 'RECORD_DEBT'}
+                    onChange={() => {
+                      if (!isWalkIn) onChangeExcessAction?.('RECORD_DEBT');
+                    }}
+                    className="w-3.5 h-3.5 text-[#0F60B6] accent-[#0F60B6] cursor-pointer disabled:cursor-not-allowed"
+                  />
+                  <span className="font-semibold text-slate-700">Tính vào công nợ</span>
+                </div>
+                <span className="font-bold text-[#0F60B6]">
+                  + {currencyFormatter.format(changeAmount)} đ
+                </span>
+              </label>
+            </div>
+            {isWalkIn && (
+              <p className="text-[10px] text-amber-700 italic">
+                * Khách lẻ mặc định nhận lại tiền thừa tại quầy.
+              </p>
+            )}
           </div>
         )}
 
-        {/* Dòng Tính vào công nợ nếu còn thiếu */}
+        {/* Dòng Tính vào công nợ khi trả thiếu (Hiển thị text màu xanh dương chuẩn theo mẫu) */}
         {remainingDebt > 0 && (
-          <div className="flex justify-between items-center text-[11px] pt-1">
-            <div className="flex items-center gap-1.5 text-rose-700 font-medium">
-              <input
-                type="checkbox"
-                checked={true}
-                readOnly
-                className="rounded text-[#0F60B6] w-3.5 h-3.5 accent-[#0F60B6]"
-              />
-              <span>Tính vào công nợ (30 ngày):</span>
-            </div>
-            <span className="font-bold text-rose-600 text-xs">
-              {currencyFormatter.format(remainingDebt)} đ
-            </span>
+          <div className="flex justify-between items-center text-xs font-semibold text-[#0F60B6] pt-1.5 px-0.5">
+            <span>Tính vào công nợ</span>
+            <span className="tabular-nums">- {currencyFormatter.format(remainingDebt)}</span>
           </div>
         )}
 
@@ -687,6 +743,8 @@ export const PosPaymentPanel: React.FC<PosPaymentPanelProps> = ({
               ? 'THANH TOÁN VIETQR & IN (F10)'
               : order.paymentMethod === 'POS_CARD'
               ? 'THANH TOÁN THẺ POS & IN (F10)'
+              : order.paymentMethod === 'WALLET'
+              ? 'THANH TOÁN VÍ & IN (F10)'
               : 'GHI CÔNG NỢ & IN (F10)'}
           </span>
         </button>
