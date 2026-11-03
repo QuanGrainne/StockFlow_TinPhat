@@ -56,14 +56,21 @@ public class CompletePurchaseCommandHandler : IRequestHandler<CompletePurchaseCo
             return Result.Failure<PurchaseDetailDto>("Phiếu nhập hàng không có mặt hàng nào để nhập kho.");
         }
 
-        int currentUserId = _currentUserService.UserId ?? 0;
-        if (currentUserId <= 0)
+        // Cô lập dữ liệu kho: chỉ hoàn thành phiếu nhập của kho mình được phân quyền
+        if (!await _currentUserService.HasWarehouseAccessAsync(receipt.WarehouseId, cancellationToken))
         {
-            currentUserId = receipt.ReceivedBy > 0 ? receipt.ReceivedBy : 1;
+            return Result.Failure<PurchaseDetailDto>("Bạn không có quyền nhập hàng vào kho này.");
         }
 
+        if (!_currentUserService.UserId.HasValue)
+        {
+            return Result.Failure<PurchaseDetailDto>("Không xác định được người dùng đăng nhập.");
+        }
+        int currentUserId = _currentUserService.UserId.Value;
+
         int warehouseId = receipt.WarehouseId;
-        DateTime receivedDate = DateTime.UtcNow;
+        // Thời điểm xác nhận nhập kho theo giờ Việt Nam
+        DateTime receivedDate = VietnamTime.Now;
 
         var dbContext = _context as DbContext;
         using var transaction = dbContext != null ? await dbContext.Database.BeginTransactionAsync(cancellationToken) : null;
@@ -107,7 +114,7 @@ public class CompletePurchaseCommandHandler : IRequestHandler<CompletePurchaseCo
                         LotId = item.LotId,
                         Quantity = incomingQty,
                         UnitCost = newUnitCost,
-                        LastUpdated = DateTime.UtcNow
+                        LastUpdated = VietnamTime.Now
                     };
                     _context.TrxInventoryBalances.Add(balance);
                 }
@@ -115,7 +122,7 @@ public class CompletePurchaseCommandHandler : IRequestHandler<CompletePurchaseCo
                 {
                     balance.Quantity = currentQty + incomingQty;
                     balance.UnitCost = newUnitCost;
-                    balance.LastUpdated = DateTime.UtcNow;
+                    balance.LastUpdated = VietnamTime.Now;
                 }
 
                 // Cập nhật giá vốn chung

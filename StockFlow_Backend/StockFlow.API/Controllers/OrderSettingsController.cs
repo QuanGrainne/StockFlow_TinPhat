@@ -6,13 +6,13 @@ using Microsoft.AspNetCore.Mvc;
 using StockFlow.Application.Features.Settings.Commands;
 using StockFlow.Application.Features.Settings.DTOs;
 using StockFlow.Application.Features.Settings.Queries;
+using StockFlow.API.Authorization;
 
 namespace StockFlow.API.Controllers;
 
 [ApiController]
 [Route("api/settings/orders")]
 [Route("api/order-settings")]
-[AllowAnonymous]
 public class OrderSettingsController : ControllerBase
 {
     private readonly IMediator _mediator;
@@ -44,6 +44,7 @@ public class OrderSettingsController : ControllerBase
     [HttpPut]
     [ProducesResponseType(typeof(OrderSettingDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [RequirePermission("SALES_APPROVE")]
     public async Task<IActionResult> UpdateSettings([FromBody] UpdateOrderSettingDto request)
     {
         var result = await _mediator.Send(new UpdateOrderSettingsCommand(request));

@@ -36,6 +36,25 @@ interface Props {
 
 type FilterTab = 'ALL' | 'MATCH' | 'DIFF' | 'UNRECEIVED';
 
+/** Bản kiểm đếm tạm của phiếu nhận (lưu trên trình duyệt; phiếu Đang chuyển không sửa được trên hệ thống) */
+interface ReceiveDraft {
+  receivedQtys: Record<number, number>;
+  itemNotes: Record<number, string>;
+  receiveNotes: string;
+}
+
+const receiveDraftKey = (transferId: number) => `stockflow_transfer_receive_draft_${transferId}`;
+
+function loadReceiveDraft(transferId: number): ReceiveDraft | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem(receiveDraftKey(transferId));
+    return raw ? (JSON.parse(raw) as ReceiveDraft) : null;
+  } catch {
+    return null;
+  }
+}
+
 export const ReceiveTransferScreen: React.FC<Props> = ({
   transfer,
   onClose,
@@ -43,6 +62,8 @@ export const ReceiveTransferScreen: React.FC<Props> = ({
 }) => {
   // State quản lý số lượng nhận cho từng mặt hàng (mặc định bằng SL chuyển)
   const [receivedQtys, setReceivedQtys] = useState<Record<number, number>>(() => {
+    const draft = loadReceiveDraft(transfer.id);
+    if (draft?.receivedQtys) return draft.receivedQtys;
     const init: Record<number, number> = {};
     (transfer.items || []).forEach((it) => {
       init[it.productId] = it.receivedQuantity !== null && it.receivedQuantity !== undefined
@@ -53,6 +74,8 @@ export const ReceiveTransferScreen: React.FC<Props> = ({
   });
 
   const [itemNotes, setItemNotes] = useState<Record<number, string>>(() => {
+    const draft = loadReceiveDraft(transfer.id);
+    if (draft?.itemNotes) return draft.itemNotes;
     const init: Record<number, string> = {};
     (transfer.items || []).forEach((it) => {
       if (it.notes) init[it.productId] = it.notes;
@@ -76,7 +99,7 @@ export const ReceiveTransferScreen: React.FC<Props> = ({
     if (isNaN(t.getTime())) return undefined;
     return toLocalDatetimeInputString(new Date(t.getTime() + 60 * 1000));
   }, [transfer.transferDate]);
-  const [receiveNotes, setReceiveNotes] = useState('');
+  const [receiveNotes, setReceiveNotes] = useState(() => loadReceiveDraft(transfer.id)?.receiveNotes ?? '');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
 
@@ -183,17 +206,13 @@ export const ReceiveTransferScreen: React.FC<Props> = ({
   }, [transfer.items, receivedQtys]);
 
   // Hành động: Lưu tạm phiếu nhận
-  const handleSaveDraft = async () => {
-    setIsSubmitting(true);
+  const handleSaveDraft = () => {
     try {
-      await transferService.updateTransfer(transfer.id, {
-        notes: receiveNotes ? `[Lưu tạm nhận]: ${receiveNotes}` : undefined,
-      });
-      showToast('Đã lưu tạm thông tin kiểm đếm phiếu nhận!');
+      const draft: ReceiveDraft = { receivedQtys, itemNotes, receiveNotes };
+      localStorage.setItem(receiveDraftKey(transfer.id), JSON.stringify(draft));
+      showToast('Đã lưu tạm số lượng kiểm đếm trên máy này. Phiếu vẫn ở trạng thái Đang chuyển cho tới khi bấm Nhận hàng.');
     } catch {
-      showToast('Đã lưu tạm thông tin!', 'success');
-    } finally {
-      setIsSubmitting(false);
+      showToast('Không lưu tạm được trên trình duyệt này.', 'error');
     }
   };
 
@@ -231,14 +250,19 @@ export const ReceiveTransferScreen: React.FC<Props> = ({
         items: itemsPayload,
       });
 
+      try {
+        localStorage.removeItem(receiveDraftKey(transfer.id));
+      } catch {
+        // bỏ qua
+      }
       showToast(`Đã nhận hàng thành công cho phiếu ${transfer.code}!`, 'success');
       setTimeout(() => {
         onSuccess();
         onClose();
       }, 800);
-    } catch (err: any) {
+    } catch (err) {
       console.error('Lỗi nhận hàng:', err);
-      showToast(err.message || 'Có lỗi xảy ra khi xác nhận nhận hàng!', 'error');
+      showToast(err instanceof Error ? err.message : 'Có lỗi xảy ra khi xác nhận nhận hàng!', 'error');
     } finally {
       setIsSubmitting(false);
     }

@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using StockFlow.Application.Features.Suppliers.Commands;
 using StockFlow.Application.Features.Suppliers.DTOs;
 using StockFlow.Application.Features.Suppliers.Queries;
+using StockFlow.API.Authorization;
 
 using StockFlow.Application.Features.WarehousePermissions.DTOs;
 using StockFlow.Application.Features.WarehousePermissions.Queries;
@@ -12,7 +13,6 @@ namespace StockFlow.API.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-[AllowAnonymous]
 public class SuppliersController : ControllerBase
 {
     private readonly IMediator _mediator;
@@ -27,13 +27,16 @@ public class SuppliersController : ControllerBase
     /// </summary>
     [HttpGet]
     [ProducesResponseType(typeof(List<SupplierDto>), StatusCodes.Status200OK)]
+    [RequirePermission("PARTNER_READ")]
     public async Task<IActionResult> GetSuppliers(
         [FromQuery] string? search,
         [FromQuery] string? debtStatus,
         [FromQuery] string? status,
-        [FromQuery] int? warehouseId)
+        [FromQuery] int? warehouseId,
+        [FromQuery] DateTime? fromDate,
+        [FromQuery] DateTime? toDate)
     {
-        var result = await _mediator.Send(new GetSuppliersQuery(search, debtStatus, status, warehouseId));
+        var result = await _mediator.Send(new GetSuppliersQuery(search, debtStatus, status, warehouseId, fromDate, toDate));
         if (!result.IsSuccess)
         {
             return BadRequest(new { message = result.Error });
@@ -61,6 +64,7 @@ public class SuppliersController : ControllerBase
     [HttpGet("{id}")]
     [ProducesResponseType(typeof(SupplierDetailDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [RequirePermission("PARTNER_READ")]
     public async Task<IActionResult> GetSupplierById(int id)
     {
         var result = await _mediator.Send(new GetSupplierByIdQuery(id));
@@ -77,6 +81,7 @@ public class SuppliersController : ControllerBase
     [HttpPost]
     [ProducesResponseType(typeof(SupplierDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [RequirePermission("PARTNER_CREATE")]
     public async Task<IActionResult> CreateSupplier([FromBody] CreateSupplierRequest request)
     {
         var result = await _mediator.Send(new CreateSupplierCommand(request));
@@ -94,6 +99,7 @@ public class SuppliersController : ControllerBase
     [ProducesResponseType(typeof(SupplierDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [RequirePermission("PARTNER_UPDATE")]
     public async Task<IActionResult> UpdateSupplier(int id, [FromBody] UpdateSupplierRequest request)
     {
         var result = await _mediator.Send(new UpdateSupplierCommand(id, request));
@@ -114,6 +120,7 @@ public class SuppliersController : ControllerBase
     [HttpPatch("{id}/toggle-status")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [RequirePermission("PARTNER_UPDATE")]
     public async Task<IActionResult> ToggleSupplierStatus(int id)
     {
         var result = await _mediator.Send(new ToggleSupplierStatusCommand(id));
@@ -127,9 +134,27 @@ public class SuppliersController : ControllerBase
     /// <summary>
     /// Xóa Nhà cung cấp hoặc tự động chuyển sang ngừng hoạt động nếu đã phát sinh chứng từ nhập kho / công nợ.
     /// </summary>
+    /// <summary>
+    /// Tạo phiếu chi thanh toán nợ nhà cung cấp (PC000001...), có thể phân bổ vào các phiếu nhập còn nợ.
+    /// </summary>
+    [HttpPost("{id}/payments")]
+    [ProducesResponseType(typeof(SupplierPaymentResultDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [RequirePermission("FIN_CREATE")]
+    public async Task<IActionResult> CreateSupplierPayment(int id, [FromBody] CreateSupplierPaymentRequest request)
+    {
+        var result = await _mediator.Send(new CreateSupplierPaymentCommand(id, request));
+        if (!result.IsSuccess)
+        {
+            return BadRequest(new { message = result.Error });
+        }
+        return Ok(result.Value);
+    }
+
     [HttpDelete("{id}")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [RequirePermission("PARTNER_DELETE")]
     public async Task<IActionResult> DeleteSupplier(int id)
     {
         var result = await _mediator.Send(new DeleteSupplierCommand(id));

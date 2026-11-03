@@ -106,7 +106,7 @@ import {
   ChevronsLeft,
   ChevronsRight,
 } from 'lucide-react';
-import { productService } from '../../services/productService';
+import { productService, type ProductStockAdjustmentResult } from '../../services/productService';
 import { adminService } from '../../services/adminService';
 import { WarehouseFacility } from '../../types';
 import { SkuAnalyticsModal } from './SkuAnalyticsModal';
@@ -119,7 +119,7 @@ import ProductFilterSidebar, {
   FilterSidebarState,
   INITIAL_FILTER_STATE,
 } from '@/components/ProductFilterSidebar';
-import { SlidersHorizontal, RotateCcw } from 'lucide-react';
+import { SlidersHorizontal, RotateCcw, Lock, Unlock } from 'lucide-react';
 
 // ─── Component Combobox Đa Năng (Vừa Tự Nhập Vừa Tự Chọn) ──────────────────────
 interface CustomComboboxProps {
@@ -863,15 +863,24 @@ export const formatRealDateTime = (dateInput?: string | Date | null): string => 
 // Định dạng hiển thị số với dấu phẩy ngăn cách hàng nghìn (VD: 50,000; 500,000; 999,999,999)
 export const formatNumberWithCommas = (val: number | string | undefined | null): string => {
   if (val === undefined || val === null || val === '') return '';
-  const str = String(val).replace(/\D/g, '');
+  // Số thực (VD giá vốn bình quân 74285.72) phải làm tròn trước, nếu không dấu "." bị xóa → 7,428,572
+  const str = toIntegerString(val);
   if (!str) return '';
   return str.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+};
+
+// Chuẩn hóa về chuỗi số nguyên: số / chuỗi số thập phân ("74285.72") thì làm tròn, chuỗi đã định dạng ("1,234") thì bỏ ký tự thừa
+const toIntegerString = (val: number | string): string => {
+  if (typeof val === 'number') return Number.isFinite(val) ? String(Math.max(0, Math.round(val))) : '';
+  const trimmed = val.trim();
+  if (/^\d+\.\d+$/.test(trimmed)) return String(Math.round(Number(trimmed)));
+  return trimmed.replace(/\D/g, '');
 };
 
 // Chuyển chuỗi định dạng có dấu phẩy về số nguyên an toàn
 export const parseCleanNumber = (val: string | number | undefined | null): number => {
   if (val === undefined || val === null || val === '') return 0;
-  const str = String(val).replace(/\D/g, '');
+  const str = toIntegerString(val);
   return str ? Number(str) : 0;
 };
 
@@ -999,7 +1008,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
     if ((filterSidebarState.locations?.length ?? 0) > 0 || filterSidebarState.location?.trim()) count++;
     if ((filterSidebarState.productTypes?.length ?? 0) > 0 || filterSidebarState.productType?.trim()) count++;
     if (filterSidebarState.directSale !== 'all') count++;
-    if (filterSidebarState.businessStatus !== 'all') count++;
+    if (filterSidebarState.businessStatus !== 'active') count++; // mặc định = đang kinh doanh
     return count;
   }, [filterSidebarState]);
 
@@ -1121,6 +1130,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
   const [inboundQty, setInboundQty] = useState<number | string>(50);
   const [inboundType, setInboundType] = useState<'ADD' | 'SET'>('ADD');
   const [inboundNote, setInboundNote] = useState<string>('Nhập hàng từ nhà cung cấp');
+  const [isAdjustingStock, setIsAdjustingStock] = useState(false);
 
   // Phân bổ tồn kho theo chi nhánh trong Form Thêm/Sửa
   const [formWarehouseStocks, setFormWarehouseStocks] = useState<Record<string, number>>({});
@@ -1372,35 +1382,17 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
             units: parsedUnits,
             attributes: parsedAttributes,
             variants: parsedVariants,
-            stockByWarehouse: (() => {
-              const total = Number(p.stockQuantity) || 0;
-              const code = (p.code || p.productCode || '').toUpperCase();
-              if (code === 'TP-KE001') {
-                return [
-                  { warehouseName: 'Kho Tổng Gia Lâm', warehouseCode: 'K001', actualStock: 200, availableStock: 200 },
-                  { warehouseName: 'Kho Đông Anh', warehouseCode: 'K002', actualStock: 80, availableStock: 80 },
-                ];
-              }
-              if (code === 'TP-SP01') {
-                return [
-                  { warehouseName: 'Kho Tổng Gia Lâm', warehouseCode: 'K001', actualStock: 350, availableStock: 350 },
-                  { warehouseName: 'Kho Đông Anh', warehouseCode: 'K002', actualStock: 100, availableStock: 100 },
-                ];
-              }
-              if (code === 'TP-SP02') {
-                return [
-                  { warehouseName: 'Kho Tổng Gia Lâm', warehouseCode: 'K001', actualStock: 120, availableStock: 120 },
-                ];
-              }
-              if (code === 'TP-SP03') {
-                return [
-                  { warehouseName: 'Kho Đông Anh', warehouseCode: 'K002', actualStock: 200, availableStock: 200 },
-                ];
-              }
-              return [
-                { warehouseName: 'Kho Tổng Gia Lâm', warehouseCode: 'K001', actualStock: total, availableStock: total },
-              ];
-            })(),
+            // Tồn kho theo từng kho lấy từ DB (ProductDto.warehouses = Σ trx_inventory_balances theo kho).
+            // Trước đây gán số cố định theo mã hàng hoặc dồn toàn bộ tổng tồn vào "Kho Tổng Gia Lâm" → hiển thị sai.
+            stockByWarehouse: (Array.isArray(p.warehouses) ? p.warehouses : []).map(
+              (w: { warehouseCode?: string; warehouseName?: string; quantity?: number; unitCost?: number }) => ({
+                warehouseName: w.warehouseName || '',
+                warehouseCode: w.warehouseCode || undefined,
+                actualStock: Number(w.quantity) || 0,
+                availableStock: Number(w.quantity) || 0,
+                costPrice: w.unitCost !== undefined && w.unitCost !== null ? Number(w.unitCost) || 0 : undefined,
+              })
+            ),
             stockCardRecent: (() => {
               const code = (p.code || p.productCode || '').toUpperCase();
               if (code === 'TP-KE001') {
@@ -1447,13 +1439,12 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                 supplier: finalSupplier,
                 createdAt: finalCreatedAt || dbItem.createdAt,
                 isStarred,
-                stockByWarehouse: localMatch.stockByWarehouse && localMatch.stockByWarehouse.length > 0
-                  ? localMatch.stockByWarehouse
-                  : dbItem.stockByWarehouse,
-                costPrice: localMatch.costPrice || dbItem.costPrice,
+                // Tồn kho & giá vốn luôn lấy từ DB, không dùng bản lưu cũ trong localStorage (gây lệch số)
+                stockByWarehouse: dbItem.stockByWarehouse,
+                costPrice: dbItem.costPrice || localMatch.costPrice,
                 standardPrice: (dbItem.standardPrice !== undefined && dbItem.standardPrice !== null && dbItem.standardPrice > 0) ? dbItem.standardPrice : (localMatch.standardPrice || 0),
-                stockQuantity: localMatch.stockQuantity || dbItem.stockQuantity,
-                availableQuantity: localMatch.availableQuantity || dbItem.availableQuantity,
+                stockQuantity: dbItem.stockQuantity,
+                availableQuantity: dbItem.availableQuantity,
               };
             }
             return {
@@ -1770,70 +1761,76 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
     setInboundModalOpen(true);
   };
 
-  // Xác nhận nhập hàng / cân chỉnh tồn kho tại kho được chọn
-  const handleConfirmInbound = () => {
-    if (!inboundItem) return;
-    const numQty = parseCleanNumber(inboundQty);
-    if (numQty <= 0 && inboundType === 'ADD') {
-      alert('Vui lòng nhập số lượng hợp lệ lớn hơn 0!');
-      return;
-    }
+  // Tìm kho (theo tên hoặc mã) trong danh sách cơ sở kho lấy từ DB
+  const findFacility = (whNameOrCode: string): WarehouseFacility | undefined => {
+    const key = whNameOrCode.trim().toLowerCase();
+    return facilities.find(
+      (f) => f.name.trim().toLowerCase() === key || (f.code && f.code.trim().toLowerCase() === key)
+    );
+  };
 
+  // Lấy productId số của hàng hóa (dữ liệu cũ trong cache có thể chỉ có mã)
+  const resolveNumericProductId = async (item: GoodsItem): Promise<number | undefined> => {
+    if (item.productId) return item.productId;
+    if (Number(item.id)) return Number(item.id);
+    try {
+      const found = await productService.getProducts({ search: item.code });
+      const exact = found.find((p) => (p.code || '').toUpperCase() === item.code.toUpperCase()) as
+        | ((typeof found)[number] & { productId?: number })
+        | undefined;
+      return exact?.productId || (exact && Number(exact.id) ? Number(exact.id) : undefined);
+    } catch {
+      return undefined;
+    }
+  };
+
+  // Cập nhật tồn kho hiển thị theo kết quả điều chỉnh đã lưu trong DB
+  const applyStockAdjustmentToGoods = (
+    item: GoodsItem,
+    result: ProductStockAdjustmentResult,
+    whLabel: string,
+    typeName: string
+  ) => {
     setGoods((prevGoods) => {
       const updated = prevGoods.map((g) => {
-        if (g.id !== inboundItem.id && g.code !== inboundItem.code) return g;
+        if (g.id !== item.id && g.code !== item.code) return g;
 
-        const currentBreakdown = g.stockByWarehouse ? [...g.stockByWarehouse] : [];
-        const existingIdx = currentBreakdown.findIndex(
-          (w) => w.warehouseName.toLowerCase() === inboundTargetWarehouse.toLowerCase()
+        const breakdown = g.stockByWarehouse ? [...g.stockByWarehouse] : [];
+        const idx = breakdown.findIndex(
+          (w) =>
+            w.warehouseName.trim().toLowerCase() === whLabel.trim().toLowerCase() ||
+            (!!w.warehouseCode && w.warehouseCode.trim().toLowerCase() === result.warehouseCode.trim().toLowerCase())
         );
-
-        let newActual = 0;
-        let delta = 0;
-
-        if (existingIdx >= 0) {
-          const oldStock = Number(currentBreakdown[existingIdx].actualStock) || 0;
-          if (inboundType === 'ADD') {
-            newActual = oldStock + numQty;
-            delta = numQty;
-          } else {
-            newActual = numQty;
-            delta = numQty - oldStock;
-          }
-          currentBreakdown[existingIdx] = {
-            ...currentBreakdown[existingIdx],
-            actualStock: newActual,
-            availableStock: newActual,
-          };
+        if (idx >= 0) {
+          breakdown[idx] = { ...breakdown[idx], actualStock: result.newQuantity, availableStock: result.newQuantity };
         } else {
-          newActual = numQty;
-          delta = numQty;
-          currentBreakdown.push({
-            warehouseName: inboundTargetWarehouse,
-            actualStock: newActual,
-            availableStock: newActual,
+          breakdown.push({
+            warehouseName: result.warehouseName || whLabel,
+            warehouseCode: result.warehouseCode || undefined,
+            actualStock: result.newQuantity,
+            availableStock: result.newQuantity,
           });
         }
 
-        const newTotalActual = currentBreakdown.reduce((sum, w) => sum + (Number(w.actualStock) || 0), 0);
-        const newTotalAvailable = currentBreakdown.reduce((sum, w) => sum + (Number(w.availableStock) || 0), 0);
-
-        const newStockCardEntry = {
-          date: `${new Date().toLocaleDateString('vi-VN')} ${new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}`,
-          docCode: `NK-${Date.now().toString().slice(-6)}`,
-          type: 'NHAP' as const,
-          typeName: inboundType === 'ADD' ? `Nhập hàng vào ${inboundTargetWarehouse}` : `Cân chỉnh tồn tại ${inboundTargetWarehouse}`,
-          qtyChange: delta,
-          balance: newTotalActual,
-          partnerOrDept: inboundTargetWarehouse,
+        const total = breakdown.reduce((sum, w) => sum + (Number(w.actualStock) || 0), 0);
+        const now = new Date();
+        const entry = {
+          date: `${now.toLocaleDateString('vi-VN')} ${now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}`,
+          docCode: `DC-${g.code}`,
+          type: (result.delta >= 0 ? 'NHAP' : 'XUAT') as 'NHAP' | 'XUAT',
+          typeName,
+          qtyChange: result.delta,
+          balance: total,
+          partnerOrDept: whLabel,
         };
 
         return {
           ...g,
-          stockQuantity: newTotalActual,
-          availableQuantity: newTotalAvailable,
-          stockByWarehouse: currentBreakdown,
-          stockCardRecent: [newStockCardEntry, ...(g.stockCardRecent || [])],
+          productId: result.productId,
+          stockQuantity: total,
+          availableQuantity: total,
+          stockByWarehouse: breakdown,
+          stockCardRecent: [entry, ...(g.stockCardRecent || [])],
         };
       });
 
@@ -1842,12 +1839,57 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
           localStorage.setItem(STOCKFLOW_GOODS_STORAGE_KEY, JSON.stringify(updated));
         } catch {}
       }
-
       return updated;
     });
+  };
 
-    showToast(`Đã cập nhật tồn kho cho "${inboundItem.name}" tại ${inboundTargetWarehouse} thành công!`);
-    setInboundModalOpen(false);
+  // Xác nhận nhập hàng / cân chỉnh tồn kho tại kho được chọn (lưu thật vào DB + ghi thẻ kho)
+  const handleConfirmInbound = async () => {
+    if (!inboundItem || isAdjustingStock) return;
+    const numQty = parseCleanNumber(inboundQty);
+    if (numQty <= 0 && inboundType === 'ADD') {
+      alert('Vui lòng nhập số lượng hợp lệ lớn hơn 0!');
+      return;
+    }
+    if (numQty < 0) {
+      alert('Tồn kho thực tế không được âm!');
+      return;
+    }
+
+    const facility = findFacility(inboundTargetWarehouse);
+    if (!facility?.warehouseId) {
+      alert(`Không xác định được kho "${inboundTargetWarehouse}". Vui lòng tải lại trang.`);
+      return;
+    }
+
+    setIsAdjustingStock(true);
+    try {
+      const productId = await resolveNumericProductId(inboundItem);
+      if (!productId) {
+        alert('Hàng hóa chưa được lưu trên hệ thống, không thể điều chỉnh tồn kho.');
+        return;
+      }
+
+      const result = await productService.adjustStock(productId, {
+        warehouseId: facility.warehouseId,
+        quantity: numQty,
+        mode: inboundType,
+        note: inboundNote.trim() || undefined,
+      });
+
+      applyStockAdjustmentToGoods(
+        inboundItem,
+        result,
+        inboundTargetWarehouse,
+        inboundType === 'ADD' ? `Nhập hàng vào ${inboundTargetWarehouse}` : `Cân chỉnh tồn tại ${inboundTargetWarehouse}`
+      );
+      showToast(`Đã cập nhật tồn kho "${inboundItem.name}" tại ${inboundTargetWarehouse}: ${result.previousQuantity.toLocaleString('vi-VN')} → ${result.newQuantity.toLocaleString('vi-VN')}`);
+      setInboundModalOpen(false);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Không thể cập nhật tồn kho. Vui lòng thử lại.');
+    } finally {
+      setIsAdjustingStock(false);
+    }
   };
 
   // Quyền hạn RBAC
@@ -2337,7 +2379,8 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
     if (modalMode === 'edit' && editInitialSnapshot) {
       // 1. Kiểm tra giá vốn có thực sự bị thay đổi so với ban đầu hay không
       const currentEnteredCost = parseCleanNumber(formCostPrice);
-      const initialCost = Number(editInitialSnapshot.costPrice ?? 0);
+      // Ô nhập hiển thị giá vốn đã làm tròn → so sánh theo số đã làm tròn để không báo "đã sửa" khi chưa sửa
+      const initialCost = Math.round(Number(editInitialSnapshot.costPrice ?? 0));
       const isCostPriceChanged = currentEnteredCost !== initialCost;
 
       // NẾU KHÔNG SỬA GIÁ VỐN: LƯU TRỰC TIẾP VÀO DATABASE, TUYỆT ĐỐI KHÔNG HIỆN POPUP ẢNH 2!
@@ -2538,13 +2581,6 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
     };
 
     // Chuẩn bị payload chuẩn gửi đến backend ASP.NET Core & MediatR
-    const activeFac: any = targetFacilities.find(
-      (f) =>
-        f.name.trim().toLowerCase() === activeWh.trim().toLowerCase() ||
-        (f.code && f.code.trim().toLowerCase() === activeWh.trim().toLowerCase())
-    );
-    const numericWhId = activeFac?.warehouseId || (activeFac?.id && Number(String(activeFac.id).replace(/\D/g, '')) ? Number(String(activeFac.id).replace(/\D/g, '')) : undefined);
-
     const apiPayload: any = {
       code: savedItem.code,
       name: savedItem.name,
@@ -2553,7 +2589,14 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
       uom: savedItem.uom,
       supplier: savedItem.supplier,
       standardPrice: savedItem.standardPrice,
-      costPrice: savedItem.costPrice,
+      // Chỉ gửi giá vốn khi người dùng thực sự sửa; kèm phạm vi kho (rỗng = toàn hệ thống)
+      costPrice: applyCostScope === 'KEEP_EXISTING' ? undefined : numEnteredCost,
+      costWarehouseIds:
+        applyCostScope === 'BRANCH'
+          ? targetBranchesForCost
+              .map((b) => findFacility(b)?.warehouseId)
+              .filter((id): id is number => typeof id === 'number' && id > 0)
+          : undefined,
       minSafeStock: savedItem.minSafeStock,
       maxSafeStock: savedItem.maxSafeStock,
       barcode: savedItem.barcode,
@@ -2565,8 +2608,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
       hasRewardPoints: savedItem.hasRewardPoints,
       imageUrl: savedItem.imageUrl,
       description: savedItem.description,
-      initialStock: savedItem.stockQuantity,
-      initialWarehouseId: numericWhId,
+      // Tồn kho không gửi kèm ở đây: được cân chỉnh riêng từng kho qua /stock-adjustments sau khi lưu
       createdAt: new Date().toISOString(),
       units: savedItem.units?.map((u) => ({
         name: u.name,
@@ -2592,52 +2634,62 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
 
     setIsSaving(true);
     try {
-      let numericId = editingItem?.productId || (editingItem && Number(editingItem.id) ? Number(editingItem.id) : undefined);
-      if (editingItem && !numericId) {
-        try {
-          const found = await productService.getProducts({ search: editingItem.code });
-          const exact = found.find((p: any) => (p.code || p.productCode || '').toUpperCase() === editingItem.code.toUpperCase());
-          if (exact) {
-            numericId = (exact as any).productId || (Number(exact.id) ? Number(exact.id) : undefined);
-          }
-        } catch {}
+      let numericId = editingItem ? await resolveNumericProductId(editingItem) : undefined;
+
+      // Lỗi API được ném ra ngoài để báo cho người dùng (không giả vờ "đã lưu" khi DB chưa được cập nhật)
+      if (editingItem && numericId) {
+        const updateRes = await productService.updateProduct(numericId, apiPayload);
+        const updated = updateRes as Partial<{ productId: number; categoryName: string }> | null;
+        savedItem.productId = updated?.productId || numericId;
+        if (updated?.categoryName) savedItem.subCategory = updated.categoryName;
+      } else {
+        const createRes = await productService.createProduct(apiPayload);
+        const created = createRes as (typeof createRes & Partial<{ productId: number; createdAt: string; categoryName: string }>) | null;
+        if (created) {
+          savedItem.productId = created.productId || (Number(created.id) ? Number(created.id) : undefined);
+          savedItem.id = String(created.id || created.productId || savedItem.id);
+          if (created.createdAt) savedItem.createdAt = formatRealDateTime(created.createdAt);
+          if (created.categoryName) savedItem.subCategory = created.categoryName;
+        }
+        numericId = savedItem.productId;
       }
 
-      if (editingItem && numericId) {
-        try {
-          const updateRes = await productService.updateProduct(numericId, apiPayload);
-          if (updateRes) {
-            savedItem.productId = (updateRes as any).productId || numericId;
-            if ((updateRes as any).categoryName) {
-              savedItem.subCategory = (updateRes as any).categoryName;
-            }
+      // Đồng bộ tồn kho từng kho có thay đổi vào DB (cân chỉnh theo số lượng nhập trên form, ghi thẻ kho)
+      const stockErrors: string[] = [];
+      if (numericId) {
+        for (const wh of builtStockByWarehouse) {
+          const oldEntry = editingItem?.stockByWarehouse?.find(
+            (w) =>
+              w.warehouseName.trim().toLowerCase() === wh.warehouseName.trim().toLowerCase() ||
+              (!!w.warehouseCode && !!wh.warehouseCode && w.warehouseCode.trim().toLowerCase() === wh.warehouseCode.trim().toLowerCase())
+          );
+          const oldQty = Number(oldEntry?.actualStock) || 0;
+          const whId = findFacility(wh.warehouseName)?.warehouseId;
+          if (!whId || wh.actualStock === oldQty) continue;
+          try {
+            const res = await productService.adjustStock(numericId, {
+              warehouseId: whId,
+              quantity: wh.actualStock,
+              mode: 'SET',
+              note: editingItem ? 'Cân chỉnh tồn kho từ form hàng hóa' : 'Tồn kho ban đầu',
+            });
+            wh.actualStock = res.newQuantity;
+            wh.availableStock = res.newQuantity;
+          } catch (stockErr) {
+            wh.actualStock = oldQty;
+            wh.availableStock = oldQty;
+            stockErrors.push(`${wh.warehouseName}: ${stockErr instanceof Error ? stockErr.message : 'lỗi không xác định'}`);
           }
-          showToast(`Đã cập nhật hàng hóa: ${savedItem.name}`);
-        } catch (apiErr) {
-          console.warn('API update fallback locally:', apiErr);
-          showToast(`Đã lưu thay đổi: ${savedItem.name}`);
         }
+      }
+      const syncedTotal = builtStockByWarehouse.reduce((s, w) => s + (Number(w.actualStock) || 0), 0);
+      savedItem.stockQuantity = syncedTotal;
+      savedItem.availableQuantity = syncedTotal;
+
+      if (stockErrors.length > 0) {
+        alert(`Đã lưu thông tin hàng hóa nhưng chưa cập nhật được tồn kho:\n${stockErrors.join('\n')}`);
       } else {
-        try {
-          const createRes = await productService.createProduct(apiPayload);
-          if (createRes) {
-            savedItem.id = String(createRes.id || (createRes as any).productId || savedItem.id);
-            savedItem.productId = (createRes as any).productId || (Number(createRes.id) ? Number(createRes.id) : Date.now());
-            if ((createRes as any).createdAt) {
-              savedItem.createdAt = formatRealDateTime((createRes as any).createdAt);
-            }
-            if ((createRes as any).categoryName) {
-              savedItem.subCategory = (createRes as any).categoryName;
-            }
-          }
-          showToast(`Tạo mới hàng hóa thành công: ${savedItem.name}`);
-        } catch (apiErr) {
-          console.warn('API create fallback locally:', apiErr);
-          if (!savedItem.productId) {
-            savedItem.productId = Date.now();
-          }
-          showToast(`Đã tạo mới hàng hóa: ${savedItem.name}`);
-        }
+        showToast(editingItem ? `Đã cập nhật hàng hóa: ${savedItem.name}` : `Tạo mới hàng hóa thành công: ${savedItem.name}`);
       }
 
       // Cập nhật React state và lưu cache LocalStorage
@@ -2670,6 +2722,41 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
       alert(`Lỗi khi lưu vào cơ sở dữ liệu: ${err?.message || 'Không thể kết nối máy chủ backend'}`);
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  // Ngừng kinh doanh / Cho phép kinh doanh lại một mặt hàng
+  const handleToggleBusinessStatus = async (item: GoodsItem) => {
+    const numericId = item.productId || (Number(item.id) ? Number(item.id) : undefined);
+    if (!numericId) return;
+    const stopping = item.status !== 'DISCONTINUED';
+    if (
+      stopping &&
+      !window.confirm(
+        `Ngừng kinh doanh "${item.name}" (${item.code})?\n\nHàng ngừng kinh doanh sẽ không tìm thấy khi bán hàng, nhập hàng và chuyển hàng. Có thể cho phép kinh doanh lại bất cứ lúc nào.`
+      )
+    ) {
+      return;
+    }
+    try {
+      const isActive = await productService.toggleProductStatus(numericId);
+      const nextStatus: GoodsItem['status'] = isActive ? 'ACTIVE' : 'DISCONTINUED';
+      const updated = goods.map((g) => (g.id === item.id ? { ...g, status: nextStatus } : g));
+      setGoods(updated);
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem(STOCKFLOW_GOODS_STORAGE_KEY, JSON.stringify(updated));
+        } catch {
+          // bỏ qua khi không ghi được cache
+        }
+      }
+      showToast(
+        isActive
+          ? `Đã cho phép kinh doanh lại ${item.code}`
+          : `Đã ngừng kinh doanh ${item.code}`
+      );
+    } catch (err) {
+      alert(`Không thể cập nhật trạng thái: ${err instanceof Error ? err.message : 'Thao tác thất bại'}`);
     }
   };
 
@@ -3506,6 +3593,11 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                       <td className="py-3 px-4">
                         <div className="font-bold text-slate-800 text-xs hover:text-blue-600 transition flex items-center gap-1.5">
                           <span>{item.name}</span>
+                          {item.status === 'DISCONTINUED' && (
+                            <span className="shrink-0 px-1.5 py-0.5 rounded bg-slate-100 border border-slate-200 text-[10px] font-semibold text-slate-500">
+                              Ngừng kinh doanh
+                            </span>
+                          )}
                           {isExpanded ? (
                             <ChevronUp size={14} className="text-blue-500 shrink-0" />
                           ) : (
@@ -3891,6 +3983,19 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                                     >
                                       <Copy size={13} />
                                       <span>Sao chép</span>
+                                    </button>
+                                    {/* Ngừng / Cho phép kinh doanh (PATCH /api/Products/{id}/toggle-status) */}
+                                    <button
+                                      type="button"
+                                      onClick={() => handleToggleBusinessStatus(item)}
+                                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition cursor-pointer ${
+                                        item.status === 'DISCONTINUED'
+                                          ? 'border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-800'
+                                          : 'border-slate-200 hover:bg-slate-50 text-slate-700'
+                                      }`}
+                                    >
+                                      {item.status === 'DISCONTINUED' ? <Unlock size={13} /> : <Lock size={13} />}
+                                      <span>{item.status === 'DISCONTINUED' ? 'Cho phép kinh doanh' : 'Ngừng kinh doanh'}</span>
                                     </button>
                                   </div>
 
@@ -6128,10 +6233,11 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
               <button
                 type="button"
                 onClick={handleConfirmInbound}
-                className="px-5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-xs font-bold text-white transition cursor-pointer shadow-xs flex items-center gap-1.5"
+                disabled={isAdjustingStock}
+                className="px-5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-xs font-bold text-white transition cursor-pointer shadow-xs flex items-center gap-1.5 disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 <Check size={14} />
-                <span>Xác nhận nhập kho</span>
+                <span>{isAdjustingStock ? 'Đang lưu...' : inboundType === 'ADD' ? 'Xác nhận nhập kho' : 'Xác nhận cân chỉnh'}</span>
               </button>
             </div>
           </div>

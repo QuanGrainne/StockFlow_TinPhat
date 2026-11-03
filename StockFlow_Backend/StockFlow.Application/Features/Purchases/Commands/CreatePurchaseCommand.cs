@@ -59,21 +59,15 @@ public class CreatePurchaseCommandHandler : IRequestHandler<CreatePurchaseComman
             var authWarehouses = await _currentUserService.GetAuthorizedWarehouseIdsAsync(cancellationToken);
             if (authWarehouses.Count == 0)
             {
-                var defaultWh = await _context.MstWarehouses
-                    .Where(w => w.IsActive != false)
-                    .OrderBy(w => w.WarehouseId)
-                    .FirstOrDefaultAsync(cancellationToken);
+                return Result.Failure<PurchaseDetailDto>("Bạn chưa được phân quyền kho nào để nhập hàng.");
+            }
+            warehouseId = authWarehouses[0];
+        }
 
-                if (defaultWh == null)
-                {
-                    return Result.Failure<PurchaseDetailDto>("Hệ thống chưa có kho hàng hoạt động nào.");
-                }
-                warehouseId = defaultWh.WarehouseId;
-            }
-            else
-            {
-                warehouseId = authWarehouses[0];
-            }
+        // Cô lập dữ liệu kho: chỉ được nhập hàng vào kho mình được phân quyền
+        if (!await _currentUserService.HasWarehouseAccessAsync(warehouseId, cancellationToken))
+        {
+            return Result.Failure<PurchaseDetailDto>("Bạn không có quyền nhập hàng vào kho này.");
         }
 
         var warehouse = await _context.MstWarehouses
@@ -120,17 +114,14 @@ public class CreatePurchaseCommandHandler : IRequestHandler<CreatePurchaseComman
             }
         }
 
-        int currentUserId = _currentUserService.UserId ?? 0;
-        if (currentUserId <= 0)
+        if (!_currentUserService.UserId.HasValue)
         {
-            var defaultUser = await _context.SecUsers
-                .Where(u => u.IsActive != false)
-                .OrderBy(u => u.UserId)
-                .FirstOrDefaultAsync(cancellationToken);
-            currentUserId = defaultUser?.UserId ?? 1;
+            return Result.Failure<PurchaseDetailDto>("Không xác định được người dùng đăng nhập.");
         }
+        int currentUserId = _currentUserService.UserId.Value;
 
-        DateTime receivedDate = req.ReceivedDate ?? DateTime.UtcNow;
+        // Client gửi ISO UTC (toISOString) → đổi về giờ Việt Nam trước khi lưu
+        DateTime receivedDate = VietnamTime.From(req.ReceivedDate);
         string status = string.Equals(req.Status?.Trim(), "DRAFT", StringComparison.OrdinalIgnoreCase) ? "DRAFT" : "COMPLETED";
 
         // Thực hiện lưu trữ trong Database Transaction đảm bảo tính toàn vẹn tuyệt đối
@@ -152,17 +143,20 @@ public class CreatePurchaseCommandHandler : IRequestHandler<CreatePurchaseComman
                 Notes = req.Notes?.Trim()
             };
 
+            // Tính tiền: phân bổ giảm giá phiếu vào giá vốn từng dòng
+            var pricing = PurchasePricing.Compute(req.Items, req.DiscountAmount);
+            goodsReceipt.DiscountAmount = pricing.DiscountApplied;
+
             _context.TrxGoodsReceipts.Add(goodsReceipt);
 
             // 7. Tạo danh sách mặt hàng DtlGoodsReceiptItem
             var receiptItems = new List<DtlGoodsReceiptItem>();
-            decimal totalAmount = 0;
+            // Số tiền cần trả NCC = tổng tiền hàng − giảm giá phiếu (làm tròn đến đồng)
+            decimal totalAmount = Math.Round(pricing.NetTotal, 0, MidpointRounding.AwayFromZero);
 
-            foreach (var reqItem in req.Items)
+            foreach (var line in pricing.Lines)
             {
-                decimal effectivePrice = reqItem.UnitPrice * (1 - (reqItem.DiscountPercent / 100m));
-                decimal itemTotal = reqItem.Quantity * effectivePrice;
-                totalAmount += itemTotal;
+                var reqItem = line.Request;
 
                 var dtl = new DtlGoodsReceiptItem
                 {
@@ -174,7 +168,9 @@ public class CreatePurchaseCommandHandler : IRequestHandler<CreatePurchaseComman
                     DefectiveQty = 0,
                     DamagedQty = 0,
                     ShortageQty = 0,
-                    UnitLandedCost = Math.Round(effectivePrice, 4, MidpointRounding.AwayFromZero),
+                    UnitLandedCost = line.LandedCost,
+                    UnitPrice = reqItem.UnitPrice,
+                    DiscountPercent = Math.Clamp(reqItem.DiscountPercent, 0, 100),
                     LotId = reqItem.LotId
                 };
 
@@ -225,7 +221,7 @@ public class CreatePurchaseCommandHandler : IRequestHandler<CreatePurchaseComman
                             LotId = item.LotId,
                             Quantity = incomingQty,
                             UnitCost = newUnitCost,
-                            LastUpdated = DateTime.UtcNow
+                            LastUpdated = VietnamTime.Now
                         };
                         _context.TrxInventoryBalances.Add(balance);
                     }
@@ -233,7 +229,7 @@ public class CreatePurchaseCommandHandler : IRequestHandler<CreatePurchaseComman
                     {
                         balance.Quantity = currentQty + incomingQty;
                         balance.UnitCost = newUnitCost;
-                        balance.LastUpdated = DateTime.UtcNow;
+                        balance.LastUpdated = VietnamTime.Now;
                     }
 
                     // B. Cập nhật Giá vốn chung của sản phẩm (MstProduct.MovingAverageCost)

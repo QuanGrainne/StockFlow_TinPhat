@@ -22,10 +22,12 @@ public record CreateTransferCommand(
 public class CreateTransferCommandHandler : IRequestHandler<CreateTransferCommand, Result<TransferDetailDto>>
 {
     private readonly IStockFlowDbContext _context;
+    private readonly ICurrentUserService _currentUserService;
 
-    public CreateTransferCommandHandler(IStockFlowDbContext context)
+    public CreateTransferCommandHandler(IStockFlowDbContext context, ICurrentUserService currentUserService)
     {
         _context = context;
+        _currentUserService = currentUserService;
     }
 
     public async Task<Result<TransferDetailDto>> Handle(CreateTransferCommand command, CancellationToken cancellationToken)
@@ -46,6 +48,12 @@ public class CreateTransferCommandHandler : IRequestHandler<CreateTransferComman
         if (req.SourceWarehouseId == req.DestWarehouseId)
         {
             return Result.Failure<TransferDetailDto>("Chi nhánh nhận hàng phải khác chi nhánh chuyển đi.");
+        }
+
+        // Cô lập dữ liệu kho (UC-33): chỉ kho xuất được lập phiếu chuyển
+        if (!await _currentUserService.HasWarehouseAccessAsync(req.SourceWarehouseId, cancellationToken))
+        {
+            return Result.Failure<TransferDetailDto>("Bạn không có quyền lập phiếu chuyển hàng từ kho này.");
         }
 
         if (req.Items == null || req.Items.Count == 0)
@@ -81,54 +89,13 @@ public class CreateTransferCommandHandler : IRequestHandler<CreateTransferComman
         var isComplete = string.Equals(req.Status, "IN_TRANSIT", StringComparison.OrdinalIgnoreCase) ||
                          string.Equals(req.Status, "COMPLETE", StringComparison.OrdinalIgnoreCase);
 
-        var finalStatus = isComplete ? "IN_TRANSIT" : "DRAFT";
         var transferDate = TransferHelper.GetVietnamTime(req.TransferDate);
 
-        // 3. Nếu là trạng thái Hoàn thành (IN_TRANSIT): Trừ tồn kho tại kho xuất và ghi nhận nhật ký xuất kho chuyển đi (TRANSFER_OUT)
-        if (isComplete)
-        {
-            var productIds = req.Items.Select(i => i.ProductId).Distinct().ToList();
-            var balances = await _context.TrxInventoryBalances
-                .Where(b => b.WarehouseId == req.SourceWarehouseId && productIds.Contains(b.ProductId))
-                .ToListAsync(cancellationToken);
+        // 3. Luôn lưu phiếu ở trạng thái Phiếu tạm trước; nếu chọn Hoàn thành thì xuất chuyển bằng đúng logic
+        //    của bước "Xuất hàng" (kiểm tra đủ tồn, trừ tồn theo giá vốn, ghi thẻ kho) trong cùng 1 giao dịch.
+        var dbContext = _context as DbContext;
+        await using var dbTransaction = dbContext != null ? await dbContext.Database.BeginTransactionAsync(cancellationToken) : null;
 
-            // Trừ tồn kho tại kho xuất và ghi nhận nhật ký xuất kho chuyển đi (TRANSFER_OUT)
-            foreach (var item in req.Items)
-            {
-                var balance = balances.FirstOrDefault(b => b.ProductId == item.ProductId);
-                if (balance != null)
-                {
-                    balance.Quantity = (balance.Quantity ?? 0) - item.Quantity;
-                    balance.LastUpdated = transferDate;
-                }
-                else
-                {
-                    var newBalance = new TrxInventoryBalance
-                    {
-                        WarehouseId = req.SourceWarehouseId,
-                        ProductId = item.ProductId,
-                        Quantity = -item.Quantity,
-                        LastUpdated = transferDate
-                    };
-                    await _context.TrxInventoryBalances.AddAsync(newBalance, cancellationToken);
-                }
-
-                // Ghi transaction lịch sử
-                var trx = new TrxInventoryTransaction
-                {
-                    WarehouseId = req.SourceWarehouseId,
-                    ProductId = item.ProductId,
-                    TransactionType = "TRANSFER_OUT",
-                    Quantity = -item.Quantity,
-                    ReferenceType = "TRANSFER",
-                    TransactionDate = transferDate,
-                    CreatedBy = command.UserId,
-                };
-                await _context.TrxInventoryTransactions.AddAsync(trx, cancellationToken);
-            }
-        }
-
-        // 4. Tạo bản ghi Header
         var transfer = new TrxStockTransfer
         {
             TransferCode = finalCode,
@@ -136,30 +103,40 @@ public class CreateTransferCommandHandler : IRequestHandler<CreateTransferComman
             DestWarehouseId = req.DestWarehouseId,
             CreatedBy = command.UserId,
             TransferDate = transferDate,
-            Status = finalStatus,
+            Status = "DRAFT",
             Notes = req.Notes?.Trim()
         };
 
         await _context.TrxStockTransfers.AddAsync(transfer, cancellationToken);
         await _context.SaveChangesAsync(cancellationToken);
 
-        // 5. Tạo các dòng chi tiết
         foreach (var it in req.Items)
         {
-            var detailItem = new DtlStockTransferItem
+            await _context.DtlStockTransferItems.AddAsync(new DtlStockTransferItem
             {
                 StockTransferId = transfer.StockTransferId,
                 ProductId = it.ProductId,
                 Quantity = it.Quantity,
-                IssuedQuantity = isComplete ? it.Quantity : 0,
+                IssuedQuantity = 0,
                 ReceivedQuantity = null
-            };
-            await _context.DtlStockTransferItems.AddAsync(detailItem, cancellationToken);
+            }, cancellationToken);
         }
-
         await _context.SaveChangesAsync(cancellationToken);
 
-        // 6. Trả về chi tiết phiếu vừa tạo
+        if (isComplete)
+        {
+            var completed = await new CompleteTransferCommandHandler(_context, _currentUserService)
+                .Handle(new CompleteTransferCommand(transfer.StockTransferId, command.UserId), cancellationToken);
+            if (!completed.IsSuccess)
+            {
+                if (dbTransaction != null) await dbTransaction.RollbackAsync(cancellationToken);
+                return completed;
+            }
+        }
+
+        if (dbTransaction != null) await dbTransaction.CommitAsync(cancellationToken);
+
+        // 4. Trả về chi tiết phiếu vừa tạo
         return await new GetTransferByIdQueryHandler(_context).Handle(new GetTransferByIdQuery(transfer.StockTransferId), cancellationToken);
     }
 }

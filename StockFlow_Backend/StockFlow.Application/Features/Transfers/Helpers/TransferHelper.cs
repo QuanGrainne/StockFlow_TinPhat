@@ -43,8 +43,17 @@ public static class TransferHelper
         }
         else
         {
-            long seq = await context.GetNextSequenceValueAsync("stockflow.seq_transfer_code", cancellationToken);
-            return $"{prefix}{seq:D6}";
+            // Bỏ qua các mã đã có (phiếu nhập mã tay / dữ liệu cũ không làm tăng sequence) để không trùng mã
+            for (var attempt = 0; attempt < 10000; attempt++)
+            {
+                long seq = await context.GetNextSequenceValueAsync("stockflow.seq_transfer_code", cancellationToken);
+                var code = $"{prefix}{seq:D6}";
+                if (!await context.TrxStockTransfers.AnyAsync(t => t.TransferCode == code, cancellationToken))
+                {
+                    return code;
+                }
+            }
+            throw new InvalidOperationException("Không sinh được mã phiếu chuyển hàng mới.");
         }
     }
 
@@ -52,19 +61,5 @@ public static class TransferHelper
     /// Chuẩn hóa thời gian sang giờ địa phương Việt Nam (UTC+7) không bị lệch múi giờ khi lưu trữ vào PostgreSQL (timestamp without time zone)
     /// </summary>
     public static DateTime GetVietnamTime(DateTime? inputDate = null)
-    {
-        if (!inputDate.HasValue)
-        {
-            return DateTime.SpecifyKind(DateTime.UtcNow.AddHours(7), DateTimeKind.Unspecified);
-        }
-
-        var dt = inputDate.Value;
-        if (dt.Kind == DateTimeKind.Utc)
-        {
-            // Nếu ngày truyền lên có dạng UTC (e.g. từ ISO string Z), cộng thêm 7 tiếng để ra đúng giờ Việt Nam
-            return DateTime.SpecifyKind(dt.AddHours(7), DateTimeKind.Unspecified);
-        }
-
-        return DateTime.SpecifyKind(dt, DateTimeKind.Unspecified);
-    }
+        => StockFlow.Application.Common.VietnamTime.From(inputDate);
 }

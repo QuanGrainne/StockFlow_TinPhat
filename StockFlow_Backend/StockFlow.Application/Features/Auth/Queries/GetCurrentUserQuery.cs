@@ -12,10 +12,12 @@ public record GetCurrentUserQuery(int UserId) : IRequest<Result<CurrentUserRespo
 public class GetCurrentUserQueryHandler : IRequestHandler<GetCurrentUserQuery, Result<CurrentUserResponse>>
 {
     private readonly IStockFlowDbContext _context;
+    private readonly IUserPermissionService _permissionService;
 
-    public GetCurrentUserQueryHandler(IStockFlowDbContext context)
+    public GetCurrentUserQueryHandler(IStockFlowDbContext context, IUserPermissionService permissionService)
     {
         _context = context;
+        _permissionService = permissionService;
     }
 
     public async Task<Result<CurrentUserResponse>> Handle(GetCurrentUserQuery request, CancellationToken cancellationToken)
@@ -45,24 +47,10 @@ public class GetCurrentUserQueryHandler : IRequestHandler<GetCurrentUserQuery, R
                 w.Warehouse.WarehouseName ?? ""))
             .ToList();
 
-        // Load active permissions for user roles
-        var roleIds = user.JncUserRoles.Select(ur => ur.RoleId).ToList();
-        var permissions = await _context.SecRoles
-            .Where(r => roleIds.Contains(r.RoleId))
-            .SelectMany(r => r.Permissions)
-            .Where(p => !string.IsNullOrEmpty(p.PermissionCode))
-            .Select(p => p.PermissionCode!.ToUpperInvariant())
-            .Distinct()
-            .ToListAsync(cancellationToken);
-
-        if (!permissions.Any())
-        {
-            foreach (var r in roles)
-            {
-                permissions.AddRange(PermissionConstants.GetDefaultPermissionCodes(r));
-            }
-            permissions = permissions.Distinct().ToList();
-        }
+        // Cùng nguồn quyền với backend authorization (RequirePermission) để FE và BE luôn khớp.
+        var permissions = (await _permissionService.GetPermissionCodesAsync(user.UserId, cancellationToken))
+            .OrderBy(p => p)
+            .ToList();
 
         var roleEntity = user.JncUserRoles.FirstOrDefault()?.Role;
         var primaryRoleName = roleEntity?.RoleName ?? (roles.FirstOrDefault() ?? "Nhân viên");

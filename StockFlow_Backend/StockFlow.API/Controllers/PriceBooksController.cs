@@ -8,12 +8,12 @@ using Microsoft.AspNetCore.Mvc;
 using StockFlow.Application.Features.PriceBooks.Commands;
 using StockFlow.Application.Features.PriceBooks.DTOs;
 using StockFlow.Application.Features.PriceBooks.Queries;
+using StockFlow.API.Authorization;
 
 namespace StockFlow.API.Controllers;
 
 [ApiController]
 [Route("api/price-books")]
-[AllowAnonymous]
 public class PriceBooksController : ControllerBase
 {
     private readonly IMediator _mediator;
@@ -28,6 +28,7 @@ public class PriceBooksController : ControllerBase
     /// </summary>
     [HttpGet]
     [ProducesResponseType(typeof(List<PriceBookDto>), StatusCodes.Status200OK)]
+    [RequirePermission("GOODS_READ")]
     public async Task<IActionResult> GetPriceBooks(
         [FromQuery] string? search,
         [FromQuery] bool? isActive,
@@ -47,6 +48,7 @@ public class PriceBooksController : ControllerBase
     [HttpGet("{id:int}")]
     [ProducesResponseType(typeof(PriceBookDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [RequirePermission("GOODS_READ")]
     public async Task<IActionResult> GetPriceBookById(int id)
     {
         var result = await _mediator.Send(new GetPriceBookByIdQuery(id));
@@ -63,6 +65,7 @@ public class PriceBooksController : ControllerBase
     [HttpPost]
     [ProducesResponseType(typeof(PriceBookDto), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [RequirePermission("GOODS_CREATE")]
     public async Task<IActionResult> CreatePriceBook([FromBody] CreatePriceBookCommand command)
     {
         var result = await _mediator.Send(command);
@@ -79,6 +82,7 @@ public class PriceBooksController : ControllerBase
     [HttpPut("{id:int}")]
     [ProducesResponseType(typeof(PriceBookDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [RequirePermission("GOODS_UPDATE")]
     public async Task<IActionResult> UpdatePriceBook(int id, [FromBody] UpdatePriceBookCommand command)
     {
         if (id != command.PriceBookId)
@@ -100,6 +104,7 @@ public class PriceBooksController : ControllerBase
     [HttpDelete("{id:int}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [RequirePermission("GOODS_DELETE")]
     public async Task<IActionResult> DeletePriceBook(int id)
     {
         var result = await _mediator.Send(new DeletePriceBookCommand(id));
@@ -115,6 +120,7 @@ public class PriceBooksController : ControllerBase
     /// </summary>
     [HttpGet("matrix")]
     [ProducesResponseType(typeof(PriceBookMatrixResultDto), StatusCodes.Status200OK)]
+    [RequirePermission("GOODS_READ")]
     public async Task<IActionResult> GetPriceMatrix(
         [FromQuery] int? warehouseId,
         [FromQuery] string? search,
@@ -157,6 +163,7 @@ public class PriceBooksController : ControllerBase
     [HttpPut("{id:int}/prices")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [RequirePermission("GOODS_UPDATE")]
     public async Task<IActionResult> UpdatePrices(int id, [FromBody] List<UpdateProductPriceItemDto> items)
     {
         var result = await _mediator.Send(new UpdatePriceBookPricesCommand(id, items));
@@ -175,6 +182,7 @@ public class PriceBooksController : ControllerBase
     [HttpPost("{id:int}/apply-formula")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [RequirePermission("GOODS_UPDATE")]
     public async Task<IActionResult> ApplyFormula(int id, [FromBody] ApplyFormulaRequestDto? body = null)
     {
         var result = await _mediator.Send(new ApplyPriceBookFormulaCommand(id, body?.CategoryIds, body?.AllProducts ?? false));

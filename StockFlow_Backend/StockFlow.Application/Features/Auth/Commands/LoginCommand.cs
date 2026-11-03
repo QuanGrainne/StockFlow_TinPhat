@@ -27,15 +27,18 @@ public class LoginCommandHandler : IRequestHandler<LoginCommand, Result<LoginRes
     private readonly IStockFlowDbContext _context;
     private readonly IPasswordHasher _passwordHasher;
     private readonly IJwtTokenGenerator _jwtTokenGenerator;
+    private readonly IUserPermissionService _permissionService;
 
     public LoginCommandHandler(
         IStockFlowDbContext context,
         IPasswordHasher passwordHasher,
-        IJwtTokenGenerator jwtTokenGenerator)
+        IJwtTokenGenerator jwtTokenGenerator,
+        IUserPermissionService permissionService)
     {
         _context = context;
         _passwordHasher = passwordHasher;
         _jwtTokenGenerator = jwtTokenGenerator;
+        _permissionService = permissionService;
     }
 
     public async Task<Result<LoginResponse>> Handle(LoginCommand request, CancellationToken cancellationToken)
@@ -98,24 +101,10 @@ public class LoginCommandHandler : IRequestHandler<LoginCommand, Result<LoginRes
             roles,
             warehouseIds);
 
-        // Load active permissions for user roles
-        var roleIds = user.JncUserRoles.Select(ur => ur.RoleId).ToList();
-        var permissions = await _context.SecRoles
-            .Where(r => roleIds.Contains(r.RoleId))
-            .SelectMany(r => r.Permissions)
-            .Where(p => !string.IsNullOrEmpty(p.PermissionCode))
-            .Select(p => p.PermissionCode!.ToUpperInvariant())
-            .Distinct()
-            .ToListAsync(cancellationToken);
-
-        if (!permissions.Any())
-        {
-            foreach (var r in roles)
-            {
-                permissions.AddRange(PermissionConstants.GetDefaultPermissionCodes(r));
-            }
-            permissions = permissions.Distinct().ToList();
-        }
+        // Cùng nguồn quyền với backend authorization (RequirePermission) để FE và BE luôn khớp.
+        var permissions = (await _permissionService.GetPermissionCodesAsync(user.UserId, cancellationToken))
+            .OrderBy(p => p)
+            .ToList();
 
         var roleEntity = user.JncUserRoles.FirstOrDefault()?.Role;
         var primaryRoleName = roleEntity?.RoleName ?? (roles.FirstOrDefault() ?? "Nhân viên");

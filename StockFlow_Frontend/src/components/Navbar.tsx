@@ -32,6 +32,7 @@ const NAV_ITEMS: NavItem[] = [
     label: 'Mua hàng',
     children: [
       { label: 'Nhập hàng', href: '/purchases' },
+      { label: 'Trả hàng nhập', href: '/purchase-returns' },
       { label: 'Nhà cung cấp', href: '/suppliers' },
     ],
   },

@@ -19,6 +19,7 @@ public class AuthController(IMediator mediator) : ControllerBase
     [ProducesResponseType(typeof(LoginResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [AllowAnonymous]
     public async Task<IActionResult> Login([FromBody] LoginRequest request)
     {
         var result = await mediator.Send(new LoginCommand(request.Username, request.Password));

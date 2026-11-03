@@ -36,10 +36,12 @@ public class CreateSupplierCommandValidator : AbstractValidator<CreateSupplierCo
 public class CreateSupplierCommandHandler : IRequestHandler<CreateSupplierCommand, Result<SupplierDto>>
 {
     private readonly IStockFlowDbContext _context;
+    private readonly ICurrentUserService _currentUserService;
 
-    public CreateSupplierCommandHandler(IStockFlowDbContext context)
+    public CreateSupplierCommandHandler(IStockFlowDbContext context, ICurrentUserService currentUserService)
     {
         _context = context;
+        _currentUserService = currentUserService;
     }
 
     public async Task<Result<SupplierDto>> Handle(CreateSupplierCommand command, CancellationToken cancellationToken)
@@ -102,7 +104,10 @@ public class CreateSupplierCommandHandler : IRequestHandler<CreateSupplierComman
             CreditLimit = req.CreditLimit ?? 0m,
             CurrentPayable = req.InitialPayable ?? 0m,
             CurrentDebt = 0m,
-            IsActive = true
+            IsActive = true,
+            // Người tạo = tài khoản đang đăng nhập, Ngày tạo = thời điểm hiện tại (giờ Việt Nam)
+            CreatedAt = VietnamTime.Now,
+            CreatedBy = _currentUserService.UserId
         };
 
         await _context.MstBusinessPartners.AddAsync(partner, cancellationToken);

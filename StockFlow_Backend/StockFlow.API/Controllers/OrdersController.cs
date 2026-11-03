@@ -7,12 +7,12 @@ using Microsoft.AspNetCore.Mvc;
 using StockFlow.Application.Features.Orders.Commands;
 using StockFlow.Application.Features.Orders.DTOs;
 using StockFlow.Application.Features.Orders.Queries;
+using StockFlow.API.Authorization;
 
 namespace StockFlow.API.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-[AllowAnonymous]
 public class OrdersController : ControllerBase
 {
     private readonly IMediator _mediator;
@@ -27,6 +27,7 @@ public class OrdersController : ControllerBase
     /// </summary>
     [HttpGet]
     [ProducesResponseType(typeof(List<PosOrderSummaryDto>), StatusCodes.Status200OK)]
+    [RequirePermission("SALES_READ")]
     public async Task<IActionResult> GetOrders([FromQuery] string? search, [FromQuery] string? status)
     {
         var result = await _mediator.Send(new GetPosOrdersQuery(search, status));
@@ -43,6 +44,7 @@ public class OrdersController : ControllerBase
     [HttpPost("pos")]
     [ProducesResponseType(typeof(PosOrderResultDto), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [RequirePermission("SALES_CREATE")]
     public async Task<IActionResult> CreatePosOrder([FromBody] CreatePosOrderRequest request)
     {
         var result = await _mediator.Send(new CreatePosOrderCommand(request));

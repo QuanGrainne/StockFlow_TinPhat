@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   SearchOutlined,
   PlusOutlined,
@@ -19,6 +19,7 @@ import InlineFormulaPopover from '../components/InlineFormulaPopover';
 import { PriceBook, PriceBookMatrixItem } from '../types';
 import { priceBookService } from '../services/priceBookService';
 import { apiClient } from '@/lib/api/client';
+import { useActiveWarehouse } from '@/lib/warehouse/useActiveWarehouse';
 
 interface CategoryItem {
   categoryId: number;
@@ -37,6 +38,10 @@ export default function PriceBooksClient() {
   // Price Books & Lookups
   const [priceBooks, setPriceBooks] = useState<PriceBook[]>([]);
   const [selectedPriceBookIds, setSelectedPriceBookIds] = useState<number[]>([]);
+  const hasInitSelectionRef = useRef(false);
+  // Giá vốn / tồn kho lấy theo chi nhánh đang chọn trên Header (giống Danh mục hàng hóa)
+  const { activeWarehouse } = useActiveWarehouse();
+  const activeWarehouseId = activeWarehouse?.warehouseId;
   const [categories, setCategories] = useState<CategoryItem[]>([]);
 
   // Filters
@@ -98,6 +103,14 @@ export default function PriceBooksClient() {
     try {
       const data = await priceBookService.getPriceBooks();
       setPriceBooks(data);
+      // Lần đầu mở màn hình: mặc định lọc theo "Bảng giá chung" (giống KiotViet)
+      if (!hasInitSelectionRef.current) {
+        hasInitSelectionRef.current = true;
+        const def = data.find(b => b.isDefault) || data[0];
+        if (def) {
+          setSelectedPriceBookIds(prev => (prev.length === 0 ? [def.priceBookId] : prev));
+        }
+      }
     } catch {
       api.error({
         message: 'Lỗi nạp dữ liệu',
@@ -118,6 +131,7 @@ export default function PriceBooksClient() {
 
     try {
       const res = await priceBookService.getPriceMatrix({
+        warehouseId: activeWarehouseId,
         search: searchKeyword.trim() || undefined,
         categoryId: selectedCategoryId ?? undefined,
         stockCondition,
@@ -136,7 +150,7 @@ export default function PriceBooksClient() {
     } finally {
       setLoading(false);
     }
-  }, [searchKeyword, selectedCategoryId, stockCondition, displayedBookIds, pageIndex, pageSize, api]);
+  }, [searchKeyword, selectedCategoryId, stockCondition, displayedBookIds, pageIndex, pageSize, api, activeWarehouseId]);
 
   useEffect(() => {
     loadMatrix();
@@ -500,8 +514,8 @@ export default function PriceBooksClient() {
               }}
               trigger="click"
               placement="bottomRight"
-              destroyTooltipOnHide
-              overlayInnerStyle={{ padding: 0 }}
+              destroyOnHidden
+              styles={{ container: { padding: 0 } }}
               getPopupContainer={() => document.body}
               content={
                 !isDefaultBook && isPopoverOpen && book ? (
@@ -585,7 +599,7 @@ export default function PriceBooksClient() {
     });
 
     return baseCols;
-  }, [selectedPriceBookIds, priceBooks, editedPrices, formulaPopoverCell, focusedCell, totalCount]);
+  }, [displayedBookIds, defaultBookId, priceBooks, editedPrices, formulaPopoverCell, focusedCell, totalCount]);
 
   const editedCount = Object.keys(editedPrices).length;
 

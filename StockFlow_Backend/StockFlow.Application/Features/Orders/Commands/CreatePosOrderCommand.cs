@@ -59,11 +59,16 @@ public class CreatePosOrderCommandHandler : IRequestHandler<CreatePosOrderComman
 {
     private readonly IStockFlowDbContext _context;
     private readonly ITransactionCodeGenerator _codeGenerator;
+    private readonly ICurrentUserService _currentUserService;
 
-    public CreatePosOrderCommandHandler(IStockFlowDbContext context, ITransactionCodeGenerator codeGenerator)
+    public CreatePosOrderCommandHandler(
+        IStockFlowDbContext context,
+        ITransactionCodeGenerator codeGenerator,
+        ICurrentUserService currentUserService)
     {
         _context = context;
         _codeGenerator = codeGenerator;
+        _currentUserService = currentUserService;
     }
 
     public async Task<Result<PosOrderResultDto>> Handle(CreatePosOrderCommand request, CancellationToken cancellationToken)
@@ -138,6 +143,18 @@ public class CreatePosOrderCommandHandler : IRequestHandler<CreatePosOrderComman
         {
             return Result<PosOrderResultDto>.Failure($"Kho xuất '{warehouse.WarehouseName}' đang tạm ngừng hoạt động, không thể xuất hàng (INV-003).");
         }
+
+        // Cô lập dữ liệu kho: chỉ được bán/xuất hàng từ kho mình được phân quyền
+        if (!await _currentUserService.HasWarehouseAccessAsync(req.WarehouseId, cancellationToken))
+        {
+            return Result<PosOrderResultDto>.Failure($"Bạn không có quyền xuất hàng từ kho '{warehouse.WarehouseName}' (AUTH-WH).");
+        }
+
+        if (!_currentUserService.UserId.HasValue)
+        {
+            return Result<PosOrderResultDto>.Failure("Không xác định được người dùng đăng nhập.");
+        }
+        var currentUserId = _currentUserService.UserId.Value;
 
         // 3. Kiểm tra khách hàng (CUS-001 -> CUS-003)
         var customer = await _context.MstBusinessPartners
@@ -408,7 +425,7 @@ public class CreatePosOrderCommandHandler : IRequestHandler<CreatePosOrderComman
             PaidAmount = actualReceived,
             OutstandingAmount = outstanding,
             PaymentStatus = paymentStatus,
-            CreatedBy = 1,
+            CreatedBy = currentUserId,
             OrderDate = finalOrderDate,
             Notes = string.IsNullOrWhiteSpace(finalNotes) ? null : finalNotes
         };
@@ -466,7 +483,7 @@ public class CreatePosOrderCommandHandler : IRequestHandler<CreatePosOrderComman
                     ReferenceType = "SALES_ORDER",
                     ReferenceId = order.OrderId,
                     TransactionDate = finalOrderDate,
-                    CreatedBy = 1
+                    CreatedBy = currentUserId
                 });
             }
         }
@@ -489,7 +506,7 @@ public class CreatePosOrderCommandHandler : IRequestHandler<CreatePosOrderComman
                 ReferenceType = "SALES_ORDER",
                 ReferenceId = order.OrderId,
                 TransactionDate = finalOrderDate,
-                CreatedBy = 1,
+                CreatedBy = currentUserId,
                 Status = "COMPLETED",
                 Description = $"Thu tiền bán hàng hóa đơn POS {order.OrderCode} ({req.PaymentMethod})"
             });

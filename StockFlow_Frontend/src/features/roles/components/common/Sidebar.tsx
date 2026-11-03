@@ -334,6 +334,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
           requiredFeature: 'feat-purchase',
         },
         {
+          id: 'purchase-returns',
+          title: 'Trả hàng nhập',
+          desc: 'Trả hàng cho nhà cung cấp & giảm công nợ',
+          icon: RotateCcw,
+          requiredModule: 'PURCHASE',
+          requiredFeature: 'feat-purchase',
+        },
+        {
           id: 'warehouse-inbound',
           title: 'Nhập kho từ chứng từ',
           desc: 'Tiếp nhận đơn mua PO',
@@ -624,6 +632,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
           requiredFeature: 'feat-purchase',
         },
         {
+          id: 'purchase-returns',
+          title: 'Trả hàng nhập',
+          desc: 'Trả hàng cho nhà cung cấp & giảm công nợ',
+          icon: RotateCcw,
+          requiredModule: 'PURCHASE',
+          requiredFeature: 'feat-purchase',
+        },
+        {
           id: 'manager-landed-cost',
           title: 'Chi phí mua hàng & Landed Cost',
           desc: 'Phân bổ chi phí cấu thành giá vốn MAC',
@@ -804,6 +820,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
           requiredModule: 'PURCHASE',
           requiredFeature: 'feat-purchase',
         },
+        {
+          id: 'purchase-returns',
+          title: 'Trả hàng nhập',
+          desc: 'Trả hàng cho nhà cung cấp & giảm công nợ',
+          icon: RotateCcw,
+          requiredModule: 'PURCHASE',
+          requiredFeature: 'feat-purchase',
+        },
       ],
     },
     {
@@ -915,6 +939,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
           requiredFeature: 'feat-purchase',
         },
         {
+          id: 'purchase-returns',
+          title: 'Trả hàng nhập',
+          desc: 'Trả hàng cho nhà cung cấp & giảm công nợ',
+          icon: RotateCcw,
+          requiredModule: 'PURCHASE',
+          requiredFeature: 'feat-purchase',
+        },
+        {
           id: 'warehouse-inbound',
           title: 'Nhập kho từ Chứng từ (3.2.5.2)',
           desc: 'Đối chiếu chứng từ giấy PO',
@@ -1017,6 +1049,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
           title: 'Nhập hàng',
           desc: 'Quản lý phiếu nhập kho & thanh toán',
           icon: ArrowDownToLine,
+          requiredModule: 'PURCHASE',
+          requiredFeature: 'feat-purchase',
+        },
+        {
+          id: 'purchase-returns',
+          title: 'Trả hàng nhập',
+          desc: 'Trả hàng cho nhà cung cấp & giảm công nợ',
+          icon: RotateCcw,
           requiredModule: 'PURCHASE',
           requiredFeature: 'feat-purchase',
         },
@@ -1127,7 +1167,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     if (tab.id === 'manager-production' && activeScreen === 'manager-bom') return true;
     if (tab.id === 'manager-partners' && activeScreen === 'manager-cashflow') return true;
     if (tab.id === 'sales-orders' && (activeScreen === 'sales-orders' || activeScreen === 'sales-consolidate' || activeScreen === 'sales-returns')) return true;
-    if (tab.id === 'warehouse-inbound' && (activeScreen === 'warehouse-inbound' || activeScreen === 'purchases' || activeScreen.includes('purchases') || activeScreen === 'manager-landed-cost')) return true;
+    if (tab.id === 'warehouse-inbound' && (activeScreen === 'warehouse-inbound' || activeScreen === 'purchases' || activeScreen.includes('purchases') || activeScreen === 'manager-landed-cost' || activeScreen === 'purchase-returns')) return true;
     if (tab.id === 'warehouse-overview' && (activeScreen === 'warehouse-overview' || activeScreen === 'warehouse-outbound' || activeScreen === 'warehouse-transfer' || activeScreen === 'warehouse-audit' || activeScreen === 'warehouse-returns')) return true;
     if (tab.id === 'production-orders' && (activeScreen === 'production-orders' || activeScreen === 'production-import' || activeScreen === 'production-logs')) return true;
     if (tab.id === 'manager-cashflow' && (activeScreen === 'manager-cashflow' || activeScreen === 'manager-reports')) return true;

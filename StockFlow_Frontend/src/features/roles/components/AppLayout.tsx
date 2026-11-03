@@ -7,6 +7,7 @@ import { GoodsCatalogScreen } from './common/GoodsCatalogScreen';
 import SuppliersClient from '@/app/(dashboard)/suppliers/SuppliersClient';
 import CustomersClient from '@/app/(dashboard)/customers/CustomersClient';
 import PurchasesClient from '@/app/(dashboard)/purchases/PurchasesClient';
+import PurchaseReturnsClient from '@/app/(dashboard)/purchase-returns/PurchaseReturnsClient';
 import PriceBooksClient from '@/features/price-books/screens/PriceBooksClient';
 import TransfersClient from '@/app/(dashboard)/transfers/TransfersClient';
 import { OrderSettingsScreen } from '@/features/settings/screens/OrderSettingsScreen';
@@ -49,12 +50,13 @@ const SCREEN_MODULE_MAP: Record<string, string> = {
   'admin-purchases': 'PURCHASE',
   'manager-purchases': 'PURCHASE',
   'warehouse-purchases': 'PURCHASE',
+  'purchase-returns': 'PURCHASE',
   'suppliers': 'PARTNER',
   'admin-suppliers': 'PARTNER',
   'manager-suppliers': 'PARTNER',
-  'transfers': 'TRANSFER',
-  'admin-transfers': 'TRANSFER',
-  'manager-transfers': 'TRANSFER',
+  'transfers': 'STOCK',
+  'admin-transfers': 'STOCK',
+  'manager-transfers': 'STOCK',
   'customers': 'PARTNER',
   'sales-customers': 'SALES',
   'manager-customers': 'PARTNER',
@@ -69,6 +71,7 @@ const SCREEN_FEATURE_MAP: Record<string, string> = {
   'admin-purchases': 'feat-purchase',
   'manager-purchases': 'feat-purchase',
   'warehouse-purchases': 'feat-purchase',
+  'purchase-returns': 'feat-purchase',
   'warehouse-inbound': 'feat-purchase',
   'manager-landed-cost': 'feat-purchase',
   'transfers': 'feat-transfers',
@@ -117,11 +120,13 @@ import { RoleCatalogScreen } from './admin/screens/RoleCatalogScreen';
 import { WarehousePermissionsScreen } from './admin/screens/WarehousePermissionsScreen';
 import { PermissionMatrixScreen } from './admin/screens/PermissionMatrixScreen';
 import { UserManagementScreen } from './admin/screens/UserManagementScreen';
+import { ROLE_SWITCHER_ENABLED } from '@/lib/auth/flags';
 
 const getStoredRole = (): UserRole => {
   if (typeof window === 'undefined') return 'SALES';
   const savedRole = localStorage.getItem('stockflow_current_role') as UserRole | null;
-  if (savedRole && ['ADMIN', 'MANAGER', 'SALES', 'WAREHOUSE', 'PRODUCTION'].includes(savedRole)) {
+  // Khi tắt bộ chuyển vai trò, bỏ qua giá trị đã lưu và lấy vai trò thật từ stockflow_user (kết quả login).
+  if (ROLE_SWITCHER_ENABLED && savedRole && ['ADMIN', 'MANAGER', 'SALES', 'WAREHOUSE', 'PRODUCTION'].includes(savedRole)) {
     return savedRole;
   }
   const userStr = localStorage.getItem('stockflow_user');
@@ -159,8 +164,13 @@ const getStoredScreen = (role: UserRole): string => {
 
 export const AppLayout: React.FC<AppLayoutProps> = ({ initialScreen }) => {
   const router = useRouter();
-  const [currentRole, setCurrentRole] = useState<UserRole>('SALES');
-  const [activeScreen, setActiveScreen] = useState<string>(initialScreen || 'sales-dashboard');
+  // Đọc vai trò thật ngay khi khởi tạo (AppLayout luôn được load với ssr:false nên có localStorage).
+  // Trước đây khởi tạo 'SALES' rồi mới cập nhật trong effect, khiến lần kiểm tra quyền đầu tiên chạy
+  // với vai trò SALES và đẩy màn hình (VD: Chuyển hàng) về trang mặc định.
+  const [currentRole, setCurrentRole] = useState<UserRole>(() => getStoredRole());
+  const [activeScreen, setActiveScreen] = useState<string>(
+    () => initialScreen || getStoredScreen(getStoredRole())
+  );
   const [selectedMatrixRole, setSelectedMatrixRole] = useState<string>('ROLE_ADMIN');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [hasImportedProductionPlan, setHasImportedProductionPlan] = useState(false);
@@ -175,18 +185,24 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ initialScreen }) => {
 
   // Lắng nghe cập nhật quyền từ Ma trận phân quyền để tự động chuyển trang nếu màn hình hiện tại bị bỏ quyền
   React.useEffect(() => {
+    // Bỏ qua kết quả của lần kiểm tra cũ (role/screen đã đổi trong lúc chờ API)
+    let stale = false;
     const checkScreenAccess = async () => {
       const roleCode = `ROLE_${currentRole}`;
       const allowed = await permissionService.getAllowedModuleKeys(roleCode);
       const allowedFeats = await permissionService.getAllowedFeatures(roleCode);
+      if (stale) return;
       const reqMod = SCREEN_MODULE_MAP[activeScreen];
       const reqFeat = SCREEN_FEATURE_MAP[activeScreen];
 
+      // Màn hình gắn với một tính năng navbar thì chỉ xét tính năng đó (giống cách Sidebar hiện menu).
+      // Trước đây vẫn xét thêm phân hệ backend, nên màn Chuyển hàng (phân hệ 'TRANSFER' không tồn tại
+      // trong ma trận backend) luôn bị đẩy về trang mặc định dù đã tick quyền.
       let isPermitted = true;
-      if (reqFeat && !allowedFeats.has(reqFeat)) {
-        isPermitted = false;
-      } else if (reqMod && !allowed.has(reqMod)) {
-        isPermitted = false;
+      if (reqFeat) {
+        isPermitted = allowedFeats.has(reqFeat);
+      } else if (reqMod) {
+        isPermitted = allowed.has(reqMod);
       }
 
       if (!isPermitted) {
@@ -201,7 +217,10 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ initialScreen }) => {
     checkScreenAccess();
 
     window.addEventListener('stockflow_permissions_updated', checkScreenAccess);
-    return () => window.removeEventListener('stockflow_permissions_updated', checkScreenAccess);
+    return () => {
+      stale = true;
+      window.removeEventListener('stockflow_permissions_updated', checkScreenAccess);
+    };
   }, [currentRole, activeScreen]);
 
   const handleNavigate = (newScreen: string) => {
@@ -214,18 +233,22 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ initialScreen }) => {
         window.history.pushState(null, '', '/suppliers');
       } else if (newScreen === 'purchases' || newScreen === '/purchases') {
         window.history.pushState(null, '', '/purchases');
+      } else if (newScreen === 'purchase-returns' || newScreen === '/purchase-returns') {
+        window.history.pushState(null, '', '/purchase-returns');
       } else if (newScreen === 'goods-catalog' || newScreen === 'products' || newScreen === '/products') {
         window.history.pushState(null, '', '/products');
       } else if (newScreen === 'transfers' || newScreen === '/transfers' || newScreen === 'admin-transfers' || newScreen === 'manager-transfers') {
         window.history.pushState(null, '', '/transfers');
-      } else if (window.location.pathname.includes('/suppliers') || window.location.pathname.includes('/purchases') || window.location.pathname.includes('/products') || window.location.pathname.includes('/transfers')) {
+      } else if (window.location.pathname.includes('/suppliers') || window.location.pathname.includes('/purchases') || window.location.pathname.includes('/purchase-returns') || window.location.pathname.includes('/products') || window.location.pathname.includes('/transfers')) {
         window.history.pushState(null, '', '/dashboard');
       }
     }
   };
 
   // Xử lý chuyển đổi vai trò (RBAC Switcher)
+  // Chỉ hoạt động khi bật cờ demo; vai trò thật luôn lấy từ tài khoản đăng nhập.
   const handleRoleChange = (newRole: UserRole) => {
+    if (!ROLE_SWITCHER_ENABLED) return;
     setCurrentRole(newRole);
     const defaultScreen = getDefaultScreenForRole(newRole);
     setActiveScreen(defaultScreen);
@@ -371,6 +394,9 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ initialScreen }) => {
       case 'warehouse-purchases':
         return <PurchasesClient onNavigate={handleNavigate} />;
 
+      case 'purchase-returns':
+        return <PurchaseReturnsClient />;
+
       case 'goods-catalog':
       case 'admin-goods':
       case 'manager-goods':
@@ -426,6 +452,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ initialScreen }) => {
       {activeScreen === 'transfers' || activeScreen.includes('transfers') ||
        activeScreen === 'warehouse-transfer' ||
        activeScreen === 'purchases' || activeScreen.includes('purchases') ||
+       activeScreen === 'purchase-returns' ||
        activeScreen === 'suppliers' || activeScreen.includes('suppliers') ||
        activeScreen === 'goods-catalog' || activeScreen === 'products' ||
        activeScreen.includes('goods') || activeScreen.includes('catalog') ||

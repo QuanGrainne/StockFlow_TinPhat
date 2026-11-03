@@ -1,121 +1,110 @@
 'use client';
 
-import React from 'react';
-import {
-  Search,
-  Plus,
-  FileSpreadsheet,
-  RefreshCcw,
-  ChevronRight,
-  X,
-  Filter,
-} from 'lucide-react';
+// Header toolbar màn hình Nhà cung cấp — cùng bố cục với màn hình Chuyển hàng
+// (tiêu đề + ô tìm kiếm bo tròn bên trái, nút hành động bên phải, cao 48px)
+
+import React, { useRef } from 'react';
+import { Search, Plus, FileDown, FileUp, Loader2, X } from 'lucide-react';
 
 interface SupplierToolbarProps {
   search: string;
   onSearchChange: (search: string) => void;
-  sidebarCollapsed: boolean;
-  onToggleSidebar: () => void;
-  onOpenMobileFilter: () => void;
   onOpenCreate: () => void;
+  onImportExcel: (file: File) => void;
+  importing?: boolean;
   onExportExcel: () => void;
-  onRefresh: () => void;
 }
 
 export default function SupplierToolbar({
   search,
   onSearchChange,
-  sidebarCollapsed,
-  onToggleSidebar,
-  onOpenMobileFilter,
   onOpenCreate,
+  onImportExcel,
+  importing = false,
   onExportExcel,
-  onRefresh,
 }: SupplierToolbarProps) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   return (
-    <div className="border-b border-[#e5e7eb] bg-white px-6 py-3.5 shrink-0">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        {/* Search Bar */}
-        <div className="flex items-center gap-2 flex-1 max-w-[480px]">
-          {/* Desktop Toggle Button when collapsed */}
-          {sidebarCollapsed && (
+    <header className="h-12 bg-white border-b border-slate-200 px-4 flex items-center justify-between gap-3 shrink-0">
+      {/* Left: Title & Search bar */}
+      <div className="flex items-center gap-4 flex-1 max-w-xl">
+        <h1 className="text-[20px] font-bold text-[#15171a] leading-7 tracking-tight whitespace-nowrap">
+          Nhà cung cấp
+        </h1>
+
+        <div className="relative flex-1">
+          <Search
+            size={14}
+            className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#677484] pointer-events-none"
+          />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => onSearchChange(e.target.value)}
+            placeholder="Theo mã, tên, điện thoại, email"
+            className="w-full h-8 pl-8 pr-8 rounded-full bg-[#f7f8f9] border border-slate-200 text-[13px] text-[#15171a] placeholder-[#677484] focus:outline-none focus:border-[#0070f4] focus:bg-white transition"
+          />
+          {search && (
             <button
               type="button"
-              onClick={onToggleSidebar}
-              className="hidden lg:flex h-9 px-3 rounded-[6px] border border-blue-200 bg-blue-50/60 text-sm font-semibold text-[#0070f4] hover:bg-blue-100/70 items-center gap-1.5 shrink-0 shadow-xs transition cursor-pointer"
-              title="Mở bảng bộ lọc"
+              onClick={() => onSearchChange('')}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#677484] hover:text-[#15171a] cursor-pointer"
+              title="Xóa từ khóa"
             >
-              <Filter size={15} />
-              <span>Bộ lọc</span>
-              <ChevronRight size={14} />
+              <X size={13} />
             </button>
           )}
-
-          {/* Mobile Filter Button */}
-          <button
-            type="button"
-            onClick={onOpenMobileFilter}
-            className="lg:hidden h-9 px-3 rounded-[6px] border border-slate-300 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50 flex items-center gap-1.5 shrink-0 cursor-pointer"
-          >
-            <Filter size={15} />
-            <span>Bộ lọc</span>
-          </button>
-
-          <div className="relative flex-1">
-            <div className="h-9 px-3 bg-white border border-slate-300 rounded-[6px] flex items-center justify-between gap-2 transition hover:border-slate-400 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-100 shadow-xs">
-              <Search size={16} className="text-slate-400 shrink-0" />
-              <input
-                type="text"
-                value={search}
-                placeholder="Tìm theo mã, tên NCC, điện thoại, email..."
-                onChange={(e) => onSearchChange(e.target.value)}
-                className="w-full bg-transparent text-sm text-slate-800 placeholder:text-slate-400 outline-none"
-              />
-              {search && (
-                <button
-                  type="button"
-                  onClick={() => onSearchChange('')}
-                  className="text-slate-400 hover:text-slate-600 shrink-0 cursor-pointer"
-                >
-                  <X size={14} />
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Action Buttons */}
-        <div className="flex items-center gap-2.5">
-          <button
-            type="button"
-            onClick={onOpenCreate}
-            className="h-9 px-4 rounded-[6px] bg-[#0070f4] hover:bg-[#005ac3] text-sm font-semibold text-white flex items-center gap-1.5 shadow-xs transition cursor-pointer"
-          >
-            <Plus size={16} />
-            <span>Nhà cung cấp</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={onExportExcel}
-            title="Xuất danh sách ra file Excel (.xlsx)"
-            className="h-9 px-3.5 rounded-[6px] border border-slate-300 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50 hover:border-slate-400 flex items-center gap-1.5 transition cursor-pointer"
-          >
-            <FileSpreadsheet size={16} className="text-emerald-600" />
-            <span className="hidden sm:inline">Xuất Excel</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={onRefresh}
-            title="Làm mới dữ liệu"
-            className="h-9 w-9 flex items-center justify-center rounded-[6px] border border-slate-300 bg-white text-slate-600 hover:bg-slate-50 hover:border-slate-400 transition cursor-pointer"
-          >
-            <RefreshCcw size={15} />
-          </button>
         </div>
       </div>
-    </div>
+
+      {/* Right: Actions */}
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={onOpenCreate}
+          className="inline-flex items-center gap-1.5 px-3.5 h-8 rounded-[8px] bg-[#0070f4] hover:bg-[#005ac3] text-white font-semibold text-[13px] shadow-xs transition cursor-pointer"
+        >
+          <Plus size={15} className="stroke-[2.5]" />
+          <span>Nhà cung cấp</span>
+        </button>
+
+        {/* Import file Excel (cùng định dạng với file Xuất file) */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".xlsx,.xls,.csv"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) onImportExcel(file);
+            e.target.value = ''; // cho phép chọn lại cùng file
+          }}
+        />
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={importing}
+          title="Nhập danh sách nhà cung cấp từ file Excel (cột: Mã NCC, Tên nhà cung cấp, Số điện thoại, Email, Địa chỉ)"
+          className="inline-flex items-center gap-1 px-3 h-8 rounded-[8px] border border-slate-300 hover:bg-[#f7f8f9] text-[#15171a] font-medium text-[13px] transition cursor-pointer bg-white disabled:opacity-60 disabled:cursor-wait"
+        >
+          {importing ? (
+            <Loader2 size={14} className="text-[#0070f4] animate-spin" />
+          ) : (
+            <FileUp size={14} className="text-[#677484]" />
+          )}
+          <span>{importing ? 'Đang import...' : 'Import file'}</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={onExportExcel}
+          className="inline-flex items-center gap-1 px-3 h-8 rounded-[8px] border border-slate-300 hover:bg-[#f7f8f9] text-[#15171a] font-medium text-[13px] transition cursor-pointer bg-white"
+        >
+          <FileDown size={14} className="text-[#677484]" />
+          <span>Xuất file</span>
+        </button>
+      </div>
+    </header>
   );
 }
-
