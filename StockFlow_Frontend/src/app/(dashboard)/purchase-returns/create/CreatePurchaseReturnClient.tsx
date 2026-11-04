@@ -31,6 +31,7 @@ import { purchaseReturnService } from '@/features/purchase-returns/services/purc
 import type { ReturnSource, SavePurchaseReturnPayload } from '@/features/purchase-returns/types';
 import { toLocalDatetimeInputString } from '@/features/transfers/utils/dateUtils';
 import { NumberInput } from '@/components/inputs/NumberInput';
+import { ProductThumb } from '@/components/ProductThumb';
 import { DiscountInput, discountAmount, type DiscountType } from '@/components/inputs/DiscountInput';
 
 interface ReturnRow {
@@ -534,11 +535,14 @@ export default function CreatePurchaseReturnClient() {
                       key={it.grItemId}
                       type="button"
                       onClick={() => addReceiptLine(it.grItemId)}
-                      className="w-full text-left p-2.5 hover:bg-[#eff6ff] flex items-center justify-between cursor-pointer"
+                      className="w-full text-left p-2.5 hover:bg-[#eff6ff] flex items-center justify-between gap-3 cursor-pointer"
                     >
-                      <span>
-                        <span className="font-bold text-[#0070f4] mr-2">{it.productCode}</span>
-                        {it.productName}
+                      <span className="flex items-center gap-2.5 min-w-0">
+                        <ProductThumb src={it.imageUrl} alt={it.productName} />
+                        <span>
+                          <span className="font-bold text-[#0070f4] mr-2">{it.productCode}</span>
+                          {it.productName}
+                        </span>
                       </span>
                       <span className="text-[11px] text-[#677484]">
                         Còn được trả: <strong className="text-[#15171a]">{it.remainingQty.toLocaleString('vi-VN')}</strong>
@@ -558,12 +562,15 @@ export default function CreatePurchaseReturnClient() {
                     key={p.productId}
                     type="button"
                     onClick={() => addFreeProduct(p)}
-                    className="w-full text-left p-2.5 hover:bg-[#eff6ff] flex items-center justify-between cursor-pointer"
+                    className="w-full text-left p-2.5 hover:bg-[#eff6ff] flex items-center justify-between gap-3 cursor-pointer"
                   >
-                    <span>
-                      <span className="font-bold text-[#0070f4] mr-2">{p.code}</span>
-                      {p.name}
-                      <span className="ml-2 text-[11px] text-[#677484]">Giá vốn: {formatVnd(p.costPrice)}</span>
+                    <span className="flex items-center gap-2.5 min-w-0">
+                      <ProductThumb src={p.imageUrl} alt={p.name} />
+                      <span>
+                        <span className="font-bold text-[#0070f4] mr-2">{p.code}</span>
+                        {p.name}
+                        <span className="ml-2 text-[11px] text-[#677484]">Giá vốn: {formatVnd(p.costPrice)}</span>
+                      </span>
                     </span>
                     <span className="text-[11px] text-[#677484]">
                       Tồn: <strong className={p.stockQuantity > 0 ? 'text-[#00b63e]' : 'text-[#fb2c36]'}>{p.stockQuantity.toLocaleString('vi-VN')}</strong>

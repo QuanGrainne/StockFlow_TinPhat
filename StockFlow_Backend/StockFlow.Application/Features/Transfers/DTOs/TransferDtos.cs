@@ -70,7 +70,8 @@ public record ProductWithStockDto(
     decimal CostPrice,
     decimal StandardPrice,
     decimal SourceStock,
-    decimal DestStock
+    decimal DestStock,
+    string? ImageUrl = null
 );
 
 public class CreateTransferItemRequest
