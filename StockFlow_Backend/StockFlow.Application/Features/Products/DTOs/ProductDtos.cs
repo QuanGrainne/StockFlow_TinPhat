@@ -241,4 +241,5 @@ public record ProductStockAdjustmentDto(
     decimal PreviousQuantity,
     decimal NewQuantity,
     decimal Delta,
-    decimal UnitCost);
+    decimal UnitCost,
+    string? StocktakeCode = null);

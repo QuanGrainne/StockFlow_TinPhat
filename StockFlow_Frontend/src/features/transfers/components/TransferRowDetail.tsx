@@ -7,7 +7,8 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { AlertTriangle, ExternalLink, FileDown, PackageCheck, Printer, RefreshCcw, Trash2, X } from 'lucide-react';
+import { message } from 'antd';
+import { AlertTriangle, Copy, ExternalLink, FileDown, NotebookPen, Save, PackageCheck, Printer, RefreshCcw, Trash2, X } from 'lucide-react';
 import type { TransferDetail, TransferStatus } from '../types';
 import { transferService } from '../services/transferService';
 import { formatDateTimeVN } from '../utils/dateUtils';
@@ -41,7 +42,7 @@ function StatusTag({ status }: { status: TransferStatus }) {
   );
 }
 
-export const TransferRowDetail: React.FC<Props> = ({ transferId, onRefresh, onOpenReceiveScreen, warehouses = [] }) => {
+export const TransferRowDetail: React.FC<Props> = ({ transferId, onRefresh, onOpenReceiveScreen }) => {
   const router = useRouter();
   // Chi nhánh đang làm việc (chọn ở Header): chỉ kho nhận mới được nhận hàng
   const { activeWarehouse } = useActiveWarehouse();
@@ -53,6 +54,9 @@ export const TransferRowDetail: React.FC<Props> = ({ transferId, onRefresh, onOp
   const [cancelOpen, setCancelOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
   const [busy, setBusy] = useState(false);
+  // Ghi chú đang sửa (undefined = chưa sửa, hiển thị giá trị đã lưu)
+  const [noteEdits, setNoteEdits] = useState<{ notes?: string; receiveNotes?: string }>({});
+  const [savingNotes, setSavingNotes] = useState(false);
   const [toast, setToast] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
 
   useEffect(() => {
@@ -116,6 +120,31 @@ export const TransferRowDetail: React.FC<Props> = ({ transferId, onRefresh, onOp
       : detail.status === 'RECEIVED'
         ? 'Hàng đã nhận sẽ bị trừ khỏi kho nhận và hoàn lại toàn bộ số lượng chuyển về kho chuyển.'
         : 'Phiếu tạm chưa làm thay đổi tồn kho.';
+
+  // Ghi chú: giá trị hiển thị = đang sửa ?? đã lưu
+  const transferNoteValue = noteEdits.notes ?? detail.notes ?? '';
+  const receiveNoteValue = noteEdits.receiveNotes ?? detail.receiveNotes ?? '';
+  const notesChanged =
+    (noteEdits.notes !== undefined && noteEdits.notes.trim() !== (detail.notes ?? '').trim()) ||
+    (noteEdits.receiveNotes !== undefined && noteEdits.receiveNotes.trim() !== (detail.receiveNotes ?? '').trim());
+
+  const handleSaveNotes = async () => {
+    setSavingNotes(true);
+    try {
+      const updated = await transferService.updateNotes(detail.id, {
+        notes: noteEdits.notes,
+        receiveNotes: noteEdits.receiveNotes,
+      });
+      setDetail(updated);
+      setNoteEdits({});
+      message.success('Cập nhật phiếu chuyển hàng thành công');
+      onRefresh();
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Không lưu được ghi chú.', 'error');
+    } finally {
+      setSavingNotes(false);
+    }
+  };
 
   const handleCancel = async () => {
     setBusy(true);
@@ -195,6 +224,12 @@ export const TransferRowDetail: React.FC<Props> = ({ transferId, onRefresh, onOp
           </div>
           {hasReceived && (
             <div>
+              <span className="text-slate-400">Người nhận: </span>
+              <span className="font-medium text-slate-800">{detail.receivedBy || '—'}</span>
+            </div>
+          )}
+          {hasReceived && (
+            <div>
               <span className="text-slate-400">Tình trạng nhận: </span>
               <span className={`font-semibold ${totalReceived === totalQty ? 'text-[#16a34a]' : 'text-[#fb2c36]'}`}>
                 {totalReceived === totalQty ? 'Khớp' : 'Không khớp'}
@@ -255,7 +290,13 @@ export const TransferRowDetail: React.FC<Props> = ({ transferId, onRefresh, onOp
                   <tr key={it.id ?? it.productId} className="hover:bg-slate-50/70">
                     <td className="py-2 px-3 text-center text-slate-400">{i + 1}</td>
                     <td className="py-2 px-3 font-mono text-[#0070f4] font-semibold">{it.productCode}</td>
-                    <td className="py-2 px-3 font-medium">{it.productName}</td>
+                    <td className="py-2 px-3 font-medium">
+                      {it.productName}
+                      {it.notes && <div className="text-[11px] italic font-normal text-[#677484]">({it.notes})</div>}
+                      {it.receiveNotes && (
+                        <div className="text-[11px] italic font-normal text-[#677484]">({it.receiveNotes})</div>
+                      )}
+                    </td>
                     <td className="py-2 px-3 text-center text-slate-500">{it.unitName}</td>
                     <td className="py-2 px-3 text-right">{qtyFmt(it.transferQuantity)}</td>
                     {isReceiveTab && (
@@ -280,13 +321,42 @@ export const TransferRowDetail: React.FC<Props> = ({ transferId, onRefresh, onOp
         </table>
       </div>
 
-      {/* Ghi chú + tổng */}
+      {/* Ghi chú chuyển / ghi chú nhận (sửa được, bấm Lưu) + tổng */}
       <div className="flex flex-col md:flex-row items-start gap-6 mb-4">
-        <div className="flex-1 w-full">
-          <label className="text-xs text-slate-500 font-medium block mb-1">Ghi chú</label>
-          <div className="p-2.5 text-xs border border-slate-200 rounded-[8px] bg-slate-50/60 min-h-[60px] text-slate-700 whitespace-pre-line">
-            {detail.notes || 'Không có ghi chú nào.'}
-          </div>
+        <div className="flex-1 w-full space-y-2">
+          {isAtDestWarehouse ? (
+            <>
+              <div className="flex items-start gap-2 text-xs text-[#15171a]">
+                <NotebookPen size={14} className="text-[#677484] shrink-0 mt-0.5" />
+                <span>Ghi chú chuyển: {detail.notes || <span className="text-[#677484]">Chưa có ghi chú</span>}</span>
+              </div>
+              {(hasReceived || detail.status === 'IN_TRANSIT') && (
+                <textarea
+                  rows={3}
+                  value={receiveNoteValue}
+                  onChange={(e) => setNoteEdits((prev) => ({ ...prev, receiveNotes: e.target.value }))}
+                  placeholder="Ghi chú nhận"
+                  className="w-full p-2.5 text-xs border border-slate-300 rounded-[8px] bg-white focus:outline-none focus:border-[#0070f4] resize-none"
+                />
+              )}
+            </>
+          ) : (
+            <>
+              <textarea
+                rows={3}
+                value={transferNoteValue}
+                onChange={(e) => setNoteEdits((prev) => ({ ...prev, notes: e.target.value }))}
+                placeholder="Ghi chú chuyển"
+                className="w-full p-2.5 text-xs border border-slate-300 rounded-[8px] bg-white focus:outline-none focus:border-[#0070f4] resize-none"
+              />
+              {(hasReceived || !!detail.receiveNotes) && (
+                <div className="flex items-start gap-2 text-xs text-[#15171a]">
+                  <NotebookPen size={14} className="text-[#677484] shrink-0 mt-0.5" />
+                  <span>Ghi chú nhận: {detail.receiveNotes || <span className="text-[#677484]">Chưa có ghi chú</span>}</span>
+                </div>
+              )}
+            </>
+          )}
         </div>
         <div className="w-full md:w-72 shrink-0 space-y-1.5 text-xs bg-slate-50/60 p-3 rounded-[8px] border border-slate-200">
           <div className="flex justify-between text-slate-600">
@@ -333,6 +403,15 @@ export const TransferRowDetail: React.FC<Props> = ({ transferId, onRefresh, onOp
           )}
           <button
             type="button"
+            onClick={() => router.push(`/transfers/create?copy=${detail.id}`)}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-[#15171a] hover:bg-[#f7f8f9] rounded-[8px] border border-slate-300 bg-white cursor-pointer"
+            title="Tạo phiếu chuyển mới từ phiếu này"
+          >
+            <Copy size={13} />
+            <span>Sao chép</span>
+          </button>
+          <button
+            type="button"
             onClick={() => exportTransferToExcel(detail)}
             className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-[#15171a] hover:bg-[#f7f8f9] rounded-[8px] border border-slate-300 bg-white cursor-pointer"
           >
@@ -367,7 +446,17 @@ export const TransferRowDetail: React.FC<Props> = ({ transferId, onRefresh, onOp
           )}
           <button
             type="button"
-            onClick={() => printTransferSlip(detail, warehouses)}
+            disabled={!notesChanged || savingNotes}
+            onClick={handleSaveNotes}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-slate-700 hover:bg-[#f7f8f9] rounded-[8px] border border-slate-300 bg-white cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            title={notesChanged ? 'Lưu ghi chú chuyển / ghi chú nhận' : 'Chưa có thay đổi ghi chú'}
+          >
+            <Save size={13} />
+            <span>{savingNotes ? 'Đang lưu...' : 'Lưu'}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => printTransferSlip(detail)}
             className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-slate-700 hover:bg-[#f7f8f9] rounded-[8px] border border-slate-300 bg-white cursor-pointer"
           >
             <Printer size={13} />

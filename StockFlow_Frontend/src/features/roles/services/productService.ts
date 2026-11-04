@@ -108,6 +108,8 @@ export interface ProductStockAdjustmentResult {
   newQuantity: number;
   delta: number;
   unitCost: number;
+  /** Mã phiếu kiểm kho tự tạo (KK...) khi tồn kho thay đổi */
+  stocktakeCode?: string | null;
 }
 
 export const productService = {

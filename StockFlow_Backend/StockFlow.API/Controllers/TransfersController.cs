@@ -164,6 +164,23 @@ public class TransfersController : ControllerBase
     }
 
     /// <summary>
+    /// Sửa ghi chú chuyển / ghi chú nhận (mọi trạng thái, không đổi tồn kho).
+    /// </summary>
+    [HttpPut("{id}/notes")]
+    [ProducesResponseType(typeof(TransferDetailDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [RequirePermission("STOCK_UPDATE")]
+    public async Task<IActionResult> UpdateTransferNotes(int id, [FromBody] UpdateTransferNotesRequest request)
+    {
+        var result = await _mediator.Send(new UpdateTransferNotesCommand(id, request));
+        if (!result.IsSuccess)
+        {
+            return BadRequest(new { message = result.Error });
+        }
+        return Ok(result.Value);
+    }
+
+    /// <summary>
     /// Chuyển phiếu từ DRAFT sang IN_TRANSIT (Xuất kho chuyển đi).
     /// </summary>
     [HttpPost("{id}/complete")]

@@ -36,6 +36,7 @@ import { toLocalDatetimeInputString } from '@/features/transfers/utils/dateUtils
 import { QuickAddSupplierModal } from '@/features/purchases/components/QuickAddSupplierModal';
 import { AddFromCategoryPopover } from '@/features/purchases/components/AddFromCategoryPopover';
 import { NumberInput } from '@/components/inputs/NumberInput';
+import { ProductThumb } from '@/components/ProductThumb';
 import { DiscountInput, discountAmount, type DiscountType } from '@/components/inputs/DiscountInput';
 import {
   PurchaseDisplayOptions,
@@ -117,6 +118,8 @@ export default function CreatePurchaseClient() {
   // Sao chép: nạp hàng hóa / NCC / giảm giá của phiếu nguồn vào một phiếu MỚI
   const copyPurchaseId = editPurchaseId ? null : searchParams.get('copy');
   const sourcePurchaseId = editPurchaseId || copyPurchaseId;
+  // Nhập hàng từ danh mục hàng hóa: ?products=1,2,3 → thêm sẵn các hàng đã chọn vào phiếu mới
+  const prefillProductIds = sourcePurchaseId ? null : searchParams.get('products');
 
   const { activeWarehouse, setActiveWarehouse, warehouses: allWarehouses } = useActiveWarehouse();
 
@@ -378,6 +381,38 @@ export default function CreatePurchaseClient() {
     loadEditData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sourcePurchaseId, copyPurchaseId]);
+
+  // ─── Nạp sẵn hàng đã tick ở danh mục hàng hóa (?products=) ─────────────────────
+  const loadedPrefillRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!prefillProductIds) return;
+    const key = `${prefillProductIds}@${activeWarehouse.warehouseId}`;
+    if (loadedPrefillRef.current === key) return;
+    loadedPrefillRef.current = key;
+    const ids = prefillProductIds
+      .split(',')
+      .map((s) => Number(s.trim()))
+      .filter((n) => Number.isInteger(n) && n > 0);
+    if (ids.length === 0) return;
+    async function loadPrefill() {
+      try {
+        const prods = await productService.getProducts({ warehouseId: activeWarehouse.warehouseId });
+        const byId = new Map(prods.map((p) => [p.productId, p]));
+        // Giữ thứ tự như lúc chọn; bỏ qua hàng không còn tồn tại / ngừng kinh doanh
+        const picked = ids
+          .map((id) => byId.get(id))
+          .filter((p): p is BackendProduct => Boolean(p) && p?.status !== 'INACTIVE');
+        setItems(picked.map(buildRowFromProduct));
+        if (picked.length < ids.length) {
+          showToast(`${ids.length - picked.length} hàng hóa không còn kinh doanh nên không được thêm`, 'warning');
+        }
+      } catch (err) {
+        console.error('Lỗi nạp hàng hóa đã chọn:', err);
+        showToast('Không tải được hàng hóa đã chọn', 'error');
+      }
+    }
+    loadPrefill();
+  }, [prefillProductIds, activeWarehouse.warehouseId]);
 
 
   // ─── Handle Global F3 Shortcut to focus product search ──────────────────────
@@ -811,7 +846,9 @@ export default function CreatePurchaseClient() {
                       onClick={() => handleSelectProduct(prod)}
                       className="p-2.5 hover:bg-[#eff6ff] transition flex items-center justify-between cursor-pointer group"
                     >
-                      <div className="flex flex-col gap-0.5">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                      <ProductThumb src={prod.imageUrl} alt={prod.name} />
+                      <div className="flex flex-col gap-0.5 min-w-0">
                         <div className="flex items-center gap-2">
                           <span className="font-bold text-[#0070f4] group-hover:underline">
                             {prod.code}
@@ -831,6 +868,7 @@ export default function CreatePurchaseClient() {
                             </strong>
                           </span>
                         </div>
+                      </div>
                       </div>
 
                       <div className="text-right flex items-center gap-4">

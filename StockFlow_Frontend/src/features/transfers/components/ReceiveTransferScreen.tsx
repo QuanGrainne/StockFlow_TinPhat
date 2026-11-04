@@ -78,7 +78,7 @@ export const ReceiveTransferScreen: React.FC<Props> = ({
     if (draft?.itemNotes) return draft.itemNotes;
     const init: Record<number, string> = {};
     (transfer.items || []).forEach((it) => {
-      if (it.notes) init[it.productId] = it.notes;
+      if (it.receiveNotes) init[it.productId] = it.receiveNotes;
     });
     return init;
   });
@@ -99,7 +99,10 @@ export const ReceiveTransferScreen: React.FC<Props> = ({
     if (isNaN(t.getTime())) return undefined;
     return toLocalDatetimeInputString(new Date(t.getTime() + 60 * 1000));
   }, [transfer.transferDate]);
-  const [receiveNotes, setReceiveNotes] = useState(() => loadReceiveDraft(transfer.id)?.receiveNotes ?? '');
+  // Ghi chú nhận: bản lưu tạm trên máy → ghi chú nhận đã lưu ở chi tiết phiếu (lúc đang chuyển) → trống
+  const [receiveNotes, setReceiveNotes] = useState(
+    () => loadReceiveDraft(transfer.id)?.receiveNotes ?? transfer.receiveNotes ?? ''
+  );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
 
@@ -240,6 +243,7 @@ export const ReceiveTransferScreen: React.FC<Props> = ({
         transferItemId: it.id,
         productId: it.productId,
         receivedQuantity: receivedQtys[it.productId] ?? it.transferQuantity,
+        notes: itemNotes[it.productId]?.trim() || undefined,
       }));
 
       await transferService.receiveTransfer(transfer.id, {
@@ -447,6 +451,11 @@ export const ReceiveTransferScreen: React.FC<Props> = ({
                             <span>{it.productName}</span>
                             <Info size={12} className="text-[#677484] cursor-pointer" />
                           </div>
+                          {it.notes && (
+                            <div className="text-[11px] italic text-[#677484] mt-0.5" title="Ghi chú của chi nhánh chuyển">
+                              ({it.notes})
+                            </div>
+                          )}
                           <div className="flex items-center gap-1 text-[11px] text-[#677484] mt-0.5">
                             <input
                               type="text"
@@ -557,8 +566,8 @@ export const ReceiveTransferScreen: React.FC<Props> = ({
               </div>
 
               <div className="flex items-center justify-between">
-                <span className="text-[#677484]">Ghi chú</span>
-                <span className="text-[#677484]">{transfer.notes || '—'}</span>
+                <span className="text-[#677484] shrink-0">Ghi chú chuyển</span>
+                <span className="text-[#15171a] text-right ml-3">{transfer.notes || '—'}</span>
               </div>
 
               <div className="flex items-center justify-between pt-1 border-t border-slate-100">
@@ -577,7 +586,7 @@ export const ReceiveTransferScreen: React.FC<Props> = ({
               <div className="flex items-center justify-between mb-1.5">
                 <div className="flex items-center gap-1.5 text-xs text-[#15171a] font-medium">
                   <Pencil size={12} className="text-[#677484]" />
-                  <span>Ghi chú</span>
+                  <span>Ghi chú nhận</span>
                 </div>
                 {hasShortage && (
                   <span className="text-[10px] font-bold text-[#fb2c36] bg-[#fef2f2] px-1.5 py-0.5 rounded border border-[#fecaca] animate-pulse">

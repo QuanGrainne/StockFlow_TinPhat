@@ -394,6 +394,12 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
             entity.Property(e => e.UnitCost)
                 .HasPrecision(18, 4)
                 .HasColumnName("unit_cost");
+            entity.Property(e => e.Notes)
+                .HasMaxLength(500)
+                .HasColumnName("notes");
+            entity.Property(e => e.ReceiveNotes)
+                .HasMaxLength(500)
+                .HasColumnName("receive_notes");
             entity.Property(e => e.LotId).HasColumnName("lot_id");
             entity.Property(e => e.ProductId).HasColumnName("product_id");
             entity.Property(e => e.Quantity)
@@ -459,6 +465,9 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
             entity.Property(e => e.SystemQty)
                 .HasPrecision(18, 2)
                 .HasColumnName("system_qty");
+            entity.Property(e => e.UnitCost)
+                .HasPrecision(18, 4)
+                .HasColumnName("unit_cost");
 
             entity.HasOne(d => d.ApprovedByNavigation).WithMany(p => p.DtlStocktakeItemApprovedByNavigations)
                 .HasForeignKey(d => d.ApprovedBy)
@@ -1649,6 +1658,9 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
             entity.Property(e => e.Notes)
                 .HasMaxLength(500)
                 .HasColumnName("notes");
+            entity.Property(e => e.ReceiveNotes)
+                .HasMaxLength(500)
+                .HasColumnName("receive_notes");
             entity.Property(e => e.SourceWarehouseId).HasColumnName("source_warehouse_id");
             entity.Property(e => e.Status)
                 .HasMaxLength(20)
@@ -1701,6 +1713,10 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
             entity.Property(e => e.StocktakeDate)
                 .HasColumnType("timestamp without time zone")
                 .HasColumnName("stocktake_date");
+            entity.Property(e => e.BalancedDate)
+                .HasColumnType("timestamp without time zone")
+                .HasColumnName("balanced_date");
+            entity.Property(e => e.BalancedBy).HasColumnName("balanced_by");
             entity.Property(e => e.WarehouseId).HasColumnName("warehouse_id");
 
             entity.HasOne(d => d.ConductedByNavigation).WithMany(p => p.TrxStocktakes)

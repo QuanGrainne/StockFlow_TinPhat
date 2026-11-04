@@ -530,6 +530,11 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("lot_id");
 
+                    b.Property<string>("Notes")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("notes");
+
                     b.Property<int>("ProductId")
                         .HasColumnType("integer")
                         .HasColumnName("product_id");
@@ -538,6 +543,11 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)")
                         .HasColumnName("quantity");
+
+                    b.Property<string>("ReceiveNotes")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("receive_notes");
 
                     b.Property<decimal?>("ReceivedQuantity")
                         .HasPrecision(18, 2)
@@ -634,6 +644,11 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)")
                         .HasColumnName("system_qty");
+
+                    b.Property<decimal?>("UnitCost")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("unit_cost");
 
                     b.HasKey("StocktakeItemId")
                         .HasName("dtl_stocktake_items_pkey");
@@ -2588,6 +2603,11 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(500)")
                         .HasColumnName("notes");
 
+                    b.Property<string>("ReceiveNotes")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("receive_notes");
+
                     b.Property<DateTime?>("ReceivedDate")
                         .HasColumnType("timestamp without time zone")
                         .HasColumnName("received_date");
@@ -2633,6 +2653,14 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                         .HasColumnName("stocktake_id");
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("StocktakeId"));
+
+                    b.Property<int?>("BalancedBy")
+                        .HasColumnType("integer")
+                        .HasColumnName("balanced_by");
+
+                    b.Property<DateTime?>("BalancedDate")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("balanced_date");
 
                     b.Property<int>("ConductedBy")
                         .HasColumnType("integer")
