@@ -69,4 +69,5 @@ export interface ProductForTransfer {
   standardPrice: number;
   sourceStock: number;
   destStock: number;
+  imageUrl?: string | null;
 }

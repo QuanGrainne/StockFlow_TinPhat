@@ -31,6 +31,7 @@ import { toLocalDatetimeInputString } from '@/features/transfers/utils/dateUtils
 import { productService, BackendProduct } from '@/features/products/services/productService';
 import { AddFromCategoryPopover } from '@/features/purchases/components/AddFromCategoryPopover';
 import { NumberInput } from '@/components/inputs/NumberInput';
+import { ProductThumb } from '@/components/ProductThumb';
 
 // Bố cục cột bảng hàng hóa (cùng kiểu màn Nhập hàng): Xóa | STT | Mã | Tên | ĐVT | Tồn kho | Tồn kho nhận | SL | Giá | Thành tiền
 /** Tiền tố mã khi sao chép phiếu (giống phiếu nhập / kiểm kho) — khi lưu hệ thống tự sinh mã mới */
@@ -807,7 +808,9 @@ export default function CreateTransferClient() {
                       onClick={() => handleSelectProduct(prod)}
                       className="p-2.5 hover:bg-[#eff6ff] transition flex items-center justify-between cursor-pointer group"
                     >
-                      <div className="flex flex-col gap-0.5">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                      <ProductThumb src={prod.imageUrl} alt={prod.productName} />
+                      <div className="flex flex-col gap-0.5 min-w-0">
                         <div className="flex items-center gap-2">
                           <span className="font-bold text-[#0070f4] group-hover:underline">
                             {prod.productCode}
@@ -827,6 +830,7 @@ export default function CreateTransferClient() {
                             </strong>
                           </span>
                         </div>
+                      </div>
                       </div>
 
                       <div className="text-right flex items-center gap-4">
