@@ -28,10 +28,12 @@ import {
   Layers,
   Inbox,
   AlertCircle,
+  Settings,
 } from 'lucide-react';
 import { posService, OrderFilterParams } from '@/features/pos/services/posService';
 import { apiClient } from '@/lib/api/client';
 import { message, Modal, Tooltip } from 'antd';
+import { KiotVietOrderDetail } from '@/features/orders/components/KiotVietOrderDetail';
 
 const currencyFormatter = new Intl.NumberFormat('vi-VN');
 
@@ -39,7 +41,6 @@ const currencyFormatter = new Intl.NumberFormat('vi-VN');
 export interface OrderRecord {
   orderId: number;
   orderCode: string;
-  channel: 'POS' | 'B2B' | 'WEB' | 'ZALO' | 'COUNTER';
   isPinned: boolean;
   orderDate: string;
   orderTime: string;
@@ -77,7 +78,6 @@ const SAMPLE_MOCK_ORDERS: OrderRecord[] = [
   {
     orderId: 123,
     orderCode: '#HD000123',
-    channel: 'POS',
     isPinned: true,
     orderDate: '31/10/2026',
     orderTime: '23:05:12',
@@ -100,7 +100,6 @@ const SAMPLE_MOCK_ORDERS: OrderRecord[] = [
   {
     orderId: 122,
     orderCode: '#HD000122',
-    channel: 'B2B',
     isPinned: true,
     orderDate: '31/10/2026',
     orderTime: '21:40:08',
@@ -123,7 +122,6 @@ const SAMPLE_MOCK_ORDERS: OrderRecord[] = [
   {
     orderId: 121,
     orderCode: '#HD000121',
-    channel: 'WEB',
     isPinned: false,
     orderDate: '31/10/2026',
     orderTime: '19:15:30',
@@ -146,7 +144,6 @@ const SAMPLE_MOCK_ORDERS: OrderRecord[] = [
   {
     orderId: 120,
     orderCode: '#HD000120',
-    channel: 'ZALO',
     isPinned: false,
     orderDate: '31/10/2026',
     orderTime: '17:02:44',
@@ -169,7 +166,6 @@ const SAMPLE_MOCK_ORDERS: OrderRecord[] = [
   {
     orderId: 119,
     orderCode: '#HD000119',
-    channel: 'POS',
     isPinned: false,
     orderDate: '31/10/2026',
     orderTime: '14:20:10',
@@ -203,6 +199,7 @@ export default function OrdersClient({ onNavigate }: OrdersClientProps) {
   const [totalCount, setTotalCount] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [expandedOrderId, setExpandedOrderId] = useState<number | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   // Phân trang
@@ -383,11 +380,6 @@ export default function OrdersClient({ onNavigate }: OrdersClientProps) {
           else if (o.partnerName?.includes('Viettel')) group = 'Dự án';
           else if (o.partnerName?.includes('Hưng Thịnh') || o.partnerName?.includes('Ninh Ha')) group = 'Bán buôn';
 
-          let chan: OrderRecord['channel'] = 'POS';
-          if (idx % 4 === 1) chan = 'B2B';
-          else if (idx % 4 === 2) chan = 'WEB';
-          else if (idx % 4 === 3) chan = 'ZALO';
-
           let methodLabel = o.paymentMethod || 'Tiền mặt';
           if (methodLabel === 'CASH') methodLabel = 'Tiền mặt';
           else if (methodLabel === 'VIETQR') methodLabel = 'Chuyển khoản (VietQR / Techcombank)';
@@ -397,7 +389,6 @@ export default function OrdersClient({ onNavigate }: OrdersClientProps) {
           return {
             orderId: o.orderId,
             orderCode: o.orderCode?.startsWith('#') ? o.orderCode : `#${o.orderCode}`,
-            channel: chan,
             isPinned: idx < 2,
             orderDate: dateStr,
             orderTime: timeStr,
@@ -426,10 +417,11 @@ export default function OrdersClient({ onNavigate }: OrdersClientProps) {
         setOrders([]);
         setTotalCount(0);
       }
-    } catch (e) {
+    } catch (e: any) {
       console.warn('Lỗi khi tải đơn hàng:', e);
-      setOrders(SAMPLE_MOCK_ORDERS);
-      setTotalCount(SAMPLE_MOCK_ORDERS.length);
+      message.error(e?.message || 'Không thể tải danh sách đơn hàng thực tế từ hệ thống.');
+      setOrders([]);
+      setTotalCount(0);
     } finally {
       setLoading(false);
     }
@@ -475,7 +467,11 @@ export default function OrdersClient({ onNavigate }: OrdersClientProps) {
   // ─── ÁP DỤNG BỘ LỌC KHI BẤM NÚT "LỌC" ─────────────────────────────────────
   const handleApplyFilter = () => {
     if (timePreset === 'CUSTOM') {
-      if (customFromDate && customToDate && new Date(customFromDate) > new Date(customToDate)) {
+      if (!customFromDate || !customToDate) {
+        message.warning('Vui lòng chọn đầy đủ cả "Từ ngày" và "Đến ngày" khi sử dụng khoảng thời gian tùy chỉnh!');
+        return;
+      }
+      if (new Date(customFromDate) > new Date(customToDate)) {
         message.error('Khoảng ngày không hợp lệ: Từ ngày phải nhỏ hơn hoặc bằng Đến ngày!');
         return;
       }
@@ -751,226 +747,254 @@ export default function OrdersClient({ onNavigate }: OrdersClientProps) {
           >
             <RotateCw size={14} className={loading ? 'animate-spin text-[#0F60B6]' : ''} />
           </button>
+
+          {/* Nút Cài đặt / Thiết lập đơn hàng (Settings) */}
+          <Tooltip title="Thiết lập đơn hàng (settings/orders)">
+            <button
+              type="button"
+              onClick={() => {
+                if (onNavigate) {
+                  onNavigate('/settings/orders');
+                } else {
+                  router.push('/settings/orders');
+                }
+              }}
+              className="h-8 w-8 rounded-[5px] bg-white border border-slate-300 hover:bg-slate-50 hover:text-[#0F60B6] hover:border-blue-300 text-slate-600 flex items-center justify-center transition cursor-pointer shadow-2xs group"
+              title="Thiết lập đơn hàng (settings/orders)"
+              aria-label="Cài đặt đơn hàng"
+            >
+              <Settings size={15} className="group-hover:rotate-45 transition-transform duration-200" />
+            </button>
+          </Tooltip>
         </div>
       </div>
 
-      {/* ─── 2. KHU VỰC BỘ LỌC (FILTER PANEL PHONG CÁCH KIOTVIET) ĐẶT PHÍA TRÊN ─── */}
-      <div className="bg-white rounded-[8px] border border-slate-200 p-3.5 shadow-2xs space-y-3">
-        {/* Header Bộ lọc + 2 Nút thao tác: "Đặt lại" & "Lọc" */}
-        <div className="flex items-center justify-between pb-2 border-b border-slate-150">
-          <div className="flex items-center gap-2 font-bold text-slate-900 text-xs">
-            <Filter size={15} className="text-[#0F60B6]" />
-            <span>BỘ LỌC TÌM KIẾM ĐƠN HÀNG</span>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={handleResetFilters}
-              className="h-7 px-3 rounded-[5px] bg-white border border-slate-300 hover:bg-slate-50 text-slate-600 font-semibold text-xs flex items-center gap-1.5 transition cursor-pointer"
-              title="Khôi phục toàn bộ điều kiện về mặc định"
-            >
-              <RotateCcw size={12} />
-              <span>Đặt lại</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={handleApplyFilter}
-              className="h-7 px-4 rounded-[5px] bg-[#0F60B6] hover:bg-blue-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-2xs transition cursor-pointer active:scale-95"
-              title="Áp dụng các điều kiện lọc đã chọn"
-            >
-              <Search size={13} />
-              <span>Lọc</span>
-            </button>
-          </div>
-        </div>
-
-        {/* 6 TRƯỜNG BỘ LỌC (Grid 6 cột trên màn hình lớn) */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 items-end">
-          {/* 1.1 Chi nhánh (Kho) */}
-          <div className="space-y-1">
-            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide flex items-center gap-1">
-              <Building2 size={12} className="text-[#0F60B6]" />
-              <span>Chi nhánh</span>
-            </label>
-            <select
-              value={filterWarehouseId}
-              onChange={(e) => setFilterWarehouseId(e.target.value)}
-              className="w-full h-8 px-2.5 rounded-[5px] border border-slate-300 bg-white text-xs text-slate-800 outline-none focus:border-[#0F60B6] cursor-pointer"
-            >
-              <option value="ALL">Tất cả chi nhánh</option>
-              {warehouses.map((w) => (
-                <option key={w.warehouseId} value={String(w.warehouseId)}>
-                  {w.name} {w.code ? `(${w.code})` : ''}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* 1.2 Thời gian */}
-          <div className="space-y-1">
-            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide flex items-center gap-1">
-              <Calendar size={12} className="text-[#0F60B6]" />
-              <span>Thời gian</span>
-            </label>
-            <select
-              value={timePreset}
-              onChange={(e) => setTimePreset(e.target.value as TimePreset)}
-              className="w-full h-8 px-2.5 rounded-[5px] border border-slate-300 bg-white text-xs text-slate-800 outline-none focus:border-[#0F60B6] cursor-pointer"
-            >
-              <option value="THIS_MONTH">Tháng này</option>
-              <option value="TODAY">Hôm nay</option>
-              <option value="YESTERDAY">Hôm qua</option>
-              <option value="LAST_7_DAYS">7 ngày qua</option>
-              <option value="CUSTOM">Tùy chỉnh...</option>
-            </select>
-          </div>
-
-          {/* 1.3 Trạng thái đơn hàng */}
-          <div className="space-y-1">
-            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide flex items-center gap-1">
-              <Tag size={12} className="text-[#0F60B6]" />
-              <span>Trạng thái đơn</span>
-            </label>
-            <div className="h-8 px-2 rounded-[5px] border border-slate-300 bg-white flex items-center gap-3 text-xs">
-              <label className="flex items-center gap-1.5 cursor-pointer text-slate-700">
-                <input
-                  type="checkbox"
-                  checked={statusCompleted}
-                  onChange={(e) => setStatusCompleted(e.target.checked)}
-                  className="rounded text-[#0F60B6] accent-[#0F60B6] cursor-pointer"
-                />
-                <span>Hoàn thành</span>
-              </label>
-
-              <label className="flex items-center gap-1.5 cursor-pointer text-slate-700">
-                <input
-                  type="checkbox"
-                  checked={statusCancelled}
-                  onChange={(e) => setStatusCancelled(e.target.checked)}
-                  className="rounded text-[#0F60B6] accent-[#0F60B6] cursor-pointer"
-                />
-                <span>Đã hủy</span>
-              </label>
+      {/* ─── 2. MAIN LAYOUT: BỘ LỌC BÊN TRÁI & NỘI DUNG BẢNG BÊN PHẢI ─── */}
+      <div className="flex flex-col lg:flex-row items-start gap-3.5">
+        {/* ─── CỘT TRÁI: BỘ LỌC TÌM KIẾM ĐƠN HÀNG (FILTER SIDEBAR) ─── */}
+        <aside className="w-full lg:w-64 xl:w-72 shrink-0 bg-white rounded-[8px] border border-slate-200 p-3.5 shadow-2xs space-y-3.5 sticky top-3">
+          {/* Header Bộ lọc + 2 Nút thao tác: "Đặt lại" & "Lọc" */}
+          <div className="flex items-center justify-between pb-2.5 border-b border-slate-150">
+            <div className="flex items-center gap-1.5 font-bold text-slate-900 text-xs">
+              <Filter size={15} className="text-[#0F60B6]" />
+              <span>BỘ LỌC ĐƠN HÀNG</span>
             </div>
-          </div>
 
-          {/* 1.4 Trạng thái trả hàng */}
-          <div className="space-y-1">
-            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide flex items-center gap-1">
-              <RotateCw size={12} className="text-[#0F60B6]" />
-              <span>Trả hàng</span>
-            </label>
-            <select
-              value={filterReturnStatus}
-              onChange={(e) => setFilterReturnStatus(e.target.value as any)}
-              className="w-full h-8 px-2.5 rounded-[5px] border border-slate-300 bg-white text-xs text-slate-800 outline-none focus:border-[#0F60B6] cursor-pointer"
-            >
-              <option value="ALL">Tất cả</option>
-              <option value="NO_RETURN">Không trả hàng</option>
-              <option value="HAS_RETURN">Có trả hàng</option>
-            </select>
-          </div>
-
-          {/* 1.5 Phương thức thanh toán */}
-          <div className="space-y-1">
-            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide flex items-center gap-1">
-              <CreditCard size={12} className="text-[#0F60B6]" />
-              <span>Phương thức TT</span>
-            </label>
-            <select
-              value={filterPaymentMethod}
-              onChange={(e) => setFilterPaymentMethod(e.target.value)}
-              className="w-full h-8 px-2.5 rounded-[5px] border border-slate-300 bg-white text-xs text-slate-800 outline-none focus:border-[#0F60B6] cursor-pointer"
-            >
-              <option value="ALL">Tất cả phương thức</option>
-              <option value="CASH">Tiền mặt</option>
-              <option value="VIETQR">Chuyển khoản VietQR</option>
-              <option value="POS_CARD">Quẹt thẻ máy POS</option>
-              <option value="DEBT">Ghi nợ đại lý</option>
-            </select>
-          </div>
-
-          {/* 1.6 Bảng giá */}
-          <div className="space-y-1">
-            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide flex items-center gap-1">
-              <Layers size={12} className="text-[#0F60B6]" />
-              <span>Bảng giá</span>
-            </label>
-            <select
-              value={filterPriceBookName}
-              onChange={(e) => setFilterPriceBookName(e.target.value)}
-              className="w-full h-8 px-2.5 rounded-[5px] border border-slate-300 bg-white text-xs text-slate-800 outline-none focus:border-[#0F60B6] cursor-pointer"
-            >
-              <option value="ALL">Tất cả bảng giá</option>
-              {priceBooks.map((pb) => (
-                <option key={pb.priceBookId} value={pb.priceBookName}>
-                  {pb.priceBookName}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        {/* Ô CHỌN NGÀY TÙY CHỈNH (Hiện khi chọn timePreset === 'CUSTOM') */}
-        {timePreset === 'CUSTOM' && (
-          <div className="pt-2 border-t border-slate-150 flex flex-wrap items-center gap-3 bg-slate-50/60 p-2.5 rounded-[6px]">
-            <span className="text-[11px] font-bold text-slate-600">Khoảng ngày tùy chỉnh:</span>
-            <div className="flex items-center gap-2">
-              <input
-                type="date"
-                value={customFromDate}
-                onChange={(e) => setCustomFromDate(e.target.value)}
-                className="h-7 px-2 rounded border border-slate-300 bg-white text-xs text-slate-800 outline-none focus:border-[#0F60B6]"
-              />
-              <span className="text-slate-400 font-bold">→</span>
-              <input
-                type="date"
-                value={customToDate}
-                onChange={(e) => setCustomToDate(e.target.value)}
-                className="h-7 px-2 rounded border border-slate-300 bg-white text-xs text-slate-800 outline-none focus:border-[#0F60B6]"
-              />
-            </div>
-            {dateError && (
-              <span className="text-[11px] font-semibold text-rose-600 flex items-center gap-1">
-                <AlertCircle size={12} />
-                <span>{dateError}</span>
-              </span>
-            )}
-          </div>
-        )}
-
-        {/* DẢI THẺ ĐIỀU KIỆN LỌC ĐANG ÁP DỤNG (ACTIVE FILTER TAGS) */}
-        {activeFilterTags.length > 0 && (
-          <div className="pt-2 border-t border-slate-150 flex flex-wrap items-center gap-1.5">
-            <span className="text-[11px] font-semibold text-slate-500 mr-1">Đang lọc theo:</span>
-            {activeFilterTags.map((t) => (
-              <span
-                key={t.id}
-                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-50 border border-blue-200 text-[#0F60B6] text-[11px] font-semibold animate-in fade-in"
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={handleResetFilters}
+                className="h-7 px-2 rounded-[5px] bg-white border border-slate-300 hover:bg-slate-50 text-slate-600 font-semibold text-[11px] flex items-center gap-1 transition cursor-pointer"
+                title="Khôi phục toàn bộ điều kiện về mặc định"
               >
-                <span>{t.label}</span>
-                <button
-                  type="button"
-                  onClick={() => handleRemoveFilterTag(t.id)}
-                  className="hover:bg-blue-200/80 rounded-full p-0.5 transition cursor-pointer text-[#0F60B6]"
-                  title="Gỡ điều kiện này"
-                >
-                  <X size={11} />
-                </button>
-              </span>
-            ))}
-            <button
-              type="button"
-              onClick={handleResetFilters}
-              className="text-[11px] text-rose-600 hover:underline font-semibold ml-1 cursor-pointer"
-            >
-              Xóa tất cả
-            </button>
+                <RotateCcw size={11} />
+                <span>Đặt lại</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleApplyFilter}
+                className="h-7 px-3 rounded-[5px] bg-[#0F60B6] hover:bg-blue-700 text-white font-bold text-[11px] flex items-center gap-1 shadow-2xs transition cursor-pointer active:scale-95"
+                title="Áp dụng các điều kiện lọc đã chọn"
+              >
+                <Search size={12} />
+                <span>Lọc</span>
+              </button>
+            </div>
           </div>
-        )}
-      </div>
+
+          {/* 6 TRƯỜNG BỘ LỌC (Xếp theo chiều dọc) */}
+          <div className="space-y-3">
+            {/* 1.1 Chi nhánh (Kho) */}
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide flex items-center gap-1">
+                <Building2 size={12} className="text-[#0F60B6]" />
+                <span>Chi nhánh</span>
+              </label>
+              <select
+                value={filterWarehouseId}
+                onChange={(e) => setFilterWarehouseId(e.target.value)}
+                className="w-full h-8 px-2.5 rounded-[5px] border border-slate-300 bg-white text-xs text-slate-800 outline-none focus:border-[#0F60B6] cursor-pointer"
+              >
+                <option value="ALL">Tất cả chi nhánh</option>
+                {warehouses.map((w) => (
+                  <option key={w.warehouseId} value={String(w.warehouseId)}>
+                    {w.name} {w.code ? `(${w.code})` : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* 1.2 Thời gian */}
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide flex items-center gap-1">
+                <Calendar size={12} className="text-[#0F60B6]" />
+                <span>Thời gian</span>
+              </label>
+              <select
+                value={timePreset}
+                onChange={(e) => setTimePreset(e.target.value as TimePreset)}
+                className="w-full h-8 px-2.5 rounded-[5px] border border-slate-300 bg-white text-xs text-slate-800 outline-none focus:border-[#0F60B6] cursor-pointer"
+              >
+                <option value="THIS_MONTH">Tháng này</option>
+                <option value="TODAY">Hôm nay</option>
+                <option value="YESTERDAY">Hôm qua</option>
+                <option value="LAST_7_DAYS">7 ngày qua</option>
+                <option value="CUSTOM">Tùy chỉnh...</option>
+              </select>
+
+              {/* Ô CHỌN NGÀY TÙY CHỈNH (Hiện khi chọn timePreset === 'CUSTOM') */}
+              {timePreset === 'CUSTOM' && (
+                <div className="pt-2 space-y-1.5 bg-slate-50/80 p-2.5 rounded-[6px] border border-slate-200 mt-1">
+                  <div>
+                    <span className="text-[10px] text-slate-500 font-medium">Từ ngày:</span>
+                    <input
+                      type="date"
+                      value={customFromDate}
+                      onChange={(e) => setCustomFromDate(e.target.value)}
+                      className="w-full h-7 px-2 rounded border border-slate-300 bg-white text-xs text-slate-800 outline-none focus:border-[#0F60B6] mt-0.5"
+                    />
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-500 font-medium">Đến ngày:</span>
+                    <input
+                      type="date"
+                      value={customToDate}
+                      onChange={(e) => setCustomToDate(e.target.value)}
+                      className="w-full h-7 px-2 rounded border border-slate-300 bg-white text-xs text-slate-800 outline-none focus:border-[#0F60B6] mt-0.5"
+                    />
+                  </div>
+                  {dateError && (
+                    <span className="text-[10px] font-semibold text-rose-600 flex items-center gap-1 pt-0.5">
+                      <AlertCircle size={11} />
+                      <span>{dateError}</span>
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* 1.3 Trạng thái đơn hàng */}
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide flex items-center gap-1">
+                <Tag size={12} className="text-[#0F60B6]" />
+                <span>Trạng thái đơn</span>
+              </label>
+              <div className="p-2.5 rounded-[5px] border border-slate-300 bg-white flex flex-col gap-2 text-xs">
+                <label className="flex items-center gap-2 cursor-pointer text-slate-700 hover:text-slate-900">
+                  <input
+                    type="checkbox"
+                    checked={statusCompleted}
+                    onChange={(e) => setStatusCompleted(e.target.checked)}
+                    className="rounded text-[#0F60B6] accent-[#0F60B6] cursor-pointer"
+                  />
+                  <span>Hoàn thành</span>
+                </label>
+
+                <label className="flex items-center gap-2 cursor-pointer text-slate-700 hover:text-slate-900">
+                  <input
+                    type="checkbox"
+                    checked={statusCancelled}
+                    onChange={(e) => setStatusCancelled(e.target.checked)}
+                    className="rounded text-[#0F60B6] accent-[#0F60B6] cursor-pointer"
+                  />
+                  <span>Đã hủy</span>
+                </label>
+              </div>
+            </div>
+
+            {/* 1.4 Trạng thái trả hàng */}
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide flex items-center gap-1">
+                <RotateCw size={12} className="text-[#0F60B6]" />
+                <span>Trả hàng</span>
+              </label>
+              <select
+                value={filterReturnStatus}
+                onChange={(e) => setFilterReturnStatus(e.target.value as any)}
+                className="w-full h-8 px-2.5 rounded-[5px] border border-slate-300 bg-white text-xs text-slate-800 outline-none focus:border-[#0F60B6] cursor-pointer"
+              >
+                <option value="ALL">Tất cả</option>
+                <option value="NO_RETURN">Không trả hàng</option>
+                <option value="HAS_RETURN">Có trả hàng</option>
+              </select>
+            </div>
+
+            {/* 1.5 Phương thức thanh toán */}
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide flex items-center gap-1">
+                <CreditCard size={12} className="text-[#0F60B6]" />
+                <span>Phương thức TT</span>
+              </label>
+              <select
+                value={filterPaymentMethod}
+                onChange={(e) => setFilterPaymentMethod(e.target.value)}
+                className="w-full h-8 px-2.5 rounded-[5px] border border-slate-300 bg-white text-xs text-slate-800 outline-none focus:border-[#0F60B6] cursor-pointer"
+              >
+                <option value="ALL">Tất cả phương thức</option>
+                <option value="CASH">Tiền mặt</option>
+                <option value="VIETQR">Chuyển khoản VietQR</option>
+                <option value="POS_CARD">Quẹt thẻ máy POS</option>
+                <option value="DEBT">Ghi nợ đại lý</option>
+              </select>
+            </div>
+
+            {/* 1.6 Bảng giá */}
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide flex items-center gap-1">
+                <Layers size={12} className="text-[#0F60B6]" />
+                <span>Bảng giá</span>
+              </label>
+              <select
+                value={filterPriceBookName}
+                onChange={(e) => setFilterPriceBookName(e.target.value)}
+                className="w-full h-8 px-2.5 rounded-[5px] border border-slate-300 bg-white text-xs text-slate-800 outline-none focus:border-[#0F60B6] cursor-pointer"
+              >
+                <option value="ALL">Tất cả bảng giá</option>
+                {priceBooks.map((pb) => (
+                  <option key={pb.priceBookId} value={pb.priceBookName}>
+                    {pb.priceBookName}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Nút Áp dụng bộ lọc ở chân panel */}
+     
+        </aside>
+
+        {/* ─── CỘT PHẢI: DẢI THẺ ĐIỀU KIỆN + BẢNG DỮ LIỆU ĐƠN HÀNG ─── */}
+        <section className="flex-1 min-w-0 space-y-3">
+          {/* DẢI THẺ ĐIỀU KIỆN LỌC ĐANG ÁP DỤNG (ACTIVE FILTER TAGS) */}
+          {activeFilterTags.length > 0 && (
+            <div className="bg-white rounded-[8px] border border-slate-200 p-2.5 px-3.5 shadow-2xs flex flex-wrap items-center gap-1.5">
+              <span className="text-[11px] font-semibold text-slate-500 mr-1">Đang lọc theo:</span>
+              {activeFilterTags.map((t) => (
+                <span
+                  key={t.id}
+                  className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-blue-50 border border-blue-200 text-[#0F60B6] text-[11px] font-semibold animate-in fade-in"
+                >
+                  <span>{t.label}</span>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveFilterTag(t.id)}
+                    className="hover:bg-blue-200/80 rounded-full p-0.5 transition cursor-pointer text-[#0F60B6]"
+                    title="Gỡ điều kiện này"
+                  >
+                    <X size={11} />
+                  </button>
+                </span>
+              ))}
+              <button
+                type="button"
+                onClick={handleResetFilters}
+                className="text-[11px] text-rose-600 hover:underline font-semibold ml-1 cursor-pointer"
+              >
+                Xóa tất cả
+              </button>
+            </div>
+          )}
 
       {/* ─── 3. BẢNG DANH SÁCH ĐƠN HÀNG TOÀN CHIỀU RỘNG (FULL WIDTH) ─── */}
       <div className="space-y-0">
@@ -1073,11 +1097,9 @@ export default function OrdersClient({ onNavigate }: OrdersClientProps) {
                 <th className="py-2.5 px-3">MÃ ĐƠN HÀNG</th>
                 <th className="py-2.5 px-3">THỜI GIAN</th>
                 <th className="py-2.5 px-3">KHÁCH HÀNG</th>
-                <th className="py-2.5 px-3">CHI NHÁNH</th>
                 <th className="py-2.5 px-3 text-right">TỔNG TIỀN</th>
                 <th className="py-2.5 px-3 text-right">CHIẾT KHẤU</th>
                 <th className="py-2.5 px-3 text-right">ĐÃ THU</th>
-                <th className="py-2.5 px-3 text-right">CÒN NỢ</th>
                 <th className="py-2.5 px-3 text-center">TRẠNG THÁI</th>
                 <th className="py-2.5 px-3 text-center">TRẢ HÀNG</th>
               </tr>
@@ -1086,7 +1108,7 @@ export default function OrdersClient({ onNavigate }: OrdersClientProps) {
             <tbody className="divide-y divide-slate-150">
               {loading ? (
                 <tr>
-                  <td colSpan={12} className="py-12 text-center text-slate-400">
+                  <td colSpan={10} className="py-12 text-center text-slate-400">
                     <div className="flex flex-col items-center justify-center gap-2">
                       <RotateCw size={22} className="animate-spin text-[#0F60B6]" />
                       <span className="text-xs font-medium">Đang tải danh sách đơn hàng...</span>
@@ -1095,7 +1117,7 @@ export default function OrdersClient({ onNavigate }: OrdersClientProps) {
                 </tr>
               ) : orders.length === 0 ? (
                 <tr>
-                  <td colSpan={12} className="py-12 text-center text-slate-400">
+                  <td colSpan={10} className="py-12 text-center text-slate-400">
                     <div className="flex flex-col items-center justify-center gap-2">
                       <Inbox size={32} className="text-slate-300" />
                       <span className="text-xs font-semibold text-slate-600">
@@ -1114,156 +1136,148 @@ export default function OrdersClient({ onNavigate }: OrdersClientProps) {
               ) : (
                 orders.map((ord) => {
                   const isChecked = selectedOrderIds.includes(ord.orderId);
+                  const isExpanded = expandedOrderId === ord.orderId;
 
                   return (
-                    <tr
-                      key={ord.orderId}
-                      className={`transition ${isChecked ? 'bg-blue-50/40 hover:bg-blue-50/60' : 'hover:bg-slate-50/80'}`}
-                    >
-                      {/* Checkbox dòng */}
-                      <td className="py-2.5 px-3 text-center">
-                        <input
-                          type="checkbox"
-                          checked={isChecked}
-                          onChange={() => handleToggleSelectRow(ord.orderId)}
-                          className="rounded text-[#0F60B6] accent-[#0F60B6] cursor-pointer"
-                        />
-                      </td>
+                    <React.Fragment key={ord.orderId}>
+                      <tr
+                        className={`transition cursor-pointer select-none ${
+                          isExpanded
+                            ? 'bg-blue-50/80 border-l-4 border-l-[#0F60B6]'
+                            : isChecked
+                            ? 'bg-blue-50/40 hover:bg-blue-50/60'
+                            : 'hover:bg-slate-50/80'
+                        }`}
+                        onClick={() => setExpandedOrderId(isExpanded ? null : ord.orderId)}
+                      >
+                        {/* Checkbox dòng */}
+                        <td className="py-2.5 px-3 text-center" onClick={(e) => e.stopPropagation()}>
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={() => handleToggleSelectRow(ord.orderId)}
+                            className="rounded text-[#0F60B6] accent-[#0F60B6] cursor-pointer"
+                          />
+                        </td>
 
-                      {/* Sao ghim */}
-                      <td className="py-2.5 px-2 text-center">
-                        <Star
-                          size={13}
-                          className={`cursor-pointer mx-auto ${ord.isPinned ? 'text-amber-400 fill-amber-400' : 'text-slate-300 hover:text-slate-400'}`}
-                        />
-                      </td>
+                        {/* Sao ghim */}
+                        <td className="py-2.5 px-2 text-center" onClick={(e) => e.stopPropagation()}>
+                          <Star
+                            size={13}
+                            className={`cursor-pointer mx-auto ${ord.isPinned ? 'text-amber-400 fill-amber-400' : 'text-slate-300 hover:text-slate-400'}`}
+                          />
+                        </td>
 
-                      {/* Mã đơn hàng + Tag kênh bán */}
-                      <td className="py-2.5 px-3">
-                        <div className="flex items-center gap-1.5">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (onNavigate) onNavigate('pos');
-                              else router.push('/pos');
-                            }}
-                            className="font-bold text-[#0F60B6] hover:underline font-mono"
-                          >
-                            {ord.orderCode}
-                          </button>
+                        {/* Mã đơn hàng */}
+                        <td className="py-2.5 px-3">
+                          <div className="flex items-center gap-1.5">
+                            <span
+                              className="font-bold text-[#0F60B6] hover:underline font-mono"
+                              title="Bấm để xem chi tiết đơn hàng"
+                            >
+                              {ord.orderCode}
+                            </span>
+                          </div>
+                          <div className="text-[10px] text-slate-400 mt-0.5">{ord.totalItems} sản phẩm</div>
+                        </td>
 
-                          <span
-                            className={`px-1.5 py-0.2 rounded font-bold text-[9px] uppercase tracking-wide ${
-                              ord.channel === 'POS'
-                                ? 'bg-blue-100 text-[#0F60B6]'
-                                : ord.channel === 'B2B'
-                                ? 'bg-purple-100 text-purple-700'
-                                : ord.channel === 'WEB'
-                                ? 'bg-emerald-100 text-emerald-700'
-                                : 'bg-cyan-100 text-cyan-700'
-                            }`}
-                          >
-                            {ord.channel}
+                        {/* Thời gian */}
+                        <td className="py-2.5 px-3 text-slate-600">
+                          <div className="font-semibold text-slate-800">{ord.orderDate}</div>
+                          <div className="text-[10px] text-slate-400 font-mono">{ord.orderTime}</div>
+                        </td>
+
+                        {/* Khách hàng */}
+                        <td className="py-2.5 px-3">
+                          <div className="font-bold text-slate-900">{ord.partnerName}</div>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            <span
+                              className={`px-1.5 py-0.2 rounded font-bold text-[9px] ${
+                                ord.partnerGroup === 'VIP 1'
+                                  ? 'bg-amber-100 text-amber-800'
+                                  : ord.partnerGroup.includes('Đại lý')
+                                  ? 'bg-purple-100 text-purple-800'
+                                  : ord.partnerGroup === 'Dự án'
+                                  ? 'bg-blue-100 text-blue-800'
+                                  : 'bg-slate-100 text-slate-600'
+                              }`}
+                            >
+                              {ord.partnerGroup}
+                            </span>
+                            {ord.partnerPhone && (
+                              <span className="text-[11px] text-slate-500 font-mono">{ord.partnerPhone}</span>
+                            )}
+                          </div>
+                        </td>
+
+                        {/* Tổng tiền hàng */}
+                        <td className="py-2.5 px-3 text-right">
+                          <span className="font-bold text-slate-900">
+                            {currencyFormatter.format(ord.totalAmount)} đ
                           </span>
-                        </div>
-                        <div className="text-[10px] text-slate-400 mt-0.5">{ord.totalItems} sản phẩm</div>
-                      </td>
+                        </td>
 
-                      {/* Thời gian */}
-                      <td className="py-2.5 px-3 text-slate-600">
-                        <div className="font-semibold text-slate-800">{ord.orderDate}</div>
-                        <div className="text-[10px] text-slate-400 font-mono">{ord.orderTime}</div>
-                      </td>
-
-                      {/* Khách hàng */}
-                      <td className="py-2.5 px-3">
-                        <div className="font-bold text-slate-900">{ord.partnerName}</div>
-                        <div className="flex items-center gap-1.5 mt-0.5">
-                          <span
-                            className={`px-1.5 py-0.2 rounded font-bold text-[9px] ${
-                              ord.partnerGroup === 'VIP 1'
-                                ? 'bg-amber-100 text-amber-800'
-                                : ord.partnerGroup.includes('Đại lý')
-                                ? 'bg-purple-100 text-purple-800'
-                                : ord.partnerGroup === 'Dự án'
-                                ? 'bg-blue-100 text-blue-800'
-                                : 'bg-slate-100 text-slate-600'
-                            }`}
-                          >
-                            {ord.partnerGroup}
-                          </span>
-                          {ord.partnerPhone && (
-                            <span className="text-[11px] text-slate-500 font-mono">{ord.partnerPhone}</span>
+                        {/* Chiết khấu */}
+                        <td className="py-2.5 px-3 text-right text-slate-600">
+                          {ord.discountAmount > 0 ? (
+                            <span className="text-amber-700 font-medium">
+                              {currencyFormatter.format(ord.discountAmount)} đ
+                            </span>
+                          ) : (
+                            <span className="text-slate-400">0 đ</span>
                           )}
-                        </div>
-                      </td>
+                        </td>
 
-                      {/* Chi nhánh / Kho */}
-                      <td className="py-2.5 px-3 text-slate-700 font-medium">
-                        <div className="flex items-center gap-1 text-[11px]">
-                          <Building2 size={12} className="text-slate-400 shrink-0" />
-                          <span>{ord.warehouseName}</span>
-                        </div>
-                      </td>
+                        {/* Đã thu */}
+                        <td className="py-2.5 px-3 text-right font-bold text-emerald-700">
+                          {currencyFormatter.format(ord.paidAmount)} đ
+                        </td>
 
-                      {/* Tổng tiền hàng */}
-                      <td className="py-2.5 px-3 text-right">
-                        <span className="font-bold text-slate-900">
-                          {currencyFormatter.format(ord.totalAmount)} đ
-                        </span>
-                      </td>
-
-                      {/* Chiết khấu */}
-                      <td className="py-2.5 px-3 text-right text-slate-600">
-                        {ord.discountAmount > 0 ? (
-                          <span className="text-amber-700 font-medium">
-                            {currencyFormatter.format(ord.discountAmount)} đ
-                          </span>
-                        ) : (
-                          <span className="text-slate-400">0 đ</span>
-                        )}
-                      </td>
-
-                      {/* Đã thu */}
-                      <td className="py-2.5 px-3 text-right font-bold text-emerald-700">
-                        {currencyFormatter.format(ord.paidAmount)} đ
-                      </td>
-
-                      {/* Còn nợ */}
-                      <td className="py-2.5 px-3 text-right font-bold text-rose-600">
-                        {ord.outstandingAmount > 0 ? `${currencyFormatter.format(ord.outstandingAmount)} đ` : '0 đ'}
-                      </td>
-
-                      {/* Trạng thái đơn */}
-                      <td className="py-2.5 px-3 text-center">
-                        <span
-                          className={`px-2 py-0.5 rounded-[4px] font-bold text-[10px] inline-block ${
-                            ord.status === 'COMPLETED'
-                              ? 'bg-emerald-100 text-emerald-800'
+                        {/* Trạng thái đơn */}
+                        <td className="py-2.5 px-3 text-center">
+                          <span
+                            className={`px-2 py-0.5 rounded-[4px] font-bold text-[10px] inline-block ${
+                              ord.status === 'COMPLETED'
+                                ? 'bg-emerald-100 text-emerald-800'
+                                : ord.status === 'CANCELLED'
+                                ? 'bg-rose-100 text-rose-800'
+                                : 'bg-amber-100 text-amber-800'
+                            }`}
+                          >
+                            {ord.status === 'COMPLETED'
+                              ? 'Hoàn thành'
                               : ord.status === 'CANCELLED'
-                              ? 'bg-rose-100 text-rose-800'
-                              : 'bg-amber-100 text-amber-800'
-                          }`}
-                        >
-                          {ord.status === 'COMPLETED'
-                            ? 'Hoàn thành'
-                            : ord.status === 'CANCELLED'
-                            ? 'Đã hủy'
-                            : 'Đang xử lý'}
-                        </span>
-                      </td>
-
-                      {/* Trạng thái trả hàng */}
-                      <td className="py-2.5 px-3 text-center">
-                        {ord.hasReturn ? (
-                          <span className="px-2 py-0.5 rounded-[4px] font-bold text-[10px] inline-block bg-orange-100 text-orange-800">
-                            Có trả hàng
+                              ? 'Đã hủy'
+                              : 'Đang xử lý'}
                           </span>
-                        ) : (
-                          <span className="text-slate-400 text-[10px]">Không</span>
-                        )}
-                      </td>
-                    </tr>
+                        </td>
+
+                        {/* Trạng thái trả hàng */}
+                        <td className="py-2.5 px-3 text-center">
+                          {ord.hasReturn ? (
+                            <span className="px-2 py-0.5 rounded-[4px] font-bold text-[10px] inline-block bg-orange-100 text-orange-800">
+                              Có trả hàng
+                            </span>
+                          ) : (
+                            <span className="text-slate-400 text-[10px]">Không</span>
+                          )}
+                        </td>
+                      </tr>
+
+                      {/* CHI TIẾT ĐƠN HÀNG MỞ RỘNG (EXPANDABLE ROW CHUẨN KIOTVIET) */}
+                      {isExpanded && (
+                        <tr key={`${ord.orderId}-detail`} className="bg-white">
+                          <td colSpan={10} className="p-0 border-b-2 border-[#0F60B6]/40">
+                            <KiotVietOrderDetail
+                              orderId={ord.orderId}
+                              orderCode={ord.orderCode}
+                              onClose={() => setExpandedOrderId(null)}
+                              onReloadList={() => fetchOrdersFromBackend(appliedFilters, currentPage, pageSize, search)}
+                            />
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
                   );
                 })
               )}
@@ -1297,13 +1311,6 @@ export default function OrdersClient({ onNavigate }: OrdersClientProps) {
               Đã thu:{' '}
               <strong className="text-emerald-700 font-bold">
                 {currencyFormatter.format(pageSummary.sumPaid)} đ
-              </strong>
-            </span>
-            <span className="text-slate-300">|</span>
-            <span>
-              Còn nợ:{' '}
-              <strong className="text-rose-600 font-bold">
-                {currencyFormatter.format(pageSummary.sumDebt)} đ
               </strong>
             </span>
           </div>
@@ -1378,6 +1385,8 @@ export default function OrdersClient({ onNavigate }: OrdersClientProps) {
           </div>
         </div>
       </div>
-    </div>
+    </section>
+  </div>
+</div>
   );
 }

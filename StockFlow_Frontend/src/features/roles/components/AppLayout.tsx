@@ -17,6 +17,7 @@ import { permissionService } from '../services/permissionService';
 
 interface AppLayoutProps {
   initialScreen?: string;
+  children?: React.ReactNode;
 }
 
 const SCREEN_MODULE_MAP: Record<string, string> = {
@@ -24,7 +25,7 @@ const SCREEN_MODULE_MAP: Record<string, string> = {
   'admin-staff-active': 'AUTH',
   'admin-roles': 'AUTH',
   'admin-matrix': 'AUTH',
-  'admin-order-settings': 'AUTH',
+  'admin-order-settings': 'SALES',
   'admin-warehouse-perms': 'AUTH',
   'admin-warehouse-facilities': 'AUTH',
   'admin-goods': 'GOODS',
@@ -146,7 +147,7 @@ const getStoredRole = (): UserRole => {
       if (upper.includes('WAREHOUSE')) return 'WAREHOUSE';
       if (upper.includes('PROD')) return 'PRODUCTION';
       if (upper.includes('SALES')) return 'SALES';
-    } catch {}
+    } catch { }
   }
   return 'SALES';
 };
@@ -168,7 +169,7 @@ const getStoredScreen = (role: UserRole): string => {
   return getDefaultScreenForRole(role);
 };
 
-export const AppLayout: React.FC<AppLayoutProps> = ({ initialScreen }) => {
+export const AppLayout: React.FC<AppLayoutProps> = ({ initialScreen, children }) => {
   const router = useRouter();
   // Đọc vai trò thật ngay khi khởi tạo (AppLayout luôn được load với ssr:false nên có localStorage).
   // Trước đây khởi tạo 'SALES' rồi mới cập nhật trong effect, khiến lần kiểm tra quyền đầu tiên chạy
@@ -264,6 +265,16 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ initialScreen }) => {
       }
       return;
     }
+    if (newScreen === 'admin-order-settings' || newScreen === 'settings/orders' || newScreen === '/settings/orders') {
+      setActiveScreen('admin-order-settings');
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('stockflow_active_screen', 'admin-order-settings');
+        if (!window.location.pathname.includes('/settings/orders')) {
+          window.history.pushState(null, '', '/settings/orders');
+        }
+      }
+      return;
+    }
     setActiveScreen(newScreen);
     if (typeof window !== 'undefined') {
       localStorage.setItem('stockflow_active_screen', newScreen);
@@ -279,6 +290,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ initialScreen }) => {
         window.history.pushState(null, '', '/products');
       } else if (newScreen === 'transfers' || newScreen === '/transfers' || newScreen === 'admin-transfers' || newScreen === 'manager-transfers') {
         window.history.pushState(null, '', '/transfers');
+
       } else if (newScreen === 'stocktakes' || newScreen === '/stocktakes') {
         window.history.pushState(null, '', '/stocktakes');
       } else if (window.location.pathname.includes('/stocktakes') || window.location.pathname.includes('/suppliers') || window.location.pathname.includes('/purchases') || window.location.pathname.includes('/purchase-returns') || window.location.pathname.includes('/products') || window.location.pathname.includes('/transfers') || window.location.pathname.includes('/customers')) {
@@ -303,7 +315,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ initialScreen }) => {
           const u = JSON.parse(userStr);
           u.roles = [newRole];
           localStorage.setItem('stockflow_user', JSON.stringify(u));
-        } catch {}
+        } catch { }
       }
     }
   };
@@ -497,21 +509,29 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ initialScreen }) => {
       </div>
 
       {/* 2. Main Workspace Content (Chỉ cuộn vùng nội dung) */}
-      {activeScreen === 'transfers' || activeScreen.includes('transfers') ||
-       activeScreen === 'warehouse-transfer' ||
-       activeScreen === 'purchases' || activeScreen.includes('purchases') ||
-       activeScreen === 'purchase-returns' ||
-       activeScreen === 'suppliers' || activeScreen.includes('suppliers') ||
-       activeScreen === 'goods-catalog' || activeScreen === 'products' ||
-       activeScreen.includes('goods') || activeScreen.includes('catalog') ||
-       activeScreen === 'price-books' || activeScreen === 'admin-price-books' ||
-       activeScreen === 'stocktakes' ||
-       activeScreen.includes('price-book') ? (
+      {children ? (
+        <main className="flex-1 min-w-0 overflow-y-auto bg-[#F4F6F9]">
+          {children}
+        </main>
+      ) : activeScreen === 'transfers' || activeScreen.includes('transfers') ||
+        activeScreen === 'warehouse-transfer' ||
+        activeScreen === 'purchases' || activeScreen.includes('purchases') ||
+        activeScreen === 'purchase-returns' ||
+        activeScreen === 'suppliers' || activeScreen.includes('suppliers') ||
+        activeScreen === 'goods-catalog' || activeScreen === 'products' ||
+        activeScreen.includes('goods') || activeScreen.includes('catalog') ||
+        activeScreen === 'price-books' || activeScreen === 'admin-price-books' ||
+        activeScreen === 'stocktakes' ||
+        activeScreen.includes('price-book') ? (
         <main className="flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden bg-[#F8FAFC]">
           {renderActiveScreen()}
         </main>
       ) : activeScreen === 'orders' || activeScreen.includes('orders') ? (
         <main className="flex-1 min-w-0 overflow-y-auto bg-[#F4F6F9]">
+          {renderActiveScreen()}
+        </main>
+      ) : activeScreen === 'admin-order-settings' || activeScreen.includes('order-settings') ? (
+        <main className="flex-1 min-w-0 overflow-y-auto bg-slate-50">
           {renderActiveScreen()}
         </main>
       ) : (
