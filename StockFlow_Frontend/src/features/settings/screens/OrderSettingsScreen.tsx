@@ -16,6 +16,7 @@ import {
   Calendar,
   Layers,
   ArrowRight,
+  ArrowLeft,
   Info,
 } from 'lucide-react';
 import { orderSettingsService } from '../services/orderSettingsService';
@@ -159,6 +160,17 @@ export function OrderSettingsScreen({ onNavigate }: OrderSettingsScreenProps) {
             </div>
           </div>
           <div className="flex items-center gap-3">
+            {onNavigate && (
+              <button
+                type="button"
+                onClick={() => onNavigate('orders')}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-slate-300 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 transition cursor-pointer shadow-2xs"
+                title="Quay lại danh sách Quản lý đơn hàng"
+              >
+                <ArrowLeft className="w-3.5 h-3.5 text-slate-500" />
+                <span>Quản lý đơn hàng</span>
+              </button>
+            )}
             <button
               type="button"
               onClick={loadSettings}
