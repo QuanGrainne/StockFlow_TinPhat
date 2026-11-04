@@ -4,6 +4,8 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { readDocumentLink } from '@/lib/navigation/documentLink';
 import { Tag, message, Modal } from 'antd';
 import {
   Search,
@@ -54,10 +56,14 @@ export default function CustomersClient({ onNavigate }: CustomersClientProps = {
   });
 
   // Filter States (Đã bỏ group & customerType)
+  // Link mở thẳng 1 khách hàng (?code=KH...&id=..., VD từ hóa đơn trong Thẻ kho)
+  const searchParams = useSearchParams();
+  const [custLink] = useState(() => readDocumentLink(searchParams));
+
   const [filterState, setFilterState] = useState<CustomerFilterState>({
-    search: '',
+    search: custLink?.code ?? '',
     debtStatus: 'ALL',
-    status: 'ACTIVE',
+    status: custLink ? 'ALL' : 'ACTIVE',
   });
 
   // Selection & Pagination
@@ -147,6 +153,24 @@ export default function CustomersClient({ onNavigate }: CustomersClientProps = {
     setEditingCustomer(cust);
     setFormModalOpen(true);
   };
+
+  // Mở sẵn chi tiết khách hàng theo link
+  useEffect(() => {
+    const linkedId = custLink?.id;
+    if (!linkedId) return;
+    let cancelled = false;
+    customerService
+      .getCustomerById(linkedId)
+      .then((detail) => {
+        if (!cancelled) setDetailCustomer(detail);
+      })
+      .catch(() => {
+        if (!cancelled) message.error('Không thể tải chi tiết khách hàng.');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [custLink]);
 
   // Mở Drawer xem chi tiết (kèm lấy lịch sử đơn hàng từ backend)
   const handleOpenDetail = async (cust: Customer) => {

@@ -15,6 +15,7 @@ import { formatDateTimeVN } from '../utils/dateUtils';
 import { exportTransferToExcel, printTransferSlip } from '../utils/transferExportUtils';
 import type { WarehouseFacility } from '@/features/roles/types';
 import { useActiveWarehouse } from '@/lib/warehouse/useActiveWarehouse';
+import { ProductCodeLink } from '@/components/links/EntityLinks';
 
 interface Props {
   transferId: number;
@@ -289,7 +290,9 @@ export const TransferRowDetail: React.FC<Props> = ({ transferId, onRefresh, onOp
                 return (
                   <tr key={it.id ?? it.productId} className="hover:bg-slate-50/70">
                     <td className="py-2 px-3 text-center text-slate-400">{i + 1}</td>
-                    <td className="py-2 px-3 font-mono text-[#0070f4] font-semibold">{it.productCode}</td>
+                    <td className="py-2 px-3 font-mono font-semibold">
+                      <ProductCodeLink code={it.productCode} productId={it.productId} />
+                    </td>
                     <td className="py-2 px-3 font-medium">
                       {it.productName}
                       {it.notes && <div className="text-[11px] italic font-normal text-[#677484]">({it.notes})</div>}

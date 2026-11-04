@@ -1276,6 +1276,15 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
                 .HasMaxLength(30)
                 .HasColumnName("transaction_type");
             entity.Property(e => e.WarehouseId).HasColumnName("warehouse_id");
+            entity.Property(e => e.TransactionPrice)
+                .HasPrecision(18, 2)
+                .HasColumnName("transaction_price");
+            entity.Property(e => e.UnitCost)
+                .HasPrecision(18, 2)
+                .HasColumnName("unit_cost");
+            entity.Property(e => e.BalanceAfter)
+                .HasPrecision(18, 2)
+                .HasColumnName("balance_after");
 
             entity.HasOne(d => d.CreatedByNavigation).WithMany(p => p.TrxInventoryTransactions)
                 .HasForeignKey(d => d.CreatedBy)
