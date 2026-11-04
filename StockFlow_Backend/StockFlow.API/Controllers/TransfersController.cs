@@ -10,12 +10,12 @@ using Microsoft.AspNetCore.Mvc;
 using StockFlow.Application.Features.Transfers.Commands;
 using StockFlow.Application.Features.Transfers.DTOs;
 using StockFlow.Application.Features.Transfers.Queries;
+using StockFlow.API.Authorization;
 
 namespace StockFlow.API.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-[AllowAnonymous]
 public class TransfersController : ControllerBase
 {
     private readonly IMediator _mediator;
@@ -32,7 +32,8 @@ public class TransfersController : ControllerBase
         {
             return id;
         }
-        return 1; // Default to admin if unauthenticated in dev
+        // Mọi endpoint đều yêu cầu đăng nhập (FallbackPolicy) nên luôn có claim; không mặc định về admin.
+        throw new InvalidOperationException("Không xác định được người dùng đăng nhập.");
     }
 
     /// <summary>
@@ -41,6 +42,7 @@ public class TransfersController : ControllerBase
     [HttpGet]
     [ProducesResponseType(typeof(List<TransferListDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [RequirePermission("STOCK_READ")]
     public async Task<IActionResult> GetTransfers(
         [FromQuery] int? sourceWarehouseId,
         [FromQuery] int? destWarehouseId,
@@ -86,6 +88,7 @@ public class TransfersController : ControllerBase
     [HttpGet("products-for-transfer")]
     [ProducesResponseType(typeof(List<ProductWithStockDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [RequirePermission("STOCK_READ")]
     public async Task<IActionResult> GetProductsForTransfer(
         [FromQuery] int sourceWarehouseId,
         [FromQuery] int? destWarehouseId,
@@ -111,6 +114,7 @@ public class TransfersController : ControllerBase
     [HttpGet("{id}")]
     [ProducesResponseType(typeof(TransferDetailDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [RequirePermission("STOCK_READ")]
     public async Task<IActionResult> GetTransferById(int id)
     {
         var result = await _mediator.Send(new GetTransferByIdQuery(id));
@@ -127,6 +131,7 @@ public class TransfersController : ControllerBase
     [HttpPost]
     [ProducesResponseType(typeof(TransferDetailDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [RequirePermission("STOCK_CREATE")]
     public async Task<IActionResult> CreateTransfer([FromBody] CreateTransferRequest request)
     {
         var userId = GetCurrentUserId();
@@ -145,6 +150,7 @@ public class TransfersController : ControllerBase
     [HttpPut("{id}")]
     [ProducesResponseType(typeof(TransferDetailDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [RequirePermission("STOCK_UPDATE")]
     public async Task<IActionResult> UpdateTransfer(int id, [FromBody] UpdateTransferRequest request)
     {
         var userId = GetCurrentUserId();
@@ -158,11 +164,29 @@ public class TransfersController : ControllerBase
     }
 
     /// <summary>
+    /// Sửa ghi chú chuyển / ghi chú nhận (mọi trạng thái, không đổi tồn kho).
+    /// </summary>
+    [HttpPut("{id}/notes")]
+    [ProducesResponseType(typeof(TransferDetailDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [RequirePermission("STOCK_UPDATE")]
+    public async Task<IActionResult> UpdateTransferNotes(int id, [FromBody] UpdateTransferNotesRequest request)
+    {
+        var result = await _mediator.Send(new UpdateTransferNotesCommand(id, request));
+        if (!result.IsSuccess)
+        {
+            return BadRequest(new { message = result.Error });
+        }
+        return Ok(result.Value);
+    }
+
+    /// <summary>
     /// Chuyển phiếu từ DRAFT sang IN_TRANSIT (Xuất kho chuyển đi).
     /// </summary>
     [HttpPost("{id}/complete")]
     [ProducesResponseType(typeof(TransferDetailDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [RequirePermission("STOCK_UPDATE")]
     public async Task<IActionResult> CompleteTransfer(int id)
     {
         var userId = GetCurrentUserId();
@@ -181,6 +205,7 @@ public class TransfersController : ControllerBase
     [HttpPost("{id}/receive")]
     [ProducesResponseType(typeof(TransferDetailDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [RequirePermission("STOCK_UPDATE")]
     public async Task<IActionResult> ReceiveTransfer(int id, [FromBody] ReceiveTransferRequest request)
     {
         var userId = GetCurrentUserId();
@@ -199,6 +224,7 @@ public class TransfersController : ControllerBase
     [HttpPost("{id}/cancel")]
     [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [RequirePermission("STOCK_UPDATE")]
     public async Task<IActionResult> CancelTransfer(int id, [FromBody] CancelTransferRequest? request)
     {
         var userId = GetCurrentUserId();

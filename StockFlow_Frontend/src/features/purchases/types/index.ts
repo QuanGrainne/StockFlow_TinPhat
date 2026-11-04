@@ -65,6 +65,33 @@ export interface PurchaseDetail {
   paymentMethod?: string | null;
   notes?: string | null;
   items: PurchaseItem[];
+  /** Tổng tiền hàng (trước giảm giá phiếu) */
+  totalGoodsAmount?: number;
+  /** Giảm giá phiếu (VND) */
+  discountAmount?: number;
+  payments?: PurchasePayment[];
+  /** Lịch sử trả hàng: các phiếu trả hàng nhập lập từ phiếu này */
+  returns?: PurchaseReturnSummary[];
+  /** Trả hàng nhập (phần tính vào công nợ) đã trừ vào số cần trả NCC của phiếu này */
+  returnOffsetAmount?: number;
+}
+
+export interface PurchaseReturnSummary {
+  purchaseReturnId: number;
+  returnCode: string;
+  returnDate?: string | null;
+  createdByName: string;
+  totalAmount: number;
+  status: string;
+}
+
+export interface PurchasePayment {
+  code: string;
+  paymentDate?: string | null;
+  createdByName: string;
+  paymentMethod: string;
+  status: string;
+  amount: number;
 }
 
 export interface CreatePurchasePayload {
@@ -77,6 +104,7 @@ export interface CreatePurchasePayload {
   paidAmount: number;
   paymentMethod?: string;
   notes?: string | null;
+  discountAmount?: number;
   items: {
     productId: number;
     quantity: number;
@@ -92,6 +120,7 @@ export interface UpdatePurchasePayload {
   externalPoNumber?: string | null;
   receivedDate?: string | null;
   notes?: string | null;
+  discountAmount?: number;
   items: {
     productId: number;
     quantity: number;

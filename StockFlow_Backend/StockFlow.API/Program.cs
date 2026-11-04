@@ -63,7 +63,20 @@ builder.Services.AddAuthentication(Microsoft.AspNetCore.Authentication.JwtBearer
         };
     });
 
-builder.Services.AddAuthorization();
+// Mặc định MỌI endpoint đều yêu cầu đăng nhập (trừ endpoint gắn [AllowAnonymous] như login/health).
+// Quyền theo chức năng gắn bằng [RequirePermission("MODULE_ACTION")] trên từng action.
+builder.Services.AddAuthorization(options =>
+{
+    options.FallbackPolicy = new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder()
+        .RequireAuthenticatedUser()
+        .Build();
+});
+builder.Services.AddScoped<Microsoft.AspNetCore.Authorization.IAuthorizationHandler,
+    StockFlow.API.Authorization.PermissionAuthorizationHandler>();
+builder.Services.AddScoped<Microsoft.AspNetCore.Authorization.IAuthorizationHandler,
+    StockFlow.API.Authorization.AdminAuthorizationHandler>();
+builder.Services.AddSingleton<Microsoft.AspNetCore.Authorization.IAuthorizationMiddlewareResultHandler,
+    StockFlow.API.Authorization.JsonAuthorizationResultHandler>();
 
 // ─── Pipeline ─────────────────────────────────────────────────────────────────
 var app = builder.Build();
@@ -76,7 +89,10 @@ if (app.Environment.IsDevelopment())
 
 app.UseMiddleware<StockFlow.API.Middleware.ExceptionHandlingMiddleware>();
 app.UseCors("AllowFrontend");
-app.UseHttpsRedirection();
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();

@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using StockFlow.Infrastructure.Persistence;
+using Microsoft.AspNetCore.Authorization;
 
 namespace StockFlow.API.Controllers;
 
@@ -11,6 +12,7 @@ public class HealthController(StockFlowDbContext dbContext) : ControllerBase
     /// Health check endpoint. Tests API status and PostgreSQL database connection.
     /// </summary>
     [HttpGet]
+    [AllowAnonymous]
     public async Task<IActionResult> Get()
     {
         bool dbConnected = false;

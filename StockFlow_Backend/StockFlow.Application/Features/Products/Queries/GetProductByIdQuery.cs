@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using StockFlow.Application.Common;
 using StockFlow.Application.Common.Interfaces;
 using StockFlow.Application.Features.Products.DTOs;
+using StockFlow.Application.Features.Products.Helpers;
 
 namespace StockFlow.Application.Features.Products.Queries;
 
@@ -65,7 +66,10 @@ public class GetProductByIdQueryHandler : IRequestHandler<GetProductByIdQuery, R
         List<ProductConversionUnitDto>? units = null;
         List<ProductAttributeDto>? attributes = null;
         List<ProductVariantItemDto>? variants = null;
-        string? supplier = null;
+        // Nhà cung cấp: tính từ các phiếu nhập đã hoàn thành (chỉ đọc)
+        var supplierMap = await ProductSupplierLookup.GetSupplierNamesAsync(
+            _context, new[] { product.ProductId }, cancellationToken);
+        var supplier = supplierMap.GetValueOrDefault(product.ProductId);
 
         if (!string.IsNullOrWhiteSpace(product.VariantsJson))
         {
@@ -84,10 +88,6 @@ public class GetProductByIdQueryHandler : IRequestHandler<GetProductByIdQuery, R
                 if (root.TryGetProperty("variants", out var vEl))
                 {
                     variants = System.Text.Json.JsonSerializer.Deserialize<List<ProductVariantItemDto>>(vEl.GetRawText());
-                }
-                if (root.TryGetProperty("supplier", out var supEl))
-                {
-                    supplier = supEl.GetString();
                 }
             }
             catch

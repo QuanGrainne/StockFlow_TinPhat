@@ -69,11 +69,17 @@ export const RoleCatalogScreen: React.FC<RoleCatalogScreenProps> = ({ onNavigate
       return;
     }
 
-    const createdRole = await adminService.createRole({
-      name: newRoleName.trim(),
-      code: newRoleCode.trim(),
-      description: newRoleDesc.trim(),
-    });
+    let createdRole: RoleDefinition;
+    try {
+      createdRole = await adminService.createRole({
+        name: newRoleName.trim(),
+        code: newRoleCode.trim(),
+        description: newRoleDesc.trim(),
+      });
+    } catch (err) {
+      alert('Không thể tạo vai trò: ' + (err instanceof Error ? err.message : String(err)));
+      return;
+    }
 
     setRoles((prev) => [...prev, createdRole]);
     setCreateModalOpen(false);
@@ -98,10 +104,16 @@ export const RoleCatalogScreen: React.FC<RoleCatalogScreenProps> = ({ onNavigate
       return;
     }
 
-    const updated = await adminService.updateRole(editingRole.id, {
-      name: editRoleName.trim(),
-      description: editRoleDesc.trim(),
-    });
+    let updated: RoleDefinition | null;
+    try {
+      updated = await adminService.updateRole(editingRole.id, {
+        name: editRoleName.trim(),
+        description: editRoleDesc.trim(),
+      });
+    } catch (err) {
+      alert('Không thể cập nhật vai trò: ' + (err instanceof Error ? err.message : String(err)));
+      return;
+    }
 
     if (updated) {
       setRoles((prev) =>

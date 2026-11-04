@@ -39,6 +39,8 @@ public static class DependencyInjection
         services.AddScoped<StockFlow.Application.Common.Interfaces.IPasswordHasher, Services.BcryptPasswordHasher>();
         services.AddScoped<StockFlow.Application.Common.Interfaces.IJwtTokenGenerator, Services.JwtTokenGenerator>();
         services.AddScoped<StockFlow.Application.Common.Interfaces.ICurrentUserService, Services.CurrentUserService>();
+        services.AddScoped<StockFlow.Application.Common.Interfaces.IUserPermissionService, Services.UserPermissionService>();
+        services.AddScoped<StockFlow.Application.Common.Interfaces.ITransactionCodeGenerator, Services.TransactionCodeGenerator>();
 
         // Unit of Work
         services.AddScoped<IUnitOfWork, UnitOfWork>();

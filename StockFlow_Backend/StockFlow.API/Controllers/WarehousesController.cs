@@ -4,12 +4,12 @@ using Microsoft.AspNetCore.Mvc;
 using StockFlow.Application.Features.WarehousePermissions.Commands;
 using StockFlow.Application.Features.WarehousePermissions.DTOs;
 using StockFlow.Application.Features.WarehousePermissions.Queries;
+using StockFlow.API.Authorization;
 
 namespace StockFlow.API.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-[AllowAnonymous]
 public class WarehousesController : ControllerBase
 {
     private readonly IMediator _mediator;
@@ -68,6 +68,7 @@ public class WarehousesController : ControllerBase
     [HttpPost]
     [ProducesResponseType(typeof(WarehouseFacilityDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [RequireAdmin]
     public async Task<IActionResult> CreateWarehouse([FromBody] CreateWarehouseRequest request)
     {
         var result = await _mediator.Send(new CreateWarehouseCommand(request));
@@ -84,6 +85,7 @@ public class WarehousesController : ControllerBase
     [HttpPut("{id}")]
     [ProducesResponseType(typeof(WarehouseFacilityDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [RequireAdmin]
     public async Task<IActionResult> UpdateWarehouse(int id, [FromBody] UpdateWarehouseRequest request)
     {
         var result = await _mediator.Send(new UpdateWarehouseCommand(id, request));
@@ -100,6 +102,7 @@ public class WarehousesController : ControllerBase
     [HttpPatch("{id}/toggle-status")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [RequireAdmin]
     public async Task<IActionResult> ToggleWarehouseStatus(int id)
     {
         var result = await _mediator.Send(new ToggleWarehouseStatusCommand(id));
@@ -116,6 +119,7 @@ public class WarehousesController : ControllerBase
     [HttpDelete("{id}")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [RequireAdmin]
     public async Task<IActionResult> DeleteWarehouse(int id)
     {
         var result = await _mediator.Send(new DeleteWarehouseCommand(id));

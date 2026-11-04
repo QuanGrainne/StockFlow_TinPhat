@@ -31,6 +31,12 @@ type PurchaseFilterSidebarProps = {
   warehouses?: WarehouseItem[];
   suppliers?: Supplier[];
   activeWarehouse?: WarehouseItem;
+  /** Đổi nhãn trạng thái (VD Trả hàng nhập: completed = "Đã trả hàng") */
+  statusLabels?: Partial<Record<PurchaseStatus, string>>;
+  /** Ẩn bộ lọc Nhà cung cấp (màn Trả hàng nhập không có) */
+  hideSupplierFilter?: boolean;
+  /** Ẩn bộ lọc Chi nhánh (VD Phiếu kiểm kho: luôn theo Kho làm việc) */
+  hideWarehouseFilter?: boolean;
 };
 
 // ─── Status options ───────────────────────────────────────────────────────────
@@ -85,6 +91,9 @@ export default function PurchaseFilterSidebar({
   warehouses = [],
   suppliers = [],
   activeWarehouse,
+  statusLabels,
+  hideSupplierFilter = false,
+  hideWarehouseFilter = false,
 }: PurchaseFilterSidebarProps) {
   const [mounted, setMounted] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -448,7 +457,7 @@ export default function PurchaseFilterSidebar({
       {!isCollapsed && (
         <div className="flex-1 min-h-0 p-3.5 space-y-4 overflow-y-auto">
           {/* ── 1. Chi nhánh (Multi-select dropdown theo đúng ảnh thiết kế) ── */}
-          <div ref={warehouseRef} className="relative">
+          <div ref={warehouseRef} className={hideWarehouseFilter ? 'hidden' : 'relative'}>
             <div className="text-[11px] font-bold text-[#677484] mb-1.5 uppercase tracking-wide">
               Chi nhánh
             </div>
@@ -585,7 +594,7 @@ export default function PurchaseFilterSidebar({
           </div>
 
           {/* Divider */}
-          <div className="border-t border-slate-100" />
+          <div className={hideWarehouseFilter ? 'hidden' : 'border-t border-slate-100'} />
 
           {/* ── 2. Trạng thái (Checkbox theo đúng yêu cầu) ── */}
           <div>
@@ -606,7 +615,7 @@ export default function PurchaseFilterSidebar({
                       onChange={() => handleToggleStatus(opt.value)}
                       className="w-4 h-4 rounded border-slate-300 text-[#0070f4] focus:ring-[#0070f4] cursor-pointer"
                     />
-                    <span>{opt.label}</span>
+                    <span>{statusLabels?.[opt.value] ?? opt.label}</span>
                   </label>
                 );
               })}
@@ -682,10 +691,10 @@ export default function PurchaseFilterSidebar({
           </div>
 
           {/* Divider */}
-          <div className="border-t border-slate-100" />
+          <div className={hideSupplierFilter ? 'hidden' : 'border-t border-slate-100'} />
 
           {/* ── 4. Nhà cung cấp ── */}
-          <div ref={supplierRef}>
+          <div ref={supplierRef} className={hideSupplierFilter ? 'hidden' : undefined}>
             <div className="text-[11px] font-bold text-[#677484] mb-1.5 uppercase tracking-wide flex items-center justify-between">
               <span>Nhà cung cấp</span>
               {state.partnerId && (

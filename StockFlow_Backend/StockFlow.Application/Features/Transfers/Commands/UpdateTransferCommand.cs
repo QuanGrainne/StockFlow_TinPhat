@@ -21,10 +21,12 @@ public record UpdateTransferCommand(
 public class UpdateTransferCommandHandler : IRequestHandler<UpdateTransferCommand, Result<TransferDetailDto>>
 {
     private readonly IStockFlowDbContext _context;
+    private readonly ICurrentUserService _currentUserService;
 
-    public UpdateTransferCommandHandler(IStockFlowDbContext context)
+    public UpdateTransferCommandHandler(IStockFlowDbContext context, ICurrentUserService currentUserService)
     {
         _context = context;
+        _currentUserService = currentUserService;
     }
 
     public async Task<Result<TransferDetailDto>> Handle(UpdateTransferCommand command, CancellationToken cancellationToken)
@@ -37,6 +39,12 @@ public class UpdateTransferCommandHandler : IRequestHandler<UpdateTransferComman
         if (transfer == null)
         {
             return Result.Failure<TransferDetailDto>("Không tìm thấy phiếu chuyển hàng.");
+        }
+
+        // Cô lập dữ liệu kho (UC-33): sửa phiếu chuyển hàng của kho xuất này
+        if (!await _currentUserService.HasWarehouseAccessAsync(transfer.SourceWarehouseId, cancellationToken))
+        {
+            return Result.Failure<TransferDetailDto>("Bạn không có quyền sửa phiếu chuyển hàng của kho xuất này.");
         }
 
         if (!string.Equals(transfer.Status, "DRAFT", StringComparison.OrdinalIgnoreCase))
@@ -73,7 +81,8 @@ public class UpdateTransferCommandHandler : IRequestHandler<UpdateTransferComman
                 ProductId = it.ProductId,
                 Quantity = it.Quantity,
                 IssuedQuantity = 0,
-                ReceivedQuantity = null
+                ReceivedQuantity = null,
+                Notes = string.IsNullOrWhiteSpace(it.Notes) ? null : it.Notes.Trim(),
             };
             await _context.DtlStockTransferItems.AddAsync(item, cancellationToken);
         }

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace StockFlow.Domain.Entities;
@@ -28,6 +28,14 @@ public partial class TrxOrder
     public DateTime? OrderDate { get; set; }
 
     public string? Notes { get; set; }
+
+    public decimal SubTotal { get; set; }
+
+    public string DiscountType { get; set; } = "AMOUNT";
+
+    public decimal DiscountValue { get; set; }
+
+    public decimal DiscountAmount { get; set; }
 
     public virtual TrxOrder? ConsolidatedIntoOrder { get; set; }
 

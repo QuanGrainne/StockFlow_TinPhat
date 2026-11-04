@@ -8,6 +8,8 @@ using Microsoft.EntityFrameworkCore;
 using StockFlow.Application.Common;
 using StockFlow.Application.Common.Interfaces;
 using StockFlow.Application.Features.Purchases.DTOs;
+using StockFlow.Application.Features.Purchases.Helpers;
+using StockFlow.Application.Features.PurchaseReturns.Helpers;
 
 namespace StockFlow.Application.Features.Purchases.Queries;
 
@@ -113,22 +115,29 @@ public class GetPurchasesQueryHandler : IRequestHandler<GetPurchasesQuery, Resul
             var receiptIds = receipts.Select(r => r.GrId).ToList();
             var payments = await _context.TrxFinancialTransactions
                 .AsNoTracking()
-                .Where(t => t.ReferenceType == "GOODS_RECEIPT" && t.ReferenceId.HasValue && receiptIds.Contains(t.ReferenceId.Value))
+                .Where(t => t.TxType == "SUPPLIER_PAYMENT" && t.Status != "CANCELLED" // bỏ khoản trả đã hủy (khi hủy phiếu)
+                            && t.ReferenceType == "GOODS_RECEIPT" && t.ReferenceId.HasValue && receiptIds.Contains(t.ReferenceId.Value))
                 .GroupBy(t => t.ReferenceId!.Value)
                 .Select(g => new { GrId = g.Key, TotalPaid = g.Sum(x => x.Amount ?? 0) })
                 .ToDictionaryAsync(x => x.GrId, x => x.TotalPaid, cancellationToken);
 
+            // Phiếu trả hàng nhập (phần tính vào công nợ) được trừ vào số còn nợ của phiếu nhập gốc
+            var openByReceipt = receipts
+                .Where(r => r.Status == "COMPLETED")
+                .ToDictionary(
+                    r => r.GrId,
+                    r => Math.Max(0, PurchaseItemMapper.NetTotal(r.DtlGoodsReceiptItems) - payments.GetValueOrDefault(r.GrId)));
+            var offsets = await ReturnOffsetCalculator.ComputeAsync(_context, openByReceipt, cancellationToken);
+
             var result = receipts.Select(r =>
             {
                 decimal totalQty = r.DtlGoodsReceiptItems.Sum(i => i.AcceptedQty ?? i.ReceivedQty ?? i.OrderedQty ?? 0);
-                decimal totalAmount = r.DtlGoodsReceiptItems.Sum(i =>
-                    (i.AcceptedQty ?? i.ReceivedQty ?? i.OrderedQty ?? 0) * (i.UnitLandedCost ?? 0)
-                );
+                decimal totalAmount = PurchaseItemMapper.NetTotal(r.DtlGoodsReceiptItems); // đã trừ giảm giá dòng + phiếu
 
                 payments.TryGetValue(r.GrId, out decimal paidAmount);
 
-                // Đối với phiếu đã hoàn thành, nếu chưa có bản ghi thanh toán riêng thì mặc định là nợ
-                decimal debtAmount = Math.Max(0, totalAmount - paidAmount);
+                // Cần trả NCC = Tổng cộng − Đã trả − Trả hàng nhập trừ vào công nợ
+                decimal debtAmount = Math.Max(0, totalAmount - paidAmount - offsets.OffsetByReceipt.GetValueOrDefault(r.GrId));
 
                 string receivedByName = r.ReceivedByNavigation?.FullName ?? r.ReceivedByNavigation?.Username ?? $"NV #{r.ReceivedBy}";
 

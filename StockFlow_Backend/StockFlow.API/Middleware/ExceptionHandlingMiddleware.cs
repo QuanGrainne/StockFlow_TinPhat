@@ -21,8 +21,26 @@ public class ExceptionHandlingMiddleware(RequestDelegate next, ILogger<Exception
             logger.LogWarning(ex, "Validation error on {Path}", context.Request.Path);
             context.Response.StatusCode = (int)HttpStatusCode.BadRequest;
             context.Response.ContentType = "application/json";
-            var errors = ex.Errors.Select(e => new { field = e.PropertyName, message = e.ErrorMessage });
-            await context.Response.WriteAsync(JsonSerializer.Serialize(new { errors }));
+
+            var errorDict = ex.Errors
+                .GroupBy(e => e.PropertyName.Replace("Request.", ""))
+                .ToDictionary(
+                    g => g.Key,
+                    g => g.Select(e => e.ErrorMessage).ToArray()
+                );
+
+            var responseObj = new
+            {
+                status = 400,
+                code = "VALIDATION_FAILED",
+                message = "Dữ liệu không hợp lệ.",
+                errors = errorDict
+            };
+
+            await context.Response.WriteAsync(JsonSerializer.Serialize(responseObj, new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+            }));
         }
         catch (Exception ex)
         {
@@ -31,7 +49,9 @@ public class ExceptionHandlingMiddleware(RequestDelegate next, ILogger<Exception
             context.Response.ContentType = "application/json";
             await context.Response.WriteAsync(JsonSerializer.Serialize(new
             {
-                error = "An unexpected error occurred. Please contact support."
+                status = 500,
+                code = "INTERNAL_SERVER_ERROR",
+                message = "Đã xảy ra lỗi máy chủ không mong muốn. Vui lòng liên hệ quản trị viên."
             }));
         }
     }

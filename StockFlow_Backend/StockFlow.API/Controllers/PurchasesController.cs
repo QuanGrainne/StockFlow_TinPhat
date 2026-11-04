@@ -9,12 +9,12 @@ using Microsoft.AspNetCore.Mvc;
 using StockFlow.Application.Features.Purchases.Commands;
 using StockFlow.Application.Features.Purchases.DTOs;
 using StockFlow.Application.Features.Purchases.Queries;
+using StockFlow.API.Authorization;
 
 namespace StockFlow.API.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-[AllowAnonymous]
 public class PurchasesController : ControllerBase
 {
     private readonly IMediator _mediator;
@@ -30,6 +30,7 @@ public class PurchasesController : ControllerBase
     [HttpGet]
     [ProducesResponseType(typeof(List<PurchaseListDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [RequirePermission("PURCHASE_READ")]
     public async Task<IActionResult> GetPurchases(
         [FromQuery] int? warehouseId,
         [FromQuery] string? warehouseIds,
@@ -73,6 +74,7 @@ public class PurchasesController : ControllerBase
     [HttpGet("{id}")]
     [ProducesResponseType(typeof(PurchaseDetailDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [RequirePermission("PURCHASE_READ")]
     public async Task<IActionResult> GetPurchaseById(int id)
     {
         var result = await _mediator.Send(new GetPurchaseByIdQuery(id));
@@ -90,6 +92,7 @@ public class PurchasesController : ControllerBase
     [HttpPost]
     [ProducesResponseType(typeof(PurchaseDetailDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [RequirePermission("PURCHASE_CREATE")]
     public async Task<IActionResult> CreatePurchase([FromBody] CreatePurchaseRequest request)
     {
         var result = await _mediator.Send(new CreatePurchaseCommand(request));
@@ -106,6 +109,7 @@ public class PurchasesController : ControllerBase
     [HttpPut("{id}")]
     [ProducesResponseType(typeof(PurchaseDetailDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [RequirePermission("PURCHASE_UPDATE")]
     public async Task<IActionResult> UpdatePurchase(int id, [FromBody] UpdatePurchaseRequest request)
     {
         var result = await _mediator.Send(new UpdatePurchaseCommand(id, request));
@@ -123,6 +127,7 @@ public class PurchasesController : ControllerBase
     [HttpPatch("{id}/complete")]
     [ProducesResponseType(typeof(PurchaseDetailDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [RequirePermission("PURCHASE_CREATE")]
     public async Task<IActionResult> CompletePurchase(int id, [FromBody] CompletePurchaseRequest? request)
     {
         var result = await _mediator.Send(new CompletePurchaseCommand(id, request ?? new CompletePurchaseRequest()));
@@ -139,6 +144,7 @@ public class PurchasesController : ControllerBase
     [HttpPatch("{id}/cancel")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [RequirePermission("PURCHASE_UPDATE")]
     public async Task<IActionResult> CancelPurchase(int id, [FromBody] CancelPurchaseRequest? request)
     {
         var result = await _mediator.Send(new CancelPurchaseCommand(id, request));

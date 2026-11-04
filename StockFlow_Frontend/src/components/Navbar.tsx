@@ -27,11 +27,11 @@ const NAV_ITEMS: NavItem[] = [
       { label: 'Chuyển hàng', href: '/transfers' },
     ],
   },
-  { label: 'Nhà cung cấp', href: '/suppliers' },
   {
     label: 'Mua hàng',
     children: [
       { label: 'Nhập hàng', href: '/purchases' },
+      { label: 'Trả hàng nhập', href: '/purchase-returns' },
       { label: 'Nhà cung cấp', href: '/suppliers' },
     ],
   },

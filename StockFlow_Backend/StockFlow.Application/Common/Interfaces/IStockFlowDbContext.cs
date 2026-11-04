@@ -19,12 +19,22 @@ public interface IStockFlowDbContext
     DbSet<TrxInventoryTransaction> TrxInventoryTransactions { get; }
     DbSet<TrxGoodsReceipt> TrxGoodsReceipts { get; }
     DbSet<DtlGoodsReceiptItem> DtlGoodsReceiptItems { get; }
+    DbSet<TrxPurchaseReturn> TrxPurchaseReturns { get; }
+    DbSet<TrxStocktake> TrxStocktakes { get; }
+    DbSet<DtlStocktakeItem> DtlStocktakeItems { get; }
+    DbSet<DtlPurchaseReturnItem> DtlPurchaseReturnItems { get; }
     DbSet<TrxFinancialTransaction> TrxFinancialTransactions { get; }
     DbSet<MstPriceBook> MstPriceBooks { get; }
     DbSet<DtlPriceBookItem> DtlPriceBookItems { get; }
+
+    DbSet<MstOrderSetting> MstOrderSettings { get; }
+    DbSet<TrxOrder> TrxOrders { get; }
     DbSet<DtlOrderItem> DtlOrderItems { get; }
     DbSet<TrxStockTransfer> TrxStockTransfers { get; }
     DbSet<DtlStockTransferItem> DtlStockTransferItems { get; }
+    DbSet<TrxStockIssue> TrxStockIssues { get; }
+    DbSet<DtlStockIssueItem> DtlStockIssueItems { get; }
 
+    Task<long> GetNextSequenceValueAsync(string sequenceName, CancellationToken cancellationToken = default);
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

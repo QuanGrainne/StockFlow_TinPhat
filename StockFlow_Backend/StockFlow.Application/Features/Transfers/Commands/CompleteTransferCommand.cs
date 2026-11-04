@@ -18,10 +18,12 @@ public record CompleteTransferCommand(int Id, int UserId) : IRequest<Result<Tran
 public class CompleteTransferCommandHandler : IRequestHandler<CompleteTransferCommand, Result<TransferDetailDto>>
 {
     private readonly IStockFlowDbContext _context;
+    private readonly ICurrentUserService _currentUserService;
 
-    public CompleteTransferCommandHandler(IStockFlowDbContext context)
+    public CompleteTransferCommandHandler(IStockFlowDbContext context, ICurrentUserService currentUserService)
     {
         _context = context;
+        _currentUserService = currentUserService;
     }
 
     public async Task<Result<TransferDetailDto>> Handle(CompleteTransferCommand command, CancellationToken cancellationToken)
@@ -35,6 +37,12 @@ public class CompleteTransferCommandHandler : IRequestHandler<CompleteTransferCo
             return Result.Failure<TransferDetailDto>("Không tìm thấy phiếu chuyển hàng.");
         }
 
+        // Cô lập dữ liệu kho (UC-33): xuất hàng chuyển kho từ kho này
+        if (!await _currentUserService.HasWarehouseAccessAsync(transfer.SourceWarehouseId, cancellationToken))
+        {
+            return Result.Failure<TransferDetailDto>("Bạn không có quyền xuất hàng chuyển kho từ kho này.");
+        }
+
         if (!string.Equals(transfer.Status, "DRAFT", StringComparison.OrdinalIgnoreCase))
         {
             return Result.Failure<TransferDetailDto>($"Chỉ phiếu ở trạng thái 'Phiếu tạm' mới có thể xuất chuyển đi. Trạng thái hiện tại: {transfer.Status}.");
@@ -46,53 +54,26 @@ public class CompleteTransferCommandHandler : IRequestHandler<CompleteTransferCo
         }
 
         var productIds = transfer.DtlStockTransferItems.Select(i => i.ProductId).Distinct().ToList();
-        var balances = await _context.TrxInventoryBalances
-            .Where(b => b.WarehouseId == transfer.SourceWarehouseId && productIds.Contains(b.ProductId))
-            .ToListAsync(cancellationToken);
-
         var products = await _context.MstProducts
             .Where(p => productIds.Contains(p.ProductId))
             .ToDictionaryAsync(p => p.ProductId, cancellationToken);
 
-        // Kiểm tra tồn kho
-        foreach (var item in transfer.DtlStockTransferItems)
+        // Cho phép xuất chuyển khi tồn kho không đủ (tồn kho xuất có thể âm), giống chính sách nhập / trả hàng.
+        // Màn hình tạo phiếu đã cảnh báo và yêu cầu xác nhận khi SL chuyển vượt tồn.
+        var missing = productIds.Where(id => !products.ContainsKey(id)).ToList();
+        if (missing.Count > 0)
         {
-            var qty = item.Quantity ?? 0;
-            var balance = balances.FirstOrDefault(b => b.ProductId == item.ProductId);
-            var currentStock = balance?.Quantity ?? 0;
-            var prodName = products.TryGetValue(item.ProductId, out var prod) ? prod.ProductName : $"SP #{item.ProductId}";
-
-            if (currentStock < qty)
-            {
-                return Result.Failure<TransferDetailDto>(
-                    $"Mặt hàng '{prodName}' không đủ tồn kho để chuyển (Tồn hiện tại: {currentStock}, Cần chuyển: {qty}).");
-            }
+            return Result.Failure<TransferDetailDto>($"Không tìm thấy hàng hóa #{string.Join(", #", missing)}.");
         }
 
-        // Trừ tồn kho và ghi nhật ký
+        // Trừ tồn kho xuất theo giá vốn hiện tại của kho, lưu giá vốn để nhập vào kho nhận / hoàn khi hủy
         foreach (var item in transfer.DtlStockTransferItems)
         {
             var qty = item.Quantity ?? 0;
             item.IssuedQuantity = qty;
-
-            var balance = balances.FirstOrDefault(b => b.ProductId == item.ProductId);
-            if (balance != null)
-            {
-                balance.Quantity = (balance.Quantity ?? 0) - qty;
-                balance.LastUpdated = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
-            }
-
-            var trx = new TrxInventoryTransaction
-            {
-                WarehouseId = transfer.SourceWarehouseId,
-                ProductId = item.ProductId,
-                TransactionType = "TRANSFER_OUT",
-                Quantity = -qty,
-                ReferenceType = "TRANSFER",
-                TransactionDate = TransferHelper.GetVietnamTime(),
-                CreatedBy = command.UserId,
-            };
-            await _context.TrxInventoryTransactions.AddAsync(trx, cancellationToken);
+            item.UnitCost = await TransferStockOps.OutboundAsync(
+                _context, transfer.SourceWarehouseId, products[item.ProductId], qty,
+                "TRANSFER_OUT", transfer.StockTransferId, command.UserId, cancellationToken);
         }
 
         transfer.Status = "IN_TRANSIT";

@@ -27,6 +27,12 @@ public partial class MstBusinessPartner
 
     public bool? IsActive { get; set; }
 
+    /// <summary>Thời điểm tạo đối tác (giờ Việt Nam). Null với dữ liệu tạo trước khi có cột này.</summary>
+    public DateTime? CreatedAt { get; set; }
+
+    /// <summary>UserId tài khoản đã tạo đối tác (sec_users.user_id).</summary>
+    public int? CreatedBy { get; set; }
+
     public virtual ICollection<TrxCreditLimitRequest> TrxCreditLimitRequests { get; set; } = new List<TrxCreditLimitRequest>();
 
     public virtual ICollection<TrxFinancialTransaction> TrxFinancialTransactions { get; set; } = new List<TrxFinancialTransaction>();

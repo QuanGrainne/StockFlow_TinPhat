@@ -25,6 +25,7 @@ public record SupplierDto(
     decimal CurrentPayable,
     decimal CurrentDebt,
     string Status,
+    decimal TotalPurchased = 0m,
     decimal? BranchPayable = null,
     int? BranchReceiptsCount = null
 );
@@ -39,7 +40,22 @@ public record SupplierRecentReceiptDto(
     int? WarehouseId,
     string? WarehouseName,
     decimal TotalAmount,
-    string? Status
+    string? Status,
+    string? CreatedByName = null,
+    string Type = "GOODS_RECEIPT"   // GOODS_RECEIPT (phiếu nhập) | PURCHASE_RETURN (phiếu trả hàng nhập)
+);
+
+/// <summary>
+/// Một dòng trong sổ "Nợ cần trả nhà cung cấp": phiếu nhập làm tăng nợ, thanh toán làm giảm nợ.
+/// </summary>
+public record SupplierDebtLedgerEntryDto(
+    string Code,
+    DateTime? Date,
+    string Type,          // GOODS_RECEIPT | PAYMENT | OPENING
+    string TypeLabel,     // Nhập hàng | Thanh toán | Nợ đầu kỳ
+    int? ReferenceId,
+    decimal Amount,       // + tăng nợ, - giảm nợ
+    decimal BalanceAfter  // Nợ cần trả NCC sau giao dịch
 );
 
 /// <summary>
@@ -61,7 +77,39 @@ public record SupplierDetailDto(
     int TotalReceiptsCount,
     decimal TotalPurchasedAmount,
     List<SupplierRecentReceiptDto> RecentReceipts,
-    List<WarehouseDebtBreakdownDto> WarehouseBreakdown
+    List<WarehouseDebtBreakdownDto> WarehouseBreakdown,
+    List<SupplierDebtLedgerEntryDto>? DebtLedger = null,
+    DateTime? CreatedAt = null,
+    string? CreatedByName = null,
+    List<SupplierOpenReceiptDto>? OpenReceipts = null
+);
+
+/// <summary>Phiếu nhập (COMPLETED) còn nợ — dùng để phân bổ khi tạo phiếu chi thanh toán NCC.</summary>
+public record SupplierOpenReceiptDto(
+    int ReceiptId,
+    string ReceiptNumber,
+    DateTime? ReceiptDate,
+    decimal TotalAmount,
+    decimal PaidAmount,
+    decimal RemainingAmount
+);
+
+public record SupplierPaymentAllocationRequest(int ReceiptId, decimal Amount);
+
+/// <summary>Tạo phiếu chi thanh toán nợ cho nhà cung cấp.</summary>
+public record CreateSupplierPaymentRequest(
+    decimal Amount,
+    DateTime? PaymentDate,
+    string? PaymentMethod,
+    string? Notes,
+    List<SupplierPaymentAllocationRequest>? Allocations
+);
+
+public record SupplierPaymentResultDto(
+    string VoucherCode,
+    decimal Amount,
+    decimal AllocatedAmount,
+    decimal RemainingPayable
 );
 
 /// <summary>

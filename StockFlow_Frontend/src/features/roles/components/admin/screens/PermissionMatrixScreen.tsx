@@ -20,6 +20,7 @@ import {
   Sliders,
   BarChart3,
   Repeat,
+  ClipboardCheck,
 } from 'lucide-react';
 import { UserRole, RoleDefinition } from '../../../types';
 import { adminService, NAVBAR_FEATURES } from '../../../services/adminService';
@@ -44,9 +45,12 @@ const FEATURE_ICONS: Record<string, React.FC<{ size?: number; className?: string
   'feat-roles': ShieldCheck,
   'feat-warehouse-perms': Building2,
   'feat-goods': Package,
+  'feat-customers': Users,
   'feat-transfers': Repeat,
+  'feat-stocktake': ClipboardCheck,
   'feat-sales': ShoppingBag,
   'feat-purchase': ArrowDownToLine,
+  'feat-suppliers': Building2,
   'feat-stock': Warehouse,
   'feat-prod': Layers,
   'feat-bom': Sliders,
@@ -175,8 +179,12 @@ export const PermissionMatrixScreen: React.FC<PermissionMatrixScreenProps> = ({
     }
     const freshMatrix = await adminService.getFeatureMatrix();
     setMatrix(freshMatrix);
-    await adminService.saveFeatureMatrix(freshMatrix);
-    showToast('Đã khôi phục phân quyền về mặc định thành công!');
+    try {
+      await adminService.saveFeatureMatrix(freshMatrix);
+      showToast('Đã khôi phục phân quyền về mặc định thành công!');
+    } catch (err) {
+      alert('Có lỗi xảy ra khi khôi phục phân quyền: ' + (err instanceof Error ? err.message : String(err)));
+    }
   };
 
   // Lọc tính năng theo từ khóa tìm kiếm (Flat list, không có hàng tiêu đề nhóm)

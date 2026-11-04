@@ -39,6 +39,7 @@ import {
   FileUp,
   Inbox,
   Star,
+  Undo2,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -46,7 +47,8 @@ import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import * as XLSX from 'xlsx';
 import PurchaseFilterSidebar from '@/components/PurchaseFilterSidebar';
 import { purchaseService } from '@/features/purchases/services/purchaseService';
-import { PurchaseListRecord, PurchaseDetail } from '@/features/purchases/types';
+import { printPurchaseReceipt } from '@/features/purchases/utils/printPurchaseReceipt';
+import { PurchaseListRecord, PurchaseDetail, PurchaseItem, PurchasePayment, PurchaseReturnSummary } from '@/features/purchases/types';
 import { useActiveWarehouse } from '@/lib/warehouse/useActiveWarehouse';
 import { supplierService } from '@/features/suppliers/services/supplierService';
 import { Supplier } from '@/features/suppliers/types';
@@ -79,7 +81,17 @@ type PriceSettingItem = {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-const currencyFormatter = new Intl.NumberFormat('vi-VN');
+const currencyFormatter = new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 0 });
+
+/** Giảm giá trên 1 đơn vị của dòng hàng (VND) */
+function lineDiscountPerUnit(item: Pick<PurchaseItem, 'unitPrice' | 'discountPercent'>): number {
+  return Math.round(item.unitPrice * (Math.min(Math.max(item.discountPercent || 0, 0), 100) / 100));
+}
+
+/** Giá nhập = Đơn giá − Giảm giá dòng (cũng là giá trả mặc định khi trả hàng nhập) */
+function lineImportPrice(item: Pick<PurchaseItem, 'unitPrice' | 'discountPercent'>): number {
+  return item.unitPrice - lineDiscountPerUnit(item);
+}
 
 function formatDateTimeVN(dateVal?: string | Date | null): string {
   if (!dateVal) return '—';
@@ -142,6 +154,112 @@ function statusTag(status: string) {
   }
 }
 
+const PAYMENT_METHOD_LABEL: Record<string, string> = {
+  CASH: 'Tiền mặt',
+  BANK_TRANSFER: 'Chuyển khoản',
+  CARD: 'Thẻ',
+};
+
+/** Tab "Lịch sử thanh toán" của phiếu nhập (khoản trả lúc nhập + phân bổ từ phiếu chi PC...) */
+function PurchasePaymentHistory({ payments }: { payments: PurchasePayment[] }) {
+  return (
+    <div className="border border-slate-200 rounded-[8px] overflow-hidden mb-2">
+      <table className="w-full text-left border-collapse text-xs">
+        <thead className="bg-[#f7f8f9] border-b border-slate-200 font-semibold text-[#677484]">
+          <tr>
+            <th className="py-2 px-3 w-36">Mã phiếu</th>
+            <th className="py-2 px-3 w-40">Thời gian</th>
+            <th className="py-2 px-3">Người tạo</th>
+            <th className="py-2 px-3 w-32">Phương thức</th>
+            <th className="py-2 px-3 w-32">Trạng thái</th>
+            <th className="py-2 px-3 w-32 text-right">Tiền chi</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-slate-100">
+          {payments.length === 0 ? (
+            <tr>
+              <td colSpan={6} className="py-6 text-center text-xs text-slate-400">
+                Phiếu nhập chưa có thanh toán nào
+              </td>
+            </tr>
+          ) : (
+            payments.map((p, i) => {
+              const cancelled = p.status?.toUpperCase() === 'CANCELLED';
+              return (
+                <tr key={`${p.code}-${i}`} className={`hover:bg-slate-50/70 ${cancelled ? 'text-slate-400' : ''}`}>
+                  <td className="py-2 px-3 font-mono text-[#0070f4] font-medium">{p.code}</td>
+                  <td className="py-2 px-3">{formatDateTimeVN(p.paymentDate)}</td>
+                  <td className="py-2 px-3">{p.createdByName}</td>
+                  <td className="py-2 px-3">{PAYMENT_METHOD_LABEL[p.paymentMethod?.toUpperCase()] ?? p.paymentMethod}</td>
+                  <td className="py-2 px-3">{cancelled ? 'Đã hủy' : 'Đã thanh toán'}</td>
+                  <td className={`py-2 px-3 text-right font-mono ${cancelled ? 'line-through' : 'text-slate-800'}`}>
+                    {currencyFormatter.format(p.amount)}
+                  </td>
+                </tr>
+              );
+            })
+          )}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+const RETURN_STATUS: Record<string, { label: string; cls: string }> = {
+  COMPLETED: { label: 'Đã trả hàng', cls: 'bg-[#e6f8ec] text-[#16a34a] border-[#bbf7d0]' },
+  DRAFT: { label: 'Phiếu tạm', cls: 'bg-[#fffbeb] text-[#d97706] border-[#fde68a]' },
+  CANCELLED: { label: 'Đã hủy', cls: 'bg-[#fef2f2] text-[#fb2c36] border-[#fecaca]' },
+};
+
+/** Tab "Lịch sử trả hàng" của phiếu nhập (các phiếu trả hàng nhập THN lập từ phiếu này) */
+function PurchaseReturnHistory({ returns }: { returns: PurchaseReturnSummary[] }) {
+  return (
+    <div className="border border-slate-200 rounded-[8px] overflow-hidden mb-2">
+      <table className="w-full text-left border-collapse text-xs">
+        <thead className="bg-[#f7f8f9] border-b border-slate-200 font-semibold text-[#677484]">
+          <tr>
+            <th className="py-2 px-3 w-40">Mã trả hàng nhập</th>
+            <th className="py-2 px-3 w-40">Thời gian</th>
+            <th className="py-2 px-3">Người trả</th>
+            <th className="py-2 px-3 w-32 text-right">Tổng cộng</th>
+            <th className="py-2 px-3 w-32">Trạng thái</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-slate-100">
+          {returns.length === 0 ? (
+            <tr>
+              <td colSpan={5} className="py-6 text-center text-xs text-slate-400">
+                Phiếu nhập chưa có phiếu trả hàng nào
+              </td>
+            </tr>
+          ) : (
+            returns.map((r) => {
+              const st = RETURN_STATUS[r.status?.toUpperCase()] ?? RETURN_STATUS.DRAFT;
+              return (
+                <tr key={r.purchaseReturnId} className="hover:bg-slate-50/70">
+                  <td className="py-2 px-3">
+                    <Link href="/purchase-returns" className="font-mono text-[#0070f4] font-medium hover:underline">
+                      {r.returnCode}
+                    </Link>
+                  </td>
+                  <td className="py-2 px-3">{formatDateTimeVN(r.returnDate)}</td>
+                  <td className="py-2 px-3">{r.createdByName || '—'}</td>
+                  <td className="py-2 px-3 text-right font-mono text-slate-800">{currencyFormatter.format(r.totalAmount)}</td>
+                  <td className="py-2 px-3">
+                    <span className={`inline-block px-2 py-0.5 rounded-[4px] text-[11px] font-semibold border ${st.cls}`}>
+                      {st.label}
+                    </span>
+                  </td>
+                </tr>
+              );
+            })
+          )}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function PurchasesClient({ onNavigate }: { onNavigate?: (screen: string) => void } = {}) {
@@ -196,8 +314,9 @@ export default function PurchasesClient({ onNavigate }: { onNavigate?: (screen: 
 
   const [cancellingRecord, setCancellingRecord] = useState<PurchaseListRecord | null>(null);
   const [cancelReason, setCancelReason] = useState<string>('');
+  // Tab trong khung chi tiết phiếu: Thông tin | Lịch sử thanh toán
+  const [detailTab, setDetailTab] = useState<'info' | 'payments' | 'returns'>('info');
 
-  const [printingRecord, setPrintingRecord] = useState<PurchaseDetail | null>(null);
   const [isSubmittingAction, setIsSubmittingAction] = useState(false);
 
   // Price Setting Modal (Existing UX feature)
@@ -325,6 +444,7 @@ export default function PurchasesClient({ onNavigate }: { onNavigate?: (screen: 
     }
 
     setExpandedRowKey(record.grId);
+    setDetailTab('info');
 
     // If detail not yet cached, fetch it from backend
     if (!detailsCache[record.grId]) {
@@ -382,10 +502,6 @@ export default function PurchasesClient({ onNavigate }: { onNavigate?: (screen: 
   }
 
   function openCancelModal(record: PurchaseListRecord) {
-    if (record.status === 'COMPLETED') {
-      message.warning('Không thể hủy phiếu nhập đã hoàn thành nhập kho để tránh sai lệch tồn kho. Vui lòng tạo phiếu trả hàng nếu cần.');
-      return;
-    }
     setCancellingRecord(record);
     setCancelReason('');
   }
@@ -399,24 +515,25 @@ export default function PurchasesClient({ onNavigate }: { onNavigate?: (screen: 
       message.success(`Đã hủy phiếu nhập ${cancellingRecord.grCode}`);
       setCancellingRecord(null);
 
-      // Update in local state
+      // Update in local state (phiếu đã nhập bị hủy: khoản trả lúc nhập cũng bị hủy → không còn nợ)
       setPurchases((prev) =>
         prev.map((p) =>
           p.grId === cancellingRecord.grId
-            ? { ...p, status: 'CANCELLED' }
+            ? { ...p, status: 'CANCELLED', paidAmount: 0, debtAmount: 0 }
             : p
         )
       );
 
-      // Update detail cache if present
-      if (detailsCache[cancellingRecord.grId]) {
-        setDetailsCache((prev) => ({
-          ...prev,
-          [cancellingRecord.grId]: {
-            ...prev[cancellingRecord.grId],
-            status: 'CANCELLED',
-          },
-        }));
+      // Tải lại chi tiết để lịch sử thanh toán hiển thị trạng thái Đã hủy
+      try {
+        const fresh = await purchaseService.getPurchaseById(cancellingRecord.grId);
+        setDetailsCache((prev) => ({ ...prev, [cancellingRecord.grId]: fresh }));
+      } catch {
+        setDetailsCache((prev) => {
+          const next = { ...prev };
+          delete next[cancellingRecord.grId];
+          return next;
+        });
       }
     } catch (err: any) {
       message.error(err.message || 'Lỗi khi hủy phiếu nhập');
@@ -438,12 +555,12 @@ export default function PurchasesClient({ onNavigate }: { onNavigate?: (screen: 
         return;
       }
     }
-    setPrintingRecord(detail);
+    printPurchaseReceipt(detail);
   }
 
+  // Sao chép: mở màn hình nhập hàng với hàng hóa / NCC / giảm giá của phiếu này (lưu thành phiếu mới)
   function handleDuplicatePurchase(record: PurchaseListRecord) {
-    message.info(`Đang chuyển thông tin phiếu ${record.grCode} sang màn hình tạo mới...`);
-    router.push('/purchases/create');
+    router.push(`/purchases/create?copy=${record.grId}`);
   }
 
   // ─── 4. Excel Exports ──────────────────────────────────────────────────────
@@ -509,9 +626,9 @@ export default function PurchasesClient({ onNavigate }: { onNavigate?: (screen: 
               'ĐVT': item.unit,
               'Số lượng': item.quantity,
               'Đơn giá (đ)': item.unitPrice,
-              'CK (%)': item.discountPercent,
+              'Giảm giá (đ)': lineDiscountPerUnit(item),
+              'Giá nhập (đ)': lineImportPrice(item),
               'Thành tiền (đ)': item.totalPrice,
-              'Số Lô': item.lotNumber || '',
               'Kho': rec.warehouseName,
             });
           });
@@ -921,12 +1038,24 @@ export default function PurchasesClient({ onNavigate }: { onNavigate?: (screen: 
                               <div className="px-6 py-4">
                                 {/* Tab Bar */}
                                 <div className="flex items-center gap-1 border-b border-slate-200 mb-4">
-                                  <button
-                                    type="button"
-                                    className="shrink-0 whitespace-nowrap px-4 py-2 text-sm font-semibold text-[#0070f4] border-b-2 border-[#0070f4] -mb-px"
-                                  >
-                                    Thông tin phiếu nhập
-                                  </button>
+                                  {([
+                                    ['info', 'Thông tin'],
+                                    ['payments', 'Lịch sử thanh toán'],
+                                    ['returns', 'Lịch sử trả hàng'],
+                                  ] as const).map(([key, label]) => (
+                                    <button
+                                      key={key}
+                                      type="button"
+                                      onClick={() => setDetailTab(key)}
+                                      className={`shrink-0 whitespace-nowrap px-4 py-2 text-sm -mb-px border-b-2 cursor-pointer transition ${
+                                        detailTab === key
+                                          ? 'font-semibold text-[#0070f4] border-[#0070f4]'
+                                          : 'text-[#677484] border-transparent hover:text-[#15171a]'
+                                      }`}
+                                    >
+                                      {label}
+                                    </button>
+                                  ))}
                                 </div>
 
                                 {loadingDetailId === record.grId ? (
@@ -934,6 +1063,10 @@ export default function PurchasesClient({ onNavigate }: { onNavigate?: (screen: 
                                     <RefreshCcw size={18} className="animate-spin text-[#0070f4]" />
                                     <span className="text-xs">Đang tải chi tiết phiếu nhập #{record.grCode}...</span>
                                   </div>
+                                ) : detailTab === 'payments' ? (
+                                  <PurchasePaymentHistory payments={detail?.payments ?? []} />
+                                ) : detailTab === 'returns' ? (
+                                  <PurchaseReturnHistory returns={detail?.returns ?? []} />
                                 ) : (
                                   <>
                                     {/* Header Info Row */}
@@ -996,9 +1129,9 @@ export default function PurchasesClient({ onNavigate }: { onNavigate?: (screen: 
                                             <th className="py-2 px-3 w-16 text-center">ĐVT</th>
                                             <th className="py-2 px-3 w-24 text-right">Số lượng</th>
                                             <th className="py-2 px-3 w-28 text-right">Đơn giá</th>
-                                            <th className="py-2 px-3 w-20 text-right">Giảm giá</th>
+                                            <th className="py-2 px-3 w-24 text-right">Giảm giá</th>
+                                            <th className="py-2 px-3 w-28 text-right">Giá nhập</th>
                                             <th className="py-2 px-3 w-28 text-right">Thành tiền</th>
-                                            <th className="py-2 px-3 w-28">Số Lô</th>
                                           </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-100">
@@ -1010,12 +1143,16 @@ export default function PurchasesClient({ onNavigate }: { onNavigate?: (screen: 
                                                 <td className="py-2 px-3 font-medium text-[#15171a]">{item.productName}</td>
                                                 <td className="py-2 px-3 text-center text-slate-500">{item.unit || 'Cái'}</td>
                                                 <td className="py-2 px-3 text-right font-mono font-medium">{item.quantity.toLocaleString('vi-VN')}</td>
-                                                <td className="py-2 px-3 text-right font-mono">{item.unitPrice.toLocaleString('vi-VN')} đ</td>
-                                                <td className="py-2 px-3 text-right">{item.discountPercent > 0 ? `${item.discountPercent}%` : '0%'}</td>
-                                                <td className="py-2 px-3 text-right font-mono font-semibold text-slate-800">
-                                                  {item.totalPrice.toLocaleString('vi-VN')} đ
+                                                <td className="py-2 px-3 text-right font-mono">{currencyFormatter.format(item.unitPrice)} đ</td>
+                                                <td className="py-2 px-3 text-right font-mono" title={item.discountPercent > 0 ? `Giảm ${item.discountPercent}%` : undefined}>
+                                                  {currencyFormatter.format(lineDiscountPerUnit(item))} đ
                                                 </td>
-                                                <td className="py-2 px-3 text-slate-500">{item.lotNumber || '—'}</td>
+                                                <td className="py-2 px-3 text-right font-mono font-medium text-slate-800">
+                                                  {currencyFormatter.format(lineImportPrice(item))} đ
+                                                </td>
+                                                <td className="py-2 px-3 text-right font-mono font-semibold text-slate-800">
+                                                  {currencyFormatter.format(item.totalPrice)} đ
+                                                </td>
                                               </tr>
                                             ))
                                           ) : (
@@ -1045,16 +1182,39 @@ export default function PurchasesClient({ onNavigate }: { onNavigate?: (screen: 
                                         </div>
                                         <div className="flex justify-between text-slate-600">
                                           <span>Tổng tiền hàng:</span>
-                                          <span className="font-semibold text-slate-800">{currencyFormatter.format(record.totalAmount)} đ</span>
+                                          <span className="font-semibold text-slate-800">
+                                            {currencyFormatter.format(detail?.totalGoodsAmount ?? record.totalAmount)} đ
+                                          </span>
+                                        </div>
+                                        <div className="flex justify-between text-slate-600">
+                                          <span>Giảm giá:</span>
+                                          <span className="font-medium text-slate-800">{currencyFormatter.format(detail?.discountAmount ?? 0)} đ</span>
+                                        </div>
+                                        <div className="flex justify-between text-slate-600">
+                                          <span>Tổng cộng:</span>
+                                          <span className="font-semibold text-slate-800">
+                                            {currencyFormatter.format(detail?.totalAmount ?? record.totalAmount)} đ
+                                          </span>
                                         </div>
                                         <div className="flex justify-between text-slate-600">
                                           <span>Tiền đã trả NCC:</span>
-                                          <span className="font-medium text-emerald-600">{currencyFormatter.format(record.paidAmount)} đ</span>
+                                          <span className="font-medium text-emerald-600">{currencyFormatter.format(detail?.paidAmount ?? record.paidAmount)} đ</span>
                                         </div>
+                                        {!isCanceled && (detail?.returnOffsetAmount ?? 0) > 0 && (
+                                          <div
+                                            className="flex justify-between text-slate-600"
+                                            title="Phiếu trả hàng nhập NCC chưa hoàn tiền mặt được trừ thẳng vào số còn nợ của phiếu nhập này"
+                                          >
+                                            <span>Trả hàng nhập (trừ công nợ):</span>
+                                            <span className="font-medium text-amber-600">
+                                              {currencyFormatter.format(detail?.returnOffsetAmount ?? 0)} đ
+                                            </span>
+                                          </div>
+                                        )}
                                         <div className="flex justify-between text-slate-700 border-t border-slate-200 pt-1.5 font-bold">
                                           <span>Cần trả NCC:</span>
-                                          <span className={record.debtAmount > 0 ? 'text-rose-600' : 'text-slate-800'}>
-                                            {currencyFormatter.format(record.debtAmount)} đ
+                                          <span className={!isCanceled && (detail?.debtAmount ?? record.debtAmount) > 0 ? 'text-rose-600' : 'text-slate-800'}>
+                                            {currencyFormatter.format(isCanceled ? 0 : detail?.debtAmount ?? record.debtAmount)} đ
                                           </span>
                                         </div>
                                       </div>
@@ -1063,14 +1223,14 @@ export default function PurchasesClient({ onNavigate }: { onNavigate?: (screen: 
                                     {/* Action Buttons matching KiotViet standard */}
                                     <div className="flex items-center justify-between pt-3 border-t border-slate-100">
                                       <div className="flex items-center gap-2">
-                                        {isDraft && (
+                                        {!isCanceled && (
                                           <button
                                             type="button"
                                             onClick={() => openCancelModal(record)}
                                             className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-rose-600 hover:bg-rose-50 rounded-[8px] transition cursor-pointer border border-rose-200 bg-white"
                                           >
                                             <Trash2 size={13} />
-                                            <span>Hủy phiếu</span>
+                                            <span>Hủy</span>
                                           </button>
                                         )}
 
@@ -1094,17 +1254,30 @@ export default function PurchasesClient({ onNavigate }: { onNavigate?: (screen: 
                                       </div>
 
                                       <div className="flex items-center gap-2">
+                                        {!isCanceled && (
+                                          <button
+                                            type="button"
+                                            onClick={() => router.push(`/purchases/create?edit=${record.grId}`)}
+                                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-[#0070f4] hover:bg-blue-50 rounded-[8px] transition cursor-pointer border border-[#0070f4]/40 bg-white font-medium"
+                                            title="Mở phiếu để chỉnh sửa"
+                                          >
+                                            <Pencil size={13} />
+                                            <span>Mở phiếu</span>
+                                          </button>
+                                        )}
+                                        {!isDraft && !isCanceled && (
+                                          <button
+                                            type="button"
+                                            onClick={() => router.push(`/purchase-returns/create?grId=${record.grId}`)}
+                                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-[#15171a] hover:bg-[#f7f8f9] rounded-[8px] transition cursor-pointer border border-slate-300 bg-white font-medium"
+                                            title="Trả hàng của phiếu nhập này cho nhà cung cấp"
+                                          >
+                                            <Undo2 size={13} />
+                                            <span>Trả hàng nhập</span>
+                                          </button>
+                                        )}
                                         {isDraft && (
                                           <>
-                                            <button
-                                              type="button"
-                                              onClick={() => router.push(`/purchases/create?edit=${record.grId}`)}
-                                              className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-[#0070f4] hover:bg-blue-50 rounded-[8px] transition cursor-pointer border border-[#0070f4]/40 bg-white font-medium"
-                                              title="Chỉnh sửa thông tin phiếu tạm"
-                                            >
-                                              <Pencil size={13} />
-                                              <span>Chỉnh sửa</span>
-                                            </button>
 
                                             <button
                                               type="button"
@@ -1308,137 +1481,10 @@ export default function PurchasesClient({ onNavigate }: { onNavigate?: (screen: 
             </div>
             <p className="text-[11px] text-slate-500">
               Phiếu sau khi hủy sẽ chuyển sang trạng thái <strong>Đã hủy</strong> và không thể thay đổi thông tin.
+              {cancellingRecord.status === 'COMPLETED' && (
+                <> Hàng đã nhập sẽ bị <strong>trừ khỏi tồn kho</strong>, khoản trả lúc nhập bị hủy và công nợ nhà cung cấp được giảm tương ứng.</>
+              )}
             </p>
-          </div>
-        )}
-      </Modal>
-
-      {/* ─── Modal 3: Bản in Phiếu nhập hàng chuẩn Tin Phát ─── */}
-      <Modal
-        title={
-          <div className="flex items-center justify-between pr-6">
-            <span className="text-sm font-semibold text-slate-800">Xem trước bản in phiếu nhập kho</span>
-          </div>
-        }
-        open={Boolean(printingRecord)}
-        onCancel={() => setPrintingRecord(null)}
-        width={760}
-        footer={[
-          <button
-            key="cancel"
-            type="button"
-            onClick={() => setPrintingRecord(null)}
-            className="px-3 py-1.5 text-xs border border-slate-300 rounded hover:bg-slate-50 mr-2"
-          >
-            Đóng
-          </button>,
-          <button
-            key="print"
-            type="button"
-            onClick={() => window.print()}
-            className="px-4 py-1.5 text-xs bg-[#0070f4] text-white rounded-[8px] font-medium hover:bg-[#005ac3] transition"
-          >
-            In phiếu ngay (Ctrl + P)
-          </button>,
-        ]}
-      >
-        {printingRecord && (
-          <div className="p-4 bg-white text-slate-900 text-xs font-sans print:p-0">
-            {/* Header công ty */}
-            <div className="flex justify-between items-start border-b border-slate-300 pb-3 mb-3">
-              <div>
-                <h3 className="font-bold text-sm uppercase text-slate-900">CÔNG TY TNHH PHÁT TRIỂN THƯƠNG MẠI VÀ DỊCH VỤ TÍN PHÁT</h3>
-                <p className="text-slate-500 text-[11px]">Hệ thống Quản lý Đơn hàng & Tồn kho StockFlow</p>
-                <p className="text-slate-600 mt-1">Kho tiếp nhận: <strong>{printingRecord.warehouseName} ({printingRecord.warehouseCode})</strong></p>
-              </div>
-              <div className="text-right">
-                <div className="text-base font-bold font-mono text-[#0070f4]">{printingRecord.grCode}</div>
-                <div className="text-slate-500 text-[11px]">{formatDateTimeVN(printingRecord.receivedDate)}</div>
-              </div>
-            </div>
-
-            {/* Tiêu đề phiếu */}
-            <div className="text-center my-4">
-              <h1 className="text-lg font-bold uppercase tracking-wider text-slate-900">PHIẾU NHẬP HÀNG HÓA</h1>
-              <p className="text-slate-500 text-[11px]">Trạng thái: <strong>{printingRecord.status === 'COMPLETED' ? 'ĐÃ NHẬP KHO' : 'PHIẾU TẠM'}</strong></p>
-            </div>
-
-            {/* Thông tin NCC & Người lập */}
-            <div className="grid grid-cols-2 gap-4 bg-slate-50 p-2.5 rounded border border-slate-200 mb-3 text-[11px]">
-              <div>
-                <p>Nhà cung cấp: <strong className="text-slate-900">{printingRecord.partnerName}</strong></p>
-                <p className="mt-1">Mã NCC: <strong className="font-mono text-slate-700">{printingRecord.partnerCode}</strong></p>
-                {printingRecord.partnerPhone && <p className="mt-1">Điện thoại: {printingRecord.partnerPhone}</p>}
-              </div>
-              <div>
-                <p>Người tạo phiếu: <strong>{printingRecord.receivedByName || 'Quản trị viên'}</strong></p>
-                <p className="mt-1">Mã đơn đối tác: <strong>{printingRecord.externalPoNumber || '—'}</strong></p>
-                <p className="mt-1">Ghi chú: {printingRecord.notes || '—'}</p>
-              </div>
-            </div>
-
-            {/* Bảng sản phẩm */}
-            <table className="w-full border-collapse border border-slate-300 text-[11px] mb-3">
-              <thead>
-                <tr className="bg-slate-100 border-b border-slate-300 text-center font-semibold text-slate-700">
-                  <th className="border border-slate-300 py-1.5 px-1 w-8">STT</th>
-                  <th className="border border-slate-300 py-1.5 px-2 text-left w-24">Mã hàng</th>
-                  <th className="border border-slate-300 py-1.5 px-2 text-left">Tên hàng hóa</th>
-                  <th className="border border-slate-300 py-1.5 px-1 w-12">ĐVT</th>
-                  <th className="border border-slate-300 py-1.5 px-2 text-right w-16">SL</th>
-                  <th className="border border-slate-300 py-1.5 px-2 text-right w-20">Đơn giá</th>
-                  <th className="border border-slate-300 py-1.5 px-2 text-right w-24">Thành tiền</th>
-                </tr>
-              </thead>
-              <tbody>
-                {printingRecord.items?.map((item, idx) => (
-                  <tr key={idx} className="border-b border-slate-200">
-                    <td className="border border-slate-300 py-1.5 text-center">{idx + 1}</td>
-                    <td className="border border-slate-300 py-1.5 px-2 font-mono">{item.productCode}</td>
-                    <td className="border border-slate-300 py-1.5 px-2">{item.productName}</td>
-                    <td className="border border-slate-300 py-1.5 text-center">{item.unit || 'Cái'}</td>
-                    <td className="border border-slate-300 py-1.5 px-2 text-right font-semibold">{item.quantity}</td>
-                    <td className="border border-slate-300 py-1.5 px-2 text-right">{item.unitPrice.toLocaleString('vi-VN')} đ</td>
-                    <td className="border border-slate-300 py-1.5 px-2 text-right font-semibold">{item.totalPrice.toLocaleString('vi-VN')} đ</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-
-            {/* Tổng kết tiền */}
-            <div className="flex justify-end mb-6 text-xs">
-              <div className="w-64 space-y-1">
-                <div className="flex justify-between">
-                  <span>Tổng tiền hàng:</span>
-                  <span className="font-bold">{currencyFormatter.format(printingRecord.totalAmount)} đ</span>
-                </div>
-                <div className="flex justify-between text-slate-600">
-                  <span>Tiền đã thanh toán:</span>
-                  <span>{currencyFormatter.format(printingRecord.paidAmount)} đ</span>
-                </div>
-                <div className="flex justify-between border-t border-slate-300 pt-1 font-bold">
-                  <span>Còn nợ NCC:</span>
-                  <span className="text-rose-600">{currencyFormatter.format(printingRecord.debtAmount)} đ</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Chữ ký */}
-            <div className="grid grid-cols-3 text-center text-[11px] text-slate-700 mt-6 pt-4 border-t border-slate-200">
-              <div>
-                <p className="font-semibold">Người giao hàng</p>
-                <p className="text-slate-400 text-[10px] italic mt-1">(Ký, họ tên)</p>
-              </div>
-              <div>
-                <p className="font-semibold">Thủ kho tiếp nhận</p>
-                <p className="text-slate-400 text-[10px] italic mt-1">(Ký, họ tên)</p>
-              </div>
-              <div>
-                <p className="font-semibold">Người lập phiếu</p>
-                <p className="text-slate-400 text-[10px] italic mt-1">(Ký, họ tên)</p>
-                <p className="mt-8 font-medium">{printingRecord.receivedByName}</p>
-              </div>
-            </div>
           </div>
         )}
       </Modal>

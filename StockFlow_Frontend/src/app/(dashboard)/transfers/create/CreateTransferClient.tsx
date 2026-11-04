@@ -9,28 +9,18 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import {
   ArrowLeft,
   Search,
-  Grid,
-  Barcode,
-  Printer,
-  Eye,
   AlertCircle,
-  User,
-  Calendar,
   ChevronRight,
   ChevronLeft,
   Trash2,
-  Save,
   Check,
   FileSpreadsheet,
-  Upload,
-  X,
-  PhoneCall,
-  Plus,
-  Minus,
   CheckCircle2,
   AlertTriangle,
   Warehouse,
   ChevronDown,
+  Pencil,
+  CircleUserRound,
 } from 'lucide-react';
 import { useActiveWarehouse } from '@/lib/warehouse/useActiveWarehouse';
 import { adminService } from '@/features/roles/services/adminService';
@@ -38,6 +28,17 @@ import { WarehouseFacility } from '@/features/roles/types';
 import { transferService } from '@/features/transfers/services/transferService';
 import { ProductForTransfer, TransferItem } from '@/features/transfers/types';
 import { toLocalDatetimeInputString } from '@/features/transfers/utils/dateUtils';
+import { productService, BackendProduct } from '@/features/products/services/productService';
+import { AddFromCategoryPopover } from '@/features/purchases/components/AddFromCategoryPopover';
+import { NumberInput } from '@/components/inputs/NumberInput';
+import { ProductThumb } from '@/components/ProductThumb';
+
+// Bố cục cột bảng hàng hóa (cùng kiểu màn Nhập hàng): Xóa | STT | Mã | Tên | ĐVT | Tồn kho | Tồn kho nhận | SL | Giá | Thành tiền
+/** Tiền tố mã khi sao chép phiếu (giống phiếu nhập / kiểm kho) — khi lưu hệ thống tự sinh mã mới */
+const COPY_CODE_PREFIX = 'Copy_';
+
+const TRANSFER_GRID ='36px 44px 110px minmax(170px,1fr) 70px 90px 110px 90px 110px 110px';
+const TRANSFER_TABLE_MIN_WIDTH = 36 + 44 + 110 + 170 + 70 + 90 + 110 + 90 + 110 + 110 + 24;
 
 interface CreateItemRow {
   productId: number;
@@ -56,6 +57,7 @@ export default function CreateTransferClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const editTransferId = searchParams.get('id');
+  const copyTransferId = searchParams.get('copy');
 
   const { activeWarehouse, setActiveWarehouse, warehouses: allWarehouses } = useActiveWarehouse();
   const [facilities, setFacilities] = useState<WarehouseFacility[]>([]);
@@ -174,6 +176,11 @@ export default function CreateTransferClient() {
     async function loadEditData() {
       try {
         const detail = await transferService.getTransferById(Number(editTransferId));
+        if (detail.status !== 'DRAFT') {
+          showToast('Chỉ sửa được phiếu chuyển hàng ở trạng thái Phiếu tạm.', 'warning');
+          router.replace('/transfers');
+          return;
+        }
         if (detail) {
           setTransferCode(detail.code);
           setSourceWarehouseId(detail.sourceWarehouseId);
@@ -206,6 +213,61 @@ export default function CreateTransferClient() {
     }
     loadEditData();
   }, [editTransferId]);
+
+  // Sao chép phiếu (?copy=<id>): tạo phiếu tạm mới từ phiếu cũ (VD phiếu nhập sai đã hủy).
+  // Kho gửi = Kho làm việc hiện tại; mã hiện "Copy_CK..." (khi lưu hệ thống tự sinh mã mới);
+  // tồn kho 2 đầu + giá chuyển lấy lại theo thời điểm hiện tại.
+  useEffect(() => {
+    if (!copyTransferId || editTransferId) return;
+    let alive = true;
+    (async () => {
+      try {
+        const detail = await transferService.getTransferById(Number(copyTransferId));
+        if (!alive) return;
+        const sourceId = activeWarehouse?.warehouseId ?? detail.sourceWarehouseId;
+        const destId = detail.destWarehouseId !== sourceId ? detail.destWarehouseId : '';
+        setTransferCode(`${COPY_CODE_PREFIX}${detail.code}`);
+        setDestWarehouseId(destId);
+        // Bỏ phần ghi chú phát sinh sau khi xuất ([Nhận hàng]: ..., [Lý do hủy]: ...)
+        setNotes((detail.notes || '').split(/\s*\|?\s*\[(?:Nhận hàng|Lý do hủy)\]:/)[0].trim());
+        setStatus('DRAFT');
+
+        const fresh = await Promise.all(
+          detail.items.map((it) =>
+            transferService
+              .getProductsForTransfer(sourceId, destId || undefined, it.productCode)
+              .then((list) => list.find((p) => p.productId === it.productId))
+              .catch(() => undefined)
+          )
+        );
+        if (!alive) return;
+        setItems(
+          detail.items.map((it, i) => {
+            const f = fresh[i];
+            const price = f ? f.costPrice : it.transferPrice;
+            return {
+              productId: it.productId,
+              productCode: it.productCode,
+              productName: it.productName,
+              unitName: it.unitName,
+              sourceStock: f ? f.sourceStock : 0,
+              destStock: f ? f.destStock : 0,
+              transferQuantity: it.transferQuantity,
+              transferPrice: price,
+              lineTotal: it.transferQuantity * price,
+              notes: it.notes,
+            };
+          })
+        );
+      } catch (err) {
+        if (alive) showToast(err instanceof Error ? err.message : 'Không tải được phiếu cần sao chép', 'error');
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [copyTransferId, editTransferId]);
 
   // Handle Global F3 Shortcut to focus product search
   useEffect(() => {
@@ -339,6 +401,48 @@ export default function CreateTransferClient() {
     setSearchQuery('');
     setShowSearchDropdown(false);
     searchInputRef.current?.focus();
+  };
+
+  // Thêm toàn bộ hàng hóa của nhóm hàng (bỏ qua hàng đã có trong phiếu)
+  const handleAddProductsFromCategories = async (prods: BackendProduct[], categoryNames: string[]) => {
+    const existing = new Set(items.map((i) => i.productId));
+    const toAdd = prods.filter((p) => !existing.has(p.productId));
+    if (toAdd.length === 0) {
+      showToast(
+        prods.length === 0
+          ? `Nhóm ${categoryNames.join(', ')} chưa có hàng hóa đang kinh doanh`
+          : 'Tất cả hàng hóa của nhóm đã có trong phiếu'
+      );
+      return;
+    }
+
+    // Tồn kho nhận (nếu đã chọn kho nhận) — prods đã mang tồn của kho xuất
+    let destStockById = new Map<number, number>();
+    if (destWarehouseId) {
+      try {
+        const destProds = await productService.getProducts({ warehouseId: Number(destWarehouseId), status: 'ACTIVE' });
+        destStockById = new Map(destProds.map((p) => [p.productId, p.stockQuantity || 0]));
+      } catch {
+        // thiếu tồn kho nhận thì để 0
+      }
+    }
+
+    const newRows: CreateItemRow[] = toAdd.map((p) => {
+      const price = p.costPrice > 0 ? p.costPrice : p.standardPrice || 0;
+      return {
+        productId: p.productId,
+        productCode: p.code,
+        productName: p.name,
+        unitName: p.uom || 'Cái',
+        sourceStock: p.stockQuantity || 0,
+        destStock: destWarehouseId ? destStockById.get(p.productId) ?? 0 : 0,
+        transferQuantity: 1,
+        transferPrice: price,
+        lineTotal: price,
+      };
+    });
+    setItems((prev) => [...newRows, ...prev]);
+    showToast(`Đã thêm ${newRows.length} hàng hóa từ nhóm ${categoryNames.join(', ')}`);
   };
 
   // Update item quantity
@@ -496,7 +600,11 @@ export default function CreateTransferClient() {
     setIsSubmitting(true);
     try {
       const payload = {
-        transferCode: transferCode.trim() || undefined,
+        // Mã "Copy_..." chỉ để nhận biết phiếu sao chép → để trống cho hệ thống tự sinh mã mới
+        transferCode:
+          transferCode.trim() && !transferCode.trim().toLowerCase().startsWith(COPY_CODE_PREFIX.toLowerCase())
+            ? transferCode.trim()
+            : undefined,
         sourceWarehouseId: Number(sourceWarehouseId),
         destWarehouseId: Number(destWarehouseId),
         transferDate: transferDateTime
@@ -512,7 +620,22 @@ export default function CreateTransferClient() {
         })),
       };
 
-      const result = await transferService.createTransfer(payload);
+      // Mở lại phiếu tạm: cập nhật đúng phiếu đó (trước đây luôn tạo phiếu mới → trùng phiếu),
+      // bấm Hoàn thành thì xuất hàng phiếu đó sau khi lưu.
+      let result;
+      if (editTransferId) {
+        result = await transferService.updateTransfer(Number(editTransferId), {
+          destWarehouseId: payload.destWarehouseId,
+          transferDate: payload.transferDate,
+          notes: payload.notes,
+          items: payload.items,
+        });
+        if (submitStatus === 'IN_TRANSIT') {
+          result = await transferService.completeTransfer(result.id);
+        }
+      } else {
+        result = await transferService.createTransfer(payload);
+      }
 
       showToast(
         submitStatus === 'DRAFT'
@@ -627,7 +750,7 @@ export default function CreateTransferClient() {
       )}
 
       {/* ─── 1. Header Toolbar Bar (Theo đúng thiết kế) ─── */}
-      <header className="h-12 bg-white border-b border-slate-200 px-4 flex items-center justify-between gap-3 shrink-0">
+      <header className="h-12 bg-white border-b border-slate-200 px-4 flex items-center justify-between gap-3 shrink-0 relative z-30">
         {/* Left: Back Arrow + Chuyển hàng title */}
         <div className="flex items-center gap-3">
           <Link
@@ -643,7 +766,7 @@ export default function CreateTransferClient() {
         </div>
 
         {/* Center: Search Box & Utility Action Buttons */}
-        <div className="flex items-center gap-2 flex-1 max-w-xl relative" ref={searchContainerRef}>
+        <div className="flex items-center gap-2 flex-1 max-w-xl ml-4 mr-auto relative" ref={searchContainerRef}>
           <div className="relative flex-1">
             <Search
               size={14}
@@ -660,17 +783,14 @@ export default function CreateTransferClient() {
               placeholder="Tìm hàng hóa theo mã hoặc tên"
               className="w-full h-8 pl-8 pr-8 rounded-full bg-[#f7f8f9] border border-slate-300 text-[13px] text-[#15171a] placeholder-[#677484] focus:outline-none focus:border-[#0070f4] focus:bg-white transition"
             />
-            <button
-              type="button"
-              onClick={() => {
-                showToast('Chế độ quét mã vạch Barcode/QR đã kích hoạt. Hãy đặt đầu đọc vào mã hàng!');
-                searchInputRef.current?.focus();
-              }}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#677484] hover:text-[#15171a] cursor-pointer"
-              title="Quét Barcode / QR Code"
-            >
-              <Grid size={14} />
-            </button>
+            {/* Thêm hàng hóa từ nhóm hàng (tồn kho theo kho xuất) */}
+            <div className="absolute right-2 top-1/2 -translate-y-1/2">
+              <AddFromCategoryPopover
+                warehouseId={sourceWarehouseId}
+                onAddProducts={handleAddProductsFromCategories}
+                onError={(msg) => showToast(msg, 'error')}
+              />
+            </div>
 
             {/* Product Suggestions Dropdown */}
             {showSearchDropdown && (
@@ -688,7 +808,9 @@ export default function CreateTransferClient() {
                       onClick={() => handleSelectProduct(prod)}
                       className="p-2.5 hover:bg-[#eff6ff] transition flex items-center justify-between cursor-pointer group"
                     >
-                      <div className="flex flex-col gap-0.5">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                      <ProductThumb src={prod.imageUrl} alt={prod.productName} />
+                      <div className="flex flex-col gap-0.5 min-w-0">
                         <div className="flex items-center gap-2">
                           <span className="font-bold text-[#0070f4] group-hover:underline">
                             {prod.productCode}
@@ -708,6 +830,7 @@ export default function CreateTransferClient() {
                             </strong>
                           </span>
                         </div>
+                      </div>
                       </div>
 
                       <div className="text-right flex items-center gap-4">
@@ -835,155 +958,152 @@ export default function CreateTransferClient() {
       <div className="flex-1 flex overflow-hidden relative">
         {/* LEFT COLUMN: Products Table or Empty Excel State */}
         <div className="flex-1 flex flex-col bg-white overflow-hidden">
-          {/* Table Header Row */}
-          <div className="h-9 bg-[#f7f8f9] border-b border-slate-200 grid grid-cols-[40px_110px_1fr_60px_90px_90px_90px_110px_110px_40px] items-center px-3 font-semibold text-[#677484] shrink-0 text-xs text-center">
-            <div>STT</div>
-            <div className="text-left pl-2">Mã hàng</div>
-            <div className="text-left pl-2">Tên hàng</div>
-            <div>ĐVT</div>
-            <div>Tồn kho</div>
-            <div>Tồn kho nhận</div>
-            <div>SL chuyển</div>
-            <div>Giá chuyển</div>
-            <div>Thành tiền</div>
-            <div></div>
-          </div>
+          {/* Bảng hàng hóa — cùng bố cục / style với màn Nhập hàng */}
+          <div className="flex-1 overflow-auto">
+            <div style={{ minWidth: TRANSFER_TABLE_MIN_WIDTH }}>
+              {/* Table Header Row */}
+              <div
+                className="h-10 bg-[#e8f2ff] border-b border-slate-200 grid items-center px-3 font-semibold text-[#15171a] text-[13px] sticky top-0 z-10"
+                style={{ gridTemplateColumns: TRANSFER_GRID }}
+              >
+                <div />
+                <div className="text-center">STT</div>
+                <div className="pl-2">Mã hàng</div>
+                <div className="pl-2">Tên hàng</div>
+                <div className="pl-2">ĐVT</div>
+                <div className="text-right pr-2">Tồn kho</div>
+                <div className="text-right pr-2">Tồn kho nhận</div>
+                <div className="text-right pr-2">SL chuyển</div>
+                <div className="text-right pr-2">Giá chuyển</div>
+                <div className="text-right pr-2">Thành tiền</div>
+              </div>
 
-          {/* Table Body */}
-          <div className="flex-1 overflow-y-auto">
-            {items.length === 0 ? (
-              /* EMPTY STATE */
-              <div className="h-full flex flex-col items-center justify-center p-8 text-center select-none">
-                <p className="text-sm font-semibold text-[#15171a] mb-2">
-                  Thêm sản phẩm từ file excel
-                </p>
-                <p className="text-xs text-[#677484] mb-6">
-                  (Tải về file mẫu:{' '}
+              {items.length === 0 ? (
+                /* EMPTY STATE: thêm hàng từ file excel */
+                <div className="py-24 flex flex-col items-center justify-center p-8 text-center select-none">
+                  <p className="text-sm font-semibold text-[#15171a] mb-2">Thêm sản phẩm từ file excel</p>
+                  <p className="text-xs text-[#677484] mb-6">
+                    (Tải về file mẫu:{' '}
+                    <button
+                      type="button"
+                      onClick={handleDownloadTemplate}
+                      className="text-[#0070f4] hover:text-[#005ac3] hover:underline cursor-pointer font-medium"
+                    >
+                      Excel file
+                    </button>
+                    )
+                  </p>
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleFileChange}
+                    accept=".xlsx,.xls,.csv"
+                    className="hidden"
+                  />
                   <button
                     type="button"
-                    onClick={handleDownloadTemplate}
-                    className="text-[#0070f4] hover:text-[#005ac3] hover:underline cursor-pointer font-medium"
+                    onClick={handleImportExcelClick}
+                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-[8px] bg-[#0070f4] hover:bg-[#005ac3] text-white font-semibold text-xs shadow-xs transition cursor-pointer"
                   >
-                    Excel file
+                    <FileSpreadsheet size={16} />
+                    <span>Chọn file dữ liệu</span>
                   </button>
-                  )
-                </p>
-
-                {/* Hidden File Input for Excel Import */}
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  onChange={handleFileChange}
-                  accept=".xlsx,.xls,.csv"
-                  className="hidden"
-                />
-
-                <button
-                  type="button"
-                  onClick={handleImportExcelClick}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-[8px] bg-[#0070f4] hover:bg-[#005ac3] text-white font-semibold text-xs shadow-xs transition cursor-pointer"
-                >
-                  <FileSpreadsheet size={16} />
-                  <span>Chọn file dữ liệu</span>
-                </button>
-              </div>
-            ) : (
-              /* PRODUCT ROWS */
-              <div className="divide-y divide-slate-100">
-                {items.map((row, index) => {
-                  return (
+                </div>
+              ) : (
+                /* PRODUCT ROWS */
+                <div>
+                  {items.map((row, index) => (
                     <div
                       key={row.productId}
-                      className="grid grid-cols-[40px_110px_1fr_60px_90px_90px_90px_110px_110px_40px] items-center px-3 py-2 text-xs transition hover:bg-[#f7f8f9] border-b border-slate-100"
+                      className="grid items-start px-3 py-2.5 text-[13px] transition hover:bg-[#f7f8f9] border-b border-slate-100"
+                      style={{ gridTemplateColumns: TRANSFER_GRID }}
                     >
+                      {/* Xóa dòng */}
+                      <div className="pt-1">
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveItem(row.productId)}
+                          className="p-1 rounded-[4px] text-[#15171a] hover:text-[#fb2c36] hover:bg-[#fef2f2] transition cursor-pointer"
+                          title="Xóa hàng hóa khỏi phiếu"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+
                       {/* STT */}
-                      <div className="text-center text-[#677484] font-mono">{index + 1}</div>
+                      <div className="text-center text-[#15171a] pt-1.5">{index + 1}</div>
 
                       {/* Mã hàng */}
-                      <div className="font-bold text-[#0070f4] pl-2 truncate">{row.productCode}</div>
+                      <div className="pl-2 pt-1.5 text-[#0070f4] truncate" title={row.productCode}>
+                        {row.productCode}
+                      </div>
 
-                      {/* Tên hàng + Ghi chú dòng */}
-                      <div className="pl-2 pr-2">
-                        <div className="font-medium text-[#15171a] truncate" title={row.productName}>
+                      {/* Tên hàng + ghi chú dòng */}
+                      <div className="pl-2 pr-2 min-w-0">
+                        <div className="pt-1.5 text-[#15171a] truncate" title={row.productName}>
                           {row.productName}
                         </div>
-                        <input
-                          type="text"
-                          value={row.notes || ''}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            setItems((prev) =>
-                              prev.map((it) =>
-                                it.productId === row.productId ? { ...it, notes: val } : it
-                              )
-                            );
-                          }}
-                          placeholder="Ghi chú hàng hóa..."
-                          className="w-full text-[11px] text-[#677484] placeholder-[#677484]/40 focus:outline-none focus:text-[#15171a] bg-transparent"
-                        />
+                        <label className="mt-1 flex items-center gap-1.5 text-[11px] italic text-[#677484] cursor-text">
+                          <input
+                            type="text"
+                            value={row.notes || ''}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setItems((prev) =>
+                                prev.map((it) => (it.productId === row.productId ? { ...it, notes: val } : it))
+                              );
+                            }}
+                            placeholder="Ghi chú..."
+                            className="min-w-0 max-w-[160px] bg-transparent italic text-[11px] text-[#15171a] placeholder-[#677484] focus:outline-none"
+                          />
+                          <Pencil size={12} className="shrink-0" />
+                        </label>
                       </div>
 
                       {/* ĐVT */}
-                      <div className="text-center text-[#15171a]">{row.unitName}</div>
+                      <div className="pl-2 pt-1.5 text-[#0070f4]">{row.unitName}</div>
 
-                      {/* Tồn kho (Source) */}
-                      <div className="text-center font-semibold text-[#15171a]">
+                      {/* Tồn kho (kho xuất) */}
+                      <div
+                        className={`text-right pr-2 pt-1.5 ${row.sourceStock < 0 ? 'text-[#fb2c36]' : 'text-[#15171a]'}`}
+                      >
                         {row.sourceStock.toLocaleString('vi-VN')}
                       </div>
 
-                      {/* Tồn kho nhận (Dest) */}
-                      <div className="text-center text-[#677484]">
+                      {/* Tồn kho nhận */}
+                      <div className="text-right pr-2 pt-1.5 text-[#15171a]">
                         {destWarehouseId ? row.destStock.toLocaleString('vi-VN') : '-'}
                       </div>
 
                       {/* SL chuyển */}
-                      <div className="px-1 flex justify-center">
-                        <input
-                          type="number"
-                          min="1"
+                      <div className="px-1">
+                        <NumberInput
                           value={row.transferQuantity}
-                          onChange={(e) =>
-                            handleUpdateQuantity(row.productId, parseInt(e.target.value) || 0)
-                          }
-                          className="w-16 h-7 text-center rounded-[4px] border border-slate-300 focus:border-[#0070f4] focus:outline-none text-xs font-semibold text-[#15171a] bg-white"
+                          onChange={(v) => handleUpdateQuantity(row.productId, v)}
+                          className="w-full"
                         />
                       </div>
 
                       {/* Giá chuyển */}
-                      <div className="px-1 flex justify-center">
-                        <input
-                          type="number"
-                          min="0"
-                          step="1000"
+                      <div className="px-1">
+                        <NumberInput
                           value={row.transferPrice}
-                          onChange={(e) =>
-                            handleUpdatePrice(row.productId, parseFloat(e.target.value) || 0)
-                          }
-                          className="w-24 h-7 text-right pr-2 rounded-[4px] border border-slate-300 focus:border-[#0070f4] focus:outline-none text-xs text-[#15171a] bg-white"
+                          onChange={(v) => handleUpdatePrice(row.productId, v)}
+                          className="w-full"
                         />
                       </div>
 
                       {/* Thành tiền */}
-                      <div className="text-right font-bold text-[#15171a] font-mono pr-2">
-                        {row.lineTotal.toLocaleString('vi-VN')} đ
-                      </div>
-
-                      {/* Delete row */}
-                      <div className="text-center">
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveItem(row.productId)}
-                          className="p-1 rounded-[4px] text-[#677484] hover:text-[#fb2c36] hover:bg-[#fef2f2] transition cursor-pointer"
-                          title="Xóa sản phẩm"
-                        >
-                          <Trash2 size={14} />
-                        </button>
+                      <div className="px-1">
+                        <div className="h-8 px-2.5 flex items-center justify-end rounded-[8px] border border-slate-300 bg-white text-[#15171a]">
+                          {Math.round(row.lineTotal).toLocaleString('vi-VN')}
+                        </div>
                       </div>
                     </div>
-                  );
-                })}
-              </div>
-            )}
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Table Footer Summary (when rows exist) */}
@@ -1024,122 +1144,114 @@ export default function CreateTransferClient() {
 
         {/* ─── 3. RIGHT SIDEBAR: Transfer Header & Actions ─── */}
         {!isSidebarCollapsed && (
-          <aside className="w-80 bg-white border-l border-slate-200 flex flex-col justify-between shrink-0 p-4 overflow-y-auto">
-            {/* Top Form Section */}
-            <div className="flex flex-col gap-3.5">
-              {/* Creator & DateTime */}
-              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-                <div className="flex items-center gap-1.5 text-xs text-[#15171a] font-medium">
-                  <span>{userDisplay}</span>
+          <aside className="w-[380px] bg-white border-l border-slate-200 flex flex-col shrink-0 text-[13px] text-[#15171a]">
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+              {/* Người chuyển + Thời gian chuyển */}
+              <div className="flex items-center justify-between gap-3">
+                <div className="h-8 px-2.5 rounded-[8px] border border-slate-300 flex items-center gap-2 min-w-0 flex-1">
+                  <CircleUserRound size={16} className="text-[#15171a] shrink-0" />
+                  <span className="truncate">{userDisplay}</span>
                 </div>
                 <input
                   type="datetime-local"
                   value={transferDateTime}
                   onChange={(e) => setTransferDateTime(e.target.value)}
-                  className="h-8 px-2 rounded-[8px] border border-slate-300 text-[11px] font-mono text-[#15171a] bg-white hover:border-[#0070f4] focus:border-[#0070f4] focus:outline-none cursor-pointer transition shadow-2xs"
+                  className="h-8 px-2 rounded-[8px] border border-slate-300 text-[12px] text-[#677484] bg-white hover:border-[#0070f4] focus:border-[#0070f4] focus:outline-none cursor-pointer transition"
                   title="Thời gian chuyển hàng"
                 />
               </div>
 
-              {/* Chi nhánh chuyển (Source Warehouse) */}
-              <div className="flex flex-col gap-1">
-                <label className="text-[11px] font-semibold text-[#677484]">
-                  Từ chi nhánh:
-                </label>
-                <div className="h-8 px-2.5 rounded-[8px] border border-slate-300 bg-[#f7f8f9] flex items-center justify-between text-xs font-medium text-[#15171a]">
-                  <span>{activeWarehouse?.name || `Kho #${sourceWarehouseId}`}</span>
-                  <span className="text-[10px] px-1.5 py-0.5 rounded-[4px] bg-[#eff6ff] text-[#0070f4] font-bold">
-                    {activeWarehouse?.code || `K00${sourceWarehouseId}`}
-                  </span>
-                </div>
-              </div>
-
               {/* Mã chuyển hàng */}
-              <div className="flex flex-col gap-1">
-                <label className="text-[11px] font-semibold text-[#677484]">
-                  Mã chuyển hàng
-                </label>
+              <div className="flex items-center justify-between gap-3">
+                <span>Mã chuyển hàng</span>
                 <input
                   type="text"
                   value={transferCode}
                   onChange={(e) => setTransferCode(e.target.value)}
                   placeholder="Mã phiếu tự động"
-                  className="h-8 px-2.5 rounded-[8px] border border-slate-300 text-xs text-[#15171a] placeholder-[#677484] focus:outline-none focus:border-[#0070f4] bg-white"
+                  className="w-44 h-8 px-2.5 rounded-[8px] border border-slate-300 text-[13px] placeholder-[#677484] focus:outline-none focus:border-[#0070f4] bg-white"
                 />
               </div>
 
-              {/* Trạng thái */}
-              <div className="flex items-center justify-between py-0.5">
-                <span className="text-[11px] font-semibold text-[#677484]">Trạng thái</span>
-                <span className="font-bold text-xs text-[#15171a]">
-                  {status === 'DRAFT' ? 'Phiếu tạm' : 'Đang chuyển'}
-                </span>
+              {/* Từ chi nhánh */}
+              <div className="flex items-center justify-between gap-3">
+                <span>Từ chi nhánh</span>
+                <span className="text-right truncate">{activeWarehouse?.name || `Kho #${sourceWarehouseId}`}</span>
               </div>
 
-              {/* Tổng số lượng */}
-              <div className="flex items-center justify-between py-0.5">
-                <span className="text-[11px] font-semibold text-[#677484]">Tổng số lượng</span>
-                <span className="font-bold text-xs text-[#15171a]">
-                  {totalQuantity.toLocaleString('vi-VN')}
-                </span>
-              </div>
-
-              {/* Chuyển tới (Destination Warehouse) */}
-              <div className="flex flex-col gap-1">
-                <label className="text-[11px] font-semibold text-[#677484]">
+              {/* Chuyển tới */}
+              <div className="flex items-center justify-between gap-3">
+                <span>
                   Chuyển tới <span className="text-[#fb2c36]">*</span>
-                </label>
+                </span>
                 <select
                   value={destWarehouseId}
                   onChange={(e) => setDestWarehouseId(e.target.value ? Number(e.target.value) : '')}
-                  className="h-8 px-2 rounded-[8px] border border-slate-300 text-xs text-[#15171a] focus:outline-none focus:border-[#0070f4] bg-white cursor-pointer"
+                  className="w-44 h-8 px-2 rounded-[8px] border border-slate-300 text-[13px] text-[#15171a] focus:outline-none focus:border-[#0070f4] bg-white cursor-pointer"
                 >
                   <option value="">Chọn chi nhánh</option>
                   {availableDestWarehouses.map((w) => (
                     <option key={w.warehouseId} value={w.warehouseId}>
-                      {w.code} - {w.name}
+                      {w.name}
                     </option>
                   ))}
                 </select>
               </div>
 
-              {/* Ghi chú */}
-              <div className="flex flex-col gap-1">
-                <textarea
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Ghi chú"
-                  rows={4}
-                  className="w-full p-2.5 rounded-[8px] border border-slate-300 text-xs text-[#15171a] placeholder-[#677484] focus:outline-none focus:border-[#0070f4] resize-none bg-white"
-                />
+              {/* Trạng thái */}
+              <div className="flex items-center justify-between gap-3">
+                <span>Trạng thái</span>
+                <span>{status === 'DRAFT' ? 'Phiếu tạm' : 'Đang chuyển'}</span>
               </div>
+
+              {/* Tổng số lượng */}
+              <div className="flex items-center justify-between gap-3">
+                <span className="flex items-center gap-1.5">
+                  Tổng số lượng
+                  <span
+                    className="min-w-[18px] h-[18px] px-1 rounded-full border border-[#677484] text-[11px] leading-none flex items-center justify-center text-[#677484]"
+                    title={`${items.length} mặt hàng`}
+                  >
+                    {items.length}
+                  </span>
+                </span>
+                <span>{totalQuantity.toLocaleString('vi-VN')}</span>
+              </div>
+
+              {/* Tổng giá trị chuyển */}
+              <div className="flex items-center justify-between gap-3">
+                <span className="font-bold">Tổng giá trị chuyển</span>
+                <span className="font-bold text-[#0070f4]">{Math.round(totalAmount).toLocaleString('vi-VN')}</span>
+              </div>
+
+              {/* Ghi chú */}
+              <textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Ghi chú"
+                rows={3}
+                className="w-full p-2.5 rounded-[8px] border border-slate-300 text-[13px] placeholder-[#677484] focus:outline-none focus:border-[#0070f4] resize-none bg-white"
+              />
             </div>
 
-            {/* Bottom Actions Section: 2 Big Buttons (Blue + Green) */}
-            <div className="pt-3 border-t border-slate-100 flex flex-col gap-2.5">
-              <div className="grid grid-cols-2 gap-2">
-                {/* Nút Lưu tạm (Blue) */}
-                <button
-                  type="button"
-                  disabled={isSubmitting}
-                  onClick={handleSaveDraft}
-                  className="h-10 rounded-[8px] bg-[#0070f4] hover:bg-[#005ac3] active:bg-[#00479b] text-white font-semibold text-xs flex items-center justify-center gap-1.5 shadow-xs transition cursor-pointer disabled:opacity-50"
-                >
-                  <Save size={15} />
-                  <span>Lưu tạm</span>
-                </button>
-
-                {/* Nút Hoàn thành (Green) */}
-                <button
-                  type="button"
-                  disabled={isSubmitting}
-                  onClick={handleComplete}
-                  className="h-10 rounded-[8px] bg-[#00b63e] hover:bg-[#009e35] active:bg-[#00872d] text-white font-semibold text-xs flex items-center justify-center gap-1.5 shadow-xs transition cursor-pointer disabled:opacity-50"
-                >
-                  <Check size={16} className="stroke-[2.5]" />
-                  <span>Hoàn thành</span>
-                </button>
-              </div>
+            {/* Lưu tạm / Hoàn thành — cùng kiểu với màn Nhập hàng */}
+            <div className="p-4 grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                disabled={isSubmitting}
+                onClick={handleSaveDraft}
+                className="h-11 rounded-[8px] border border-[#0070f4] bg-white hover:bg-[#eff6ff] text-[#0070f4] font-semibold text-[14px] transition cursor-pointer disabled:opacity-50"
+              >
+                Lưu tạm
+              </button>
+              <button
+                type="button"
+                disabled={isSubmitting}
+                onClick={handleComplete}
+                className="h-11 rounded-[8px] bg-[#0070f4] hover:bg-[#005ac3] text-white font-semibold text-[14px] transition cursor-pointer disabled:opacity-50"
+              >
+                Hoàn thành
+              </button>
             </div>
           </aside>
         )}

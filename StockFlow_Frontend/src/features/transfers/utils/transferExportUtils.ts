@@ -1,8 +1,8 @@
 // src/features/transfers/utils/transferExportUtils.ts
 import * as XLSX from 'xlsx';
 import { TransferDetail, TransferItem, TransferRecord } from '../types';
-import { WarehouseFacility } from '@/features/roles/types';
 import { formatDateTimeVN } from './dateUtils';
+import { escapeHtml, printDateTime, printHtml, printMoney, printQty } from '@/lib/print/printHtml';
 
 /**
  * Xuất dữ liệu chi tiết phiếu chuyển hàng ra file Excel (.xlsx) chuẩn theo thiết kế
@@ -86,241 +86,102 @@ export function exportTransferToExcel(detail: TransferDetail): void {
 }
 
 /**
- * In phiếu chuyển hàng chuẩn khổ giấy A4 theo tiêu đề "StockFlow - Kho hàng - Chuyển hàng"
+ * In phiếu chuyển hàng (A4, cùng kiểu với phiếu nhập / phiếu trả hàng nhập / phiếu kiểm kho).
+ * Không in thông tin công ty: chỉ thông tin phiếu, 2 chi nhánh, bảng hàng, ghi chú, ký tên.
  */
-export function printTransferSlip(
-  detail: TransferDetail,
-  warehouses?: WarehouseFacility[]
-): void {
-  try {
-    const iframe = document.createElement('iframe');
-    iframe.style.position = 'fixed';
-    iframe.style.right = '0';
-    iframe.style.bottom = '0';
-    iframe.style.width = '0';
-    iframe.style.height = '0';
-    iframe.style.border = 'none';
-    document.body.appendChild(iframe);
-
-    const doc = iframe.contentWindow?.document;
-    if (!doc) return;
-
-    // Tìm địa chỉ kho chuyển (nguồn) thực tế
-    const sourceWh = warehouses?.find(
-      (w) =>
-        w.warehouseId === detail.sourceWarehouseId ||
-        w.name.toLowerCase() === detail.sourceWarehouseName.toLowerCase() ||
-        w.code.toLowerCase() === detail.sourceWarehouseCode.toLowerCase()
-    );
-    const addressDisplay = sourceWh?.address || 'Số 18 Đường Dệt May, Gia Lâm, Hà Nội';
-
-    // Xử lý tách ghi chú chuyển hàng và ghi chú nhận hàng nếu có
-    let transferNotes = detail.notes || '';
-    let receiveNotes = '';
-    if (transferNotes.includes('[Nhận hàng]:')) {
-      const parts = transferNotes.split('[Nhận hàng]:');
-      transferNotes = parts[0].replace(/\|\s*$/, '').trim();
-      receiveNotes = parts[1].trim();
-    }
-
-    const formattedTransferDate = formatDateTimeVN(detail.transferDate);
-
-    const rowsHtml = (detail.items || [])
-      .map((item: TransferItem, idx: number) => {
-        const unitStr = item.unitName ? ` (${item.unitName})` : '';
-        const receivedQtyStr =
-          detail.status === 'RECEIVED' &&
-          item.receivedQuantity !== null &&
-          item.receivedQuantity !== undefined
-            ? item.receivedQuantity
-            : '';
-        const priceStr = (item.transferPrice || 0).toLocaleString('vi-VN');
-
-        return `
-          <tr>
-            <td style="text-align: center;">${idx + 1}</td>
-            <td>${item.productCode || ''}</td>
-            <td>${item.productName || ''}${unitStr}</td>
-            <td style="text-align: right;">${item.transferQuantity}</td>
-            <td style="text-align: right;">${receivedQtyStr}</td>
-            <td style="text-align: right;">${priceStr}</td>
-          </tr>
-        `;
-      })
-      .join('');
-
-    const html = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="utf-8" />
-        <title>StockFlow - Kho hàng - Chuyển hàng</title>
-        <style>
-          @page {
-            size: A4 portrait;
-            margin: 15mm 15mm;
-          }
-          * {
-            box-sizing: border-box;
-          }
-          body {
-            font-family: Arial, "Helvetica Neue", Helvetica, sans-serif;
-            font-size: 13px;
-            color: #000;
-            margin: 0;
-            padding: 24px;
-            background: #fff;
-            line-height: 1.4;
-          }
-          .header-top {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            margin-bottom: 24px;
-          }
-          .company-info {
-            font-size: 13px;
-            line-height: 1.5;
-          }
-          .company-name {
-            font-weight: 700;
-            text-transform: uppercase;
-          }
-          .system-title {
-            font-size: 13px;
-            color: #333;
-            font-weight: 600;
-          }
-          .title-section {
-            text-align: center;
-            margin-bottom: 24px;
-          }
-          .main-title {
-            font-size: 20px;
-            font-weight: 800;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin-bottom: 4px;
-          }
-          .transfer-code {
-            font-size: 13px;
-            font-weight: bold;
-            margin-bottom: 3px;
-          }
-          .transfer-date {
-            font-size: 13px;
-            font-style: italic;
-          }
-          .meta-section {
-            margin-bottom: 16px;
-            font-size: 13px;
-            line-height: 1.7;
-          }
-          table.data-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 8px;
-            margin-bottom: 16px;
-          }
-          table.data-table th, table.data-table td {
-            border: 1px solid #000;
-            padding: 6px 8px;
-            font-size: 13px;
-          }
-          table.data-table th {
-            font-weight: bold;
-            text-align: center;
-            background-color: #fff;
-          }
-          .notes-section {
-            margin-top: 14px;
-            margin-bottom: 30px;
-            font-size: 13px;
-            line-height: 1.8;
-          }
-          .signatures-section {
-            display: flex;
-            justify-content: space-around;
-            text-align: center;
-            margin-top: 24px;
-            page-break-inside: avoid;
-          }
-          .signature-title {
-            font-weight: bold;
-            font-size: 14px;
-          }
-        </style>
-      </head>
-      <body>
-        <div class="header-top">
-          <div class="company-info">
-            <div class="company-name">ctytnhhsanxuattinphat</div>
-            <div>Địa chỉ: ${addressDisplay}</div>
-            <div>SĐT: +84913268079</div>
-          </div>
-          <div class="system-title">
-            StockFlow - Kho hàng - Chuyển hàng
-          </div>
-        </div>
-
-        <div class="title-section">
-          <div class="main-title">PHIẾU CHUYỂN HÀNG</div>
-          <div class="transfer-code">Mã phiếu: ${detail.code}</div>
-          <div class="transfer-date">Ngày chuyển: ${formattedTransferDate}</div>
-        </div>
-
-        <div class="meta-section">
-          <div>Chi nhánh chuyển: ${detail.sourceWarehouseName}</div>
-          <div>Người chuyển: ${detail.createdBy || ''}</div>
-          <div>Chi nhánh nhận: ${detail.destWarehouseName}</div>
-          <div>Người nhận: ${detail.receivedBy || ''}</div>
-        </div>
-
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th style="width: 50px;">STT</th>
-              <th style="width: 120px;">Mã hàng</th>
-              <th>Tên hàng</th>
-              <th style="width: 90px;">SL chuyển</th>
-              <th style="width: 90px;">SL nhận</th>
-              <th style="width: 100px;">Giá chuyển</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${rowsHtml}
-          </tbody>
-        </table>
-
-        <div class="notes-section">
-          <div>Ghi chú chi nhánh chuyển: ${transferNotes || '—'}</div>
-          <div>Ghi chú chi nhánh nhận: ${receiveNotes || '—'}</div>
-        </div>
-
-        <div class="signatures-section">
-          <div class="signature-title">Người chuyển</div>
-          <div class="signature-title">Người nhận</div>
-        </div>
-      </body>
-      </html>
-    `;
-
-    doc.open();
-    doc.write(html);
-    doc.close();
-
-    iframe.contentWindow?.focus();
-    setTimeout(() => {
-      iframe.contentWindow?.print();
-      setTimeout(() => {
-        if (document.body.contains(iframe)) {
-          document.body.removeChild(iframe);
-        }
-      }, 1500);
-    }, 300);
-  } catch (err) {
-    console.error('Lỗi khi in phiếu chuyển hàng:', err);
+export function printTransferSlip(detail: TransferDetail): void {
+  // Ghi chú lưu chung 1 trường: tách phần ghi chú lúc nhận hàng "[Nhận hàng]: ..."
+  let transferNotes = detail.notes || '';
+  let receiveNotes = detail.receiveNotes || '';
+  if (transferNotes.includes('[Nhận hàng]:')) {
+    const parts = transferNotes.split('[Nhận hàng]:');
+    transferNotes = parts[0].replace(/\|\s*$/, '').trim();
+    receiveNotes = parts.slice(1).join(' ').trim();
   }
+
+  const items: TransferItem[] = detail.items || [];
+  const received = detail.status === 'RECEIVED';
+  const totalQty = items.reduce((s, it) => s + (it.transferQuantity || 0), 0);
+  const totalReceived = items.reduce((s, it) => s + (it.receivedQuantity ?? 0), 0);
+  const totalValue = items.reduce((s, it) => s + (it.lineTotal || (it.transferQuantity || 0) * (it.transferPrice || 0)), 0);
+  const statusLabel =
+    detail.status === 'RECEIVED' ? 'Đã nhận' : detail.status === 'IN_TRANSIT' ? 'Đang chuyển' : detail.status === 'CANCELLED' ? 'Đã hủy' : 'Phiếu tạm';
+
+  const rows = items
+    .map(
+      (it, i) => `<tr>
+        <td class="c">${i + 1}</td>
+        <td>${escapeHtml(it.productCode)}</td>
+        <td>${escapeHtml(it.unitName ? `${it.productName} (${it.unitName})` : it.productName)}${
+          it.notes ? `<br /><i style="font-size:11px">(${escapeHtml(it.notes)})</i>` : ''
+        }${it.receiveNotes ? `<br /><i style="font-size:11px">(${escapeHtml(it.receiveNotes)})</i>` : ''}</td>
+        <td class="r">${printQty(it.transferQuantity)}</td>
+        <td class="r">${received && it.receivedQuantity !== null && it.receivedQuantity !== undefined ? printQty(it.receivedQuantity) : ''}</td>
+        <td class="r">${printMoney(it.transferPrice)}</td>
+        <td class="r">${printMoney(it.lineTotal || (it.transferQuantity || 0) * (it.transferPrice || 0))}</td>
+      </tr>`
+    )
+    .join('');
+
+  printHtml(`<!doctype html>
+<html lang="vi"><head><meta charset="utf-8" /><title>StockFlow - Hàng hóa - Chuyển hàng</title>
+<style>
+  @page { size: A4 portrait; margin: 12mm 10mm; }
+  * { box-sizing: border-box; }
+  body { font-family: Arial, Helvetica, sans-serif; font-size: 13px; color: #000; margin: 0; }
+  h1 { text-align: center; font-size: 18px; margin: 4px 0; }
+  .sub { text-align: center; font-size: 11px; line-height: 1.5; }
+  .info { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 24px; margin: 16px 0 8px; line-height: 1.55; }
+  table.items { width: 100%; border-collapse: collapse; }
+  table.items th, table.items td { border: 1px solid #000; padding: 2px 4px; }
+  table.items th { text-align: center; }
+  .c { text-align: center; } .r { text-align: right; }
+  table.sum { margin: 6px 0 0 auto; width: 55%; border-collapse: collapse; }
+  table.sum td { padding: 2px 4px; }
+  .note { margin-top: 8px; line-height: 1.6; }
+  .sign { display: flex; justify-content: space-around; margin-top: 24px; font-weight: bold; text-align: center; }
+  .sign small { display: block; font-weight: normal; font-style: italic; font-size: 11px; margin-top: 2px; }
+</style></head>
+<body>
+  <h1>PHIẾU CHUYỂN HÀNG</h1>
+  <div class="sub"><b>Mã phiếu: ${escapeHtml(detail.code)}</b><br /><i>Ngày chuyển: ${printDateTime(detail.transferDate)}</i></div>
+
+  <div class="info">
+    <div>Chi nhánh chuyển: ${escapeHtml(detail.sourceWarehouseName)}</div>
+    <div>Trạng thái: ${statusLabel}</div>
+    <div>Người chuyển: ${escapeHtml(detail.createdBy)}</div>
+    <div>Ngày chuyển: ${printDateTime(detail.transferDate)}</div>
+    <div>Chi nhánh nhận: ${escapeHtml(detail.destWarehouseName)}</div>
+    <div>Ngày nhận: ${printDateTime(detail.receivedDate)}</div>
+    <div>Người nhận: ${escapeHtml(detail.receivedBy)}</div>
+  </div>
+
+  <table class="items">
+    <thead><tr>
+      <th style="width:36px">STT</th><th style="width:90px">Mã hàng</th><th>Tên hàng</th>
+      <th style="width:70px">SL chuyển</th><th style="width:70px">SL nhận</th>
+      <th style="width:84px">Giá chuyển</th><th style="width:96px">Thành tiền</th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
+  </table>
+
+  <table class="sum">
+    <tr><td>Tổng số mặt hàng:</td><td class="r">${items.length}</td></tr>
+    <tr><td>Tổng SL chuyển:</td><td class="r">${printQty(totalQty)}</td></tr>
+    ${received ? `<tr><td>Tổng SL nhận:</td><td class="r">${printQty(totalReceived)}</td></tr>` : ''}
+    <tr><td><b>Tổng giá trị chuyển:</b></td><td class="r"><b>${printMoney(totalValue)}</b></td></tr>
+  </table>
+
+  <div class="note">
+    Ghi chú chi nhánh chuyển: ${escapeHtml(transferNotes)}<br />
+    Ghi chú chi nhánh nhận: ${escapeHtml(receiveNotes)}
+  </div>
+
+  <div class="sign">
+    <div>Người chuyển<small>(Ký, họ tên)</small></div>
+    <div>Người nhận<small>(Ký, họ tên)</small></div>
+  </div>
+</body></html>`);
 }
 
 /**

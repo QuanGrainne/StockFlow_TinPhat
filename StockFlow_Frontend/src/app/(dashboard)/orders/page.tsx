@@ -1,8 +1,19 @@
-﻿export default function ordersPage() {
-  return (
-    <div>
-      <h1 className="text-2xl font-semibold text-gray-900">Đơn hàng</h1>
-      <p className="text-gray-500 mt-2">Tính năng đang được xây dựng...</p>
-    </div>
-  );
+'use client';
+
+import dynamic from 'next/dynamic';
+
+const AppLayout = dynamic(
+  () => import('@/features/roles/components/AppLayout').then((mod) => mod.AppLayout),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex h-screen items-center justify-center bg-[#f7f9fa] text-sm text-slate-400">
+        Đang tải Quản lý đơn hàng...
+      </div>
+    ),
+  }
+);
+
+export default function OrdersPage() {
+  return <AppLayout initialScreen="orders" />;
 }

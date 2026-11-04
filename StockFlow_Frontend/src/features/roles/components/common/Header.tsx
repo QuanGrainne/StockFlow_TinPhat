@@ -23,6 +23,7 @@ import {
 import { adminService } from '../../services/adminService';
 import { useRouter } from 'next/navigation';
 import { TIN_PHAT_WAREHOUSES, setActiveWarehouseGlobal } from '@/lib/warehouse/useActiveWarehouse';
+import { ROLE_SWITCHER_ENABLED } from '@/lib/auth/flags';
 
 interface HeaderProps {
   currentRole: UserRole;
@@ -161,8 +162,14 @@ export const Header: React.FC<HeaderProps> = ({
       setUserWarehouseAccess(initialWhs);
     }
 
-    // Tải danh sách nhân viên để phục vụ đổi nhanh và bổ sung avatar/kho nếu user thiếu
-    adminService.getStaffList().then((list) => {
+    // Tải danh sách nhân viên để phục vụ đổi nhanh và bổ sung avatar/kho nếu user thiếu.
+    // API /api/Staff cần quyền AUTH_READ: nhân viên thường sẽ bị 403 và service rơi về dữ liệu mock,
+    // dễ ghép nhầm dữ liệu giả vào tài khoản thật, nên chỉ gọi khi bật demo hoặc là Admin.
+    const isAdminUser =
+      Array.isArray(u?.roles) && u.roles.some((r: string) => String(r).toUpperCase().includes('ADMIN'));
+    const staffListPromise: Promise<StaffAccount[]> =
+      ROLE_SWITCHER_ENABLED || isAdminUser ? adminService.getStaffList() : Promise.resolve([]);
+    staffListPromise.then((list) => {
       if (list && list.length > 0) {
         setStaffList(list);
 
@@ -424,6 +431,7 @@ export const Header: React.FC<HeaderProps> = ({
 
   // Chuyển nhanh sang nhân viên khác
   const handleSwitchUser = (staff: StaffAccount) => {
+    if (!ROLE_SWITCHER_ENABLED) return;
     const words = staff.name.trim().split(/\s+/);
     const initials = words.length > 1
       ? (words[0][0] + words[words.length - 1][0]).toUpperCase()
@@ -700,7 +708,9 @@ export const Header: React.FC<HeaderProps> = ({
                 </div>
               </div>
 
-              {/* Section 1: Switch Role (Ảnh 4) */}
+              {/* Section 1: Switch Role (Ảnh 4) — chỉ hiện khi bật cờ demo ROLE_SWITCHER_ENABLED */}
+              {ROLE_SWITCHER_ENABLED && (
+              <>
               <div className="px-2 pt-3 pb-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                 CHUYỂN ĐỔI PHÂN QUYỀN (SWITCH ROLE)
               </div>
@@ -759,9 +769,11 @@ export const Header: React.FC<HeaderProps> = ({
                   );
                 })}
               </div>
+              </>
+              )}
 
-              {/* Section 2: Quick switch staff account */}
-              {staffList.length > 0 && (
+              {/* Section 2: Quick switch staff account — chỉ hiện khi bật cờ demo ROLE_SWITCHER_ENABLED */}
+              {ROLE_SWITCHER_ENABLED && staffList.length > 0 && (
                 <>
                   <div className="px-2 pt-3 pb-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider border-t border-slate-100 mt-2">
                     ĐỔI NHANH NHÂN VIÊN

@@ -4,12 +4,12 @@ using Microsoft.AspNetCore.Mvc;
 using StockFlow.Application.Features.Products.Commands;
 using StockFlow.Application.Features.Products.DTOs;
 using StockFlow.Application.Features.Products.Queries;
+using StockFlow.API.Authorization;
 
 namespace StockFlow.API.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-[AllowAnonymous]
 public class ProductsController : ControllerBase
 {
     private readonly IMediator _mediator;
@@ -25,6 +25,7 @@ public class ProductsController : ControllerBase
     [HttpGet]
     [ProducesResponseType(typeof(List<ProductDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [RequirePermission("GOODS_READ")]
     public async Task<IActionResult> GetProducts(
         [FromQuery] string? search,
         [FromQuery] string? type,
@@ -51,6 +52,7 @@ public class ProductsController : ControllerBase
     [HttpGet("{id}")]
     [ProducesResponseType(typeof(ProductDetailDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [RequirePermission("GOODS_READ")]
     public async Task<IActionResult> GetProductById(int id)
     {
         var result = await _mediator.Send(new GetProductByIdQuery(id));
@@ -68,6 +70,7 @@ public class ProductsController : ControllerBase
     [ProducesResponseType(typeof(ProductDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [RequirePermission("GOODS_CREATE")]
     public async Task<IActionResult> CreateProduct([FromBody] CreateProductRequest request)
     {
         var result = await _mediator.Send(new CreateProductCommand(request));
@@ -88,6 +91,7 @@ public class ProductsController : ControllerBase
     [HttpPost("import")]
     [ProducesResponseType(typeof(ImportProductsResultDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [RequirePermission("GOODS_CREATE")]
     public async Task<IActionResult> ImportProducts([FromBody] ImportProductsRequest request)
     {
         var result = await _mediator.Send(new ImportProductsCommand(request));
@@ -104,9 +108,27 @@ public class ProductsController : ControllerBase
     [HttpPut("{id}")]
     [ProducesResponseType(typeof(ProductDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [RequirePermission("GOODS_UPDATE")]
     public async Task<IActionResult> UpdateProduct(int id, [FromBody] UpdateProductRequest request)
     {
         var result = await _mediator.Send(new UpdateProductCommand(id, request));
+        if (!result.IsSuccess)
+        {
+            return BadRequest(new { message = result.Error });
+        }
+        return Ok(result.Value);
+    }
+
+    /// <summary>
+    /// Nhập thêm (ADD) hoặc cân chỉnh (SET) tồn kho của hàng hóa tại 1 kho; ghi thẻ kho, giữ nguyên giá vốn.
+    /// </summary>
+    [HttpPost("{id}/stock-adjustments")]
+    [ProducesResponseType(typeof(ProductStockAdjustmentDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [RequirePermission("STOCK_UPDATE")]
+    public async Task<IActionResult> AdjustStock(int id, [FromBody] AdjustProductStockRequest request)
+    {
+        var result = await _mediator.Send(new AdjustProductStockCommand(id, request));
         if (!result.IsSuccess)
         {
             return BadRequest(new { message = result.Error });
@@ -120,6 +142,7 @@ public class ProductsController : ControllerBase
     [HttpPatch("{id}/toggle-status")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [RequirePermission("GOODS_UPDATE")]
     public async Task<IActionResult> ToggleProductStatus(int id)
     {
         var result = await _mediator.Send(new ToggleProductStatusCommand(id));
@@ -136,6 +159,7 @@ public class ProductsController : ControllerBase
     [HttpDelete("{id}")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [RequirePermission("GOODS_DELETE")]
     public async Task<IActionResult> DeleteProduct(int id)
     {
         var result = await _mediator.Send(new DeleteProductCommand(id));
@@ -151,6 +175,7 @@ public class ProductsController : ControllerBase
     /// </summary>
     [HttpGet("categories")]
     [ProducesResponseType(typeof(List<ProductCategoryDto>), StatusCodes.Status200OK)]
+    [RequirePermission("GOODS_READ")]
     public async Task<IActionResult> GetProductCategories()
     {
         var result = await _mediator.Send(new GetProductCategoriesQuery());
@@ -163,6 +188,7 @@ public class ProductsController : ControllerBase
     [HttpPost("categories")]
     [ProducesResponseType(typeof(ProductCategoryDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [RequirePermission("GOODS_CREATE")]
     public async Task<IActionResult> CreateProductCategory([FromBody] CreateCategoryRequest request)
     {
         var result = await _mediator.Send(new CreateProductCategoryCommand(request));
@@ -178,6 +204,7 @@ public class ProductsController : ControllerBase
     /// </summary>
     [HttpGet("units")]
     [ProducesResponseType(typeof(List<ProductUnitDto>), StatusCodes.Status200OK)]
+    [RequirePermission("GOODS_READ")]
     public async Task<IActionResult> GetProductUnits()
     {
         var result = await _mediator.Send(new GetProductUnitsQuery());

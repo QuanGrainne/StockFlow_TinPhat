@@ -8,6 +8,7 @@ using Microsoft.EntityFrameworkCore;
 using StockFlow.Application.Common;
 using StockFlow.Application.Common.Interfaces;
 using StockFlow.Application.Features.Transfers.DTOs;
+using StockFlow.Application.Features.Transfers.Helpers;
 
 namespace StockFlow.Application.Features.Transfers.Queries;
 
@@ -20,14 +21,22 @@ public record GetProductsForTransferQuery(
 public class GetProductsForTransferQueryHandler : IRequestHandler<GetProductsForTransferQuery, Result<List<ProductWithStockDto>>>
 {
     private readonly IStockFlowDbContext _context;
+    private readonly ICurrentUserService _currentUserService;
 
-    public GetProductsForTransferQueryHandler(IStockFlowDbContext context)
+    public GetProductsForTransferQueryHandler(IStockFlowDbContext context, ICurrentUserService currentUserService)
     {
         _context = context;
+        _currentUserService = currentUserService;
     }
 
     public async Task<Result<List<ProductWithStockDto>>> Handle(GetProductsForTransferQuery request, CancellationToken cancellationToken)
     {
+        // Cô lập dữ liệu kho: chỉ tra tồn để chuyển đi từ kho mình được phân quyền
+        if (!await _currentUserService.HasWarehouseAccessAsync(request.SourceWarehouseId, cancellationToken))
+        {
+            return Result.Failure<List<ProductWithStockDto>>("Bạn không có quyền truy cập kho xuất này.");
+        }
+
         var productQuery = _context.MstProducts
             .Include(p => p.BaseUnit)
             .Where(p => p.IsActive != false)
@@ -78,10 +87,13 @@ public class GetProductsForTransferQueryHandler : IRequestHandler<GetProductsFor
                 ProductCode: p.ProductCode ?? $"SP-{p.ProductId}",
                 ProductName: p.ProductName ?? "Sản phẩm",
                 UnitName: p.BaseUnit?.UnitName ?? "Cái",
-                CostPrice: p.MovingAverageCost ?? p.StandardPrice ?? 0,
+                // Giá vốn tại kho xuất (giá trị chuyển), không lấy giá bán
+                CostPrice: TransferStockOps.CostOf(
+                    stockBalances.Where(b => b.WarehouseId == request.SourceWarehouseId && b.ProductId == p.ProductId), p),
                 StandardPrice: p.StandardPrice ?? 0,
                 SourceStock: sourceStock,
-                DestStock: destStock
+                DestStock: destStock,
+                ImageUrl: p.ImageUrl
             );
         }).ToList();
 

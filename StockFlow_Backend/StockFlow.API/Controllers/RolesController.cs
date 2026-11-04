@@ -4,12 +4,12 @@ using Microsoft.AspNetCore.Mvc;
 using StockFlow.Application.Features.Roles.Commands;
 using StockFlow.Application.Features.Roles.DTOs;
 using StockFlow.Application.Features.Roles.Queries;
+using StockFlow.API.Authorization;
 
 namespace StockFlow.API.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-[AllowAnonymous]
 public class RolesController : ControllerBase
 {
     private readonly IMediator _mediator;
@@ -24,6 +24,7 @@ public class RolesController : ControllerBase
     /// </summary>
     [HttpGet]
     [ProducesResponseType(typeof(List<RoleDto>), StatusCodes.Status200OK)]
+    [RequirePermission("AUTH_READ")]
     public async Task<IActionResult> GetRoles()
     {
         var result = await _mediator.Send(new GetRolesQuery());
@@ -36,6 +37,7 @@ public class RolesController : ControllerBase
     [HttpPost]
     [ProducesResponseType(typeof(RoleDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [RequireAdmin]
     public async Task<IActionResult> CreateRole([FromBody] CreateRoleRequest request)
     {
         var result = await _mediator.Send(new CreateRoleCommand(request));
@@ -51,6 +53,8 @@ public class RolesController : ControllerBase
     /// </summary>
     [HttpGet("{roleCode}/permissions")]
     [ProducesResponseType(typeof(List<PermissionModuleDto>), StatusCodes.Status200OK)]
+    // Chỉ cần đăng nhập: frontend của mọi nhân viên đọc ma trận quyền của chính vai trò mình để ẩn/hiện menu.
+    // Đây là dữ liệu chỉ đọc, không nhạy cảm; thay đổi ma trận vẫn yêu cầu [RequireAdmin].
     public async Task<IActionResult> GetRolePermissions(string roleCode)
     {
         var result = await _mediator.Send(new GetRolePermissionsQuery(roleCode));
@@ -63,6 +67,7 @@ public class RolesController : ControllerBase
     [HttpPut("{roleIdOrCode}")]
     [ProducesResponseType(typeof(RoleDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [RequireAdmin]
     public async Task<IActionResult> UpdateRole(string roleIdOrCode, [FromBody] UpdateRoleRequest request)
     {
         var result = await _mediator.Send(new UpdateRoleCommand(roleIdOrCode, request));
@@ -79,6 +84,7 @@ public class RolesController : ControllerBase
     [HttpDelete("{roleIdOrCode}")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [RequireAdmin]
     public async Task<IActionResult> DeleteRole(string roleIdOrCode)
     {
         var result = await _mediator.Send(new DeleteRoleCommand(roleIdOrCode));
@@ -95,6 +101,7 @@ public class RolesController : ControllerBase
     [HttpPut("{roleCode}/permissions")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [RequireAdmin]
     public async Task<IActionResult> SaveRolePermissions(string roleCode, [FromBody] List<PermissionModuleDto> modules)
     {
         var result = await _mediator.Send(new SaveRolePermissionsCommand(roleCode, modules));

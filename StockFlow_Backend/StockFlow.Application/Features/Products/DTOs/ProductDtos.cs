@@ -106,7 +106,8 @@ public record ProductCategoryDto(
     string CategoryName,
     string? Description,
     bool IsActive,
-    int ProductCount
+    int ProductCount,
+    int ActiveProductCount = 0 // số hàng hóa đang kinh doanh (is_active khác false)
 );
 
 public record ProductUnitDto(
@@ -179,6 +180,10 @@ public class UpdateProductRequest
     public List<ProductConversionUnitDto>? Units { get; set; }
     public List<ProductAttributeDto>? Attributes { get; set; }
     public List<ProductVariantItemDto>? Variants { get; set; }
+    /// <summary>
+    /// Phạm vi áp dụng giá vốn mới (CostPrice): null/rỗng = toàn hệ thống (mọi kho), có giá trị = chỉ các kho này.
+    /// </summary>
+    public List<int>? CostWarehouseIds { get; set; }
 }
 
 public class ImportProductItemRequest
@@ -223,3 +228,18 @@ public class ImportProductsResultDto
     public string Message { get; set; } = string.Empty;
     public List<ProductDto> Products { get; set; } = new();
 }
+
+/// <summary>Yêu cầu nhập thêm (ADD) hoặc cân chỉnh (SET) tồn kho của 1 hàng hóa tại 1 kho.</summary>
+public record AdjustProductStockRequest(int WarehouseId, decimal Quantity, string Mode = "ADD", string? Note = null);
+
+/// <summary>Kết quả điều chỉnh tồn kho tại 1 kho.</summary>
+public record ProductStockAdjustmentDto(
+    int ProductId,
+    int WarehouseId,
+    string WarehouseCode,
+    string WarehouseName,
+    decimal PreviousQuantity,
+    decimal NewQuantity,
+    decimal Delta,
+    decimal UnitCost,
+    string? StocktakeCode = null);

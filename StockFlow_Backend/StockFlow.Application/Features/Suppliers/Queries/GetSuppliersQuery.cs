@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using StockFlow.Application.Common;
 using StockFlow.Application.Common.Interfaces;
 using StockFlow.Application.Features.Suppliers.DTOs;
+using StockFlow.Application.Features.Suppliers.Helpers;
 
 namespace StockFlow.Application.Features.Suppliers.Queries;
 
@@ -13,7 +14,9 @@ public record GetSuppliersQuery(
     string? Search = null,
     string? DebtStatus = null,
     string? Status = null,
-    int? WarehouseId = null
+    int? WarehouseId = null,
+    DateTime? FromDate = null,
+    DateTime? ToDate = null
 ) : IRequest<Result<List<SupplierDto>>>;
 
 public class GetSuppliersQueryHandler : IRequestHandler<GetSuppliersQuery, Result<List<SupplierDto>>>
@@ -72,59 +75,107 @@ public class GetSuppliersQueryHandler : IRequestHandler<GetSuppliersQuery, Resul
         }
 
         // 5. Lọc theo Chi nhánh / Kho nhập hàng (nếu có chọn kho)
-        Dictionary<int, (decimal TotalPurchased, int ReceiptCount)> branchStats = new();
         if (query.WarehouseId.HasValue && query.WarehouseId.Value > 0)
         {
             var targetWhId = query.WarehouseId.Value;
             var partnerIdsInWh = await _context.TrxGoodsReceipts
-                .Where(r => r.WarehouseId == targetWhId)
+                .Where(r => r.WarehouseId == targetWhId && r.Status == "COMPLETED")
                 .Select(r => r.PartnerId)
                 .Distinct()
                 .ToListAsync(cancellationToken);
 
             dbQuery = dbQuery.Where(p => partnerIdsInWh.Contains(p.PartnerId));
+        }
 
-            // Tính số tiền nhập và số phiếu tại kho này
-            var receiptsInWh = await _context.TrxGoodsReceipts
-                .Include(r => r.DtlGoodsReceiptItems)
-                .Where(r => r.WarehouseId == targetWhId)
-                .AsNoTracking()
+        // 5b. Lọc theo thời gian phát sinh nhập hàng (ngày nhập của phiếu nhập, ToDate tính hết ngày)
+        var hasTimeFilter = query.FromDate.HasValue || query.ToDate.HasValue;
+        var fromDate = query.FromDate?.Date;
+        var toDateExclusive = query.ToDate?.Date.AddDays(1);
+        if (hasTimeFilter)
+        {
+            var partnerIdsInRange = await _context.TrxGoodsReceipts
+                .Where(r => r.Status == "COMPLETED" && r.ReceivedDate != null
+                    && (fromDate == null || r.ReceivedDate >= fromDate)
+                    && (toDateExclusive == null || r.ReceivedDate < toDateExclusive))
+                .Select(r => r.PartnerId)
+                .Distinct()
                 .ToListAsync(cancellationToken);
 
-            branchStats = receiptsInWh
-                .GroupBy(r => r.PartnerId)
-                .ToDictionary(
-                    g => g.Key,
-                    g => (
-                        TotalPurchased: g.Sum(r => r.DtlGoodsReceiptItems.Sum(i => (i.ReceivedQty ?? 0) * (i.UnitLandedCost ?? 0))),
-                        ReceiptCount: g.Count()
-                    )
-                );
+            dbQuery = dbQuery.Where(p => partnerIdsInRange.Contains(p.PartnerId));
         }
 
         // 6. Sắp xếp danh sách
         var partners = await dbQuery
-            .OrderBy(p => p.PartnerId)
+            .OrderByDescending(p => p.PartnerId) // NCC mới tạo lên đầu danh sách
             .ToListAsync(cancellationToken);
 
-        // 7. Map sang DTO
+        var partnerIds = partners.Select(p => p.PartnerId).ToList();
+
+        // 7. Thống kê Tổng mua hàng từ các phiếu nhập đã hoàn thành (phiếu tạm / đã hủy không phát sinh tiền hàng)
+        var receiptsQuery = _context.TrxGoodsReceipts
+            .Include(r => r.DtlGoodsReceiptItems)
+            .Where(r => partnerIds.Contains(r.PartnerId) && r.Status == "COMPLETED")
+            .AsNoTracking();
+
+        if (query.WarehouseId.HasValue && query.WarehouseId.Value > 0)
+        {
+            receiptsQuery = receiptsQuery.Where(r => r.WarehouseId == query.WarehouseId.Value);
+        }
+
+        // Tổng mua chỉ tính các phiếu nhập trong khoảng thời gian đang lọc
+        if (hasTimeFilter)
+        {
+            receiptsQuery = receiptsQuery.Where(r => r.ReceivedDate != null
+                && (fromDate == null || r.ReceivedDate >= fromDate)
+                && (toDateExclusive == null || r.ReceivedDate < toDateExclusive));
+        }
+
+        var receipts = await receiptsQuery.ToListAsync(cancellationToken);
+
+        // Thanh toán theo phiếu nhập để tính nợ còn lại tại từng kho
+        var receiptIds = receipts.Select(r => r.GrId).ToList();
+        var payments = await _context.TrxFinancialTransactions
+            .Where(t => t.TxType == SupplierDebtCalculator.PaymentTxType
+                        && t.ReferenceType == SupplierDebtCalculator.GoodsReceiptRef
+                        && t.ReferenceId != null && receiptIds.Contains(t.ReferenceId.Value))
+            .AsNoTracking()
+            .ToListAsync(cancellationToken);
+        var paidByReceipt = SupplierDebtCalculator.PaidByReceipt(payments);
+        // Trả hàng nhập (phần tính vào công nợ) trừ vào số còn nợ của phiếu nhập gốc
+        var returnOffsets = await StockFlow.Application.Features.PurchaseReturns.Helpers.ReturnOffsetCalculator.ComputeAsync(
+            _context,
+            receipts.Where(SupplierDebtCalculator.IsCompleted)
+                .ToDictionary(r => r.GrId, r => SupplierDebtCalculator.ReceiptDebt(r, paidByReceipt)),
+            cancellationToken);
+
+        var stats = receipts
+            .GroupBy(r => r.PartnerId)
+            .ToDictionary(
+                g => g.Key,
+                g => (
+                    TotalPurchased: g.Sum(SupplierDebtCalculator.ReceiptTotal),
+                    Payable: g.Sum(r => Math.Max(0,
+                        SupplierDebtCalculator.ReceiptDebt(r, paidByReceipt) - returnOffsets.OffsetByReceipt.GetValueOrDefault(r.GrId))),
+                    ReceiptCount: g.Count()
+                )
+            );
+
+        // 8. Map sang DTO
         var dtos = partners.Select(p =>
         {
+            decimal totalPurchased = 0m;
             decimal? branchPayable = null;
             int? branchReceiptsCount = null;
 
-            if (query.WarehouseId.HasValue && query.WarehouseId.Value > 0)
+            if (stats.TryGetValue(p.PartnerId, out var stat))
             {
-                if (branchStats.TryGetValue(p.PartnerId, out var stat))
+                totalPurchased = stat.TotalPurchased;
+                if (query.WarehouseId.HasValue && query.WarehouseId.Value > 0)
                 {
-                    // Công nợ theo chi nhánh được phản ánh từ giá trị phát sinh của kho đó
-                    branchPayable = stat.TotalPurchased;
+                    // Nợ tại chi nhánh = tiền hàng các phiếu tại kho đó − số đã thanh toán cho các phiếu này
+                    // (trước đây gán bằng tổng tiền mua nên NCC đã trả đủ vẫn hiện còn nợ)
+                    branchPayable = stat.Payable;
                     branchReceiptsCount = stat.ReceiptCount;
-                }
-                else
-                {
-                    branchPayable = 0m;
-                    branchReceiptsCount = 0;
                 }
             }
 
@@ -141,6 +192,7 @@ public class GetSuppliersQueryHandler : IRequestHandler<GetSuppliersQuery, Resul
                 CurrentPayable: p.CurrentPayable ?? 0m,
                 CurrentDebt: p.CurrentDebt ?? 0m,
                 Status: p.IsActive != false ? "ACTIVE" : "INACTIVE",
+                TotalPurchased: totalPurchased,
                 BranchPayable: branchPayable,
                 BranchReceiptsCount: branchReceiptsCount
             );

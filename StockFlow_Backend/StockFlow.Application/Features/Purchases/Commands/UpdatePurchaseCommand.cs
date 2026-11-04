@@ -8,6 +8,8 @@ using Microsoft.EntityFrameworkCore;
 using StockFlow.Application.Common;
 using StockFlow.Application.Common.Interfaces;
 using StockFlow.Application.Features.Purchases.DTOs;
+using StockFlow.Application.Features.PurchaseReturns.Helpers;
+using StockFlow.Application.Features.Purchases.Helpers;
 using StockFlow.Domain.Entities;
 
 namespace StockFlow.Application.Features.Purchases.Commands;
@@ -17,10 +19,12 @@ public record UpdatePurchaseCommand(int Id, UpdatePurchaseRequest Request) : IRe
 public class UpdatePurchaseCommandHandler : IRequestHandler<UpdatePurchaseCommand, Result<PurchaseDetailDto>>
 {
     private readonly IStockFlowDbContext _context;
+    private readonly ICurrentUserService _currentUserService;
 
-    public UpdatePurchaseCommandHandler(IStockFlowDbContext context)
+    public UpdatePurchaseCommandHandler(IStockFlowDbContext context, ICurrentUserService currentUserService)
     {
         _context = context;
+        _currentUserService = currentUserService;
     }
 
     public async Task<Result<PurchaseDetailDto>> Handle(UpdatePurchaseCommand command, CancellationToken cancellationToken)
@@ -43,9 +47,32 @@ public class UpdatePurchaseCommandHandler : IRequestHandler<UpdatePurchaseComman
                 return Result.Failure<PurchaseDetailDto>($"Không tìm thấy phiếu nhập hàng #{command.Id}.");
             }
 
-            if (!string.Equals(receipt.Status, "DRAFT", StringComparison.OrdinalIgnoreCase))
+            // Cô lập dữ liệu kho: chỉ thao tác trên phiếu thuộc kho mình được phân quyền
+            if (!await _currentUserService.HasWarehouseAccessAsync(receipt.WarehouseId, cancellationToken))
             {
-                return Result.Failure<PurchaseDetailDto>("Chỉ có thể chỉnh sửa thông tin của phiếu nhập đang ở trạng thái Phiếu tạm (DRAFT).");
+                return Result.Failure<PurchaseDetailDto>("Bạn không có quyền truy cập phiếu nhập của kho này.");
+            }
+
+            var isCompleted = string.Equals(receipt.Status, "COMPLETED", StringComparison.OrdinalIgnoreCase);
+            if (!isCompleted && !string.Equals(receipt.Status, "DRAFT", StringComparison.OrdinalIgnoreCase))
+            {
+                return Result.Failure<PurchaseDetailDto>("Phiếu nhập đã hủy, không thể chỉnh sửa.");
+            }
+            // Phiếu nhập đã có phiếu trả hàng nhập → không sửa được (dòng hàng đang được phiếu trả tham chiếu)
+            var returnCodes = await PurchaseReturnLogic.ActiveReturnCodesAsync(_context, receipt.GrId, cancellationToken);
+            if (returnCodes.Count > 0)
+            {
+                return Result.Failure<PurchaseDetailDto>(
+                    $"Phiếu nhập đã có phiếu trả hàng nhập {string.Join(", ", returnCodes)}. Vui lòng hủy phiếu trả hàng trước khi sửa.");
+            }
+
+            if (isCompleted && req.PartnerId != receipt.PartnerId)
+            {
+                return Result.Failure<PurchaseDetailDto>("Không thể đổi nhà cung cấp của phiếu đã nhập hàng. Vui lòng hủy phiếu và lập phiếu mới.");
+            }
+            if (isCompleted && !_currentUserService.UserId.HasValue)
+            {
+                return Result.Failure<PurchaseDetailDto>("Không xác định được người dùng đăng nhập.");
             }
 
             if (req.Items == null || req.Items.Count == 0)
@@ -72,13 +99,16 @@ public class UpdatePurchaseCommandHandler : IRequestHandler<UpdatePurchaseComman
                 return Result.Failure<PurchaseDetailDto>($"Không tìm thấy nhà cung cấp ID #{req.PartnerId}.");
             }
 
-            var productIds = req.Items.Select(i => i.ProductId).Distinct().ToList();
+            // Gồm cả sản phẩm của dòng cũ (để đảo nhập kho khi sửa phiếu đã nhập)
+            var productIds = req.Items.Select(i => i.ProductId)
+                .Concat(receipt.DtlGoodsReceiptItems.Select(i => i.ProductId))
+                .Distinct().ToList();
             var products = await _context.MstProducts
                 .Include(p => p.BaseUnit)
                 .Where(p => productIds.Contains(p.ProductId))
                 .ToDictionaryAsync(p => p.ProductId, cancellationToken);
 
-            if (products.Count != productIds.Count)
+            if (req.Items.Select(i => i.ProductId).Distinct().Any(id => !products.ContainsKey(id)))
             {
                 return Result.Failure<PurchaseDetailDto>("Một số sản phẩm trong danh sách không tồn tại trong danh mục.");
             }
@@ -86,20 +116,34 @@ public class UpdatePurchaseCommandHandler : IRequestHandler<UpdatePurchaseComman
             // Cập nhật thông tin phiếu
             receipt.PartnerId = partner.PartnerId;
             receipt.ExternalPoNumber = req.ExternalPoNumber?.Trim();
-            receipt.ReceivedDate = req.ReceivedDate ?? receipt.ReceivedDate;
+            receipt.ReceivedDate = req.ReceivedDate.HasValue ? VietnamTime.From(req.ReceivedDate) : receipt.ReceivedDate;
             receipt.Notes = req.Notes?.Trim();
 
-            // Xóa các chi tiết cũ và tạo mới danh sách chi tiết
-            _context.DtlGoodsReceiptItems.RemoveRange(receipt.DtlGoodsReceiptItems);
+            var dbContext = _context as DbContext;
+            using var transaction = dbContext != null ? await dbContext.Database.BeginTransactionAsync(cancellationToken) : null;
 
-            decimal totalAmount = 0;
+            // Phiếu đã nhập: đảo nhập kho theo các dòng cũ trước khi thay bằng dòng mới
+            var oldItems = receipt.DtlGoodsReceiptItems.ToList();
+            var oldNetTotal = PurchaseItemMapper.NetTotal(oldItems);
+            if (isCompleted)
+            {
+                foreach (var old in oldItems)
+                {
+                    await PurchaseStockOps.ReverseInboundAsync(
+                        _context, receipt, old, products, "INBOUND_RECEIPT_EDIT_OUT", _currentUserService.UserId!.Value, cancellationToken);
+                }
+            }
+
+            // Xóa các chi tiết cũ và tạo mới danh sách chi tiết
+            _context.DtlGoodsReceiptItems.RemoveRange(oldItems);
+
+            var pricing = PurchasePricing.Compute(req.Items, req.DiscountAmount);
+            receipt.DiscountAmount = pricing.DiscountApplied;
             var newItems = new List<DtlGoodsReceiptItem>();
 
-            foreach (var item in req.Items)
+            foreach (var line in pricing.Lines)
             {
-                decimal effectivePrice = item.UnitPrice * (1 - (item.DiscountPercent / 100m));
-                totalAmount += item.Quantity * effectivePrice;
-
+                var item = line.Request;
                 var dtl = new DtlGoodsReceiptItem
                 {
                     GrId = receipt.GrId,
@@ -110,14 +154,30 @@ public class UpdatePurchaseCommandHandler : IRequestHandler<UpdatePurchaseComman
                     DefectiveQty = 0,
                     DamagedQty = 0,
                     ShortageQty = 0,
-                    UnitLandedCost = Math.Round(effectivePrice, 4, MidpointRounding.AwayFromZero),
+                    UnitLandedCost = line.LandedCost,
+                    UnitPrice = item.UnitPrice,
+                    DiscountPercent = Math.Clamp(item.DiscountPercent, 0, 100),
                     LotId = item.LotId
                 };
                 newItems.Add(dtl);
                 _context.DtlGoodsReceiptItems.Add(dtl);
             }
 
+            if (isCompleted)
+            {
+                // Nhập kho lại theo dòng mới + điều chỉnh công nợ NCC theo chênh lệch tổng tiền
+                foreach (var dtl in newItems)
+                {
+                    await PurchaseStockOps.ApplyInboundAsync(
+                        _context, receipt, dtl, products, "INBOUND_RECEIPT_EDIT_IN", _currentUserService.UserId!.Value, cancellationToken);
+                }
+
+                var newNetTotal = PurchaseItemMapper.NetTotal(newItems);
+                partner.CurrentPayable = (partner.CurrentPayable ?? 0) + (newNetTotal - oldNetTotal);
+            }
+
             await _context.SaveChangesAsync(cancellationToken);
+            if (transaction != null) await transaction.CommitAsync(cancellationToken);
 
             var responseItems = newItems.Select(i =>
             {
@@ -138,6 +198,8 @@ public class UpdatePurchaseCommandHandler : IRequestHandler<UpdatePurchaseComman
                     null
                 );
             }).ToList();
+
+            var totalAmount = PurchaseItemMapper.NetTotal(newItems);
 
             string receivedByName = receipt.ReceivedByNavigation?.FullName ??
                                     receipt.ReceivedByNavigation?.Username ??
