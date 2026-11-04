@@ -4,7 +4,8 @@
 // xem chi tiết dưới dòng, gộp nhiều phiếu tạm, hủy, sao chép, in, xuất file.
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { linkDateFilter, readDocumentLink, scrollToWhenReady } from '@/lib/navigation/documentLink';
 import { message } from 'antd';
 import { StarFilled, StarOutlined } from '@ant-design/icons';
 import * as XLSX from 'xlsx';
@@ -15,6 +16,7 @@ import { useActiveWarehouse } from '@/lib/warehouse/useActiveWarehouse';
 import { getDateRangeForPreset } from '@/features/transfers/utils/dateUtils';
 import { stocktakeService } from '@/features/stocktakes/services/stocktakeService';
 import type { StocktakeDetail, StocktakeStatus, StocktakeSummary } from '@/features/stocktakes/types';
+import { ProductCodeLink } from '@/components/links/EntityLinks';
 import { exportStocktakeExcel, printStocktake, STOCKTAKE_STATUS_LABEL } from '@/features/stocktakes/utils/stocktakeDocs';
 
 const money = new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 0 });
@@ -58,11 +60,15 @@ export default function StocktakesClient() {
   const router = useRouter();
   const { activeWarehouse, warehouses } = useActiveWarehouse();
 
-  const [query, setQuery] = useState('');
+  // Link mở thẳng 1 phiếu (?code=&id=&date=&wh=, VD từ Thẻ kho)
+  const searchParams = useSearchParams();
+  const [docLink] = useState(() => readDocumentLink(searchParams));
+
+  const [query, setQuery] = useState(() => docLink?.code ?? '');
   const [reloadTick, setReloadTick] = useState(0);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [selectedKeys, setSelectedKeys] = useState<number[]>([]);
-  const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [expandedId, setExpandedId] = useState<number | null>(() => docLink?.id ?? null);
   const [details, setDetails] = useState<Record<number, StocktakeDetail>>({});
   const [itemSearch, setItemSearch] = useState({ code: '', name: '' });
   const [cancelling, setCancelling] = useState<StocktakeSummary | null>(null);
@@ -81,12 +87,14 @@ export default function StocktakesClient() {
 
   const [filterState, setFilterState] = useState<PurchaseFilterState>(() => {
     const range = getDateRangeForPreset('this_month');
+    if (docLink) return { statuses: ['draft', 'completed', 'canceled'], ...linkDateFilter(docLink.date) };
     return { statuses: ['draft', 'completed'], timeRange: 'this_month', dateFrom: range.from, dateTo: range.to, periodLabel: 'Tháng này' };
   });
 
   const activeWarehouseId = activeWarehouse?.warehouseId;
   // Không lọc chi nhánh trên màn này: luôn xem phiếu kiểm của Kho làm việc
-  const warehouseIds = activeWarehouseId ? [activeWarehouseId] : [];
+  // (mở từ link thì xem đúng chi nhánh của phiếu đó)
+  const warehouseIds = docLink?.warehouseId ? [docLink.warehouseId] : activeWarehouseId ? [activeWarehouseId] : [];
 
   const requestKey = JSON.stringify({
     warehouseIds,
@@ -139,6 +147,26 @@ export default function StocktakesClient() {
       return null;
     }
   }
+
+  // Mở thẳng phiếu theo link: tải chi tiết + cuộn tới dòng
+  useEffect(() => {
+    const linkedId = docLink?.id;
+    if (!linkedId) return;
+    let cancelled = false;
+    stocktakeService
+      .getById(linkedId)
+      .then((d) => {
+        if (!cancelled) setDetails((prev) => ({ ...prev, [linkedId]: d }));
+      })
+      .catch(() => {
+        if (!cancelled) message.error(`Không tải được phiếu kiểm ${docLink.code}`);
+      });
+    const stopScroll = scrollToWhenReady(`[data-doc-row="${linkedId}"]`);
+    return () => {
+      cancelled = true;
+      stopScroll();
+    };
+  }, [docLink]);
 
   function toggleExpand(r: StocktakeSummary) {
     if (expandedId === r.stocktakeId) {
@@ -394,6 +422,7 @@ export default function StocktakesClient() {
                     return (
                       <React.Fragment key={r.stocktakeId}>
                         <tr
+                          data-doc-row={r.stocktakeId}
                           onClick={() => toggleExpand(r)}
                           className={`cursor-pointer ${isExpanded ? 'bg-[#e6f1fe]/80' : 'hover:bg-[#f7f8f9]'}`}
                         >
@@ -495,7 +524,9 @@ export default function StocktakesClient() {
                 <tbody className="divide-y divide-slate-100">
                   {mergePreview.map((row) => (
                     <tr key={row.productId}>
-                      <td className="py-2 px-3 font-mono text-[#0070f4]">{row.productCode}</td>
+                      <td className="py-2 px-3 font-mono">
+                        <ProductCodeLink code={row.productCode} productId={row.productId} />
+                      </td>
                       <td className="py-2 px-3">{row.productName}</td>
                       <td className="py-2 px-3 text-right">{qty(row.systemQty)}</td>
                       <td className="py-2 px-3 text-right font-semibold">{qty(row.actualQty)}</td>
@@ -695,7 +726,9 @@ function StocktakeDetailPanel({
             {items.map((it, i) => (
               <tr key={it.stocktakeItemId}>
                 <td className="py-2 px-3 text-center text-slate-400">{i + 1}</td>
-                <td className="py-2 px-3 font-mono text-[#0070f4] font-semibold">{it.productCode}</td>
+                <td className="py-2 px-3 font-mono font-semibold">
+                  <ProductCodeLink code={it.productCode} productId={it.productId} />
+                </td>
                 <td className="py-2 px-3 font-medium">{it.productName}</td>
                 <td className="py-2 px-3 text-center text-slate-500">{it.unit}</td>
                 <td className="py-2 px-3 text-right">{qty(it.systemQty)}</td>

@@ -537,6 +537,8 @@ var dbContext = _context as DbContext;
                     }
 
                     // Ghi lịch sử biến động thẻ kho trỏ tới phiếu xuất kho
+                    // (thời gian thẻ kho theo giờ Việt Nam như các nghiệp vụ kho khác; bán hàng không đổi giá vốn)
+                    var issuedBalance = balanceMap[item.ProductId];
                     _context.TrxInventoryTransactions.Add(new TrxInventoryTransaction
                     {
                         WarehouseId = req.WarehouseId,
@@ -545,8 +547,11 @@ var dbContext = _context as DbContext;
                         Quantity = -item.Quantity,
                         ReferenceType = "STOCK_ISSUE",
                         ReferenceId = stockIssue.StockIssueId,
-                        TransactionDate = finalOrderDate,
-                        CreatedBy = 1
+                        TransactionDate = VietnamTime.From(finalOrderDate),
+                        CreatedBy = currentUserId,
+                        TransactionPrice = orderItem.UnitPrice,
+                        UnitCost = issuedBalance.UnitCost ?? prod.MovingAverageCost,
+                        BalanceAfter = issuedBalance.Quantity
                     });
                 }
             }

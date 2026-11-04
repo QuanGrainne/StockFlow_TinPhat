@@ -112,7 +112,33 @@ export interface ProductStockAdjustmentResult {
   stocktakeCode?: string | null;
 }
 
+/** 1 dòng thẻ kho (GET /api/Products/{id}/stock-card?warehouseId=) — mới nhất trước */
+export interface StockCardEntry {
+  transactionId: number;
+  /** PN… nhập hàng, HD… bán hàng, THN… trả hàng nhập, CK… chuyển hàng, KK… kiểm kho, CB… cập nhật giá vốn */
+  documentCode: string;
+  referenceType: string | null;
+  referenceId: number | null;
+  /** Id chứng từ để mở phiếu (HD theo id hóa đơn); null nếu không mở được (CB…) */
+  documentId: number | null;
+  transactionDate: string | null;
+  transactionType: string;
+  transactionTypeName: string;
+  /** Giá GD; null khi chỉ sửa giá vốn / kiểm kho */
+  transactionPrice: number | null;
+  /** Giá vốn sau giao dịch; dòng cũ có thể null */
+  unitCost: number | null;
+  quantity: number;
+  endingBalance: number;
+  partnerName: string | null;
+}
+
 export const productService = {
+  /** Thẻ kho của hàng hóa tại 1 chi nhánh (chỉ xem) */
+  getStockCard(id: number | string, warehouseId: number): Promise<StockCardEntry[]> {
+    return apiClient.get<StockCardEntry[]>(`/api/Products/${id}/stock-card?warehouseId=${warehouseId}`);
+  },
+
   /** Điều chỉnh tồn kho thật trong DB (ghi thẻ kho, giữ nguyên giá vốn) */
   adjustStock(id: number | string, payload: AdjustProductStockPayload): Promise<ProductStockAdjustmentResult> {
     return apiClient.post<ProductStockAdjustmentResult>(`/api/Products/${id}/stock-adjustments`, payload);

@@ -250,7 +250,8 @@ public static class PurchaseReturnLogic
                 (item.ReturnPrice ?? 0) * factor,
                 products,
                 reference,
-                ct);
+                ct,
+                item.ReturnPrice ?? 0); // Giá GD = giá trả trên phiếu
         }
 
         var total = ret.TotalAmount ?? 0;
@@ -299,7 +300,8 @@ public static class PurchaseReturnLogic
                 (item.ReturnPrice ?? 0) * factor,
                 products,
                 reference,
-                ct);
+                ct,
+                item.ReturnPrice ?? 0); // Giá GD = giá trả trên phiếu
         }
 
         var refunds = await context.TrxFinancialTransactions

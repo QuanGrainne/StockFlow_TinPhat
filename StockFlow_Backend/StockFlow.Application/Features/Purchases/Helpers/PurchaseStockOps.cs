@@ -30,6 +30,10 @@ public static class PurchaseStockOps
                    b.LocationId == key.LocationId && b.LotId == key.LotId, ct);
     }
 
+    /// <summary>Giá nhập trên phiếu (đơn giá sau giảm giá của dòng, chưa phân bổ giảm giá tổng phiếu) — Giá GD trên thẻ kho.</summary>
+    public static decimal LinePrice(DtlGoodsReceiptItem item) =>
+        Math.Round((item.UnitPrice ?? item.UnitLandedCost ?? 0) * (1 - (item.DiscountPercent ?? 0) / 100m), 2, MidpointRounding.AwayFromZero);
+
     public static decimal Quantity(DtlGoodsReceiptItem item) =>
         item.AcceptedQty ?? item.ReceivedQty ?? item.OrderedQty ?? 0;
 
@@ -49,7 +53,8 @@ public static class PurchaseStockOps
         decimal price,
         IReadOnlyDictionary<int, MstProduct> products,
         StockRef reference,
-        CancellationToken ct)
+        CancellationToken ct,
+        decimal? transactionPrice = null)
     {
         var balance = await FindBalanceAsync(context, key, ct);
 
@@ -82,7 +87,7 @@ public static class PurchaseStockOps
             product.MovingAverageCost = newCost;
         }
 
-        AddCardEntry(context, key, qty, reference);
+        AddCardEntry(context, key, qty, reference, transactionPrice ?? price, newCost, currentQty + qty);
     }
 
     /// <summary>
@@ -96,7 +101,8 @@ public static class PurchaseStockOps
         decimal price,
         IReadOnlyDictionary<int, MstProduct> products,
         StockRef reference,
-        CancellationToken ct)
+        CancellationToken ct,
+        decimal? transactionPrice = null)
     {
         var balance = await FindBalanceAsync(context, key, ct);
 
@@ -136,10 +142,13 @@ public static class PurchaseStockOps
             product.MovingAverageCost = newCost;
         }
 
-        AddCardEntry(context, key, -qty, reference);
+        AddCardEntry(context, key, -qty, reference, transactionPrice ?? price, newCost, remainingQty);
     }
 
-    private static void AddCardEntry(IStockFlowDbContext context, StockKey key, decimal signedQty, StockRef reference)
+    /// <summary>Ghi 1 dòng thẻ kho: SL biến động, Giá GD, giá vốn và tồn cuối ngay sau giao dịch.</summary>
+    private static void AddCardEntry(
+        IStockFlowDbContext context, StockKey key, decimal signedQty, StockRef reference,
+        decimal transactionPrice, decimal unitCostAfter, decimal balanceAfter)
     {
         context.TrxInventoryTransactions.Add(new TrxInventoryTransaction
         {
@@ -153,6 +162,9 @@ public static class PurchaseStockOps
             ReferenceId = reference.ReferenceId,
             TransactionDate = VietnamTime.Now,
             CreatedBy = reference.UserId,
+            TransactionPrice = transactionPrice,
+            UnitCost = unitCostAfter,
+            BalanceAfter = balanceAfter,
         });
     }
 
@@ -169,7 +181,7 @@ public static class PurchaseStockOps
         int userId,
         CancellationToken ct) =>
         InboundAsync(context, KeyOf(receipt, item), Quantity(item), item.UnitLandedCost ?? 0, products,
-            new StockRef(transactionType, "GOODS_RECEIPT", receipt.GrId, userId), ct);
+            new StockRef(transactionType, "GOODS_RECEIPT", receipt.GrId, userId), ct, LinePrice(item));
 
     /// <summary>Đảo nhập kho 1 dòng phiếu nhập (khi hủy / sửa phiếu đã nhập).</summary>
     public static Task ReverseInboundAsync(
@@ -181,5 +193,5 @@ public static class PurchaseStockOps
         int userId,
         CancellationToken ct) =>
         OutboundAsync(context, KeyOf(receipt, item), Quantity(item), item.UnitLandedCost ?? 0, products,
-            new StockRef(transactionType, "GOODS_RECEIPT", receipt.GrId, userId), ct);
+            new StockRef(transactionType, "GOODS_RECEIPT", receipt.GrId, userId), ct, LinePrice(item));
 }

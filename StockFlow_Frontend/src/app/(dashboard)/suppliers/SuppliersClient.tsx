@@ -4,7 +4,9 @@
 
 'use client';
 
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { readDocumentLink, scrollToWhenReady } from '@/lib/navigation/documentLink';
 import SupplierFilterSidebar from '@/components/SupplierFilterSidebar';
 import SupplierFormModal from '@/features/suppliers/components/SupplierFormModal';
 import SupplierToolbar from '@/features/suppliers/components/SupplierToolbar';
@@ -18,7 +20,15 @@ interface SuppliersClientProps {
 }
 
 export default function SuppliersClient({}: SuppliersClientProps = {}) {
-  const s = useSuppliers();
+  // Link mở thẳng 1 NCC (?code=NCC...&id=..., VD từ phiếu trong Thẻ kho)
+  const searchParams = useSearchParams();
+  const [link] = useState(() => readDocumentLink(searchParams));
+  const s = useSuppliers(link ? { search: link.code, expandId: link.id } : undefined);
+
+  useEffect(() => {
+    if (!link?.id) return;
+    return scrollToWhenReady(`[data-doc-row="${link.id}"]`);
+  }, [link]);
 
   const totalPurchased = useMemo(
     () => s.filteredSuppliers.reduce((sum, sup) => sum + (sup.totalPurchased || 0), 0),

@@ -161,6 +161,7 @@ export default function SuppliersTable({
                 return (
                   <React.Fragment key={sup.id}>
                     <tr
+                      data-doc-row={sup.partnerId}
                       onClick={() => onRowClick(sup)}
                       className={`hover:bg-[#f7f8f9] transition cursor-pointer select-none border-b border-slate-100 ${
                         isExpanded ? 'bg-[#e6f1fe]/80 font-medium' : isSelected ? 'bg-[#e6f1fe]/50' : ''

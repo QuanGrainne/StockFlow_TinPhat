@@ -5,7 +5,8 @@
 
 import React, { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { linkDateFilter, readDocumentLink, scrollToWhenReady } from '@/lib/navigation/documentLink';
 import {
   Search,
   Plus,
@@ -67,8 +68,26 @@ const statusBadgeConfig: Record<
 export default function TransfersClient() {
   const router = useRouter();
 
+  // Link mở thẳng 1 phiếu (?code=&id=&date=, VD từ Thẻ kho)
+  const searchParams = useSearchParams();
+  const [docLink] = useState(() => readDocumentLink(searchParams));
+
   // State bộ lọc chuẩn ảnh 1 KiotViet
   const [filters, setFilters] = useState<TransferFilterState>(() => {
+    if (docLink) {
+      const { timeRange, dateFrom, dateTo } = linkDateFilter(docLink.date);
+      return {
+        sourceWarehouseId: 'ALL',
+        destWarehouseId: 'ALL',
+        statuses: ['DRAFT', 'IN_TRANSIT', 'RECEIVED', 'CANCELLED'],
+        matchStatus: 'ALL',
+        dateType: 'transfer',
+        timeRange,
+        dateFrom,
+        dateTo,
+        search: docLink.code,
+      };
+    }
     const range = getDateRangeForPreset('this_month');
     return {
       sourceWarehouseId: 'ALL',
@@ -89,7 +108,13 @@ export default function TransfersClient() {
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
 
   // Drawer & Modal states
-  const [selectedTransferId, setSelectedTransferId] = useState<number | null>(null);
+  const [selectedTransferId, setSelectedTransferId] = useState<number | null>(() => docLink?.id ?? null);
+
+  // Mở thẳng phiếu theo link: cuộn tới dòng (chi tiết phiếu tự tải trong TransferRowDetail)
+  useEffect(() => {
+    if (!docLink?.id) return;
+    return scrollToWhenReady(`[data-doc-row="${docLink.id}"]`);
+  }, [docLink]);
   const [receiveModalTransfer, setReceiveModalTransfer] = useState<TransferDetail | null>(null);
 
   const loadData = async () => {
@@ -304,6 +329,7 @@ export default function TransfersClient() {
                     return (
                       <React.Fragment key={t.id}>
                         <tr
+                          data-doc-row={t.id}
                           onClick={() => setSelectedTransferId(isExpanded ? null : t.id)}
                           className={`hover:bg-[#f7f8f9] transition cursor-pointer select-none border-b border-slate-100 ${
                             isExpanded ? 'bg-[#e6f1fe]/80 font-medium' : isSelected ? 'bg-[#e6f1fe]/50' : ''
