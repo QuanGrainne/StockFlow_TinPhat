@@ -3,7 +3,7 @@
 
 'use client';
 
-import React, { use } from 'react';
+import React, { use, Suspense } from 'react';
 import dynamic from 'next/dynamic';
 import OrderDetailClient from './OrderDetailClient';
 
@@ -23,7 +23,7 @@ interface OrderDetailPageProps {
   params: Promise<{ id: string }> | { id: string };
 }
 
-export default function OrderDetailPage({ params }: OrderDetailPageProps) {
+function OrderDetailContent({ params }: OrderDetailPageProps) {
   const resolvedParams = 'then' in params ? use(params) : params;
 
   return (
@@ -33,3 +33,16 @@ export default function OrderDetailPage({ params }: OrderDetailPageProps) {
   );
 }
 
+export default function OrderDetailPage(props: OrderDetailPageProps) {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex h-screen items-center justify-center bg-[#f7f9fa] text-sm text-slate-400">
+          Đang tải Chi tiết đơn hàng...
+        </div>
+      }
+    >
+      <OrderDetailContent {...props} />
+    </Suspense>
+  );
+}
