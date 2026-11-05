@@ -4,8 +4,10 @@
 //   [Thông tin] [Lịch sử bán/trả hàng] [Nợ cần thu từ khách]
 
 import React, { useMemo, useState } from 'react';
-import Link from 'next/link';
-import { ChevronDown, FileUp, Loader2, Lock, Pencil, Trash2, Unlock, UserRound } from 'lucide-react';
+import { ChevronDown, CircleDollarSign, FileUp, Loader2, Lock, Pencil, Trash2, Unlock, UserRound } from 'lucide-react';
+import CustomerPaymentModal from './CustomerPaymentModal';
+import CustomerReceiptModal from './CustomerReceiptModal';
+import InvoicePreviewModal from '@/features/orders/components/InvoicePreviewModal';
 import { Customer, CustomerDebtLedgerEntry, CustomerDetail } from '../types';
 import { exportCustomerLedgerToXLSX, exportCustomerOrdersToXLSX, GENDER_LABEL } from '../utils/exportExcel';
 
@@ -17,6 +19,10 @@ interface CustomerExpandedRowProps {
   onEdit: (customer: Customer) => void;
   onToggleStatus: (customer: Customer) => void;
   onDelete: (customer: Customer) => void;
+  /** Gọi sau khi tạo phiếu thu thành công để tải lại chi tiết + danh sách */
+  onPaymentCreated?: (customerId: number, voucherCode: string) => void;
+  /** Gọi sau khi sửa / hủy phiếu thu để tải lại chi tiết + danh sách */
+  onDataChanged?: (customerId: number) => void;
 }
 
 type TabKey = 'info' | 'orders' | 'debts';
@@ -77,9 +83,15 @@ export default function CustomerExpandedRow({
   onEdit,
   onToggleStatus,
   onDelete,
+  onPaymentCreated,
+  onDataChanged,
 }: CustomerExpandedRowProps) {
   const [activeTab, setActiveTab] = useState<TabKey>('info');
   const [ledgerFilter, setLedgerFilter] = useState<LedgerFilter>('ALL');
+  const [showPayment, setShowPayment] = useState(false);
+  /** Popup xem nhanh hóa đơn / phiếu thu khi bấm mã */
+  const [previewOrderId, setPreviewOrderId] = useState<number | null>(null);
+  const [receiptCode, setReceiptCode] = useState<string | null>(null);
   const c = detail ?? customer;
   const orders = useMemo(() => detail?.recentOrders ?? [], [detail]);
   const ledger: CustomerDebtLedgerEntry[] = useMemo(() => detail?.debtLedger ?? [], [detail]);
@@ -88,7 +100,15 @@ export default function CustomerExpandedRow({
     [ledger, ledgerFilter]
   );
   const isActive = customer.status === 'ACTIVE';
-  const orderIds = useMemo(() => new Set(orders.map((o) => o.orderId)), [orders]);
+  const currentDebt = c.currentDebt || 0;
+  // Hóa đơn hoàn thành còn nợ, cũ nhất trước (để phân bổ phiếu thu)
+  const openOrders = useMemo(
+    () =>
+      orders
+        .filter((o) => (o.status || '').toUpperCase() === 'COMPLETED' && o.outstandingAmount > 0)
+        .sort((a, b) => (a.orderDate || '').localeCompare(b.orderDate || '') || a.orderId - b.orderId),
+    [orders]
+  );
 
   const tabs: { key: TabKey; label: string }[] = [
     { key: 'info', label: 'Thông tin' },
@@ -228,15 +248,14 @@ export default function CustomerExpandedRow({
                               return (
                                 <tr key={o.orderId} className="hover:bg-[#f7f8f9]">
                                   <td className="py-2.5 px-3 font-medium">
-                                    <Link
-                                      href={`/orders/${o.orderId}`}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="text-[#0070f4] hover:underline"
-                                      title={`Mở hóa đơn ${o.orderCode}`}
+                                    <button
+                                      type="button"
+                                      onClick={() => setPreviewOrderId(o.orderId)}
+                                      className="text-[#0070f4] hover:underline cursor-pointer"
+                                      title={`Xem hóa đơn ${o.orderCode}`}
                                     >
                                       {o.orderCode}
-                                    </Link>
+                                    </button>
                                   </td>
                                   <td className="py-2.5 px-3 whitespace-nowrap">{fmtDateTime(o.orderDate)}</td>
                                   <td className="py-2.5 px-3">{o.sellerName || '—'}</td>
@@ -312,19 +331,18 @@ export default function CustomerExpandedRow({
                             filteredLedger.map((l, i) => (
                               <tr key={`${l.type}-${l.code}-${i}`} className="hover:bg-[#f7f8f9]">
                                 <td className="py-2.5 px-3 font-medium">
-                                  {l.referenceId && orderIds.has(l.referenceId) ? (
-                                    <Link
-                                      href={`/orders/${l.referenceId}`}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="text-[#0070f4] hover:underline"
-                                      title={`Mở hóa đơn của ${l.code}`}
-                                    >
-                                      {l.code}
-                                    </Link>
-                                  ) : (
-                                    <span className="text-[#0070f4]">{l.code}</span>
-                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      l.type === 'SALE' && l.referenceId
+                                        ? setPreviewOrderId(l.referenceId)
+                                        : setReceiptCode(l.code)
+                                    }
+                                    className="text-[#0070f4] hover:underline cursor-pointer"
+                                    title={l.type === 'SALE' ? `Xem hóa đơn ${l.code}` : `Xem phiếu thu ${l.code}`}
+                                  >
+                                    {l.code}
+                                  </button>
                                 </td>
                                 <td className="py-2.5 px-3 whitespace-nowrap">{fmtDateTime(l.date)}</td>
                                 <td className="py-2.5 px-3">{l.typeLabel}</td>
@@ -337,7 +355,7 @@ export default function CustomerExpandedRow({
                       </table>
                     </div>
                   </div>
-                  <div className="px-5 py-3 border-t border-slate-200 flex items-center">
+                  <div className="px-5 py-3 border-t border-slate-200 flex items-center justify-between">
                     <button
                       type="button"
                       onClick={() => exportCustomerLedgerToXLSX(customer, filteredLedger)}
@@ -347,12 +365,43 @@ export default function CustomerExpandedRow({
                       <FileUp size={15} />
                       <span>Xuất file công nợ</span>
                     </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowPayment(true)}
+                      disabled={currentDebt <= 0}
+                      title={currentDebt <= 0 ? 'Khách hàng không còn nợ cần thu' : 'Tạo phiếu thu nợ của khách'}
+                      className={`${primaryBtnCls} disabled:opacity-50 disabled:cursor-not-allowed`}
+                    >
+                      <CircleDollarSign size={15} />
+                      <span>Thanh toán</span>
+                    </button>
                   </div>
                 </>
               )}
             </>
           )}
         </div>
+        {showPayment && (
+          <CustomerPaymentModal
+            customer={customer}
+            currentDebt={currentDebt}
+            openOrders={openOrders}
+            onClose={() => setShowPayment(false)}
+            onSuccess={(result) => {
+              setShowPayment(false);
+              onPaymentCreated?.(customer.id, result.voucherCode);
+            }}
+          />
+        )}
+        {previewOrderId !== null && <InvoicePreviewModal orderId={previewOrderId} onClose={() => setPreviewOrderId(null)} />}
+        {receiptCode !== null && (
+          <CustomerReceiptModal
+            partnerId={customer.id}
+            code={receiptCode}
+            onClose={() => setReceiptCode(null)}
+            onChanged={() => onDataChanged?.(customer.id)}
+          />
+        )}
       </td>
     </tr>
   );

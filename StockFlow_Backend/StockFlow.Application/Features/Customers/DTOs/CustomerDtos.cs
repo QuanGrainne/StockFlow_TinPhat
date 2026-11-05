@@ -55,7 +55,28 @@ public record CustomerRecentOrderDto(
     decimal TotalAmount,
     string? Status,
     string? SellerName = null,
-    string? WarehouseName = null
+    string? WarehouseName = null,
+    decimal PaidAmount = 0,
+    decimal OutstandingAmount = 0
+);
+
+/// <summary>Phân bổ 1 phần tiền phiếu thu vào 1 hóa đơn còn nợ.</summary>
+public record CustomerPaymentAllocationRequest(int OrderId, decimal Amount);
+
+/// <summary>Tạo phiếu thu tiền nợ của khách hàng.</summary>
+public record CreateCustomerPaymentRequest(
+    decimal Amount,
+    DateTime? PaymentDate,
+    string? PaymentMethod,
+    string? Notes,
+    List<CustomerPaymentAllocationRequest>? Allocations
+);
+
+public record CustomerPaymentResultDto(
+    string VoucherCode,
+    decimal Amount,
+    decimal AllocatedAmount,
+    decimal RemainingDebt
 );
 
 /// <summary>
@@ -144,3 +165,36 @@ public class BatchCustomerStatusRequest
     public List<int> PartnerIds { get; set; } = new();
     public string Status { get; set; } = "ACTIVE";
 }
+
+/// <summary>1 dòng phân bổ của phiếu thu vào hóa đơn.</summary>
+public record CustomerReceiptAllocationDto(
+    int OrderId,
+    string OrderCode,
+    DateTime? OrderDate,
+    decimal OrderTotal,
+    decimal PaidBefore,
+    decimal Amount,
+    string? PaymentStatus
+);
+
+/// <summary>Chi tiết 1 phiếu thu của khách (TTHD... / PT...).</summary>
+public record CustomerReceiptDetailDto(
+    string Code,
+    DateTime? TransactionDate,
+    string? CreatedByName,
+    string PaymentMethod,
+    decimal TotalAmount,
+    string? Description,
+    string Status,
+    int PartnerId,
+    string PartnerCode,
+    string PartnerName,
+    List<CustomerReceiptAllocationDto> Allocations
+);
+
+/// <summary>Sửa phiếu thu của khách: thời gian, phương thức, ghi chú (số tiền / phân bổ không đổi).</summary>
+public record UpdateCustomerReceiptRequest(
+    DateTime? TransactionDate,
+    string? PaymentMethod,
+    string? Notes
+);

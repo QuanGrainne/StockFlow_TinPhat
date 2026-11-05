@@ -90,8 +90,9 @@ public class CreatePosOrderCommandHandler : IRequestHandler<CreatePosOrderComman
         // Thời gian bán người dùng chọn không được ở tương lai (kiểm tra trước khi sinh mã để không bỏ số hóa đơn)
         if (!settings.LockTransactionTime && req.OrderDate.HasValue)
         {
-            var requested = req.OrderDate.Value.Kind == DateTimeKind.Utc ? req.OrderDate.Value : req.OrderDate.Value.ToUniversalTime();
-            if (requested > DateTime.UtcNow.AddMinutes(1))
+            // DB lưu giờ Việt Nam (timestamp without time zone) — so sánh theo giờ Việt Nam
+            var requested = VietnamTime.From(req.OrderDate);
+            if (requested > VietnamTime.Now.AddMinutes(1))
                 return Result<PosOrderResultDto>.Failure("Không được bán hàng với thời gian trong tương lai.");
         }
 
@@ -121,7 +122,7 @@ public class CreatePosOrderCommandHandler : IRequestHandler<CreatePosOrderComman
                     OutstandingAmount = existingWithReq.OutstandingAmount ?? 0,
                     PaymentStatus = existingWithReq.PaymentStatus ?? "",
                     Status = existingWithReq.Status ?? "",
-                    OrderDate = existingWithReq.OrderDate ?? DateTime.UtcNow,
+                    OrderDate = existingWithReq.OrderDate ?? VietnamTime.Now,
                     Message = "Đơn hàng đã được ghi nhận trước đó (Idempotent response)."
                 });
             }
@@ -131,7 +132,7 @@ public class CreatePosOrderCommandHandler : IRequestHandler<CreatePosOrderComman
         var duplicateRecent = await _context.TrxOrders
             .Where(o => (req.PartnerId <= 0 || o.PartnerId == req.PartnerId)
                      && o.TotalAmount == req.TotalAmount
-                     && o.OrderDate >= DateTime.UtcNow.AddSeconds(-3))
+                     && o.OrderDate >= VietnamTime.Now.AddSeconds(-3))
             .FirstOrDefaultAsync(cancellationToken);
 
         if (duplicateRecent != null)
@@ -433,16 +434,15 @@ public class CreatePosOrderCommandHandler : IRequestHandler<CreatePosOrderComman
         DateTime finalOrderDate;
         if (settings.LockTransactionTime || !req.OrderDate.HasValue)
         {
-            finalOrderDate = DateTime.UtcNow;
+            finalOrderDate = VietnamTime.Now;
         }
         else
         {
-            finalOrderDate = req.OrderDate.Value.Kind == DateTimeKind.Utc
-                ? req.OrderDate.Value
-                : req.OrderDate.Value.ToUniversalTime();
+            // Giờ người dùng chọn (ISO UTC từ trình duyệt) → giờ Việt Nam để lưu DB
+            finalOrderDate = VietnamTime.From(req.OrderDate);
 
             // Không cho bán với thời gian trong tương lai (cho lệch 1 phút do đồng hồ máy khách)
-            if (finalOrderDate > DateTime.UtcNow.AddMinutes(1))
+            if (finalOrderDate > VietnamTime.Now.AddMinutes(1))
             {
                 return Result<PosOrderResultDto>.Failure("Không được bán hàng với thời gian trong tương lai.");
             }
@@ -591,14 +591,12 @@ var dbContext = _context as DbContext;
             // 12. Ghi nhận giao dịch tài chính (Phiếu thu)
             if (actualReceived > 0 && isCompleted)
             {
-                string desc = isRecordDebtExcess && rawChangeAmount > 0
-                    ? $"Thu tiền bán hàng hóa đơn POS {order.OrderCode} ({req.PaymentMethod}) - Cấn trừ {rawChangeAmount:N0} đ vào công nợ"
-                    : $"Thu tiền bán hàng hóa đơn POS {order.OrderCode} ({req.PaymentMethod})";
-
                 _context.TrxFinancialTransactions.Add(new TrxFinancialTransaction
                 {
                     PartnerId = customer.PartnerId,
                     TxType = "RECEIPT",
+                    // Mã phiếu thu theo hóa đơn: TTHD000085 (lần thu sau: TTHD000085-1, -2...)
+                    TxCode = $"TT{order.OrderCode}",
                     Amount = actualReceived,
                     PaymentMethod = req.PaymentMethod,
                     ReferenceType = "SALES_ORDER",
@@ -606,7 +604,8 @@ var dbContext = _context as DbContext;
                     TransactionDate = finalOrderDate,
 CreatedBy = currentUserId,
                     Status = "COMPLETED",
-                    Description = desc
+                    // Ghi chú phiếu thu để trống: người dùng tự nhập khi sửa phiếu thu
+                    Description = null
                 });
             }
 
@@ -638,7 +637,7 @@ CreatedBy = currentUserId,
                 OutstandingAmount = outstanding,
                 PaymentStatus = paymentStatus,
                 Status = order.Status,
-                OrderDate = order.OrderDate ?? DateTime.UtcNow,
+                OrderDate = order.OrderDate ?? VietnamTime.Now,
                 StockIssueId = stockIssue?.StockIssueId,
                 StockIssueCode = stockIssue?.IssueCode,
                 CustomerCurrentDebt = customer.CurrentDebt ?? 0,

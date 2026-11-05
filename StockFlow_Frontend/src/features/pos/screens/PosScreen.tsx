@@ -19,7 +19,7 @@ import {
   Info,
   Menu,
   Minus,
-  MoreVertical,
+  TriangleAlert,
   Pencil,
   Plus,
   PlusCircle,
@@ -73,7 +73,7 @@ function emptyTab(index: number, priceBookId: number | null): PosTab {
   };
 }
 
-/** Giảm giá trên 1 đơn vị (không vượt đơn giá) */
+/** Giảm giá trên 1 đơn vị (không vượt đơn giá). Giá trị âm (VND) = bán cao hơn đơn giá. */
 const unitDiscount = (price: number, mode: DiscountMode, value: number) =>
   Math.min(price, mode === 'PERCENT' ? Math.round((price * Math.min(value, 100)) / 100) : value);
 
@@ -118,6 +118,7 @@ function DiscountPopover({
   mode,
   value,
   resultLabel,
+  costPrice = 0,
   onChange,
   onClose,
 }: {
@@ -126,7 +127,10 @@ function DiscountPopover({
   editableBase?: (v: number) => void;
   mode: DiscountMode;
   value: number;
+  /** Có ô Giá bán: được nhập giá bán cao hơn đơn giá */
   resultLabel?: string;
+  /** Giá vốn: giá bán thấp hơn thì cảnh báo */
+  costPrice?: number;
   onChange: (mode: DiscountMode, value: number) => void;
   onClose: () => void;
 }) {
@@ -145,6 +149,8 @@ function DiscountPopover({
   }, [onClose]);
 
   const disc = unitDiscount(base, mode, value);
+  const sale = base - disc;
+  const belowCost = !!resultLabel && costPrice > 0 && sale < costPrice;
   return (
     <div
       ref={ref}
@@ -167,7 +173,7 @@ function DiscountPopover({
             className="w-full bg-transparent text-right border-b border-slate-300 focus:border-[#0070f4] outline-none py-0.5"
           />
         ) : (
-          <MoneyInput value={value} onChange={(v) => onChange('VND', Math.min(v, base))} autoFocus />
+          <MoneyInput value={Math.max(0, value)} onChange={(v) => onChange('VND', Math.min(v, base))} autoFocus />
         )}
         <div className="flex shrink-0">
           {(['VND', 'PERCENT'] as DiscountMode[]).map((m) => (
@@ -177,7 +183,8 @@ function DiscountPopover({
               onClick={() => {
                 // Đổi kiểu giảm giá: quy đổi giá trị đang có cho tương đương
                 if (m === mode) return;
-                const converted = m === 'PERCENT' ? (base > 0 ? Math.round((disc / base) * 10000) / 100 : 0) : disc;
+                const d = Math.max(0, disc);
+                const converted = m === 'PERCENT' ? (base > 0 ? Math.round((d / base) * 10000) / 100 : 0) : d;
                 onChange(m, converted);
               }}
               className={`px-2.5 h-7 text-[12px] font-semibold rounded-md cursor-pointer ${
@@ -192,11 +199,14 @@ function DiscountPopover({
       {resultLabel && (
         <div className="flex items-center gap-3">
           <span className="w-24 shrink-0">{resultLabel}</span>
-          <MoneyInput
-            value={base - disc}
-            onChange={(sale) => onChange('VND', Math.max(0, base - Math.min(sale, base)))}
-            className="font-semibold"
-          />
+          {/* Giá bán được phép cao hơn đơn giá (lưu dạng giảm giá âm) */}
+          <MoneyInput value={sale} onChange={(v) => onChange('VND', base - v)} className="font-semibold" />
+        </div>
+      )}
+      {belowCost && (
+        <div className="flex items-center justify-end gap-1.5 text-[13px] text-[#fb2c36]">
+          <TriangleAlert size={15} className="fill-[#fb2c36] text-white" />
+          <span>Giá bán đang nhỏ hơn giá vốn</span>
         </div>
       )}
     </div>
@@ -233,7 +243,6 @@ export default function PosScreen() {
   const [customerDropdown, setCustomerDropdown] = useState(false);
   const [customerFormOpen, setCustomerFormOpen] = useState(false);
   const [pricePopoverKey, setPricePopoverKey] = useState<string | null>(null);
-  const [lineMenuKey, setLineMenuKey] = useState<string | null>(null);
   const [orderDiscountOpen, setOrderDiscountOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -479,15 +488,17 @@ export default function PosScreen() {
       orderDate: !lockSaleTime && saleTime ? new Date(saleTime).toISOString() : undefined,
       items: tab.lines.map((l) => {
         const c = lineCalc(l);
+        // Bán cao hơn đơn giá: gửi giá bán làm đơn giá gốc, không giảm giá (server không nhận giảm giá âm)
+        const markup = c.disc < 0;
         return {
           productId: l.productId,
           quantity: l.quantity,
           unitId: l.unitId,
-          originalPrice: l.unitPrice,
+          originalPrice: markup ? c.sale : l.unitPrice,
           unitPrice: c.sale,
           discountType: l.discountMode === 'PERCENT' ? 'PERCENT' : 'AMOUNT',
-          discountValue: l.discountValue,
-          discountAmount: c.disc * l.quantity,
+          discountValue: markup ? 0 : l.discountValue,
+          discountAmount: markup ? 0 : c.disc * l.quantity,
         };
       }),
     };
@@ -702,7 +713,7 @@ export default function PosScreen() {
               tab.lines.map((l, idx) => {
                 const c = lineCalc(l);
                 const overStock = !allowNegativeStock && (qtyByProduct.get(l.productId) ?? 0) > l.stock;
-                const active = pricePopoverKey === l.key || lineMenuKey === l.key;
+                const active = pricePopoverKey === l.key;
                 return (
                   <div
                     key={l.key}
@@ -781,6 +792,7 @@ export default function PosScreen() {
                             mode={l.discountMode}
                             value={l.discountValue}
                             resultLabel="Giá bán"
+                            costPrice={products.find((x) => x.productId === l.productId)?.costPrice ?? 0}
                             onChange={(mode, value) => updateLine(l.key, { discountMode: mode, discountValue: value })}
                             onClose={() => setPricePopoverKey(null)}
                           />
@@ -799,39 +811,6 @@ export default function PosScreen() {
                       >
                         <Plus size={18} />
                       </button>
-                      <div className="relative">
-                        <button
-                          type="button"
-                          onClick={() => setLineMenuKey((k) => (k === l.key ? null : l.key))}
-                          className="p-1 rounded hover:bg-slate-100 cursor-pointer"
-                        >
-                          <MoreVertical size={18} />
-                        </button>
-                        {lineMenuKey === l.key && (
-                          <div className="absolute right-0 top-full mt-1 z-30 w-40 bg-white rounded-lg shadow-lg border border-slate-200 py-1 text-[13px]">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                updateLine(l.key, { discountMode: 'VND', discountValue: 0 });
-                                setLineMenuKey(null);
-                              }}
-                              className="w-full text-left px-3 py-2 hover:bg-slate-50 cursor-pointer"
-                            >
-                              Bỏ giảm giá
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                updateTab((t) => ({ lines: t.lines.filter((x) => x.key !== l.key), paid: null }));
-                                setLineMenuKey(null);
-                              }}
-                              className="w-full text-left px-3 py-2 hover:bg-slate-50 text-[#fb2c36] cursor-pointer"
-                            >
-                              Xóa dòng
-                            </button>
-                          </div>
-                        )}
-                      </div>
                     </div>
                     {prefs.note && (
                       <div className={`mt-1 ${prefs.image ? 'pl-[160px]' : 'pl-[60px]'}`}>

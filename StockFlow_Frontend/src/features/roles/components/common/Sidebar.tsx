@@ -5,11 +5,13 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { message } from 'antd';
 import { UserRole } from '../../types';
 import {
   LayoutGrid,
   Package,
   ClipboardList,
+  ShoppingCart,
   GitMerge,
   AlertCircle,
   RotateCcw,
@@ -45,6 +47,8 @@ interface DropdownItem {
   icon: any;
   requiredModule?: string;
   requiredFeature?: string;
+  /** Chức năng chưa làm: hiện nhãn Đang phát triển, bấm không chuyển màn */
+  comingSoon?: boolean;
 }
 
 interface TabConfig {
@@ -275,45 +279,33 @@ export const Sidebar: React.FC<SidebarProps> = ({
       dropdownItems: [
         {
           id: 'pos',
-          title: 'Bán hàng tại quầy (POS)',
+          title: 'Bán hàng',
           desc: 'Màn hình thu ngân & in hóa đơn K80',
           icon: ShoppingBag,
           requiredModule: 'SALES',
         },
         {
+          id: 'sales-booking',
+          title: 'Đặt hàng',
+          desc: 'Khách đặt trước, giao hàng sau',
+          icon: ShoppingCart,
+          requiredModule: 'SALES',
+          comingSoon: true,
+        },
+        {
           id: 'orders',
-          title: 'Danh sách đơn hàng',
-          desc: 'Quản lý toàn bộ đơn bán hàng',
+          title: 'Hóa đơn',
+          desc: 'Quản lý toàn bộ hóa đơn bán hàng',
           icon: ClipboardList,
-          requiredModule: 'SALES',
-        },
-        {
-          id: 'sales-dashboard',
-          title: 'Tổng quan bán hàng',
-          desc: 'Báo cáo doanh số và đơn hàng',
-          icon: LayoutGrid,
-          requiredModule: 'SALES',
-        },
-        {
-          id: 'sales-orders',
-          title: 'Đơn chờ xử lý',
-          desc: 'Tiếp nhận đơn hàng mới',
-          icon: ClipboardList,
-          requiredModule: 'SALES',
-        },
-        {
-          id: 'sales-consolidate',
-          title: 'Gộp đơn xuất kho',
-          desc: 'Gộp đơn giao hàng B2B',
-          icon: GitMerge,
           requiredModule: 'SALES',
         },
         {
           id: 'sales-returns',
-          title: 'Quản lý trả hàng',
-          desc: 'Biên bản xử lý hàng trả',
+          title: 'Trả hàng',
+          desc: 'Khách trả lại hàng đã mua',
           icon: RotateCcw,
           requiredModule: 'SALES',
+          comingSoon: true,
         },
       ],
     },
@@ -526,39 +518,27 @@ export const Sidebar: React.FC<SidebarProps> = ({
           requiredModule: 'SALES',
         },
         {
+          id: 'sales-booking',
+          title: 'Đặt hàng',
+          desc: 'Khách đặt trước, giao hàng sau',
+          icon: ShoppingCart,
+          requiredModule: 'SALES',
+          comingSoon: true,
+        },
+        {
           id: 'orders',
-          title: 'Danh sách đơn hàng',
-          desc: 'Quản lý toàn bộ đơn bán hàng',
+          title: 'Hóa đơn',
+          desc: 'Quản lý toàn bộ hóa đơn bán hàng',
           icon: ClipboardList,
-          requiredModule: 'SALES',
-        },
-        {
-          id: 'sales-dashboard',
-          title: 'Tổng quan bán hàng',
-          desc: 'Báo cáo doanh số và đơn hàng',
-          icon: LayoutGrid,
-          requiredModule: 'SALES',
-        },
-        {
-          id: 'sales-orders',
-          title: 'Đơn chờ xử lý',
-          desc: 'Tiếp nhận đơn hàng mới',
-          icon: ClipboardList,
-          requiredModule: 'SALES',
-        },
-        {
-          id: 'sales-consolidate',
-          title: 'Gộp đơn xuất kho',
-          desc: 'Gộp đơn giao hàng B2B',
-          icon: GitMerge,
           requiredModule: 'SALES',
         },
         {
           id: 'sales-returns',
-          title: 'Quản lý trả hàng',
-          desc: 'Biên bản xử lý hàng trả',
+          title: 'Trả hàng',
+          desc: 'Khách trả lại hàng đã mua',
           icon: RotateCcw,
           requiredModule: 'SALES',
+          comingSoon: true,
         },
       ],
     },
@@ -1087,12 +1067,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
     currentRole === 'ADMIN'
       ? adminTabs
       : currentRole === 'MANAGER'
-      ? managerTabs
-      : currentRole === 'WAREHOUSE'
-      ? warehouseTabs
-      : currentRole === 'PRODUCTION'
-      ? productionTabs
-      : salesTabs;
+        ? managerTabs
+        : currentRole === 'WAREHOUSE'
+          ? warehouseTabs
+          : currentRole === 'PRODUCTION'
+            ? productionTabs
+            : salesTabs;
 
   // Lọc tab theo quyền hạn cấu hình ma trận (tích quyền nào thì hiện mục đó)
   const filterTabByPermission = (tab: TabConfig): TabConfig | null => {
@@ -1206,11 +1186,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     onNavigate(tab.id);
                   }
                 }}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-[8px] text-xs font-semibold transition cursor-pointer border ${
-                  active
-                    ? 'bg-blue-50/80 text-[#2B6CB0] border-blue-200 shadow-2xs'
-                    : 'text-slate-600 border-transparent hover:text-slate-900 hover:bg-slate-50'
-                }`}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-[8px] text-xs font-semibold transition cursor-pointer border ${active
+                  ? 'bg-blue-50/80 text-[#2B6CB0] border-blue-200 shadow-2xs'
+                  : 'text-slate-600 border-transparent hover:text-slate-900 hover:bg-slate-50'
+                  }`}
               >
                 <Icon size={14} className={active ? 'text-[#2B6CB0]' : 'text-slate-500'} />
                 <span>{tab.label}</span>
@@ -1219,9 +1198,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 )}
                 {tab.badgeText && (
                   <span
-                    className={`w-4 h-4 rounded-full text-white text-[10px] font-bold flex items-center justify-center ${
-                      tab.badgeColor || 'bg-blue-600'
-                    }`}
+                    className={`w-4 h-4 rounded-full text-white text-[10px] font-bold flex items-center justify-center ${tab.badgeColor || 'bg-blue-600'
+                      }`}
                   >
                     {tab.badgeText}
                   </span>
@@ -1229,55 +1207,63 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 {tab.hasDropdown && (
                   <ChevronDown
                     size={12}
-                    className={`tab-chevron transition-transform duration-150 ${active ? 'text-[#2B6CB0]' : 'text-slate-400'} ${
-                      isOpen ? 'is-open' : ''
-                    }`}
+                    className={`tab-chevron transition-transform duration-150 ${active ? 'text-[#2B6CB0]' : 'text-slate-400'} ${isOpen ? 'is-open' : ''
+                      }`}
                   />
                 )}
               </button>
 
 
-            {/* Dropdown Menu Modal (Hiện mượt mà khi hover chuột) */}
-            {tab.hasDropdown && tab.dropdownItems && (
-              <div
-                onMouseEnter={() => handleMouseEnter(tab.id)}
-                onMouseLeave={handleMouseLeave}
-                className={`tab-dropdown-menu absolute top-full left-0 pt-1.5 w-64 z-50 ${
-                  isOpen ? 'is-open' : ''
-                }`}
-              >
-                <div className="bg-white rounded-[10px] shadow-xl border border-slate-200 py-1.5 overflow-hidden">
-                  {tab.dropdownItems.map((item) => {
-                    const ItemIcon = item.icon;
-                    const isItemActive = activeScreen === item.id;
-                    return (
-                      <button
-                        key={item.id}
-                        type="button"
-                        onClick={() => {
-                          setOpenDropdownId(null);
-                          onNavigate(item.id);
-                        }}
-                        className={`w-full text-left px-3.5 py-2.5 flex items-start gap-3 transition cursor-pointer hover:bg-blue-50/70 ${
-                          isItemActive ? 'bg-blue-50 text-[#2B6CB0]' : 'text-slate-700'
-                        }`}
-                      >
-                        <div className={`mt-0.5 p-1 rounded-[6px] shrink-0 ${isItemActive ? 'text-[#2B6CB0]' : 'text-slate-400'}`}>
-                          <ItemIcon size={16} />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="text-xs font-bold leading-tight">{item.title}</div>
-                          <div className="text-[11px] text-slate-400 mt-0.5 leading-tight">{item.desc}</div>
-                        </div>
-                      </button>
-                    );
-                  })}
+              {/* Dropdown Menu Modal (Hiện mượt mà khi hover chuột) */}
+              {tab.hasDropdown && tab.dropdownItems && (
+                <div
+                  onMouseEnter={() => handleMouseEnter(tab.id)}
+                  onMouseLeave={handleMouseLeave}
+                  className={`tab-dropdown-menu absolute top-full left-0 pt-1.5 w-64 z-50 ${isOpen ? 'is-open' : ''
+                    }`}
+                >
+                  <div className="bg-white rounded-[10px] shadow-xl border border-slate-200 py-1.5 overflow-hidden">
+                    {tab.dropdownItems.map((item) => {
+                      const ItemIcon = item.icon;
+                      const isItemActive = activeScreen === item.id;
+                      return (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => {
+                            setOpenDropdownId(null);
+                            if (item.comingSoon) {
+                              message.info(`Chức năng ${item.title} đang được phát triển.`);
+                              return;
+                            }
+                            onNavigate(item.id);
+                          }}
+                          className={`w-full text-left px-3.5 py-2.5 flex items-start gap-3 transition cursor-pointer hover:bg-blue-50/70 ${isItemActive ? 'bg-blue-50 text-[#2B6CB0]' : 'text-slate-700'
+                            }`}
+                        >
+                          <div className={`mt-0.5 p-1 rounded-[6px] shrink-0 ${isItemActive ? 'text-[#2B6CB0]' : 'text-slate-400'}`}>
+                            <ItemIcon size={16} />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="text-xs font-bold leading-tight flex items-center gap-1.5">
+                              <span>{item.title}</span>
+                              {item.comingSoon && (
+                                <span className="px-1.5 py-px rounded-full text-[10px] font-semibold bg-amber-50 text-amber-600 border border-amber-200">
+                                  Đang phát triển
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-[11px] text-slate-400 mt-0.5 leading-tight">{item.desc}</div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
-            )}
-          </div>
-        );
-      })}
+              )}
+            </div>
+          );
+        })}
       </div>
 
       {/* Right shortcut prompt for Warehouse Desktop data entry */}

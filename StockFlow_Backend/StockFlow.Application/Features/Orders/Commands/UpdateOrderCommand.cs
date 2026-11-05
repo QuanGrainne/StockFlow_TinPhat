@@ -103,7 +103,7 @@ public class UpdateOrderCommandHandler : IRequestHandler<UpdateOrderCommand, Res
         }
 
         // Cập nhật Audit Log
-        order.UpdatedAt = DateTime.UtcNow;
+        order.UpdatedAt = VietnamTime.Now;
         if (_currentUserService.UserId.HasValue)
         {
             order.UpdatedBy = _currentUserService.UserId.Value;

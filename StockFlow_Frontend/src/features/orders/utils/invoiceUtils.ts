@@ -142,3 +142,12 @@ export function exportInvoiceDetailToXLSX(order: OrderDetail) {
   XLSX.utils.book_append_sheet(wb, ws, 'ChiTiet');
   XLSX.writeFile(wb, `HoaDon_${order.orderCode}_${stamp()}.xlsx`);
 }
+
+/** Bỏ các thẻ hệ thống trong ghi chú ([Bảng giá: …], [Người bán: …], [REQ:…]) — chỉ giữ ghi chú người dùng nhập */
+export function stripNoteTags(notes?: string | null): string {
+  return (notes || '')
+    .replace(/\[(Bảng giá|Người bán):[^\]]*\]/gi, '')
+    .replace(/\[REQ:[^\]]*\]/gi, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
