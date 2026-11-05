@@ -160,6 +160,8 @@ export interface OrderListItem {
   warehouseName: string;
   paymentMethod: string;
   hasReturn: boolean;
+  /** Mã phiếu trả hàng gần nhất của hóa đơn (nếu có) */
+  returnCode?: string | null;
   notes?: string | null;
 }
 
@@ -173,7 +175,7 @@ export interface OrderListFilter {
   status?: string;
   /** ALL | NO_RETURN | HAS_RETURN */
   returnStatus?: string;
-  /** ALL | CASH | VIETQR | DEBT */
+  /** ALL | CASH | VIETQR */
   paymentMethod?: string;
   priceBookName?: string;
 }

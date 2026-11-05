@@ -21,7 +21,7 @@ public class CreatePosOrderRequest
 {
     public int PartnerId { get; set; }
     public int WarehouseId { get; set; } = 3; // Default Kho Tổng Gia Lâm (K001)
-    public string PaymentMethod { get; set; } = "CASH"; // CASH, VIETQR, POS_CARD, DEBT, WALLET
+    public string PaymentMethod { get; set; } = "CASH"; // CASH, VIETQR, DEBT
     public decimal SubTotal { get; set; }
     public string DiscountType { get; set; } = "AMOUNT"; // "PERCENT" hoặc "AMOUNT"
     public decimal DiscountValue { get; set; }
@@ -83,5 +83,6 @@ public class PosOrderSummaryDto
     public string WarehouseName { get; set; } = string.Empty;
     public string PaymentMethod { get; set; } = string.Empty;
     public bool HasReturn { get; set; }
+    public string? ReturnCode { get; set; }
     public string? Notes { get; set; }
 }

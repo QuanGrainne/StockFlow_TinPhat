@@ -66,6 +66,46 @@ body {
   display: none;
 }
 
+/* Hóa đơn (orders): header xanh nhạt, dòng tổng ở đầu bảng, dòng đang mở có viền xanh như KiotViet */
+.stockflow-invoices-table .ant-table-thead > tr > th {
+  background: #e8f2ff;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.stockflow-invoices-table .ant-table-thead > tr > th::before {
+  display: none;
+}
+
+.stockflow-invoices-table .stockflow-invoice-summary > td {
+  background: #ffffff;
+  font-size: 13px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.stockflow-invoices-table .ant-table-tbody > tr.stockflow-invoice-row-expanded > td {
+  background: #f3f8ff;
+  border-top: 1px solid #0071ba;
+  border-bottom: 0;
+}
+
+.stockflow-invoices-table .ant-table-tbody > tr.stockflow-invoice-row-expanded > td:first-child {
+  border-left: 1px solid #0071ba;
+}
+
+.stockflow-invoices-table .ant-table-tbody > tr.stockflow-invoice-row-expanded > td:last-child {
+  border-right: 1px solid #0071ba;
+}
+
+.stockflow-invoices-table .ant-table-tbody > tr.stockflow-invoice-expanded > td {
+  padding: 0 !important;
+  background: #ffffff !important;
+  border: 1px solid #0071ba;
+  border-top: 0;
+}
+
 /* Custom smooth hover dropdown for navigation tabs */
 .tab-dropdown-menu {
   display: none;

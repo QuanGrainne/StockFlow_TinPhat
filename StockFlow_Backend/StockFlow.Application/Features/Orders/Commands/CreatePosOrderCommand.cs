@@ -17,7 +17,7 @@ public record CreatePosOrderCommand(CreatePosOrderRequest Request) : IRequest<Re
 
 public class CreatePosOrderCommandValidator : AbstractValidator<CreatePosOrderCommand>
 {
-    private static readonly string[] AllowedPaymentMethods = { "CASH", "VIETQR", "POS_CARD", "DEBT", "WALLET" };
+    private static readonly string[] AllowedPaymentMethods = { "CASH", "VIETQR", "DEBT" };
 
     public CreatePosOrderCommandValidator()
     {
@@ -30,7 +30,7 @@ public class CreatePosOrderCommandValidator : AbstractValidator<CreatePosOrderCo
 
         RuleFor(x => x.Request.PaymentMethod)
             .Must(m => AllowedPaymentMethods.Contains(m?.ToUpper()))
-            .WithMessage("Phương thức thanh toán không hợp lệ (PAY-001). Chỉ chấp nhận: Tiền mặt, VietQR, Quẹt thẻ POS, Ví hoặc Ghi công nợ.");
+            .WithMessage("Phương thức thanh toán không hợp lệ (PAY-001). Chỉ chấp nhận: Tiền mặt, Chuyển khoản (VietQR) hoặc Ghi công nợ.");
 
         RuleFor(x => x.Request.Items)
             .NotEmpty().WithMessage("Đơn hàng phải có ít nhất 1 sản phẩm (AMT-001).");
