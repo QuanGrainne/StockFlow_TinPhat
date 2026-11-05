@@ -20,8 +20,12 @@ export const orderService = {
     add('paymentMethod', filter.paymentMethod);
     add('priceBookName', filter.priceBookName);
     const pageSize = 100;
-    const fetchPage = (page: number) =>
-      apiClient.get<{ items: OrderListItem[]; totalCount: number }>();
+    const fetchPage = (page: number) => {
+      const qs = new URLSearchParams(sp);
+      qs.set('page', String(page));
+      qs.set('pageSize', String(pageSize));
+      return apiClient.get<{ items: OrderListItem[]; totalCount: number }>(`/api/orders?${qs.toString()}`);
+    };
     const first = await fetchPage(1);
     const pages = Math.ceil((first.totalCount || 0) / pageSize);
     const rest = pages > 1 ? await Promise.all(Array.from({ length: pages - 1 }, (_, i) => fetchPage(i + 2))) : [];
@@ -30,7 +34,7 @@ export const orderService = {
 
   /** Hủy hóa đơn: hoàn tồn kho, giảm công nợ khách, hủy phiếu thu */
   async cancelOrder(orderId: number): Promise<void> {
-    await apiClient.post(, {});
+    await apiClient.post(`/api/orders/${orderId}/cancel`, {});
   },
 
   /**

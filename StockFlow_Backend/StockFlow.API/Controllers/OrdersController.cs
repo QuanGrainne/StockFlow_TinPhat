@@ -82,7 +82,7 @@ public class OrdersController : ControllerBase
     }
 
     /// <summary>
-    /// Tạo mới đơn hàng bán lẻ / bán buôn POS (hỗ trợ thanh toán tiền mặt, chuyển khoản VietQR, quẹt thẻ POS hoặc ghi nợ).
+    /// Tạo mới đơn hàng bán lẻ / bán buôn POS (hỗ trợ thanh toán tiền mặt, chuyển khoản VietQR hoặc ghi nợ).
     /// </summary>
     [HttpPost("pos")]
     [ProducesResponseType(typeof(PosOrderResultDto), StatusCodes.Status201Created)]

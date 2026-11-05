@@ -4,7 +4,7 @@
 // - Bên trái: danh sách hàng trong hóa đơn (ảnh, mã, tên, ĐVT, SL ± có tồn/đặt, đơn giá có popover giảm giá, thành tiền, ghi chú),
 //   ghi chú đơn hàng ở dưới.
 // - Bên phải: người bán + thời gian, khách hàng (F4) + bảng giá, tổng tiền hàng, giảm giá, khách cần trả,
-//   khách thanh toán, phương thức (Tiền mặt / Chuyển khoản / Thẻ / Ví), nút THANH TOÁN (F9).
+//   khách thanh toán, phương thức (Tiền mặt / Chuyển khoản), nút THANH TOÁN (F9).
 
 'use client';
 
