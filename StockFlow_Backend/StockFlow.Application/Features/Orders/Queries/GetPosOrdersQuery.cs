@@ -169,6 +169,7 @@ public class GetPosOrdersQueryHandler : IRequestHandler<GetPosOrdersQuery, Resul
                     .Select(ft => ft.PaymentMethod)
                     .FirstOrDefault() ?? (o.OutstandingAmount > 0 && o.PaidAmount == 0 ? "DEBT" : "CASH"),
                 HasReturn = o.TrxReturnRequests.Any(),
+                ReturnCode = o.TrxReturnRequests.OrderByDescending(r => r.ReturnRequestId).Select(r => r.ReturnCode).FirstOrDefault(),
                 Notes = o.Notes
             })
             .ToListAsync(cancellationToken);

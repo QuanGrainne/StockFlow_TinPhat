@@ -91,7 +91,6 @@ export const PaymentHistoryCard: React.FC<PaymentHistoryCardProps> = ({
                 let methodLabel = tx.paymentMethod;
                 if (methodLabel === 'CASH') methodLabel = 'Tiền mặt';
                 else if (methodLabel === 'VIETQR') methodLabel = 'Chuyển khoản VietQR';
-                else if (methodLabel === 'POS_CARD') methodLabel = 'Quẹt thẻ máy POS';
                 else if (methodLabel === 'DEBT') methodLabel = 'Ghi nợ đại lý';
 
                 return (

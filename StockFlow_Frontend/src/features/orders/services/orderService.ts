@@ -21,10 +21,10 @@ export const orderService = {
     add('priceBookName', filter.priceBookName);
     const pageSize = 100;
     const fetchPage = (page: number) => {
-      const q = new URLSearchParams(sp);
-      q.set('page', String(page));
-      q.set('pageSize', String(pageSize));
-      return apiClient.get<{ items: OrderListItem[]; totalCount: number }>(`/api/orders?${q.toString()}`);
+      const qs = new URLSearchParams(sp);
+      qs.set('page', String(page));
+      qs.set('pageSize', String(pageSize));
+      return apiClient.get<{ items: OrderListItem[]; totalCount: number }>(`/api/orders?${qs.toString()}`);
     };
     const first = await fetchPage(1);
     const pages = Math.ceil((first.totalCount || 0) / pageSize);
