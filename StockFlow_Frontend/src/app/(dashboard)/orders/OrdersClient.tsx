@@ -1,69 +1,32 @@
 // src/app/(dashboard)/orders/OrdersClient.tsx
-// Màn hình Hóa đơn (theo mẫu KiotViet):
-// - Cột trái: bộ lọc Chi nhánh, Thời gian, Trạng thái, Trạng thái trả hàng, Phương thức thanh toán, Bảng giá.
-// - Bên phải: tìm theo mã hóa đơn, nút "+ Hóa đơn" mở màn Bán hàng POS, Xuất file.
-// - Bảng hóa đơn có dòng tổng ở đầu bảng; bấm 1 dòng để mở chi tiết (Thông tin / Lịch sử thanh toán).
+// Màn hình Hóa đơn — cùng bố cục với Khách hàng / Nhà cung cấp / Nhập hàng:
+// Header 48px (tiêu đề + tìm kiếm + "+ Hóa đơn" mở màn Bán hàng + Xuất file)
+// → [Sidebar bộ lọc | Bảng có dòng tổng + chi tiết mở rộng (Thông tin / Lịch sử thanh toán)] → footer phân trang.
 
 'use client';
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { Button, Input, Pagination, Select, Table, Tooltip, message } from 'antd';
-import type { ColumnsType } from 'antd/es/table';
-import { PlusOutlined, SearchOutlined, CloudDownloadOutlined, ImportOutlined, ReloadOutlined, SettingOutlined } from '@ant-design/icons';
-import { Star } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { message } from 'antd';
+import { ChevronLeft, ChevronRight, FileDown, Inbox, Plus, RefreshCw, Search, Star, X } from 'lucide-react';
 
 import { orderService } from '@/features/orders/services/orderService';
 import type { OrderListFilter, OrderListItem } from '@/features/orders/types';
 import { KiotVietOrderDetail } from '@/features/orders/components/KiotVietOrderDetail';
-import {
-  PAYMENT_METHOD_OPTIONS,
-  exportInvoicesToXLSX,
-  formatDateTime,
-  toDateKey,
-} from '@/features/orders/utils/invoiceUtils';
+import OrderFilterSidebar, { type OrderSidebarState } from '@/features/orders/components/OrderFilterSidebar';
+import { exportInvoicesToXLSX, formatDateTime } from '@/features/orders/utils/invoiceUtils';
 import { priceBookService } from '@/features/price-books/services/priceBookService';
+import { getTimeRangeForPreset } from '@/components/filters/TimeRangeFilter';
+import { PartnerLink } from '@/components/links/EntityLinks';
 import { useActiveWarehouse } from '@/lib/warehouse/useActiveWarehouse';
+import { readDocumentLink, scrollToWhenReady } from '@/lib/navigation/documentLink';
 
 const money = new Intl.NumberFormat('vi-VN');
-
-type TimePreset = 'TODAY' | 'YESTERDAY' | 'LAST_7_DAYS' | 'THIS_MONTH' | 'LAST_MONTH' | 'ALL';
-
-const TIME_PRESETS: { value: TimePreset; label: string }[] = [
-  { value: 'TODAY', label: 'Hôm nay' },
-  { value: 'YESTERDAY', label: 'Hôm qua' },
-  { value: 'LAST_7_DAYS', label: '7 ngày qua' },
-  { value: 'THIS_MONTH', label: 'Tháng này' },
-  { value: 'LAST_MONTH', label: 'Tháng trước' },
-  { value: 'ALL', label: 'Toàn thời gian' },
-];
-
+const COLUMN_COUNT = 10;
 const STAR_KEY = 'stockflow_invoice_stars';
-
-function presetRange(preset: TimePreset): { from?: string; to?: string } {
-  const now = new Date();
-  const day = (offset: number) => new Date(now.getFullYear(), now.getMonth(), now.getDate() + offset);
-  switch (preset) {
-    case 'TODAY':
-      return { from: toDateKey(now), to: toDateKey(now) };
-    case 'YESTERDAY':
-      return { from: toDateKey(day(-1)), to: toDateKey(day(-1)) };
-    case 'LAST_7_DAYS':
-      return { from: toDateKey(day(-6)), to: toDateKey(now) };
-    case 'THIS_MONTH':
-      return {
-        from: toDateKey(new Date(now.getFullYear(), now.getMonth(), 1)),
-        to: toDateKey(new Date(now.getFullYear(), now.getMonth() + 1, 0)),
-      };
-    case 'LAST_MONTH':
-      return {
-        from: toDateKey(new Date(now.getFullYear(), now.getMonth() - 1, 1)),
-        to: toDateKey(new Date(now.getFullYear(), now.getMonth(), 0)),
-      };
-    default:
-      return {};
-  }
-}
+const WALK_IN_CODE = 'KH00000';
+const thCls = 'sticky top-0 z-20 bg-[#f7f8f9] py-2.5 px-3 border-b border-slate-200 whitespace-nowrap';
+const checkboxCls = 'rounded text-[#0070f4] focus:ring-[#0070f4] h-3.5 w-3.5 border-slate-300 cursor-pointer';
 
 function readStars(): number[] {
   try {
@@ -75,137 +38,129 @@ function readStars(): number[] {
   }
 }
 
+function defaultSidebar(warehouseId: number): OrderSidebarState {
+  const month = getTimeRangeForPreset('this_month');
+  return {
+    warehouseIds: [warehouseId],
+    timeRange: month.timeRange,
+    dateFrom: month.dateFrom,
+    dateTo: month.dateTo,
+    statusCompleted: true,
+    statusCancelled: false,
+    noReturn: true,
+    hasReturn: true,
+    paymentMethod: '',
+    priceBookName: '',
+  };
+}
+
 interface OrdersClientProps {
+  /** Điều hướng màn hình trong AppLayout (giữ tương thích) */
   onNavigate?: (screenId: string) => void;
 }
 
-/** Khung 1 nhóm bộ lọc ở cột trái */
-function FilterCard({ title, extra, children }: { title: string; extra?: React.ReactNode; children: React.ReactNode }) {
-  return (
-    <section className="rounded-lg bg-white px-3.5 py-3 shadow-xs">
-      <div className="mb-2 flex items-center justify-between">
-        <span className="text-[13px] font-semibold text-slate-800">{title}</span>
-        {extra}
-      </div>
-      {children}
-    </section>
-  );
-}
-
-function CheckRow({ checked, label, onChange }: { checked: boolean; label: string; onChange: (v: boolean) => void }) {
-  return (
-    <label className="flex cursor-pointer items-center gap-2 py-1 text-[13px] text-slate-700">
-      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="h-4 w-4 accent-[#0071BA]" />
-      <span>{label}</span>
-    </label>
-  );
-}
-
-export default function OrdersClient({ onNavigate }: OrdersClientProps) {
-  const router = useRouter();
+export default function OrdersClient({}: OrdersClientProps = {}) {
   const { activeWarehouse, warehouses } = useActiveWarehouse();
+  // Link mở thẳng 1 hóa đơn (?code=HD...&id=..., VD từ sổ công nợ khách hàng): tìm theo mã, mọi chi nhánh, toàn thời gian
+  const searchParams = useSearchParams();
+  const [docLink] = useState(() => readDocumentLink(searchParams));
 
-  // ─── Bộ lọc ────────────────────────────────────────────────────────────────
-  const [warehouseIds, setWarehouseIds] = useState<number[]>(() => [activeWarehouse.warehouseId]);
-  const [timeMode, setTimeMode] = useState<'PRESET' | 'CUSTOM'>('PRESET');
-  const [timePreset, setTimePreset] = useState<TimePreset>('THIS_MONTH');
-  const [customFrom, setCustomFrom] = useState('');
-  const [customTo, setCustomTo] = useState('');
-  const [statusCompleted, setStatusCompleted] = useState(true);
-  const [statusCancelled, setStatusCancelled] = useState(false);
-  const [noReturn, setNoReturn] = useState(true);
-  const [hasReturn, setHasReturn] = useState(true);
-  const [paymentMethod, setPaymentMethod] = useState<string | undefined>(undefined);
-  const [priceBookName, setPriceBookName] = useState<string | undefined>(undefined);
-  const [searchInput, setSearchInput] = useState('');
-  const [search, setSearch] = useState('');
-
-  // ─── Dữ liệu ───────────────────────────────────────────────────────────────
-  const [rows, setRows] = useState<OrderListItem[]>([]);
-  /** Khóa của lần tải gần nhất đã xong → so với khóa hiện tại để biết đang tải */
-  const [loadedKey, setLoadedKey] = useState<string | null>(null);
+  const [sidebar, setSidebar] = useState<OrderSidebarState>(() =>
+    docLink
+      ? {
+          ...defaultSidebar(activeWarehouse.warehouseId),
+          warehouseIds: [],
+          timeRange: 'all_time',
+          dateFrom: '',
+          dateTo: '',
+          statusCancelled: true,
+        }
+      : defaultSidebar(activeWarehouse.warehouseId)
+  );
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [searchInput, setSearchInput] = useState(() => docLink?.code ?? '');
+  const [search, setSearch] = useState(() => docLink?.code ?? '');
   const [reloadTick, setReloadTick] = useState(0);
-  const [priceBookOptions, setPriceBookOptions] = useState<{ value: string; label: string }[]>([]);
-  const [selectedKeys, setSelectedKeys] = useState<React.Key[]>([]);
-  const [stars, setStars] = useState<number[]>(() => (typeof window === 'undefined' ? [] : readStars()));
+  const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(15);
-  // Trang và dòng đang mở gắn với bộ lọc: đổi bộ lọc thì tự về trang 1, đóng chi tiết
-  const [pageState, setPageState] = useState<{ key: string; page: number }>({ key: '', page: 1 });
-  const [expandState, setExpandState] = useState<{ key: string; id: number | null }>({ key: '', id: null });
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [expandedId, setExpandedId] = useState<number | null>(() => docLink?.id ?? null);
+  const [priceBooks, setPriceBooks] = useState<string[]>([]);
+  const [stars, setStars] = useState<number[]>(() => (typeof window === 'undefined' ? [] : readStars()));
 
+  // Mở theo link: cuộn tới dòng hóa đơn khi dữ liệu tải xong
   useEffect(() => {
-    priceBookService
-      .getPriceBooks()
-      .then((list) => setPriceBookOptions(list.map((p) => ({ value: p.priceBookName, label: p.priceBookName }))))
-      .catch(() => setPriceBookOptions([]));
-  }, []);
+    if (!docLink?.id) return;
+    return scrollToWhenReady(`[data-doc-row="${docLink.id}"]`);
+  }, [docLink]);
 
-  // Tìm kiếm: chờ người dùng ngừng gõ 300ms rồi mới gọi API
+  // Tìm kiếm: chờ ngừng gõ 300ms rồi mới gọi API
   useEffect(() => {
     const t = setTimeout(() => setSearch(searchInput.trim()), 300);
     return () => clearTimeout(t);
   }, [searchInput]);
 
-  const customRangeInvalid = timeMode === 'CUSTOM' && !!customFrom && !!customTo && customFrom > customTo;
+  useEffect(() => {
+    priceBookService
+      .getPriceBooks()
+      .then((list) => setPriceBooks(Array.from(new Set(list.map((p) => p.priceBookName).filter(Boolean)))))
+      .catch(() => setPriceBooks([]));
+  }, []);
 
+  // ── Bộ lọc gửi lên server; đang tải khi kết quả chưa khớp khóa hiện tại ──
   const serverFilter = useMemo<OrderListFilter>(() => {
-    const range = timeMode === 'CUSTOM' ? { from: customFrom || undefined, to: customTo || undefined } : presetRange(timePreset);
-    const statuses = [statusCompleted && 'COMPLETED', statusCancelled && 'CANCELLED'].filter(Boolean).join(',');
-    const returnStatus = noReturn === hasReturn ? 'ALL' : noReturn ? 'NO_RETURN' : 'HAS_RETURN';
+    const statuses = [sidebar.statusCompleted && 'COMPLETED', sidebar.statusCancelled && 'CANCELLED'].filter(Boolean).join(',');
     return {
       search: search || undefined,
-      // API chỉ nhận 1 kho; chọn nhiều kho thì lọc tiếp ở client
-      warehouseId: warehouseIds.length === 1 ? warehouseIds[0] : undefined,
-      fromDate: range.from,
-      toDate: range.to,
+      // API nhận 1 kho; chọn nhiều kho thì tải tất cả rồi lọc tiếp ở client
+      warehouseId: sidebar.warehouseIds.length === 1 ? sidebar.warehouseIds[0] : undefined,
+      fromDate: sidebar.dateFrom || undefined,
+      toDate: sidebar.dateTo || undefined,
       status: statuses || undefined,
-      returnStatus,
-      paymentMethod,
-      priceBookName,
+      returnStatus: sidebar.noReturn === sidebar.hasReturn ? 'ALL' : sidebar.noReturn ? 'NO_RETURN' : 'HAS_RETURN',
+      paymentMethod: sidebar.paymentMethod || undefined,
+      priceBookName: sidebar.priceBookName || undefined,
     };
-  }, [search, warehouseIds, timeMode, timePreset, customFrom, customTo, statusCompleted, statusCancelled, noReturn, hasReturn, paymentMethod, priceBookName]);
+  }, [sidebar, search]);
 
-  const filterKey = useMemo(() => `${JSON.stringify(serverFilter)}|${warehouseIds.join(',')}`, [serverFilter, warehouseIds]);
-  const requestKey = `${filterKey}#${reloadTick}`;
-  const loading = !customRangeInvalid && loadedKey !== requestKey;
+  // Bỏ hết trạng thái → không có hóa đơn nào (API coi rỗng là "tất cả")
+  const noStatus = !sidebar.statusCompleted && !sidebar.statusCancelled;
+  const requestKey = JSON.stringify({ ...serverFilter, reloadTick });
+  const [result, setResult] = useState<{ key: string; items: OrderListItem[] }>({ key: '', items: [] });
+  const loading = !noStatus && result.key !== requestKey;
 
   useEffect(() => {
-    if (customRangeInvalid) return;
-    let alive = true;
+    if (noStatus) return;
+    let stale = false;
+    const { reloadTick: _tick, ...params } = JSON.parse(requestKey) as OrderListFilter & { reloadTick: number };
+    void _tick;
     orderService
-      .getOrders(serverFilter)
-      .then((data) => {
-        if (alive) setRows(data);
+      .getOrders(params)
+      .then((items) => {
+        if (!stale) setResult({ key: requestKey, items });
       })
       .catch((err: unknown) => {
-        if (!alive) return;
-        setRows([]);
+        if (stale) return;
         message.error(err instanceof Error ? err.message : 'Không thể tải danh sách hóa đơn.');
-      })
-      .finally(() => {
-        if (alive) setLoadedKey(requestKey);
+        setResult({ key: requestKey, items: [] });
       });
     return () => {
-      alive = false;
+      stale = true;
     };
-  }, [serverFilter, customRangeInvalid, requestKey]);
+  }, [requestKey, noStatus]);
 
-  const loadOrders = useCallback(() => setReloadTick((t) => t + 1), []);
-
-  const page = pageState.key === filterKey ? pageState.page : 1;
-  const setPage = (p: number) => setPageState({ key: filterKey, page: p });
-  const expandedId = expandState.key === filterKey ? expandState.id : null;
-  const setExpandedId = (id: number | null) => setExpandState({ key: filterKey, id });
-
-  const filteredRows = useMemo(() => {
-    if (warehouseIds.length <= 1) return rows;
-    const set = new Set(warehouseIds);
-    return rows.filter((r) => r.warehouseId != null && set.has(r.warehouseId));
-  }, [rows, warehouseIds]);
-
+  const rows = useMemo(() => {
+    if (noStatus) return [];
+    if (sidebar.warehouseIds.length <= 1) return result.items;
+    const set = new Set(sidebar.warehouseIds);
+    return result.items.filter((r) => r.warehouseId != null && set.has(r.warehouseId));
+  }, [noStatus, result.items, sidebar.warehouseIds]);
+  const pageCount = Math.max(1, Math.ceil(rows.length / pageSize));
+  const safePage = Math.min(page, pageCount);
+  const paged = rows.slice((safePage - 1) * pageSize, safePage * pageSize);
   const totals = useMemo(
     () =>
-      filteredRows.reduce(
+      rows.reduce(
         (acc, r) => ({
           subTotal: acc.subTotal + (r.subTotal || 0),
           discount: acc.discount + (r.discountAmount || 0),
@@ -213,10 +168,15 @@ export default function OrdersClient({ onNavigate }: OrdersClientProps) {
         }),
         { subTotal: 0, discount: 0, paid: 0 }
       ),
-    [filteredRows]
+    [rows]
   );
 
-  const pageRows = useMemo(() => filteredRows.slice((page - 1) * pageSize, page * pageSize), [filteredRows, page, pageSize]);
+  const changeSidebar = (patch: Partial<OrderSidebarState>) => {
+    setSidebar((prev) => ({ ...prev, ...patch }));
+    setPage(1);
+    setExpandedId(null);
+  };
+  const reload = () => setReloadTick((t) => t + 1);
 
   const toggleStar = (orderId: number) => {
     setStars((prev) => {
@@ -230,13 +190,12 @@ export default function OrdersClient({ onNavigate }: OrdersClientProps) {
     });
   };
 
+  /** "+ Hóa đơn" / "Sao chép" → mở màn Bán hàng ở tab mới, giữ nguyên màn Hóa đơn đang xem */
   const openPos = () => {
-    if (onNavigate) onNavigate('pos');
-    else router.push('/pos');
+    window.open('/pos', '_blank', 'noopener');
   };
 
-  const handleExport = () => {
-    const source = selectedKeys.length > 0 ? filteredRows.filter((r) => selectedKeys.includes(r.orderId)) : filteredRows;
+  const handleExport = (source: OrderListItem[]) => {
     if (source.length === 0) {
       message.warning('Không có hóa đơn nào để xuất file.');
       return;
@@ -250,7 +209,7 @@ export default function OrdersClient({ onNavigate }: OrdersClientProps) {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'F1') {
         e.preventDefault();
-        openPos();
+        window.open('/pos', '_blank', 'noopener');
       } else if (e.key === 'F3') {
         e.preventDefault();
         document.getElementById('invoice-search')?.focus();
@@ -258,306 +217,305 @@ export default function OrdersClient({ onNavigate }: OrdersClientProps) {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [onNavigate]);
+  }, []);
 
-  const columns: ColumnsType<OrderListItem> = [
-    {
-      key: 'star',
-      width: 42,
-      align: 'center',
-      title: <Star size={14} className="mx-auto text-slate-400" />,
-      render: (_, r) => (
-        <button
-          type="button"
-          aria-label="Đánh dấu hóa đơn"
-          onClick={(e) => {
-            e.stopPropagation();
-            toggleStar(r.orderId);
-          }}
-          className="cursor-pointer"
-        >
-          <Star size={14} className={stars.includes(r.orderId) ? 'fill-amber-400 text-amber-400' : 'text-slate-300 hover:text-slate-400'} />
-        </button>
-      ),
-    },
-    {
-      key: 'code',
-      title: 'Mã hóa đơn',
-      width: 140,
-      render: (_, r) => <span className="text-[13px] text-[#262626]">{r.orderCode}</span>,
-    },
-    {
-      key: 'time',
-      title: 'Thời gian',
-      width: 160,
-      render: (_, r) => <span className="text-[13px] text-[#262626]">{formatDateTime(r.orderDate)}</span>,
-    },
-    {
-      key: 'returnCode',
-      title: 'Mã trả hàng',
-      width: 130,
-      render: (_, r) => <span className="text-[13px] text-[#595959]">{r.returnCode || ''}</span>,
-    },
-    {
-      key: 'partnerCode',
-      title: 'Mã KH',
-      width: 120,
-      render: (_, r) => <span className="text-[13px] text-[#595959]">{r.partnerCode || ''}</span>,
-    },
-    {
-      key: 'partner',
-      title: 'Khách hàng',
-      render: (_, r) => <span className="text-[13px] text-[#262626]">{r.partnerCode ? r.partnerName : 'Khách lẻ'}</span>,
-    },
-    {
-      key: 'subTotal',
-      title: 'Tổng tiền hàng',
-      align: 'right',
-      width: 150,
-      render: (_, r) => <span className="text-[13px]">{money.format(r.subTotal || 0)}</span>,
-    },
-    {
-      key: 'discount',
-      title: 'Giảm giá',
-      align: 'right',
-      width: 120,
-      render: (_, r) => <span className="text-[13px]">{money.format(r.discountAmount || 0)}</span>,
-    },
-    {
-      key: 'paid',
-      title: 'Khách đã trả',
-      align: 'right',
-      width: 140,
-      render: (_, r) => <span className="text-[13px]">{money.format(r.paidAmount || 0)}</span>,
-    },
-  ];
-
-  const warehouseOptions = warehouses.map((w) => ({ value: w.warehouseId, label: w.name }));
+  const allPageSelected = paged.length > 0 && paged.every((r) => selectedIds.includes(r.orderId));
 
   return (
-    <div className="flex h-full min-h-[calc(100vh-56px)] gap-4 bg-[#f0f2f5] p-4 text-[#262626]">
-      {/* ─── CỘT TRÁI: BỘ LỌC ─── */}
-      <aside className="hidden w-[260px] shrink-0 flex-col gap-3 lg:flex">
-        <h1 className="px-1 text-[20px] font-bold tracking-tight text-slate-900">Hóa đơn</h1>
+    <div className="flex-1 h-full min-h-0 flex flex-col bg-[#f5f5f5] overflow-hidden select-none text-[13px] text-[#15171a] font-sans">
+      {/* 1. Header */}
+      <header className="h-12 bg-white border-b border-slate-200 px-4 flex items-center justify-between gap-3 shrink-0">
+        <div className="flex items-center gap-4 flex-1 max-w-xl">
+          <h1 className="text-[20px] font-bold text-[#15171a] leading-7 tracking-tight whitespace-nowrap">Hóa đơn</h1>
+          <div className="relative flex-1">
+            <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#677484] pointer-events-none" />
+            <input
+              id="invoice-search"
+              type="text"
+              value={searchInput}
+              onChange={(e) => {
+                setSearchInput(e.target.value);
+                setPage(1);
+              }}
+              placeholder="Theo mã hóa đơn, tên hoặc SĐT khách (F3)"
+              className="w-full h-8 pl-8 pr-8 rounded-full bg-[#f7f8f9] border border-slate-200 text-[13px] placeholder-[#677484] focus:outline-none focus:border-[#0070f4] focus:bg-white transition"
+            />
+            {searchInput && (
+              <button
+                type="button"
+                onClick={() => setSearchInput('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#677484] hover:text-[#15171a] cursor-pointer"
+                title="Xóa từ khóa"
+              >
+                <X size={13} />
+              </button>
+            )}
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={openPos}
+            title="Mở màn hình Bán hàng (F1)"
+            className="inline-flex items-center gap-1.5 px-3.5 h-8 rounded-[8px] bg-[#0070f4] hover:bg-[#005ac3] text-white font-semibold text-[13px] shadow-xs transition cursor-pointer"
+          >
+            <Plus size={15} className="stroke-[2.5]" />
+            <span>Hóa đơn</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => handleExport(rows)}
+            disabled={rows.length === 0}
+            className="inline-flex items-center gap-1 px-3 h-8 rounded-[8px] border border-slate-300 hover:bg-[#f7f8f9] font-medium text-[13px] transition cursor-pointer bg-white disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <FileDown size={14} className="text-[#677484]" />
+            <span>Xuất file</span>
+          </button>
+        </div>
+      </header>
 
-        <FilterCard title="Chi nhánh">
-          <Select
-            mode="multiple"
-            allowClear
-            value={warehouseIds}
-            onChange={(v: number[]) => setWarehouseIds(v)}
-            options={warehouseOptions}
-            placeholder="Tất cả chi nhánh"
-            className="w-full"
-            maxTagCount="responsive"
-          />
-        </FilterCard>
+      {/* 2. Bộ lọc + bảng */}
+      <div className="flex-1 min-h-0 flex overflow-hidden">
+        <OrderFilterSidebar
+          state={sidebar}
+          warehouses={warehouses}
+          priceBooks={priceBooks}
+          fallbackWarehouseId={activeWarehouse.warehouseId}
+          onChange={changeSidebar}
+          isCollapsed={sidebarCollapsed}
+          onToggleCollapse={() => setSidebarCollapsed((v) => !v)}
+        />
 
-        <FilterCard title="Thời gian">
-          <div className="space-y-2">
-            <label className="flex items-center gap-2">
-              <input type="radio" checked={timeMode === 'PRESET'} onChange={() => setTimeMode('PRESET')} className="h-4 w-4 accent-[#0071BA]" />
-              <Select<TimePreset>
-                value={timePreset}
-                onChange={(v) => {
-                  setTimePreset(v);
-                  setTimeMode('PRESET');
-                }}
-                options={TIME_PRESETS}
-                className="flex-1"
-                size="middle"
-              />
-            </label>
-            <label className="flex items-start gap-2">
-              <input
-                type="radio"
-                checked={timeMode === 'CUSTOM'}
-                onChange={() => setTimeMode('CUSTOM')}
-                className="mt-2.5 h-4 w-4 accent-[#0071BA]"
-              />
-              <div className="flex-1 space-y-1.5">
-                {timeMode !== 'CUSTOM' ? (
-                  <button
-                    type="button"
-                    onClick={() => setTimeMode('CUSTOM')}
-                    className="h-8 w-full rounded-[6px] border border-slate-300 px-3 text-left text-[13px] text-slate-700 hover:border-slate-400"
-                  >
-                    Tùy chỉnh
-                  </button>
-                ) : (
-                  <>
+        <div className="flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden bg-white">
+          <div className="flex-1 min-h-0 overflow-auto">
+            <table className="w-full text-left border-collapse min-w-[980px]">
+              <thead className="bg-[#f7f8f9] sticky top-0 z-20 border-b border-slate-200 text-[12px] font-semibold text-[#677484] shadow-xs">
+                <tr>
+                  <th className={`${thCls} w-10 text-center`}>
                     <input
-                      type="date"
-                      value={customFrom}
-                      onChange={(e) => setCustomFrom(e.target.value)}
-                      aria-label="Từ ngày"
-                      className="h-8 w-full rounded-[6px] border border-slate-300 px-2 text-[13px] outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                      type="checkbox"
+                      checked={allPageSelected}
+                      onChange={(e) =>
+                        setSelectedIds((prev) =>
+                          e.target.checked
+                            ? Array.from(new Set([...prev, ...paged.map((r) => r.orderId)]))
+                            : prev.filter((id) => !paged.some((r) => r.orderId === id))
+                        )
+                      }
+                      className={checkboxCls}
                     />
-                    <input
-                      type="date"
-                      value={customTo}
-                      onChange={(e) => setCustomTo(e.target.value)}
-                      aria-label="Đến ngày"
-                      className="h-8 w-full rounded-[6px] border border-slate-300 px-2 text-[13px] outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                    />
-                    {customRangeInvalid && <p className="text-[11px] text-rose-600">Từ ngày phải nhỏ hơn hoặc bằng Đến ngày.</p>}
-                  </>
+                  </th>
+                  <th className={`${thCls} w-9 text-center`}>
+                    <Star size={13} className="mx-auto text-[#677484]" />
+                  </th>
+                  <th className={thCls}>Mã hóa đơn</th>
+                  <th className={thCls}>Thời gian</th>
+                  <th className={thCls}>Mã trả hàng</th>
+                  <th className={thCls}>Mã KH</th>
+                  <th className={thCls}>Khách hàng</th>
+                  <th className={`${thCls} text-right`}>Tổng tiền hàng</th>
+                  <th className={`${thCls} text-right`}>Giảm giá</th>
+                  <th className={`${thCls} text-right`}>Khách đã trả</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {/* Dòng tổng */}
+                {!loading && paged.length > 0 && (
+                  <tr className="bg-white border-b border-slate-200 font-bold text-[13px]">
+                    <td colSpan={7}></td>
+                    <td className="py-2.5 px-3 text-right font-mono">{money.format(totals.subTotal)}</td>
+                    <td className="py-2.5 px-3 text-right font-mono">{money.format(totals.discount)}</td>
+                    <td className="py-2.5 px-3 text-right font-mono">{money.format(totals.paid)}</td>
+                  </tr>
                 )}
+
+                {loading ? (
+                  <tr>
+                    <td colSpan={COLUMN_COUNT} className="py-20 text-center text-[#677484]">
+                      <RefreshCw size={20} className="animate-spin mx-auto mb-2 text-[#0070f4]" />
+                      Đang tải danh sách hóa đơn...
+                    </td>
+                  </tr>
+                ) : paged.length === 0 ? (
+                  <tr>
+                    <td colSpan={COLUMN_COUNT} className="py-24 text-center">
+                      <div className="flex flex-col items-center justify-center">
+                        <div className="w-16 h-16 rounded-full bg-[#e6f1fe] text-[#0070f4] flex items-center justify-center mb-3">
+                          <Inbox size={32} className="stroke-[1.5]" />
+                        </div>
+                        <h3 className="font-bold text-sm mb-1">Không tìm thấy hóa đơn</h3>
+                        <p className="text-xs text-[#677484] max-w-sm">
+                          Chưa có hóa đơn phù hợp.{' '}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSidebar(defaultSidebar(activeWarehouse.warehouseId));
+                              setSearchInput('');
+                              setPage(1);
+                            }}
+                            className="text-[#0070f4] font-semibold hover:underline cursor-pointer"
+                          >
+                            Xóa bộ lọc
+                          </button>{' '}
+                          hoặc bấm <strong>+ Hóa đơn</strong> để bán hàng.
+                        </p>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  paged.map((r) => {
+                    const isExpanded = expandedId === r.orderId;
+                    const isSelected = selectedIds.includes(r.orderId);
+                    const cancelled = r.status === 'CANCELLED';
+                    const walkIn = !r.partnerCode || r.partnerCode === WALK_IN_CODE;
+                    const starred = stars.includes(r.orderId);
+                    return (
+                      <React.Fragment key={r.orderId}>
+                        <tr
+                          data-doc-row={r.orderId}
+                          onClick={() => setExpandedId(isExpanded ? null : r.orderId)}
+                          className={`hover:bg-[#f7f8f9] transition cursor-pointer select-none border-b border-slate-100 ${
+                            isExpanded ? 'bg-[#e6f1fe]/80 font-medium' : isSelected ? 'bg-[#e6f1fe]/50' : ''
+                          } ${cancelled ? 'text-[#677484]' : ''}`}
+                        >
+                          <td className="py-2.5 px-3 text-center" onClick={(e) => e.stopPropagation()}>
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={(e) =>
+                                setSelectedIds((prev) =>
+                                  e.target.checked ? [...prev, r.orderId] : prev.filter((id) => id !== r.orderId)
+                                )
+                              }
+                              className={checkboxCls}
+                            />
+                          </td>
+                          <td className="py-2.5 px-1 text-center">
+                            <button
+                              type="button"
+                              aria-label="Đánh dấu hóa đơn"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleStar(r.orderId);
+                              }}
+                              className="cursor-pointer align-middle"
+                            >
+                              <Star
+                                size={14}
+                                className={starred ? 'fill-amber-400 text-amber-400' : 'text-slate-300 hover:text-slate-400'}
+                              />
+                            </button>
+                          </td>
+                          <td className="py-2.5 px-3 font-mono font-bold text-[#0070f4] whitespace-nowrap">
+                            {r.orderCode}
+                            {cancelled && (
+                              <span className="ml-2 px-1.5 py-0.5 rounded-[4px] text-[10px] font-semibold font-sans bg-[#fef2f2] text-[#fb2c36] border border-[#fecaca]">
+                                Đã hủy
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-2.5 px-3 whitespace-nowrap">{formatDateTime(r.orderDate)}</td>
+                          <td className="py-2.5 px-3 font-mono text-[12px] text-[#677484] whitespace-nowrap">{r.returnCode || ''}</td>
+                          <td className="py-2.5 px-3 font-mono text-[12px] whitespace-nowrap">
+                            {walkIn ? (
+                              ''
+                            ) : (
+                              <PartnerLink kind="customer" code={r.partnerCode} />
+                            )}
+                          </td>
+                          <td className="py-2.5 px-3">{walkIn ? 'Khách lẻ' : r.partnerName}</td>
+                          <td className="py-2.5 px-3 text-right font-mono">{money.format(r.subTotal || 0)}</td>
+                          <td className="py-2.5 px-3 text-right font-mono">{money.format(r.discountAmount || 0)}</td>
+                          <td className="py-2.5 px-3 text-right font-mono">{money.format(r.paidAmount || 0)}</td>
+                        </tr>
+                        {isExpanded && (
+                          <tr>
+                            <td colSpan={COLUMN_COUNT} className="p-0 bg-white">
+                              <KiotVietOrderDetail
+                                orderId={r.orderId}
+                                onClose={() => setExpandedId(null)}
+                                onReloadList={reload}
+                                onOpenPos={openPos}
+                              />
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Footer phân trang */}
+          <footer className="h-10 bg-white border-t border-slate-200 px-4 flex items-center justify-between text-[12px] text-[#677484] shrink-0">
+            <div className="flex items-center gap-3">
+              <span>
+                Hiển thị{' '}
+                <strong className="text-[#15171a]">
+                  {rows.length === 0 ? 0 : (safePage - 1) * pageSize + 1} - {Math.min(safePage * pageSize, rows.length)}
+                </strong>{' '}
+                trên <strong className="text-[#15171a]">{rows.length}</strong> hóa đơn
+              </span>
+              <select
+                value={pageSize}
+                onChange={(e) => {
+                  setPageSize(Number(e.target.value));
+                  setPage(1);
+                }}
+                className="h-7 rounded-[6px] border border-slate-300 bg-white px-1.5 text-[12px] text-[#15171a] focus:outline-none focus:border-[#0070f4] cursor-pointer"
+              >
+                <option value={15}>15 dòng</option>
+                <option value={30}>30 dòng</option>
+                <option value={50}>50 dòng</option>
+              </select>
+            </div>
+            {pageCount > 1 && (
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  disabled={safePage <= 1}
+                  onClick={() => setPage(Math.max(1, safePage - 1))}
+                  className="flex h-7 w-7 items-center justify-center rounded-[6px] border border-slate-300 bg-white hover:bg-[#f7f8f9] disabled:opacity-40 cursor-pointer"
+                >
+                  <ChevronLeft size={14} />
+                </button>
+                <span className="px-2 font-semibold text-[#15171a]">
+                  {safePage}/{pageCount}
+                </span>
+                <button
+                  type="button"
+                  disabled={safePage >= pageCount}
+                  onClick={() => setPage(Math.min(pageCount, safePage + 1))}
+                  className="flex h-7 w-7 items-center justify-center rounded-[6px] border border-slate-300 bg-white hover:bg-[#f7f8f9] disabled:opacity-40 cursor-pointer"
+                >
+                  <ChevronRight size={14} />
+                </button>
               </div>
-            </label>
-          </div>
-        </FilterCard>
-
-        <FilterCard title="Trạng thái">
-          <CheckRow checked={statusCompleted} label="Hoàn thành" onChange={setStatusCompleted} />
-          <CheckRow checked={statusCancelled} label="Đã hủy" onChange={setStatusCancelled} />
-        </FilterCard>
-
-        <FilterCard title="Trạng thái trả hàng">
-          <CheckRow checked={noReturn} label="Không trả hàng" onChange={setNoReturn} />
-          <CheckRow checked={hasReturn} label="Có trả hàng" onChange={setHasReturn} />
-        </FilterCard>
-
-        <FilterCard title="Phương thức thanh toán">
-          <Select
-            allowClear
-            value={paymentMethod}
-            onChange={(v: string | undefined) => setPaymentMethod(v)}
-            options={PAYMENT_METHOD_OPTIONS}
-            placeholder="Chọn phương thức thanh toán..."
-            className="w-full"
-          />
-        </FilterCard>
-
-        <FilterCard title="Bảng giá">
-          <Select
-            allowClear
-            showSearch
-            value={priceBookName}
-            onChange={(v: string | undefined) => setPriceBookName(v)}
-            options={priceBookOptions}
-            placeholder="Chọn bảng giá"
-            className="w-full"
-          />
-        </FilterCard>
-      </aside>
-
-      {/* ─── BÊN PHẢI: THANH CÔNG CỤ + BẢNG ─── */}
-      <section className="flex min-w-0 flex-1 flex-col">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-          <Input
-            id="invoice-search"
-            allowClear
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            prefix={<SearchOutlined className="text-[#8c8c8c]" />}
-            placeholder="Theo mã hóa đơn, tên hoặc SĐT khách hàng (F3)"
-            className="h-[36px] w-full rounded-[6px] sm:w-[420px]"
-          />
-          <div className="flex items-center gap-2">
-            <Tooltip title="Mở màn hình bán hàng (F1)">
-              <Button icon={<PlusOutlined />} onClick={openPos} className="!border-[#0071BA] font-medium !text-[#0071BA]">
-                Hóa đơn
-              </Button>
-            </Tooltip>
-            <Tooltip title="Chưa hỗ trợ nhập hóa đơn từ file">
-              <Button icon={<ImportOutlined />} disabled>
-                Import file
-              </Button>
-            </Tooltip>
-            <Button icon={<CloudDownloadOutlined />} onClick={handleExport}>
-              Xuất file
-            </Button>
-            <Tooltip title="Tải lại">
-              <Button icon={<ReloadOutlined spin={loading} />} onClick={loadOrders} aria-label="Tải lại danh sách" />
-            </Tooltip>
-            <Tooltip title="Thiết lập đơn hàng">
-              <Button
-                icon={<SettingOutlined />}
-                aria-label="Thiết lập đơn hàng"
-                onClick={() => (onNavigate ? onNavigate('/settings/orders') : router.push('/settings/orders'))}
-              />
-            </Tooltip>
-          </div>
+            )}
+          </footer>
         </div>
+      </div>
 
-        <div className="min-h-0 flex-1 overflow-hidden rounded-lg border border-[#e5e7eb] bg-white shadow-xs">
-          <Table<OrderListItem>
-            className="stockflow-invoices-table"
-            rowKey="orderId"
-            size="middle"
-            loading={loading}
-            columns={columns}
-            dataSource={pageRows}
-            pagination={false}
-            scroll={{ x: 1100, y: 'calc(100vh - 260px)' }}
-            rowSelection={{ selectedRowKeys: selectedKeys, onChange: setSelectedKeys, columnWidth: 44 }}
-            rowClassName={(r) =>
-              r.orderId === expandedId
-                ? 'stockflow-invoice-row-expanded'
-                : r.status === 'CANCELLED'
-                ? 'bg-rose-50/40 hover:bg-rose-50/70'
-                : ''
-            }
-            onRow={(r) => ({
-              onClick: () => setExpandedId(expandedId === r.orderId ? null : r.orderId),
-              className: 'cursor-pointer',
-            })}
-            expandable={{
-              showExpandColumn: false,
-              expandedRowKeys: expandedId != null ? [expandedId] : [],
-              expandedRowClassName: () => 'stockflow-invoice-expanded',
-              expandedRowRender: (r) => (
-                <KiotVietOrderDetail
-                  orderId={r.orderId}
-                  onClose={() => setExpandedId(null)}
-                  onReloadList={loadOrders}
-                  onOpenPos={openPos}
-                />
-              ),
-            }}
-            locale={{ emptyText: 'Không tìm thấy hóa đơn nào phù hợp với bộ lọc.' }}
-            summary={() =>
-              filteredRows.length > 0 ? (
-                <Table.Summary fixed="top">
-                  <Table.Summary.Row className="stockflow-invoice-summary">
-                    <Table.Summary.Cell index={0} colSpan={7} />
-                    <Table.Summary.Cell index={7} align="right">
-                      <strong>{money.format(totals.subTotal)}</strong>
-                    </Table.Summary.Cell>
-                    <Table.Summary.Cell index={8} align="right">
-                      <strong>{money.format(totals.discount)}</strong>
-                    </Table.Summary.Cell>
-                    <Table.Summary.Cell index={9} align="right">
-                      <strong>{money.format(totals.paid)}</strong>
-                    </Table.Summary.Cell>
-                  </Table.Summary.Row>
-                </Table.Summary>
-              ) : null
-            }
-          />
+      {/* 3. Thao tác hàng loạt */}
+      {selectedIds.length > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-[#15171a] text-white rounded-xl shadow-2xl px-4 py-2.5 flex items-center gap-3 text-[13px]">
+          <span>
+            <strong>{selectedIds.length}</strong> hóa đơn đã chọn
+          </span>
+          <button
+            type="button"
+            onClick={() => handleExport(rows.filter((r) => selectedIds.includes(r.orderId)))}
+            className="inline-flex items-center gap-1 px-2.5 h-7 rounded-[6px] bg-white/10 hover:bg-white/20 cursor-pointer"
+          >
+            <FileDown size={13} /> Xuất file
+          </button>
+          <button type="button" onClick={() => setSelectedIds([])} className="p-1 rounded hover:bg-white/10 cursor-pointer" title="Bỏ chọn">
+            <X size={14} />
+          </button>
         </div>
-
-        <div className="mt-auto flex flex-wrap items-center justify-between gap-3 px-1 py-3">
-          <div className="text-xs text-slate-500">
-            {selectedKeys.length > 0 ? `Đã chọn ${selectedKeys.length} hóa đơn` : 'Chọn hóa đơn để xuất file hàng loạt'}
-          </div>
-          <Pagination
-            current={page}
-            pageSize={pageSize}
-            total={filteredRows.length}
-            showSizeChanger
-            pageSizeOptions={[15, 30, 50, 100]}
-            onChange={(p, ps) => {
-              setPage(ps !== pageSize ? 1 : p);
-              setPageSize(ps);
-              setExpandedId(null);
-            }}
-            showTotal={(total, range) => `${range[0]}-${range[1]} trên ${total} hóa đơn`}
-          />
-        </div>
-      </section>
+      )}
     </div>
   );
 }

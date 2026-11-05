@@ -85,6 +85,57 @@ public class CustomersController : ControllerBase
     }
 
     /// <summary>
+    /// Chi tiết 1 phiếu thu của khách hàng theo mã (TTHD000085, TTHD000085-1, PT000001...).
+    /// </summary>
+    [HttpGet("{id}/receipts/{code}")]
+    [ProducesResponseType(typeof(CustomerReceiptDetailDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [RequirePermission("PARTNER_READ")]
+    public async Task<IActionResult> GetCustomerReceipt(int id, string code)
+    {
+        var result = await _mediator.Send(new GetCustomerReceiptQuery(id, code));
+        if (!result.IsSuccess)
+        {
+            return NotFound(new { message = result.Error });
+        }
+        return Ok(result.Value);
+    }
+
+    /// <summary>
+    /// Sửa phiếu thu của khách: thời gian, phương thức thanh toán, ghi chú.
+    /// </summary>
+    [HttpPut("{id}/receipts/{code}")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [RequirePermission("FIN_UPDATE")]
+    public async Task<IActionResult> UpdateCustomerReceipt(int id, string code, [FromBody] UpdateCustomerReceiptRequest request)
+    {
+        var result = await _mediator.Send(new UpdateCustomerReceiptCommand(id, code, request));
+        if (!result.IsSuccess)
+        {
+            return BadRequest(new { message = result.Error });
+        }
+        return Ok(new { message = $"Đã lưu phiếu thu {code}" });
+    }
+
+    /// <summary>
+    /// Hủy phiếu thu của khách: hoàn lại số đã trả của hóa đơn và cộng lại nợ khách.
+    /// </summary>
+    [HttpPost("{id}/receipts/{code}/cancel")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [RequirePermission("FIN_UPDATE")]
+    public async Task<IActionResult> CancelCustomerReceipt(int id, string code)
+    {
+        var result = await _mediator.Send(new CancelCustomerReceiptCommand(id, code));
+        if (!result.IsSuccess)
+        {
+            return BadRequest(new { message = result.Error });
+        }
+        return Ok(new { message = $"Đã hủy phiếu thu {code}" });
+    }
+
+    /// <summary>
     /// Thêm mới một Khách hàng (tự động gán partner_type = 'CUSTOMER').
     /// </summary>
     [HttpPost]
@@ -116,6 +167,23 @@ public class CustomersController : ControllerBase
             });
         }
         return StatusCode(StatusCodes.Status201Created, result.Value);
+    }
+
+    /// <summary>
+    /// Tạo phiếu thu nợ khách hàng (PT000001...), có thể phân bổ vào các hóa đơn còn nợ.
+    /// </summary>
+    [HttpPost("{id}/payments")]
+    [ProducesResponseType(typeof(CustomerPaymentResultDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [RequirePermission("FIN_CREATE")]
+    public async Task<IActionResult> CreateCustomerPayment(int id, [FromBody] CreateCustomerPaymentRequest request)
+    {
+        var result = await _mediator.Send(new CreateCustomerPaymentCommand(id, request));
+        if (!result.IsSuccess)
+        {
+            return BadRequest(new { message = result.Error });
+        }
+        return Ok(result.Value);
     }
 
     /// <summary>
