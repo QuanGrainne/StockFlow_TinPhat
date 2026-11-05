@@ -114,4 +114,21 @@ public class OrdersController : ControllerBase
         }
         return Ok(result.Value);
     }
+
+    /// <summary>
+    /// Hủy hóa đơn: hoàn tồn kho (ghi thẻ kho), giảm công nợ khách, hủy phiếu thu của hóa đơn.
+    /// </summary>
+    [HttpPost("{id:int}/cancel")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [RequirePermission("SALES_UPDATE")]
+    public async Task<IActionResult> CancelOrder(int id)
+    {
+        var result = await _mediator.Send(new CancelOrderCommand(id));
+        if (!result.IsSuccess)
+        {
+            return BadRequest(new { message = result.Error });
+        }
+        return Ok(new { success = true });
+    }
 }

@@ -594,6 +594,12 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
             entity.Property(e => e.IsActive).HasColumnName("is_active");
             entity.Property(e => e.CreatedAt).HasColumnName("created_at");
             entity.Property(e => e.CreatedBy).HasColumnName("created_by");
+            entity.Property(e => e.Phone2).HasMaxLength(20).HasColumnName("phone2");
+            entity.Property(e => e.Gender).HasMaxLength(10).HasColumnName("gender");
+            entity.Property(e => e.BirthDate).HasColumnType("timestamp without time zone").HasColumnName("birth_date");
+            entity.Property(e => e.Facebook).HasMaxLength(255).HasColumnName("facebook");
+            entity.Property(e => e.Notes).HasMaxLength(500).HasColumnName("notes");
+            entity.Property(e => e.CreatedWarehouseId).HasColumnName("created_warehouse_id");
             entity.Property(e => e.PartnerCode)
                 .HasMaxLength(30)
                 .HasColumnName("partner_code");

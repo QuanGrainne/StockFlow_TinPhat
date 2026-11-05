@@ -1,403 +1,261 @@
-// src/features/customers/components/CustomerFormModal.tsx
-// Modal tạo mới / chỉnh sửa thông tin khách hàng tuân thủ toàn diện bộ quy tắc validation VR-01 -> VR-14
+'use client';
+
+// Form Tạo / Cập nhật khách hàng — modal tự dựng (không dùng antd Modal theo AI_CODING_RULES §5),
+// bố cục theo mẫu: Tên, Mã, Điện thoại 1/2, Sinh nhật, Giới tính, Email, Facebook, Địa chỉ, Hạn mức nợ, Ghi chú.
+// Dùng chung cho màn Khách hàng và nút thêm nhanh khách ở POS.
 
 import React, { useEffect, useState } from 'react';
-import { Modal, Form, Input, InputNumber, Select, message } from 'antd';
-import { Customer } from '../types';
-import { ApiClientError } from '@/lib/api/client';
+import { ChevronDown, ChevronUp, UserRound, X } from 'lucide-react';
+import { useActiveWarehouse } from '@/lib/warehouse/useActiveWarehouse';
+import { CreateCustomerPayload, Customer, CustomerGender } from '../types';
 
 interface CustomerFormModalProps {
   open: boolean;
+  /** Khách đang sửa; không truyền = tạo mới */
   customer?: Customer | null;
   onCancel: () => void;
-  onSuccess: (customer: Customer) => Promise<void> | void;
+  /** Lưu: nhận dữ liệu form (cha gọi API tạo / cập nhật). Ném lỗi để hiện thông báo trong form. */
+  onSuccess: (payload: CreateCustomerPayload) => Promise<void> | void;
 }
 
-export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
-  open,
+const labelCls = 'block text-[13px] text-[#15171a] mb-1.5';
+const inputCls =
+  'w-full h-9 px-3 rounded-[8px] border border-slate-300 bg-white text-[13px] text-[#15171a] placeholder-[#677484]/70 focus:outline-none focus:border-[#0070f4] transition';
+
+export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({ open, customer, onCancel, onSuccess }) => {
+  if (!open) return null;
+  // Mount lại mỗi lần mở / đổi khách → state form khởi tạo đúng, không cần effect đồng bộ
+  return <CustomerFormBody key={customer?.id ?? 'new'} customer={customer} onCancel={onCancel} onSuccess={onSuccess} />;
+};
+
+function CustomerFormBody({
   customer,
   onCancel,
   onSuccess,
-}) => {
-  const [form] = Form.useForm();
-  const [submitting, setSubmitting] = useState(false);
-  const isEdit = Boolean(customer);
+}: Omit<CustomerFormModalProps, 'open'>) {
+  const isEditing = Boolean(customer);
+  const { activeWarehouse } = useActiveWarehouse();
 
-  // Khởi tạo giá trị khi mở modal
-  useEffect(() => {
-    if (open) {
-      if (customer) {
-        form.setFieldsValue({
-          code: customer.code,
-          name: customer.name,
-          phone: customer.phone,
-          email: customer.email,
-          address: customer.address,
-          creditLimit: customer.creditLimit ?? 0,
-          status: customer.status || 'ACTIVE',
-        });
-      } else {
-        form.resetFields();
-        form.setFieldsValue({
-          code: '',
-          name: '',
-          phone: '',
-          email: '',
-          address: '',
-          creditLimit: 100000000,
-          status: 'ACTIVE',
-        });
-      }
-    }
-  }, [open, customer, form]);
+  const [name, setName] = useState(customer?.name ?? '');
+  const [code, setCode] = useState(customer?.code ?? '');
+  const [phone, setPhone] = useState(customer?.phone ?? '');
+  const [phone2, setPhone2] = useState(customer?.phone2 ?? '');
+  const [birthDate, setBirthDate] = useState(customer?.birthDate ?? '');
+  const [gender, setGender] = useState<CustomerGender | ''>(customer?.gender ?? '');
+  const [email, setEmail] = useState(customer?.email ?? '');
+  const [facebook, setFacebook] = useState(customer?.facebook ?? '');
+  const [address, setAddress] = useState(customer?.address ?? '');
+  const [creditLimit, setCreditLimit] = useState<string>(customer?.creditLimit ? String(customer.creditLimit) : '');
+  const [notes, setNotes] = useState(customer?.notes ?? '');
+  const [addressOpen, setAddressOpen] = useState(true);
+  const [otherOpen, setOtherOpen] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
 
-  // Xử lý submit form
-  const handleFinish = async (values: any) => {
+  const handleSubmit = async () => {
+    if (saving) return;
+    if (!name.trim()) return setError('Tên khách hàng không được để trống.');
+    if (!phone.trim() && !email.trim()) return setError('Cần nhập ít nhất Số điện thoại hoặc Email.');
+    if (email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) return setError('Email không đúng định dạng.');
+    setSaving(true);
+    setError('');
     try {
-      setSubmitting(true);
-
-      // Chuẩn hóa dữ liệu trước khi gửi đi (VR-01, VR-05, VR-06, VR-07, VR-08)
-      const normalizedName = (values.name || '').trim();
-      const normalizedPhone = (values.phone || '').trim();
-      const normalizedEmail = (values.email || '').trim().toLowerCase();
-      const normalizedAddress = (values.address || '').trim();
-      const rawCode = (values.code || '').trim();
-      const normalizedCode = rawCode ? rawCode.toUpperCase() : undefined;
-
       await onSuccess({
-        id: customer?.id || 0,
-        code: normalizedCode || (isEdit ? customer?.code || '' : ''),
-        name: normalizedName,
-        phone: normalizedPhone,
-        email: normalizedEmail,
-        address: normalizedAddress,
-        creditLimit: values.creditLimit !== undefined && values.creditLimit !== null ? Number(values.creditLimit) : 0,
-        currentDebt: customer?.currentDebt || 0,
-        isOverCreditLimit: (customer?.currentDebt || 0) > (values.creditLimit || 0),
-        status: values.status || 'ACTIVE',
+        code: isEditing ? undefined : code.trim() || undefined,
+        name: name.trim(),
+        phone: phone.trim(),
+        phone2: phone2.trim(),
+        email: email.trim(),
+        address: address.trim(),
+        gender: gender || null,
+        birthDate: birthDate || null,
+        facebook: facebook.trim(),
+        notes: notes.trim(),
+        creditLimit: Number(creditLimit.replace(/[^\d]/g, '')) || 0,
+        status: customer?.status ?? 'ACTIVE',
+        createdWarehouseId: isEditing ? undefined : activeWarehouse?.warehouseId ?? null,
       });
-
-      // VR-14: Thành công -> đóng form được kích hoạt từ onSuccess
-    } catch (e: any) {
-      const apiErr = e as ApiClientError;
-
-      // II.2.6: Khi Backend trả lỗi validation hoặc trùng mã, ánh xạ lỗi vào đúng trường
-      if (apiErr.status === 409 || apiErr.response?.code === 'CUSTOMER_CODE_EXISTS') {
-        const errorMsg = apiErr.response?.message || 'Mã khách hàng đã tồn tại.';
-        form.setFields([
-          {
-            name: 'code',
-            errors: [errorMsg],
-          },
-        ]);
-        message.error(errorMsg);
-      } else if (apiErr.response?.errors && typeof apiErr.response.errors === 'object') {
-        const fieldErrors: { name: string; errors: string[] }[] = [];
-        const errs = apiErr.response.errors;
-
-        for (const [key, val] of Object.entries(errs)) {
-          const lowerKey = key.toLowerCase();
-          const msgs = Array.isArray(val) ? val : [String(val)];
-
-          if (lowerKey === 'name') fieldErrors.push({ name: 'name', errors: msgs });
-          else if (lowerKey === 'phone') fieldErrors.push({ name: 'phone', errors: msgs });
-          else if (lowerKey === 'email') fieldErrors.push({ name: 'email', errors: msgs });
-          else if (lowerKey === 'code') fieldErrors.push({ name: 'code', errors: msgs });
-          else if (lowerKey === 'address') fieldErrors.push({ name: 'address', errors: msgs });
-          else if (lowerKey.includes('creditlimit')) fieldErrors.push({ name: 'creditLimit', errors: msgs });
-          else if (lowerKey === 'status') fieldErrors.push({ name: 'status', errors: msgs });
-          else if (lowerKey === 'contact' || lowerKey === 'request') {
-            fieldErrors.push({ name: 'phone', errors: msgs });
-            fieldErrors.push({ name: 'email', errors: msgs });
-          }
-        }
-
-        if (fieldErrors.length > 0) {
-          form.setFields(fieldErrors);
-        }
-        message.error(apiErr.response.message || 'Dữ liệu không hợp lệ. Vui lòng kiểm tra lại các trường báo lỗi.');
-      } else {
-        // II.2.7: Khi lỗi mạng hoặc máy chủ, giữ nguyên dữ liệu đã nhập và chỉ thông báo lỗi
-        message.error(apiErr.message || 'Không thể kết nối đến máy chủ. Dữ liệu đã nhập được giữ nguyên.');
-      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Không lưu được khách hàng.';
+      setError(msg.replace(/^CUSTOMER_CODE_EXISTS:/, ''));
     } finally {
-      // II.2.5: Bật lại nút tạo khi xử lý xong
-      setSubmitting(false);
+      setSaving(false);
     }
   };
 
-  return (
-    <Modal
-      title={
-        <div className="text-base font-bold text-slate-800">
-          {isEdit ? 'Chỉnh sửa thông tin khách hàng' : 'Thêm mới khách hàng'}
-        </div>
+  // Esc đóng form, F9 lưu
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !saving) onCancel();
+      if (e.key === 'F9') {
+        e.preventDefault();
+        void handleSubmit();
       }
-      open={open}
-      onCancel={submitting ? undefined : onCancel}
-      onOk={() => form.submit()}
-      okText={isEdit ? 'Lưu thay đổi' : 'Tạo khách hàng'}
-      cancelText="Hủy bỏ"
-      confirmLoading={submitting}
-      destroyOnHidden
-      centered
-      width={580}
-      okButtonProps={{
-        disabled: submitting,
-        className: 'bg-[#0F60B6] hover:bg-blue-700 text-xs font-semibold px-4 py-1.5 h-auto',
-      }}
-      cancelButtonProps={{
-        disabled: submitting,
-        className: 'text-xs px-4 py-1.5 h-auto border-slate-200 text-slate-600',
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  });
+
+  return (
+    <div
+      className="fixed inset-0 z-[1050] bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget && !saving) onCancel();
       }}
     >
-      <Form
-        form={form}
-        layout="vertical"
-        onFinish={handleFinish}
-        className="mt-4 pt-1"
-        requiredMark={false}
-        validateTrigger={['onBlur']} // II.2.1 & II.2.2: Không hiện lỗi đỏ lúc mở form; hiện khi người dùng rời trường (onBlur)
-        scrollToFirstError={{ behavior: 'smooth', block: 'center' }} // II.2.4: Tự động focus vào lỗi đầu tiên
-      >
-        <div className="grid grid-cols-2 gap-x-4">
-          {/* VR-08 / FE-CODE-01 -> FE-CODE-08: Mã khách hàng */}
-          <Form.Item
-            name="code"
-            label={<span className="text-xs font-semibold text-slate-700">Mã khách hàng</span>}
-            tooltip="Hệ thống tự động sinh mã dạng KHxxxxx nếu để trống"
-            rules={[
-              {
-                validator: async (_, value) => {
-                  if (!value || !value.trim()) return Promise.resolve(); // FE-CODE-01: Để trống thì cho phép (hệ thống tự sinh)
-                  const val = value.trim();
-                  if (val.toUpperCase() === 'TỰ ĐỘNG' || val.toUpperCase() === 'AUTO') return Promise.resolve();
-
-                  if (/\s/.test(val)) {
-                    return Promise.reject(new Error('Mã khách hàng không được chứa khoảng trắng ở giữa.')); // FE-CODE-04
-                  }
-                  if (val.length > 30) {
-                    return Promise.reject(new Error('Mã khách hàng tối đa 30 ký tự.')); // FE-CODE-06
-                  }
-                  if (!/^[a-zA-Z0-9\-_]+$/.test(val)) {
-                    return Promise.reject(new Error('Mã chỉ được chứa chữ cái, chữ số và dấu gạch.')); // FE-CODE-05
-                  }
-                  return Promise.resolve();
-                },
-              },
-            ]}
+      <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[92vh] flex flex-col animate-in fade-in zoom-in-95 duration-150 text-[13px] text-[#15171a]">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 pt-5 pb-3">
+          <h3 className="text-[18px] font-bold">{isEditing ? 'Cập nhật khách hàng' : 'Tạo khách hàng'}</h3>
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={saving}
+            className="p-1.5 rounded-full text-[#15171a] hover:bg-[#f7f8f9] cursor-pointer disabled:opacity-50"
+            aria-label="Đóng"
           >
-            <Input
-              placeholder={isEdit ? customer?.code : 'Tự động (KHxxxxx)'}
-              disabled={isEdit || submitting}
-              className="font-mono text-xs"
-            />
-          </Form.Item>
-
-          {/* VR-02, VR-04, VR-05 / FE-CONTACT: Số điện thoại */}
-          <Form.Item
-            name="phone"
-            dependencies={['email']}
-            label={
-              <span className="text-xs font-semibold text-slate-700">
-                Số điện thoại <span className="text-slate-400 font-normal">(hoặc Email)</span>
-              </span>
-            }
-            rules={[
-              {
-                validator: async (_, value) => {
-                  const phoneStr = (value || '').trim();
-                  const emailStr = (form.getFieldValue('email') || '').trim();
-
-                  // FE-CONTACT-04, FE-CONTACT-13: Cả 2 cùng trống -> từ chối
-                  if (!phoneStr && !emailStr) {
-                    return Promise.reject(new Error('Cần cung cấp ít nhất Số điện thoại hoặc Email.'));
-                  }
-
-                  // FE-CONTACT-05, FE-CONTACT-06: Nếu đã nhập Phone -> phải đúng định dạng
-                  if (phoneStr) {
-                    const clean = phoneStr.replace(/[\s\-\.]+/g, '');
-                    const phoneRegex = /^(?:\+84|0)[1-9]\d{8,9}$/;
-                    if (!phoneRegex.test(clean)) {
-                      return Promise.reject(
-                        new Error('Số điện thoại không đúng định dạng (10-11 số, ví dụ 0912 345 678).')
-                      );
-                    }
-                  }
-
-                  return Promise.resolve();
-                },
-              },
-            ]}
-          >
-            <Input
-              placeholder="Ví dụ: 0912 345 678"
-              disabled={submitting}
-              className="text-xs"
-              onChange={() => {
-                // Kích hoạt re-validate liên hệ chéo khi thay đổi
-                if (form.getFieldError('email').length > 0) {
-                  form.validateFields(['email']);
-                }
-              }}
-            />
-          </Form.Item>
+            <X size={18} strokeWidth={2.5} />
+          </button>
         </div>
 
-        {/* VR-01 / FE-NAME-01 -> FE-NAME-10: Tên khách hàng */}
-        <Form.Item
-          name="name"
-          label={
-            <span className="text-xs font-semibold text-slate-700">
-              Tên khách hàng / Doanh nghiệp <span className="text-rose-500">*</span>
-            </span>
-          }
-          rules={[
-            {
-              validator: async (_, value) => {
-                const trimmed = (value || '').trim();
-                if (!trimmed) {
-                  return Promise.reject(new Error('Tên khách hàng không được để trống.')); // FE-NAME-01, FE-NAME-02
-                }
-                if (trimmed.length < 2) {
-                  return Promise.reject(new Error('Tên khách hàng phải có từ 2 ký tự trở lên.')); // VR-01
-                }
-                if (trimmed.length > 200) {
-                  return Promise.reject(new Error('Tên khách hàng tối đa 200 ký tự.')); // FE-NAME-07
-                }
-                return Promise.resolve(); // FE-NAME-03, FE-NAME-04, FE-NAME-08: Hỗ trợ tiếng Việt, số, &, ., -
-              },
-            },
-          ]}
-        >
-          <Input
-            placeholder="Ví dụ: Công ty CP Thiết bị Nam Á hoặc Anh Tuấn"
-            disabled={submitting}
-            className="text-xs"
-          />
-        </Form.Item>
+        {/* Body */}
+        <div className="flex-1 min-h-0 overflow-y-auto px-6 pb-4 space-y-4">
+          {error && (
+            <div className="px-3 py-2 rounded-[8px] bg-[#fef2f2] border border-[#fecaca] text-[#fb2c36] text-xs">{error}</div>
+          )}
 
-        {/* VR-03, VR-04, VR-06 / FE-CONTACT: Email liên hệ */}
-        <Form.Item
-          name="email"
-          dependencies={['phone']}
-          label={
-            <span className="text-xs font-semibold text-slate-700">
-              Email liên hệ <span className="text-slate-400 font-normal">(hoặc Số điện thoại)</span>
-            </span>
-          }
-          rules={[
-            {
-              validator: async (_, value) => {
-                const emailStr = (value || '').trim();
-                const phoneStr = (form.getFieldValue('phone') || '').trim();
+          <div className="flex gap-6">
+            <div className="flex-1 grid grid-cols-2 gap-x-4 gap-y-3.5">
+              <div>
+                <label className={labelCls}>Tên khách hàng</label>
+                <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Bắt buộc" autoFocus className={inputCls} />
+              </div>
+              <div>
+                <label className={labelCls}>Mã khách hàng</label>
+                <input
+                  value={code}
+                  onChange={(e) => setCode(e.target.value)}
+                  disabled={isEditing}
+                  placeholder="Tự động"
+                  className={`${inputCls} disabled:bg-[#f7f8f9] disabled:text-[#677484] disabled:cursor-not-allowed`}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={labelCls}>Điện thoại 1</label>
+                  <input value={phone} maxLength={11} onChange={(e) => setPhone(e.target.value.replace(/\D/g, ''))} className={inputCls} />
+                </div>
+                <div>
+                  <label className={labelCls}>Điện thoại 2</label>
+                  <input value={phone2} maxLength={11} onChange={(e) => setPhone2(e.target.value.replace(/\D/g, ''))} className={inputCls} />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={labelCls}>Sinh nhật</label>
+                  <input type="date" value={birthDate ?? ''} onChange={(e) => setBirthDate(e.target.value)} className={inputCls} />
+                </div>
+                <div>
+                  <label className={labelCls}>Giới tính</label>
+                  <div className="relative">
+                    <select
+                      value={gender}
+                      onChange={(e) => setGender(e.target.value as CustomerGender | '')}
+                      className={`${inputCls} pr-8 appearance-none cursor-pointer`}
+                    >
+                      <option value="">Chọn giới tính</option>
+                      <option value="MALE">Nam</option>
+                      <option value="FEMALE">Nữ</option>
+                    </select>
+                    <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#677484] pointer-events-none" />
+                  </div>
+                </div>
+              </div>
+              <div>
+                <label className={labelCls}>Email</label>
+                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="email@gmail.com" className={inputCls} />
+              </div>
+              <div>
+                <label className={labelCls}>Facebook</label>
+                <input value={facebook} onChange={(e) => setFacebook(e.target.value)} placeholder="facebook.com/username" className={inputCls} />
+              </div>
+            </div>
 
-                // FE-CONTACT-04, FE-CONTACT-13: Cả 2 cùng trống -> từ chối
-                if (!emailStr && !phoneStr) {
-                  return Promise.reject(new Error('Cần cung cấp ít nhất Số điện thoại hoặc Email.'));
-                }
+            {/* Ảnh đại diện (chưa lưu ảnh khách hàng → chỉ hiển thị biểu tượng) */}
+            <div className="hidden sm:flex w-40 h-40 shrink-0 rounded-full border-2 border-dashed border-slate-200 bg-[#f7f8f9] items-center justify-center text-[#94a3b8]">
+              <UserRound size={56} strokeWidth={1.5} />
+            </div>
+          </div>
 
-                // FE-CONTACT-07, FE-CONTACT-12: Nếu đã nhập Email -> kiểm tra format & max 254 chars
-                if (emailStr) {
-                  if (emailStr.length > 254) {
-                    return Promise.reject(new Error('Email không được vượt quá 254 ký tự.'));
-                  }
-                  const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-                  if (!emailRegex.test(emailStr)) {
-                    return Promise.reject(new Error('Email không đúng định dạng (ví dụ: contact@nama.vn).'));
-                  }
-                }
+          {/* Địa chỉ */}
+          <div className="rounded-xl border border-slate-200">
+            <button
+              type="button"
+              onClick={() => setAddressOpen((v) => !v)}
+              className="w-full flex items-center justify-between px-4 py-3 font-semibold cursor-pointer"
+            >
+              <span>Địa chỉ</span>
+              {addressOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+            </button>
+            {addressOpen && (
+              <div className="px-4 pb-4">
+                <label className={labelCls}>Địa chỉ</label>
+                <input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Nhập địa chỉ" className={inputCls} />
+              </div>
+            )}
+          </div>
 
-                return Promise.resolve();
-              },
-            },
-          ]}
-        >
-          <Input
-            placeholder="Ví dụ: contact@nama.vn"
-            disabled={submitting}
-            className="text-xs"
-            onChange={() => {
-              // Kích hoạt re-validate liên hệ chéo khi thay đổi
-              if (form.getFieldError('phone').length > 0) {
-                form.validateFields(['phone']);
-              }
-            }}
-          />
-        </Form.Item>
-
-        {/* VR-07 / FE-ADDR-01 -> FE-ADDR-08: Địa chỉ */}
-        <Form.Item
-          name="address"
-          label={<span className="text-xs font-semibold text-slate-700">Địa chỉ giao dịch / kho hàng</span>}
-          rules={[
-            {
-              validator: async (_, value) => {
-                if (!value || !value.trim()) return Promise.resolve(); // FE-ADDR-01: Để trống hợp lệ
-                const val = value.trim();
-                if (val.length > 500) {
-                  return Promise.reject(new Error('Địa chỉ tối đa 500 ký tự.')); // FE-ADDR-06
-                }
-                return Promise.resolve();
-              },
-            },
-          ]}
-        >
-          <Input
-            placeholder="Ví dụ: 45 Nguyễn Trãi, Thanh Xuân, Hà Nội"
-            disabled={submitting}
-            className="text-xs"
-          />
-        </Form.Item>
-
-        <div className="grid grid-cols-2 gap-x-4">
-          {/* VR-09 / FE-CREDIT-01 -> FE-CREDIT-12: Hạn mức tín dụng */}
-          <Form.Item
-            name="creditLimit"
-            label={<span className="text-xs font-semibold text-slate-700">Hạn mức tín dụng nợ (VNĐ)</span>}
-            rules={[
-              {
-                validator: async (_, value) => {
-                  if (value === undefined || value === null || value === '') return Promise.resolve();
-                  const num = Number(value);
-                  if (isNaN(num)) {
-                    return Promise.reject(new Error('Hạn mức phải là số hợp lệ.')); // FE-CREDIT-05
-                  }
-                  if (num < 0) {
-                    return Promise.reject(new Error('Hạn mức tín dụng không được âm.')); // FE-CREDIT-04
-                  }
-                  if (!Number.isInteger(num)) {
-                    return Promise.reject(new Error('Hạn mức phải là số tiền nguyên (không có số thập phân).')); // FE-CREDIT-07
-                  }
-                  return Promise.resolve();
-                },
-              },
-            ]}
-          >
-            <InputNumber
-              className="w-full text-xs"
-              disabled={submitting}
-              min={0}
-              step={1000000}
-              formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-              parser={(value) => value?.replace(/\$\s?|(,*)/g, '') as any}
-              placeholder="100,000,000"
-            />
-          </Form.Item>
-
-          {/* VR-10 / FE-STATUS-01 -> FE-STATUS-05: Trạng thái */}
-          <Form.Item
-            name="status"
-            label={<span className="text-xs font-semibold text-slate-700">Trạng thái</span>}
-            rules={[{ required: true, message: 'Vui lòng chọn trạng thái.' }]}
-          >
-            <Select disabled={submitting} className="text-xs">
-              <Select.Option value="ACTIVE">Đang hoạt động</Select.Option>
-              <Select.Option value="INACTIVE">Tạm khóa / Ngừng GD</Select.Option>
-            </Select>
-          </Form.Item>
+          {/* Thông tin khác */}
+          <div className="rounded-xl border border-slate-200">
+            <button
+              type="button"
+              onClick={() => setOtherOpen((v) => !v)}
+              className="w-full flex items-center justify-between px-4 py-3 font-semibold cursor-pointer"
+            >
+              <span>Hạn mức nợ & ghi chú</span>
+              {otherOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+            </button>
+            {otherOpen && (
+              <div className="px-4 pb-4 grid grid-cols-2 gap-4">
+                <div>
+                  <label className={labelCls}>Hạn mức nợ (VNĐ)</label>
+                  <input
+                    inputMode="numeric"
+                    value={creditLimit ? Number(creditLimit.replace(/[^\d]/g, '') || 0).toLocaleString('vi-VN') : ''}
+                    onChange={(e) => setCreditLimit(e.target.value.replace(/[^\d]/g, ''))}
+                    placeholder="0 = không cho ghi nợ"
+                    className={`${inputCls} text-right`}
+                  />
+                </div>
+                <div>
+                  <label className={labelCls}>Ghi chú</label>
+                  <input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Ghi chú về khách hàng" className={inputCls} />
+                </div>
+              </div>
+            )}
+          </div>
         </div>
-      </Form>
-    </Modal>
+
+        {/* Footer */}
+        <div className="flex items-center justify-end gap-2 px-6 py-3 border-t border-slate-200">
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={saving}
+            className="inline-flex items-center px-4 h-9 rounded-[8px] border border-slate-300 hover:bg-[#f7f8f9] text-[13px] font-semibold cursor-pointer bg-white disabled:opacity-50"
+          >
+            Bỏ qua
+          </button>
+          <button
+            type="button"
+            onClick={() => void handleSubmit()}
+            disabled={saving}
+            className="inline-flex items-center px-5 h-9 rounded-[8px] bg-[#0070f4] hover:bg-[#005ac3] text-white text-[13px] font-semibold shadow-xs cursor-pointer disabled:opacity-50"
+          >
+            {saving ? 'Đang lưu...' : 'Lưu'}
+          </button>
+        </div>
+      </div>
+    </div>
   );
-};
+}

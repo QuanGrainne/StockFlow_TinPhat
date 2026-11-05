@@ -139,3 +139,41 @@ export interface OrderDetail {
   timelineEvents: OrderTimelineEvent[];
 }
 
+
+/** 1 dòng danh sách Hóa đơn (GET /api/orders) */
+export interface OrderListItem {
+  orderId: number;
+  orderCode: string;
+  partnerName: string;
+  partnerPhone: string;
+  partnerCode: string;
+  subTotal: number;
+  discountAmount: number;
+  totalAmount: number;
+  paidAmount: number;
+  outstandingAmount: number;
+  paymentStatus: string;
+  status: string;
+  orderDate?: string | null;
+  totalItems: number;
+  warehouseId?: number | null;
+  warehouseName: string;
+  paymentMethod: string;
+  hasReturn: boolean;
+  notes?: string | null;
+}
+
+/** Bộ lọc màn Hóa đơn */
+export interface OrderListFilter {
+  search?: string;
+  warehouseId?: number | null;
+  fromDate?: string;
+  toDate?: string;
+  /** VD "COMPLETED,CANCELLED" */
+  status?: string;
+  /** ALL | NO_RETURN | HAS_RETURN */
+  returnStatus?: string;
+  /** ALL | CASH | VIETQR | DEBT */
+  paymentMethod?: string;
+  priceBookName?: string;
+}

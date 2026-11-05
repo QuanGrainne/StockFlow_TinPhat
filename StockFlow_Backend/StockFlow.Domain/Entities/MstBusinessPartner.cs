@@ -33,6 +33,24 @@ public partial class MstBusinessPartner
     /// <summary>UserId tài khoản đã tạo đối tác (sec_users.user_id).</summary>
     public int? CreatedBy { get; set; }
 
+    /// <summary>Hồ sơ khách hàng: điện thoại 2</summary>
+    public string? Phone2 { get; set; }
+
+    /// <summary>Hồ sơ khách hàng: giới tính MALE / FEMALE</summary>
+    public string? Gender { get; set; }
+
+    /// <summary>Hồ sơ khách hàng: sinh nhật</summary>
+    public DateTime? BirthDate { get; set; }
+
+    /// <summary>Hồ sơ khách hàng: link Facebook</summary>
+    public string? Facebook { get; set; }
+
+    /// <summary>Ghi chú đối tác</summary>
+    public string? Notes { get; set; }
+
+    /// <summary>Chi nhánh (kho) đang làm việc lúc tạo hồ sơ</summary>
+    public int? CreatedWarehouseId { get; set; }
+
     public virtual ICollection<TrxCreditLimitRequest> TrxCreditLimitRequests { get; set; } = new List<TrxCreditLimitRequest>();
 
     public virtual ICollection<TrxFinancialTransaction> TrxFinancialTransactions { get; set; } = new List<TrxFinancialTransaction>();
