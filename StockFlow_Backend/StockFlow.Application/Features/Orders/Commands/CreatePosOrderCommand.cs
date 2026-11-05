@@ -21,8 +21,9 @@ public class CreatePosOrderCommandValidator : AbstractValidator<CreatePosOrderCo
 
     public CreatePosOrderCommandValidator()
     {
+        // PartnerId = 0 (không chọn khách) → bán cho "Khách lẻ" (KH00000), xử lý trong handler
         RuleFor(x => x.Request.PartnerId)
-            .GreaterThan(0).WithMessage("Vui lòng chọn khách hàng hợp lệ (CUS-001).");
+            .GreaterThanOrEqualTo(0).WithMessage("Khách hàng không hợp lệ (CUS-001).");
 
         RuleFor(x => x.Request.WarehouseId)
             .GreaterThan(0).WithMessage("Vui lòng chọn kho xuất hàng hợp lệ (INV-001).");
@@ -86,6 +87,14 @@ public class CreatePosOrderCommandHandler : IRequestHandler<CreatePosOrderComman
             return Result<PosOrderResultDto>.Failure("Hệ thống hiện đang tạm ngừng tiếp nhận đơn đặt hàng mới theo chính sách cài đặt (A1).");
         }
 
+        // Thời gian bán người dùng chọn không được ở tương lai (kiểm tra trước khi sinh mã để không bỏ số hóa đơn)
+        if (!settings.LockTransactionTime && req.OrderDate.HasValue)
+        {
+            var requested = req.OrderDate.Value.Kind == DateTimeKind.Utc ? req.OrderDate.Value : req.OrderDate.Value.ToUniversalTime();
+            if (requested > DateTime.UtcNow.AddMinutes(1))
+                return Result<PosOrderResultDto>.Failure("Không được bán hàng với thời gian trong tương lai.");
+        }
+
         // 1. Chống gửi trùng đơn (Idempotency - AMT-015, PAY-016)
         if (!string.IsNullOrWhiteSpace(req.ClientRequestId))
         {
@@ -120,7 +129,7 @@ public class CreatePosOrderCommandHandler : IRequestHandler<CreatePosOrderComman
 
         // Chống nhấp đúp tạo đơn trùng trong vòng 3 giây
         var duplicateRecent = await _context.TrxOrders
-            .Where(o => o.PartnerId == req.PartnerId
+            .Where(o => (req.PartnerId <= 0 || o.PartnerId == req.PartnerId)
                      && o.TotalAmount == req.TotalAmount
                      && o.OrderDate >= DateTime.UtcNow.AddSeconds(-3))
             .FirstOrDefaultAsync(cancellationToken);
@@ -157,8 +166,10 @@ public class CreatePosOrderCommandHandler : IRequestHandler<CreatePosOrderComman
         var currentUserId = _currentUserService.UserId.Value;
 
         // 3. Kiểm tra khách hàng (CUS-001 -> CUS-003)
-        var customer = await _context.MstBusinessPartners
-            .FirstOrDefaultAsync(p => p.PartnerId == req.PartnerId, cancellationToken);
+        // Không chọn khách → dùng hồ sơ "Khách lẻ" (KH00000), tự tạo nếu chưa có
+        var customer = req.PartnerId > 0
+            ? await _context.MstBusinessPartners.FirstOrDefaultAsync(p => p.PartnerId == req.PartnerId, cancellationToken)
+            : await GetOrCreateWalkInCustomerAsync(cancellationToken);
 
         if (customer == null)
         {
@@ -271,7 +282,10 @@ public class CreatePosOrderCommandHandler : IRequestHandler<CreatePosOrderComman
             .Where(b => productIds.Contains(b.ProductId) && b.WarehouseId == req.WarehouseId)
             .ToListAsync(cancellationToken);
 
-        balanceMap = balances.ToDictionary(b => b.ProductId);
+        // Một hàng có thể có nhiều dòng tồn (vị trí / lô) → dùng dòng tồn chung (không vị trí, không lô) nếu có
+        balanceMap = balances
+            .GroupBy(b => b.ProductId)
+            .ToDictionary(g => g.Key, g => g.FirstOrDefault(b => b.LocationId == null && b.LotId == null) ?? g.First());
 
         // Gom số lượng yêu cầu theo từng sản phẩm (xử lý tình huống quét nhiều dòng cùng mã - POS-004)
         var productQuantitySummary = req.Items
@@ -426,6 +440,12 @@ public class CreatePosOrderCommandHandler : IRequestHandler<CreatePosOrderComman
             finalOrderDate = req.OrderDate.Value.Kind == DateTimeKind.Utc
                 ? req.OrderDate.Value
                 : req.OrderDate.Value.ToUniversalTime();
+
+            // Không cho bán với thời gian trong tương lai (cho lệch 1 phút do đồng hồ máy khách)
+            if (finalOrderDate > DateTime.UtcNow.AddMinutes(1))
+            {
+                return Result<PosOrderResultDto>.Failure("Không được bán hàng với thời gian trong tương lai.");
+            }
         }
 
         string paymentStatus = finalTotal == 0
@@ -443,7 +463,7 @@ var dbContext = _context as DbContext;
             var order = new TrxOrder
             {
                 OrderCode = orderCode,
-                PartnerId = req.PartnerId,
+                PartnerId = customer.PartnerId,
                 Status = isCompleted ? "COMPLETED" : (isPendingBooking ? "PENDING" : "DRAFT"),
                 SubTotal = serverSubTotal,
                 DiscountType = orderDiscountType,
@@ -497,8 +517,8 @@ var dbContext = _context as DbContext;
                     IssueType = "SALES",
                     SalesOrderId = order.OrderId,
                     WarehouseId = req.WarehouseId,
-                    RequestedBy = 1,
-                    ProcessedBy = 1,
+                    RequestedBy = currentUserId,
+                    ProcessedBy = currentUserId,
                     RequestedDate = finalOrderDate,
                     ProcessedDate = finalOrderDate,
                     Status = "COMPLETED"
@@ -634,4 +654,28 @@ CreatedBy = currentUserId,
             throw;
         }
     }
+
+    /// <summary>Hồ sơ "Khách lẻ" dùng cho đơn POS không chọn khách (mã KH00000, chỉ thanh toán đủ, không ghi nợ).</summary>
+    private async Task<MstBusinessPartner> GetOrCreateWalkInCustomerAsync(CancellationToken ct)
+    {
+        var walkIn = await _context.MstBusinessPartners.FirstOrDefaultAsync(p => p.PartnerCode == WalkInCustomerCode, ct);
+        if (walkIn != null) return walkIn;
+        walkIn = new MstBusinessPartner
+        {
+            PartnerCode = WalkInCustomerCode,
+            PartnerName = "Khách lẻ",
+            PartnerType = "CUSTOMER",
+            CreditLimit = 0,
+            CurrentDebt = 0,
+            CurrentPayable = 0,
+            IsActive = true,
+            CreatedAt = VietnamTime.Now,
+            CreatedBy = _currentUserService.UserId,
+        };
+        _context.MstBusinessPartners.Add(walkIn);
+        await _context.SaveChangesAsync(ct);
+        return walkIn;
+    }
+
+    public const string WalkInCustomerCode = "KH00000";
 }

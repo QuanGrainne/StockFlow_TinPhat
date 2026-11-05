@@ -518,6 +518,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ initialScreen, children })
         activeScreen === 'purchases' || activeScreen.includes('purchases') ||
         activeScreen === 'purchase-returns' ||
         activeScreen === 'suppliers' || activeScreen.includes('suppliers') ||
+        activeScreen === 'customers' || activeScreen.includes('customers') ||
         activeScreen === 'goods-catalog' || activeScreen === 'products' ||
         activeScreen.includes('goods') || activeScreen.includes('catalog') ||
         activeScreen === 'price-books' || activeScreen === 'admin-price-books' ||

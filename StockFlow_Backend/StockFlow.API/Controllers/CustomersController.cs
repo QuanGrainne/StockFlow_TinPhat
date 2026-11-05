@@ -29,9 +29,21 @@ public class CustomersController : ControllerBase
     public async Task<IActionResult> GetCustomers(
         [FromQuery] string? search,
         [FromQuery] string? debtStatus,
-        [FromQuery] string? status)
+        [FromQuery] string? status,
+        [FromQuery] int? createdWarehouseId,
+        [FromQuery] DateTime? createdFrom,
+        [FromQuery] DateTime? createdTo,
+        [FromQuery] string? gender,
+        [FromQuery] decimal? minSales,
+        [FromQuery] decimal? maxSales,
+        [FromQuery] DateTime? salesFrom,
+        [FromQuery] DateTime? salesTo,
+        [FromQuery] decimal? minDebt,
+        [FromQuery] decimal? maxDebt)
     {
-        var result = await _mediator.Send(new GetCustomersQuery(search, debtStatus, status));
+        var result = await _mediator.Send(new GetCustomersQuery(
+            search, debtStatus, status, createdWarehouseId, createdFrom, createdTo, gender,
+            minSales, maxSales, salesFrom, salesTo, minDebt, maxDebt));
         if (!result.IsSuccess)
         {
             return BadRequest(new { message = result.Error });

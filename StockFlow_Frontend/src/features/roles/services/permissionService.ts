@@ -471,6 +471,17 @@ export const permissionService = {
             localStorage.setItem('stockflow_feature_matrix', JSON.stringify(matrix));
             localStorage.setItem('stockflow_stocktake_feat_initialized_v1', 'true');
           }
+          // One-time (v2): ma trận lưu sau lần v1 có thể đã mất "Khách hàng" → menu Khách hàng bị ẩn, vào /customers bị đá về Tổng quan.
+          // Bật lại mặc định cho ADMIN, MANAGER, SALES (sau đó Admin vẫn tắt được cho Quản lý / Kinh doanh trong ma trận).
+          if (!localStorage.getItem('stockflow_customers_feat_initialized_v2')) {
+            for (const r of ['ROLE_ADMIN', 'ROLE_MANAGER', 'ROLE_SALES']) {
+              if (Array.isArray(matrix[r]) && !matrix[r].includes('feat-customers')) {
+                matrix[r].push('feat-customers');
+              }
+            }
+            localStorage.setItem('stockflow_feature_matrix', JSON.stringify(matrix));
+            localStorage.setItem('stockflow_customers_feat_initialized_v2', 'true');
+          }
           if (!localStorage.getItem('stockflow_suppliers_feat_initialized_v2')) {
             const defaultRolesWithSuppliers = ['ROLE_ADMIN', 'ROLE_MANAGER', 'ROLE_WAREHOUSE'];
             for (const r of defaultRolesWithSuppliers) {
@@ -533,7 +544,11 @@ export const permissionService = {
 
   async getAllowedFeatures(roleCode: string): Promise<Set<string>> {
     const matrix = await this.getFeatureMatrix();
-    const feats = matrix[roleCode] || DEFAULT_ROLE_FEATURE_PERMS[roleCode] || [];
+    // Admin luôn dùng được mọi chức năng (backend cũng luôn cho Admin qua) → không bị ẩn màn do ma trận cũ lưu trên trình duyệt
+    const feats =
+      roleCode === 'ROLE_ADMIN'
+        ? NAVBAR_FEATURES.map((f) => f.id)
+        : matrix[roleCode] || DEFAULT_ROLE_FEATURE_PERMS[roleCode] || [];
     const allowed = new Set<string>();
 
     for (const fid of feats) {
