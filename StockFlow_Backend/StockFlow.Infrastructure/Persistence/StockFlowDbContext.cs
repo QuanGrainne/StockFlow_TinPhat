@@ -1276,6 +1276,15 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
                 .HasMaxLength(30)
                 .HasColumnName("transaction_type");
             entity.Property(e => e.WarehouseId).HasColumnName("warehouse_id");
+            entity.Property(e => e.TransactionPrice)
+                .HasPrecision(18, 2)
+                .HasColumnName("transaction_price");
+            entity.Property(e => e.UnitCost)
+                .HasPrecision(18, 2)
+                .HasColumnName("unit_cost");
+            entity.Property(e => e.BalanceAfter)
+                .HasPrecision(18, 2)
+                .HasColumnName("balance_after");
 
             entity.HasOne(d => d.CreatedByNavigation).WithMany(p => p.TrxInventoryTransactions)
                 .HasForeignKey(d => d.CreatedBy)
@@ -1349,6 +1358,19 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
             entity.Property(e => e.DiscountAmount)
                 .HasPrecision(18, 2)
                 .HasColumnName("discount_amount");
+            entity.Property(e => e.OrderType)
+                .HasMaxLength(20)
+                .HasDefaultValue("INVOICE")
+                .HasColumnName("order_type");
+            entity.Property(e => e.UpdatedAt)
+                .HasColumnType("timestamp without time zone")
+                .HasColumnName("updated_at");
+            entity.Property(e => e.UpdatedBy)
+                .HasColumnName("updated_by");
+
+            entity.HasOne(d => d.UpdatedByNavigation).WithMany()
+                .HasForeignKey(d => d.UpdatedBy)
+                .HasConstraintName("fk_trx_orders_updated_by");
 
             entity.HasOne(d => d.ConsolidatedIntoOrder).WithMany(p => p.InverseConsolidatedIntoOrder)
                 .HasForeignKey(d => d.ConsolidatedIntoOrderId)

@@ -444,7 +444,7 @@ export const ReportsScreen: React.FC<ReportsScreenProps> = () => {
   // Modal Gửi cảnh báo / Thông báo đáo hạn
   const [selectedAlertItem, setSelectedAlertItem] = useState<CustomerCreditItem | null>(null);
   const [alertModalOpen, setAlertModalOpen] = useState(false);
-  const [alertChannel, setAlertChannel] = useState<'ZALO' | 'SMS' | 'EMAIL'>('ZALO');
+  const [alertChannel, setAlertChannel] = useState<'SMS' | 'EMAIL'>('SMS');
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -473,7 +473,7 @@ export const ReportsScreen: React.FC<ReportsScreenProps> = () => {
       )
     );
     const channelName =
-      alertChannel === 'ZALO' ? 'Zalo ZNS' : alertChannel === 'SMS' ? 'SMS Brandname TINPHAT' : 'Email kế toán';
+      alertChannel === 'SMS' ? 'SMS Brandname TINPHAT' : 'Email kế toán';
     showToast(`Đã gửi thông báo đáo hạn qua ${channelName} tới ${selectedAlertItem.partnerName}!`);
     setAlertModalOpen(false);
   };
@@ -484,7 +484,7 @@ export const ReportsScreen: React.FC<ReportsScreenProps> = () => {
         i.daysRemaining <= 7 ? { ...i, lastNotified: 'Hôm nay (20/10/2026)' } : i
       )
     );
-    showToast('Đã gửi thông báo đáo hạn tự động qua Zalo ZNS tới các khách hàng sắp đến hạn và quá hạn!');
+    showToast('Đã gửi thông báo đáo hạn tự động qua SMS Brandname tới các khách hàng sắp đến hạn và quá hạn!');
   };
 
   const handleOpenCreditDetail = (item: CustomerCreditItem) => {
@@ -2078,19 +2078,7 @@ export const ReportsScreen: React.FC<ReportsScreenProps> = () => {
               <label className="block text-xs font-bold text-slate-700">
                 Chọn phương thức gửi cảnh báo:
               </label>
-              <div className="grid grid-cols-3 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setAlertChannel('ZALO')}
-                  className={`p-2.5 rounded-xl border text-xs font-semibold flex flex-col items-center gap-1 transition cursor-pointer ${
-                    alertChannel === 'ZALO'
-                      ? 'border-blue-500 bg-blue-50/60 text-blue-700 shadow-2xs'
-                      : 'border-slate-200 text-slate-600 hover:bg-slate-50'
-                  }`}
-                >
-                  <MessageSquare size={16} />
-                  <span>Zalo ZNS (OA)</span>
-                </button>
+              <div className="grid grid-cols-2 gap-3">
                 <button
                   type="button"
                   onClick={() => setAlertChannel('SMS')}

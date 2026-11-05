@@ -143,7 +143,10 @@ public class CompletePurchaseCommandHandler : IRequestHandler<CompletePurchaseCo
                     ReferenceType = "GOODS_RECEIPT",
                     ReferenceId = receipt.GrId,
                     TransactionDate = receivedDate,
-                    CreatedBy = currentUserId
+                    CreatedBy = currentUserId,
+                    TransactionPrice = PurchaseStockOps.LinePrice(item), // Giá GD = giá nhập trên phiếu (sau giảm giá dòng)
+                    UnitCost = newUnitCost,
+                    BalanceAfter = balance.Quantity
                 };
                 _context.TrxInventoryTransactions.Add(invTx);
             }

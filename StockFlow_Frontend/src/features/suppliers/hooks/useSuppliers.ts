@@ -12,7 +12,13 @@ import {
   WarehouseOption,
 } from '../types';
 
-export function useSuppliers() {
+/** Mở sẵn từ link (?code=NCC...&id=...): điền ô tìm kiếm + mở dòng chi tiết NCC */
+export interface SupplierInitialLink {
+  search?: string;
+  expandId?: number | null;
+}
+
+export function useSuppliers(initial?: SupplierInitialLink) {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false);
@@ -20,7 +26,7 @@ export function useSuppliers() {
 
   // Filter State
   const [filterState, setFilterState] = useState<SupplierFilterState>({
-    search: '',
+    search: initial?.search ?? '',
     debtStatus: 'ALL',
     status: 'ALL',
     warehouseId: 'ALL',
@@ -41,9 +47,30 @@ export function useSuppliers() {
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
 
   // Accordion Expand State & Cache
-  const [expandedRowKey, setExpandedRowKey] = useState<number | null>(null);
+  const [expandedRowKey, setExpandedRowKey] = useState<number | null>(initial?.expandId ?? null);
   const [detailsCache, setDetailsCache] = useState<Record<number, SupplierDetail>>({});
-  const [loadingDetailId, setLoadingDetailId] = useState<number | null>(null);
+  const [loadingDetailId, setLoadingDetailId] = useState<number | null>(initial?.expandId ?? null);
+  const [linkedId] = useState(initial?.expandId ?? null);
+
+  // Mở sẵn NCC theo link: tải chi tiết dòng đang mở
+  useEffect(() => {
+    if (!linkedId) return;
+    let cancelled = false;
+    supplierService
+      .getSupplierById(linkedId)
+      .then((detail) => {
+        if (!cancelled) setDetailsCache((prev) => ({ ...prev, [linkedId]: detail }));
+      })
+      .catch(() => {
+        if (!cancelled) message.error('Không thể tải chi tiết nhà cung cấp.');
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingDetailId((cur) => (cur === linkedId ? null : cur));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [linkedId]);
 
   // 1. Tải danh sách kho khi khởi tạo
   useEffect(() => {

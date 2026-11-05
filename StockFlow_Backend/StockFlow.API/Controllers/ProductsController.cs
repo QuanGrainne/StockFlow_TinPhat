@@ -64,6 +64,23 @@ public class ProductsController : ControllerBase
     }
 
     /// <summary>
+    /// Thẻ kho của hàng hóa tại 1 chi nhánh: lịch sử biến động SL & giá vốn (mới nhất trước), chỉ xem.
+    /// </summary>
+    [HttpGet("{id}/stock-card")]
+    [ProducesResponseType(typeof(List<StockCardEntryDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [RequirePermission("GOODS_READ")]
+    public async Task<IActionResult> GetStockCard(int id, [FromQuery] int warehouseId)
+    {
+        var result = await _mediator.Send(new GetProductStockCardQuery(id, warehouseId));
+        if (!result.IsSuccess)
+        {
+            return BadRequest(new { message = result.Error });
+        }
+        return Ok(result.Value);
+    }
+
+    /// <summary>
     /// Thêm mới một mặt hàng vào danh mục hàng hóa (tự động phân giải nhóm danh mục & đơn vị tính nếu cần).
     /// </summary>
     [HttpPost]

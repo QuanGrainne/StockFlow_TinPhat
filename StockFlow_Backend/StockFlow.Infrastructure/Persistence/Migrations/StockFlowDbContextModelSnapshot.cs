@@ -1975,6 +1975,11 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("TransactionId"));
 
+                    b.Property<decimal?>("BalanceAfter")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("balance_after");
+
                     b.Property<int>("CreatedBy")
                         .HasColumnType("integer")
                         .HasColumnName("created_by");
@@ -2009,10 +2014,20 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp without time zone")
                         .HasColumnName("transaction_date");
 
+                    b.Property<decimal?>("TransactionPrice")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("transaction_price");
+
                     b.Property<string>("TransactionType")
                         .HasMaxLength(30)
                         .HasColumnType("character varying(30)")
                         .HasColumnName("transaction_type");
+
+                    b.Property<decimal?>("UnitCost")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("unit_cost");
 
                     b.Property<int>("WarehouseId")
                         .HasColumnType("integer")
@@ -2081,6 +2096,14 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp without time zone")
                         .HasColumnName("order_date");
 
+                    b.Property<string>("OrderType")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("INVOICE")
+                        .HasColumnName("order_type");
+
                     b.Property<decimal?>("OutstandingAmount")
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)")
@@ -2115,6 +2138,14 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                         .HasColumnType("numeric(18,2)")
                         .HasColumnName("total_amount");
 
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<int?>("UpdatedBy")
+                        .HasColumnType("integer")
+                        .HasColumnName("updated_by");
+
                     b.HasKey("OrderId")
                         .HasName("trx_orders_pkey");
 
@@ -2123,6 +2154,8 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                     b.HasIndex("CreatedBy");
 
                     b.HasIndex("PartnerId");
+
+                    b.HasIndex("UpdatedBy");
 
                     b.HasIndex(new[] { "OrderCode" }, "uq_trx_orders_1")
                         .IsUnique();
@@ -3465,11 +3498,18 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasConstraintName("fk_trx_orders_partner_id");
 
+                    b.HasOne("StockFlow.Domain.Entities.SecUser", "UpdatedByNavigation")
+                        .WithMany()
+                        .HasForeignKey("UpdatedBy")
+                        .HasConstraintName("fk_trx_orders_updated_by");
+
                     b.Navigation("ConsolidatedIntoOrder");
 
                     b.Navigation("CreatedByNavigation");
 
                     b.Navigation("Partner");
+
+                    b.Navigation("UpdatedByNavigation");
                 });
 
             modelBuilder.Entity("StockFlow.Domain.Entities.TrxProductionMaterialRequirement", b =>

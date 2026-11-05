@@ -4,7 +4,9 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { DocumentCodeLink, PartnerLink, ProductCodeLink } from '@/components/links/EntityLinks';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { linkDateFilter, readDocumentLink, scrollToWhenReady } from '@/lib/navigation/documentLink';
 import { message } from 'antd';
 import { StarFilled, StarOutlined } from '@ant-design/icons';
 import {
@@ -84,13 +86,22 @@ export default function PurchaseReturnsClient() {
   const router = useRouter();
   const { activeWarehouse, warehouses } = useActiveWarehouse();
 
-  const [query, setQuery] = useState('');
+  // Link mở thẳng 1 phiếu (?code=&id=&date=&wh=, VD từ Thẻ kho)
+  const searchParams = useSearchParams();
+  const [docLink] = useState(() => readDocumentLink(searchParams));
+
+  const [query, setQuery] = useState(() => docLink?.code ?? '');
   const [reloadTick, setReloadTick] = useState(0);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(15);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [selectedKeys, setSelectedKeys] = useState<number[]>([]);
-  const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [expandedId, setExpandedId] = useState<number | null>(() => docLink?.id ?? null);
+  // Ô tìm mã hàng / tên hàng trong bảng hàng của phiếu đang mở
+  const [itemSearch, setItemSearch] = useState({ code: '', name: '' });
+  const matchItemSearch = (it: { productCode: string; productName: string }) =>
+    (!itemSearch.code.trim() || it.productCode.toLowerCase().includes(itemSearch.code.trim().toLowerCase())) &&
+    (!itemSearch.name.trim() || it.productName.toLowerCase().includes(itemSearch.name.trim().toLowerCase()));
   const [details, setDetails] = useState<Record<number, PurchaseReturnDetail>>({});
   const [loadingDetailId, setLoadingDetailId] = useState<number | null>(null);
   const [cancelling, setCancelling] = useState<PurchaseReturnListRecord | null>(null);
@@ -114,6 +125,13 @@ export default function PurchaseReturnsClient() {
   });
 
   const [filterState, setFilterState] = useState<PurchaseFilterState>(() => {
+    if (docLink) {
+      return {
+        statuses: ['draft', 'completed', 'canceled'],
+        ...linkDateFilter(docLink.date),
+        warehouseIds: docLink.warehouseId ? [docLink.warehouseId] : [],
+      };
+    }
     const range = getDateRangeForPreset('this_month');
     return {
       statuses: ['draft', 'completed'],
@@ -218,6 +236,26 @@ export default function PurchaseReturnsClient() {
     });
   }
 
+  // Mở thẳng phiếu theo link: tải chi tiết + cuộn tới dòng
+  useEffect(() => {
+    const linkedId = docLink?.id;
+    if (!linkedId) return;
+    let cancelled = false;
+    purchaseReturnService
+      .getById(linkedId)
+      .then((detail) => {
+        if (!cancelled) setDetails((prev) => ({ ...prev, [linkedId]: detail }));
+      })
+      .catch(() => {
+        if (!cancelled) message.error(`Không thể tải chi tiết phiếu ${docLink.code}`);
+      });
+    const stopScroll = scrollToWhenReady(`[data-doc-row="${linkedId}"]`);
+    return () => {
+      cancelled = true;
+      stopScroll();
+    };
+  }, [docLink]);
+
   async function toggleExpand(record: PurchaseReturnListRecord) {
     if (expandedId === record.purchaseReturnId) {
       setExpandedId(null);
@@ -225,6 +263,7 @@ export default function PurchaseReturnsClient() {
     }
     setExpandedId(record.purchaseReturnId);
     setDetailTab('info');
+    setItemSearch({ code: '', name: '' });
     if (details[record.purchaseReturnId]) return;
     try {
       setLoadingDetailId(record.purchaseReturnId);
@@ -502,6 +541,7 @@ export default function PurchaseReturnsClient() {
                     return (
                       <React.Fragment key={r.purchaseReturnId}>
                         <tr
+                          data-doc-row={r.purchaseReturnId}
                           onClick={() => toggleExpand(r)}
                           className={`hover:bg-[#f7f8f9] cursor-pointer ${
                             isExpanded ? 'bg-[#e6f1fe]/80 font-medium' : isDraft ? 'bg-[#fffbeb]' : isCancelled ? 'bg-[#fef2f2]' : ''
@@ -630,13 +670,17 @@ export default function PurchaseReturnsClient() {
                                         </div>
                                         <div>
                                           <span className="text-slate-400">Nhà cung cấp: </span>
-                                          <span className="text-[#0070f4] font-semibold">
+                                          <PartnerLink kind="supplier" code={detail.partnerCode} partnerId={detail.partnerId} className="font-semibold">
                                             {detail.partnerName} ({detail.partnerCode})
-                                          </span>
+                                          </PartnerLink>
                                         </div>
                                         <div>
                                           <span className="text-slate-400">Phiếu nhập: </span>
-                                          <span className="font-mono text-[#0070f4]">{detail.grCode ?? '—'}</span>
+                                          {detail.grCode ? (
+                                            <DocumentCodeLink kind="purchase" code={detail.grCode} id={detail.grId} warehouseId={detail.warehouseId} className="font-mono" />
+                                          ) : (
+                                            <span className="text-slate-400">—</span>
+                                          )}
                                         </div>
                                         <div>
                                           <span className="text-slate-400">Hình thức: </span>
@@ -660,12 +704,41 @@ export default function PurchaseReturnsClient() {
                                             <th className="py-2 px-3 w-28 text-right">Giá trả lại</th>
                                             <th className="py-2 px-3 w-28 text-right">Thành tiền</th>
                                           </tr>
+                                          <tr className="bg-white border-t border-slate-200">
+                                            <th />
+                                            <th className="py-1.5 px-3">
+                                              <input
+                                                value={itemSearch.code}
+                                                onChange={(e) => setItemSearch((s) => ({ ...s, code: e.target.value }))}
+                                                placeholder="Tìm mã hàng"
+                                                className="w-full h-7 px-2 text-xs font-normal border border-slate-300 rounded-[6px] focus:outline-none focus:border-[#0070f4]"
+                                              />
+                                            </th>
+                                            <th className="py-1.5 px-3">
+                                              <input
+                                                value={itemSearch.name}
+                                                onChange={(e) => setItemSearch((s) => ({ ...s, name: e.target.value }))}
+                                                placeholder="Tìm tên hàng"
+                                                className="w-full h-7 px-2 text-xs font-normal border border-slate-300 rounded-[6px] focus:outline-none focus:border-[#0070f4]"
+                                              />
+                                            </th>
+                                            <th colSpan={5} />
+                                          </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-100">
-                                          {detail.items.map((it, i) => (
+                                          {detail.items.filter(matchItemSearch).length === 0 && (
+                                            <tr>
+                                              <td colSpan={8} className="py-6 text-center text-xs text-slate-400">
+                                                Không có mặt hàng nào phù hợp
+                                              </td>
+                                            </tr>
+                                          )}
+                                          {detail.items.filter(matchItemSearch).map((it, i) => (
                                             <tr key={it.prItemId}>
                                               <td className="py-2 px-3 text-center text-slate-400">{i + 1}</td>
-                                              <td className="py-2 px-3 font-mono text-[#0070f4] font-semibold">{it.productCode}</td>
+                                              <td className="py-2 px-3 font-mono font-semibold">
+                                                <ProductCodeLink code={it.productCode} productId={it.productId} />
+                                              </td>
                                               <td className="py-2 px-3 font-medium">{it.productName}</td>
                                               <td className="py-2 px-3 text-center text-slate-500">{it.unit}</td>
                                               <td className="py-2 px-3 text-right">{it.quantity.toLocaleString('vi-VN')}</td>

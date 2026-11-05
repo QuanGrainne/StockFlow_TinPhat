@@ -250,7 +250,10 @@ public class CreatePurchaseCommandHandler : IRequestHandler<CreatePurchaseComman
                         ReferenceType = "GOODS_RECEIPT",
                         ReferenceId = goodsReceipt.GrId,
                         TransactionDate = receivedDate,
-                        CreatedBy = currentUserId
+                        CreatedBy = currentUserId,
+                        TransactionPrice = PurchaseStockOps.LinePrice(item), // Giá GD = giá nhập trên phiếu (sau giảm giá dòng)
+                        UnitCost = newUnitCost,
+                        BalanceAfter = balance.Quantity
                     };
                     _context.TrxInventoryTransactions.Add(invTx);
                 }

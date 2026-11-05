@@ -14,6 +14,7 @@ import { PriceBook, PriceBookMatrixItem } from '../types';
 import { priceBookService } from '../services/priceBookService';
 import { apiClient } from '@/lib/api/client';
 import { useActiveWarehouse } from '@/lib/warehouse/useActiveWarehouse';
+import { ProductCodeLink } from '@/components/links/EntityLinks';
 
 interface CategoryItem {
   categoryId: number;
@@ -346,10 +347,8 @@ export default function PriceBooksClient() {
         key: 'productCode',
         width: 120,
         fixed: 'left',
-        render: (code: string) => (
-          <span className="font-mono text-xs font-semibold text-blue-600 hover:underline cursor-pointer">
-            {code}
-          </span>
+        render: (code: string, record: PriceBookMatrixItem) => (
+          <ProductCodeLink code={code} productId={record.productId} className="font-mono text-xs font-semibold" />
         ),
       },
       {

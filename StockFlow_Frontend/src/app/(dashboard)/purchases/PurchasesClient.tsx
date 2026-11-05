@@ -42,7 +42,10 @@ import {
   Undo2,
 } from 'lucide-react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { DocumentCodeLink, PartnerLink, ProductCodeLink } from '@/components/links/EntityLinks';
+import { toLinkDate } from '@/lib/navigation/documentLink';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { linkDateFilter, readDocumentLink, scrollToWhenReady } from '@/lib/navigation/documentLink';
 import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import * as XLSX from 'xlsx';
 import PurchaseFilterSidebar from '@/components/PurchaseFilterSidebar';
@@ -238,9 +241,13 @@ function PurchaseReturnHistory({ returns }: { returns: PurchaseReturnSummary[] }
               return (
                 <tr key={r.purchaseReturnId} className="hover:bg-slate-50/70">
                   <td className="py-2 px-3">
-                    <Link href="/purchase-returns" className="font-mono text-[#0070f4] font-medium hover:underline">
-                      {r.returnCode}
-                    </Link>
+                    <DocumentCodeLink
+                      kind="purchase-return"
+                      code={r.returnCode}
+                      id={r.purchaseReturnId}
+                      date={toLinkDate(r.returnDate)}
+                      className="font-mono font-medium"
+                    />
                   </td>
                   <td className="py-2 px-3">{formatDateTimeVN(r.returnDate)}</td>
                   <td className="py-2 px-3">{r.createdByName || '—'}</td>
@@ -274,8 +281,12 @@ export default function PurchasesClient({ onNavigate }: { onNavigate?: (screen: 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
+  // Link mở thẳng 1 phiếu (?code=&id=&date=&wh=, VD từ Thẻ kho)
+  const searchParams = useSearchParams();
+  const [docLink] = useState(() => readDocumentLink(searchParams));
+
   // Search & Filtering state
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState(() => docLink?.code ?? '');
   const [searchDropdownOpen, setSearchDropdownOpen] = useState(false);
   const [searchCode, setSearchCode] = useState('');
   const [searchProduct, setSearchProduct] = useState('');
@@ -292,9 +303,14 @@ export default function PurchasesClient({ onNavigate }: { onNavigate?: (screen: 
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   // Detail cache & expand state
-  const [expandedRowKey, setExpandedRowKey] = useState<number | null>(null);
+  const [expandedRowKey, setExpandedRowKey] = useState<number | null>(() => docLink?.id ?? null);
+  // Ô tìm mã hàng / tên hàng trong bảng hàng của phiếu đang mở
+  const [itemSearch, setItemSearch] = useState({ code: '', name: '' });
+  const matchItemSearch = (it: { productCode: string; productName: string }) =>
+    (!itemSearch.code.trim() || it.productCode.toLowerCase().includes(itemSearch.code.trim().toLowerCase())) &&
+    (!itemSearch.name.trim() || it.productName.toLowerCase().includes(itemSearch.name.trim().toLowerCase()));
   const [detailsCache, setDetailsCache] = useState<Record<number, PurchaseDetail>>({});
-  const [loadingDetailId, setLoadingDetailId] = useState<number | null>(null);
+  const [loadingDetailId, setLoadingDetailId] = useState<number | null>(() => docLink?.id ?? null);
 
   // Favorites
   const [favoriteKeys, setFavoriteKeys] = useState<number[]>(() => {
@@ -326,6 +342,13 @@ export default function PurchasesClient({ onNavigate }: { onNavigate?: (screen: 
   const [priceSettingItems, setPriceSettingItems] = useState<PriceSettingItem[]>([]);
 
   const [filterState, setFilterState] = useState<PurchaseFilterState>(() => {
+    if (docLink) {
+      return {
+        statuses: ['draft', 'completed', 'canceled'],
+        ...linkDateFilter(docLink.date),
+        warehouseIds: docLink.warehouseId ? [docLink.warehouseId] : [],
+      };
+    }
     const range = getDateRangeForPreset('this_month');
     return {
       statuses: ['draft', 'completed'],
@@ -335,6 +358,29 @@ export default function PurchasesClient({ onNavigate }: { onNavigate?: (screen: 
       periodLabel: 'Tháng này',
     };
   });
+
+  // Mở thẳng phiếu theo link: tải chi tiết + cuộn tới dòng
+  useEffect(() => {
+    const linkedId = docLink?.id;
+    if (!linkedId) return;
+    let cancelled = false;
+    purchaseService
+      .getPurchaseById(linkedId)
+      .then((detail) => {
+        if (!cancelled) setDetailsCache((prev) => ({ ...prev, [linkedId]: detail }));
+      })
+      .catch(() => {
+        if (!cancelled) message.error(`Không thể tải chi tiết phiếu ${docLink.code}`);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingDetailId((cur) => (cur === linkedId ? null : cur));
+      });
+    const stopScroll = scrollToWhenReady(`[data-doc-row="${linkedId}"]`);
+    return () => {
+      cancelled = true;
+      stopScroll();
+    };
+  }, [docLink]);
 
   // Load suppliers for filter sidebar
   useEffect(() => {
@@ -445,6 +491,7 @@ export default function PurchasesClient({ onNavigate }: { onNavigate?: (screen: 
 
     setExpandedRowKey(record.grId);
     setDetailTab('info');
+    setItemSearch({ code: '', name: '' });
 
     // If detail not yet cached, fetch it from backend
     if (!detailsCache[record.grId]) {
@@ -965,6 +1012,7 @@ export default function PurchasesClient({ onNavigate }: { onNavigate?: (screen: 
                     return (
                       <React.Fragment key={record.grId}>
                         <tr
+                          data-doc-row={record.grId}
                           onClick={() => handleRowClick(record)}
                           className={`hover:bg-[#f7f8f9] transition cursor-pointer select-none border-b border-slate-100 ${
                             isExpanded ? 'bg-[#e6f1fe]/80 font-medium' : selectedRowKeys.includes(record.grId) ? 'bg-[#e6f1fe]/50' : statusBg
@@ -1098,7 +1146,9 @@ export default function PurchasesClient({ onNavigate }: { onNavigate?: (screen: 
                                         <div className="mt-2 text-xs text-slate-600 flex items-center gap-4">
                                           <div>
                                             <span className="text-slate-400">Nhà cung cấp: </span>
-                                            <span className="text-[#0070f4] font-semibold">{record.partnerName} ({record.partnerCode})</span>
+                                            <PartnerLink kind="supplier" code={record.partnerCode} partnerId={record.partnerId} className="font-semibold">
+                                              {record.partnerName} ({record.partnerCode})
+                                            </PartnerLink>
                                           </div>
                                           {detail?.partnerPhone && (
                                             <div>
@@ -1133,13 +1183,41 @@ export default function PurchasesClient({ onNavigate }: { onNavigate?: (screen: 
                                             <th className="py-2 px-3 w-28 text-right">Giá nhập</th>
                                             <th className="py-2 px-3 w-28 text-right">Thành tiền</th>
                                           </tr>
+                                          <tr className="bg-white border-t border-slate-200">
+                                            <th />
+                                            <th className="py-1.5 px-3">
+                                              <input
+                                                value={itemSearch.code}
+                                                onChange={(e) => setItemSearch((s) => ({ ...s, code: e.target.value }))}
+                                                placeholder="Tìm mã hàng"
+                                                className="w-full h-7 px-2 text-xs font-normal border border-slate-300 rounded-[6px] focus:outline-none focus:border-[#0070f4]"
+                                              />
+                                            </th>
+                                            <th className="py-1.5 px-3">
+                                              <input
+                                                value={itemSearch.name}
+                                                onChange={(e) => setItemSearch((s) => ({ ...s, name: e.target.value }))}
+                                                placeholder="Tìm tên hàng"
+                                                className="w-full h-7 px-2 text-xs font-normal border border-slate-300 rounded-[6px] focus:outline-none focus:border-[#0070f4]"
+                                              />
+                                            </th>
+                                            <th colSpan={6} />
+                                          </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-100">
                                           {detail?.items && detail.items.length > 0 ? (
-                                            detail.items.map((item, i) => (
+                                            detail.items.filter(matchItemSearch).length === 0 ? (
+                                              <tr>
+                                                <td colSpan={9} className="py-6 text-center text-xs text-slate-400">
+                                                  Không có mặt hàng nào phù hợp
+                                                </td>
+                                              </tr>
+                                            ) : detail.items.filter(matchItemSearch).map((item, i) => (
                                               <tr key={item.grItemId || i} className="hover:bg-slate-50/70">
                                                 <td className="py-2 px-3 text-center text-slate-400">{i + 1}</td>
-                                                <td className="py-2 px-3 font-mono text-[#0070f4] font-semibold">{item.productCode}</td>
+                                                <td className="py-2 px-3 font-mono font-semibold">
+                                                  <ProductCodeLink code={item.productCode} productId={item.productId} />
+                                                </td>
                                                 <td className="py-2 px-3 font-medium text-[#15171a]">{item.productName}</td>
                                                 <td className="py-2 px-3 text-center text-slate-500">{item.unit || 'Cái'}</td>
                                                 <td className="py-2 px-3 text-right font-mono font-medium">{item.quantity.toLocaleString('vi-VN')}</td>

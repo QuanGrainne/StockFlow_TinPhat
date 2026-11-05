@@ -58,7 +58,8 @@ export function calculateDaysUntilOutOfStock(
 // Hỗ trợ cả TỰ NHẬP (free text) và TỰ CHỌN (dropdown suggestions) cho tất cả các trường dữ liệu
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { readDocumentLink, scrollToWhenReady } from '@/lib/navigation/documentLink';
 import {
   Package,
   Boxes,
@@ -118,6 +119,7 @@ import GoodsExportDownloadDock from './GoodsExportDownloadDock';
 import GoodsImportModal from './GoodsImportModal';
 import { ImageLightbox } from '@/components/ImageLightbox';
 import { ProductThumb } from '@/components/ProductThumb';
+import { StockCardTab, type StockCardWarehouseOption } from './StockCardTab';
 import ProductFilterSidebar, {
   FilterSidebarState,
   INITIAL_FILTER_STATE,
@@ -948,7 +950,12 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
     return INITIAL_GOODS_LIST;
   });
   const suggestedProductCode = getNextProductCode(goods);
-  const [search, setSearch] = useState('');
+  // Link mở thẳng 1 hàng hóa (?code=SP...&id=..., VD bấm mã hàng trong phiếu nhập / chuyển / kiểm kho...)
+  const searchParams = useSearchParams();
+  const [productLink] = useState(() => readDocumentLink(searchParams));
+  // Link chỉ có mã (không có id): mở chi tiết sau khi tải xong danh sách hàng
+  const pendingProductCodeRef = useRef<string | null>(productLink && !productLink.id ? productLink.code : null);
+  const [search, setSearch] = useState(() => productLink?.code ?? '');
   // Dropdown gợi ý hàng hóa dưới ô tìm kiếm (giống ô tìm hàng của form chuyển hàng / nhập hàng)
   const [showSearchSuggest, setShowSearchSuggest] = useState(false);
   const [suggestActiveIdx, setSuggestActiveIdx] = useState(0);
@@ -1126,7 +1133,15 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
   const [formWarehouseStocks, setFormWarehouseStocks] = useState<Record<string, number>>({});
 
   // Master-Detail Row Expansion (Ảnh 5)
-  const [expandedRowId, setExpandedRowId] = useState<string | null>('G-00');
+  const [expandedRowId, setExpandedRowId] = useState<string | null>(() =>
+    productLink?.id ? String(productLink.id) : 'G-00'
+  );
+
+  // Mở từ link có id: cuộn tới dòng hàng hóa
+  useEffect(() => {
+    if (!productLink?.id) return;
+    return scrollToWhenReady(`[data-goods-row="${productLink.id}"]`);
+  }, [productLink]);
   const [expandedTab, setExpandedTab] = useState<'info' | 'desc' | 'stockCard' | 'stockByWh' | 'variants'>('info');
   const [hoveredImageId, setHoveredImageId] = useState<string | null>(null);
   // Xem ảnh hàng hóa phóng to (bấm vào ảnh ở phần chi tiết)
@@ -1457,6 +1472,15 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
           });
 
           setGoods(mergedDbItems);
+          if (pendingProductCodeRef.current) {
+            const code = pendingProductCodeRef.current.toUpperCase();
+            const linked = mergedDbItems.find((g) => g.code.toUpperCase() === code);
+            pendingProductCodeRef.current = null;
+            if (linked) {
+              setExpandedRowId(linked.id);
+              setExpandedTab('info');
+            }
+          }
           if (typeof window !== 'undefined') {
             try {
               localStorage.setItem(STOCKFLOW_GOODS_STORAGE_KEY, JSON.stringify(mergedDbItems));
@@ -1742,6 +1766,15 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
       row?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }, 150);
   };
+
+  // Thẻ kho: các chi nhánh được xem (có id trong DB) và chi nhánh mở mặc định
+  const stockCardWarehouses: StockCardWarehouseOption[] = (permittedFacilities.length > 0 ? permittedFacilities : facilities)
+    .filter((f): f is WarehouseFacility & { warehouseId: number } => typeof f.warehouseId === 'number' && f.warehouseId > 0)
+    .map((f) => ({ warehouseId: f.warehouseId, name: f.name }));
+  const stockCardDefaultWarehouseId =
+    (warehouseFilter && warehouseFilter !== 'ALL' ? findFacility(warehouseFilter)?.warehouseId : undefined) ??
+    findFacility(getActiveWarehouse().name)?.warehouseId ??
+    stockCardWarehouses[0]?.warehouseId;
 
   // Quyền hạn RBAC
   const canViewCostPrice = role === 'ADMIN' || role === 'MANAGER';
@@ -3718,6 +3751,17 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                               </button>
                               <button
                                 type="button"
+                                onClick={() => setExpandedTab('stockCard')}
+                                className={`pb-2 -mb-2 border-b-2 transition cursor-pointer ${
+                                  expandedTab === 'stockCard'
+                                    ? 'border-blue-600 text-blue-600 font-bold'
+                                    : 'border-transparent hover:text-slate-900'
+                                }`}
+                              >
+                                Thẻ kho
+                              </button>
+                              <button
+                                type="button"
                                 onClick={() => setExpandedTab('stockByWh')}
                                 className={`pb-2 -mb-2 border-b-2 transition cursor-pointer flex items-center gap-1.5 ${
                                   expandedTab === 'stockByWh'
@@ -3726,7 +3770,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                                 }`}
                               >
                                 <Warehouse size={13} />
-                                <span>Tồn kho / Thẻ kho</span>
+                                <span>Tồn kho</span>
                               </button>
                               <button
                                 type="button"
@@ -3975,39 +4019,20 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                               </div>
                             )}
 
-                            {/* Tab 3: THẺ KHO GẦN NHẤT */}
+                            {/* Tab 3: THẺ KHO — lịch sử biến động SL & giá vốn tại chi nhánh (chỉ xem, xuất file) */}
                             {expandedTab === 'stockCard' && (
-                              <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-2xs">
-                                <table className="w-full text-left border-collapse text-xs">
-                                  <thead>
-                                    <tr className="border-b border-slate-200 bg-slate-50 text-[11px] font-bold text-slate-500 uppercase">
-                                      <th className="py-2.5 px-3">Thời gian</th>
-                                      <th className="py-2.5 px-3">Chứng từ</th>
-                                      <th className="py-2.5 px-3">Loại giao dịch</th>
-                                      <th className="py-2.5 px-3 text-right">Biến động</th>
-                                      <th className="py-2.5 px-3 text-right">Tồn sau</th>
-                                      <th className="py-2.5 px-3">Đối tác / Phân xưởng</th>
-                                    </tr>
-                                  </thead>
-                                  <tbody className="divide-y divide-slate-100">
-                                    {item.stockCardRecent.map((sc, scIdx) => (
-                                      <tr key={scIdx} className="hover:bg-slate-50">
-                                        <td className="py-2 px-3 text-slate-500">{sc.date}</td>
-                                        <td className="py-2 px-3 font-mono font-bold text-blue-700">{sc.docCode}</td>
-                                        <td className="py-2 px-3 text-slate-700">{sc.typeName}</td>
-                                        <td className={`py-2 px-3 text-right font-mono font-bold ${sc.qtyChange >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                                          {sc.qtyChange > 0 ? `+${sc.qtyChange}` : sc.qtyChange}
-                                        </td>
-                                        <td className="py-2 px-3 text-right font-mono font-bold text-slate-900">{sc.balance}</td>
-                                        <td className="py-2 px-3 text-slate-600">{sc.partnerOrDept}</td>
-                                      </tr>
-                                    ))}
-                                  </tbody>
-                                </table>
-                              </div>
+                              <StockCardTab
+                                key={item.id}
+                                productId={item.productId ?? (Number(item.id) || undefined)}
+                                productCode={item.code}
+                                productName={item.name}
+                                warehouses={stockCardWarehouses}
+                                defaultWarehouseId={stockCardDefaultWarehouseId}
+                                canViewCost={canViewCostPrice}
+                              />
                             )}
 
-                            {/* Tab 4: TỒN KHO & THẺ KHO CHI TIẾT TỪNG CHI NHÁNH */}
+                            {/* Tab 4: TỒN KHO CHI TIẾT TỪNG CHI NHÁNH */}
                             {expandedTab === 'stockByWh' && (() => {
                               const standardFacilities = [
                                 { code: 'K001', name: 'Kho Tổng Gia Lâm', address: 'Số 18 Đường Dệt May, Gia Lâm, Hà Nội' },
@@ -4225,52 +4250,6 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                                     </table>
                                   </div>
 
-                                  {/* 3. LỊCH SỬ BIẾN ĐỘNG THẺ KHO GẦN ĐÂY CỦA SẢN PHẨM */}
-                                  <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-2xs">
-                                    <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
-                                      <div className="flex items-center gap-2">
-                                        <Clock size={14} className="text-slate-500" />
-                                        <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-                                          Nhật ký thẻ kho gần đây
-                                        </span>
-                                      </div>
-                                      <span className="text-[11px] text-slate-400">
-                                        Hiển thị {item.stockCardRecent.length} giao dịch phát sinh gần nhất
-                                      </span>
-                                    </div>
-                                    {item.stockCardRecent.length > 0 ? (
-                                      <table className="w-full text-left border-collapse text-xs">
-                                        <thead>
-                                          <tr className="border-b border-slate-200 bg-slate-50/70 text-[11px] font-bold text-slate-500 uppercase">
-                                            <th className="py-2.5 px-4 w-36">Thời gian</th>
-                                            <th className="py-2.5 px-3 w-32">Mã chứng từ</th>
-                                            <th className="py-2.5 px-4">Loại giao dịch</th>
-                                            <th className="py-2.5 px-4 text-right w-28">Biến động</th>
-                                            <th className="py-2.5 px-4 text-right w-28">Tồn sau GD</th>
-                                            <th className="py-2.5 px-4">Đối tác / Kho liên quan</th>
-                                          </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-slate-100">
-                                          {item.stockCardRecent.map((sc, scIdx) => (
-                                            <tr key={scIdx} className="hover:bg-slate-50/80">
-                                              <td className="py-2.5 px-4 text-slate-500">{sc.date}</td>
-                                              <td className="py-2.5 px-3 font-mono font-bold text-[#0071BA]">{sc.docCode}</td>
-                                              <td className="py-2.5 px-4 text-slate-700 font-medium">{sc.typeName}</td>
-                                              <td className={`py-2.5 px-4 text-right font-mono font-bold ${sc.qtyChange >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                                                {sc.qtyChange > 0 ? `+${sc.qtyChange}` : sc.qtyChange} {item.uom}
-                                              </td>
-                                              <td className="py-2.5 px-4 text-right font-mono font-extrabold text-slate-900">{sc.balance} {item.uom}</td>
-                                              <td className="py-2.5 px-4 text-slate-600">{sc.partnerOrDept}</td>
-                                            </tr>
-                                          ))}
-                                        </tbody>
-                                      </table>
-                                    ) : (
-                                      <div className="py-6 text-center text-slate-400 text-xs">
-                                        Chưa phát sinh giao dịch nhập / xuất kho cho mặt hàng này.
-                                      </div>
-                                    )}
-                                  </div>
                                 </div>
                               );
                             })()}
