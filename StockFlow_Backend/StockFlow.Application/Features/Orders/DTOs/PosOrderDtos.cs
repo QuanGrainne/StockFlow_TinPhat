@@ -69,6 +69,7 @@ public class PosOrderSummaryDto
     public string OrderCode { get; set; } = string.Empty;
     public string PartnerName { get; set; } = string.Empty;
     public string PartnerPhone { get; set; } = string.Empty;
+    public string PartnerCode { get; set; } = string.Empty;
     public decimal SubTotal { get; set; }
     public decimal DiscountAmount { get; set; }
     public decimal TotalAmount { get; set; }

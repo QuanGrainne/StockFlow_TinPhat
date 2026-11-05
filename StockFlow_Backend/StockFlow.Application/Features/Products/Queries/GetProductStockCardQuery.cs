@@ -33,6 +33,7 @@ public class GetProductStockCardQueryHandler : IRequestHandler<GetProductStockCa
         ["OUTBOUND_PURCHASE_RETURN"] = "Trả hàng nhập",
         ["PURCHASE_RETURN_CANCEL"] = "Hủy phiếu trả hàng nhập",
         ["ISSUE_SALE"] = "Bán hàng",
+        ["ISSUE_SALE_CANCEL"] = "Hủy hóa đơn",
         ["TRANSFER_OUT"] = "Chuyển hàng",
         ["TRANSFER_IN"] = "Nhận hàng chuyển",
         ["TRANSFER_CANCEL_IN"] = "Hủy phiếu chuyển hàng",

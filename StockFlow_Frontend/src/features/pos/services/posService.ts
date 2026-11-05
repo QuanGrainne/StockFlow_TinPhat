@@ -17,7 +17,61 @@ export interface OrderFilterParams {
   pageSize?: number;
 }
 
+/** Dữ liệu gửi khi thanh toán 1 hóa đơn POS (POST /api/orders/pos) */
+export interface PosSaleRequest {
+  /** 0 = Khách lẻ */
+  partnerId: number;
+  warehouseId: number;
+  paymentMethod: 'CASH' | 'VIETQR';
+  subTotal: number;
+  discountType: 'AMOUNT' | 'PERCENT';
+  discountValue: number;
+  discountAmount: number;
+  totalAmount: number;
+  paidAmount: number;
+  notes?: string;
+  clientRequestId: string;
+  /** Thời gian bán (ISO); bỏ trống = giờ hiện tại. Không được ở tương lai. */
+  orderDate?: string;
+  items: {
+    productId: number;
+    quantity: number;
+    unitId: number;
+    /** Đơn giá (theo bảng giá) */
+    originalPrice: number;
+    /** Giá bán sau giảm giá dòng */
+    unitPrice: number;
+    discountType: 'AMOUNT' | 'PERCENT';
+    /** Giảm trên 1 đơn vị: VNĐ hoặc % */
+    discountValue: number;
+    discountAmount: number;
+  }[];
+}
+
+export interface PosSaleResult {
+  orderId: number;
+  orderCode: string;
+  totalAmount: number;
+  paidAmount: number;
+  changeAmount: number;
+  outstandingAmount: number;
+  message?: string;
+}
+
 export const posService = {
+  /** Thanh toán hóa đơn POS: trừ tồn, ghi thẻ kho, công nợ, phiếu thu */
+  submitSale(req: PosSaleRequest): Promise<PosSaleResult> {
+    return apiClient.post<PosSaleResult>('/api/orders/pos', {
+      ...req,
+      excessAction: 'RETURN_CASH',
+      vatAmount: 0,
+      deliveryFee: 0,
+      deliveryType: 'COUNTER',
+      status: 'COMPLETED',
+      issueStockNow: true,
+    });
+  },
+
   /**
    * Lấy danh sách sản phẩm từ backend theo kho cụ thể (đồng bộ tồn kho chuẩn POS-014)
    */
@@ -245,7 +299,8 @@ export const posService = {
     const finalTotal = Math.max(0, itemsSubTotal - orderDiscountAmount);
 
     const payload = {
-      partnerId: order.selectedCustomer?.id || 9,
+      // 0 = không chọn khách → backend tự dùng hồ sơ "Khách lẻ" (KH00000)
+      partnerId: order.selectedCustomer?.id || 0,
       warehouseId: order.warehouseId || 3,
       paymentMethod: order.paymentMethod,
       subTotal: itemsSubTotal,

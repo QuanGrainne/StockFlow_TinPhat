@@ -49,10 +49,8 @@ public class GetPosOrdersQueryHandler : IRequestHandler<GetPosOrdersQuery, Resul
         if (_currentUserService.IsAuthenticated && !_currentUserService.IsAdmin)
         {
             var authorizedWarehouseIds = await _currentUserService.GetAuthorizedWarehouseIdsAsync(cancellationToken);
-            if (authorizedWarehouseIds.Count > 0)
-            {
-                query = query.Where(o => o.TrxStockIssues.Any(si => authorizedWarehouseIds.Contains(si.WarehouseId)));
-            }
+            // Chưa được gán kho nào → không thấy hóa đơn nào (trước đây bỏ qua lọc → thấy toàn bộ)
+            query = query.Where(o => o.TrxStockIssues.Any(si => authorizedWarehouseIds.Contains(si.WarehouseId)));
         }
 
         // 2. Lọc theo kho / chi nhánh cụ thể
@@ -154,6 +152,7 @@ public class GetPosOrdersQueryHandler : IRequestHandler<GetPosOrdersQuery, Resul
                 OrderCode = o.OrderCode ?? $"HD{o.OrderId:D5}",
                 PartnerName = o.Partner != null && o.Partner.PartnerName != null ? o.Partner.PartnerName : "Khách lẻ tại quầy",
                 PartnerPhone = o.Partner != null ? (o.Partner.Phone ?? "") : "",
+                PartnerCode = o.Partner != null ? (o.Partner.PartnerCode ?? "") : "",
                 SubTotal = o.SubTotal,
                 DiscountAmount = o.DiscountAmount,
                 TotalAmount = o.TotalAmount ?? 0,

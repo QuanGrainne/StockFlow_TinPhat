@@ -765,6 +765,10 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(255)")
                         .HasColumnName("address");
 
+                    b.Property<DateTime?>("BirthDate")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("birth_date");
+
                     b.Property<DateTime?>("CreatedAt")
                         .HasColumnType("timestamp without time zone")
                         .HasColumnName("created_at");
@@ -772,6 +776,10 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                     b.Property<int?>("CreatedBy")
                         .HasColumnType("integer")
                         .HasColumnName("created_by");
+
+                    b.Property<int?>("CreatedWarehouseId")
+                        .HasColumnType("integer")
+                        .HasColumnName("created_warehouse_id");
 
                     b.Property<decimal?>("CreditLimit")
                         .HasPrecision(18, 2)
@@ -793,9 +801,24 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(100)")
                         .HasColumnName("email");
 
+                    b.Property<string>("Facebook")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("facebook");
+
+                    b.Property<string>("Gender")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("gender");
+
                     b.Property<bool?>("IsActive")
                         .HasColumnType("boolean")
                         .HasColumnName("is_active");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("notes");
 
                     b.Property<string>("PartnerCode")
                         .HasMaxLength(30)
@@ -816,6 +839,11 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)")
                         .HasColumnName("phone");
+
+                    b.Property<string>("Phone2")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("phone2");
 
                     b.HasKey("PartnerId")
                         .HasName("mst_business_partners_pkey");
