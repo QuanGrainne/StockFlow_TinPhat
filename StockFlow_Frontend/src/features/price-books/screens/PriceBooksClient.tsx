@@ -662,8 +662,8 @@ export default function PriceBooksClient() {
       {contextHolder}
 
       {/* 1. Header: tiêu đề + tìm kiếm | + Bảng giá, Xuất file (giống Nhập hàng / Trả hàng nhập) */}
-      <header className="h-12 bg-white border-b border-slate-200 px-4 flex items-center justify-between gap-3 shrink-0">
-        <div className="flex items-center gap-4 flex-1 max-w-xl">
+      <header className="min-h-12 bg-white border-b border-slate-200 px-3 sm:px-4 py-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 shrink-0">
+        <div className="flex items-center gap-4 flex-1 basis-[320px] min-w-[260px] max-w-xl">
           <h1 className="text-[20px] font-bold leading-7 tracking-tight whitespace-nowrap">Thiết lập giá</h1>
           <div className="relative flex-1">
             <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#677484] pointer-events-none" />
@@ -680,7 +680,7 @@ export default function PriceBooksClient() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {editedCount > 0 && (
             <button
               type="button"

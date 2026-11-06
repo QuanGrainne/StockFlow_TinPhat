@@ -395,8 +395,8 @@ export default function PurchaseReturnsClient() {
   return (
     <div className="flex-1 h-full min-h-0 flex flex-col bg-[#f5f5f5] overflow-hidden select-none text-[13px] text-[#15171a] font-sans">
       {/* 1. Header */}
-      <header className="h-12 bg-white border-b border-slate-200 px-4 flex items-center justify-between gap-3 shrink-0">
-        <div className="flex items-center gap-4 flex-1 max-w-xl">
+      <header className="min-h-12 bg-white border-b border-slate-200 px-3 sm:px-4 py-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 shrink-0">
+        <div className="flex items-center gap-4 flex-1 basis-[320px] min-w-[260px] max-w-xl">
           <h1 className="text-[20px] font-bold leading-7 tracking-tight whitespace-nowrap">Trả hàng nhập</h1>
           <div className="relative flex-1">
             <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#677484] pointer-events-none" />
@@ -413,7 +413,7 @@ export default function PurchaseReturnsClient() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Link
             href="/purchase-returns/create"
             className="inline-flex items-center gap-1.5 px-3.5 h-8 rounded-[8px] bg-[#0070f4] hover:bg-[#005ac3] text-white font-semibold text-[13px] shadow-xs transition"
@@ -867,7 +867,7 @@ export default function PurchaseReturnsClient() {
           </div>
 
           {/* Footer phân trang */}
-          <footer className="h-10 bg-white border-t border-slate-200 px-4 flex items-center justify-between text-[12px] text-[#677484] shrink-0">
+          <footer className="min-h-10 bg-white border-t border-slate-200 px-3 sm:px-4 py-1.5 flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5 text-[12px] text-[#677484] shrink-0">
             <div className="flex items-center gap-3">
               <span>
                 Hiển thị <strong className="text-[#15171a]">{paged.length}</strong> trên{' '}

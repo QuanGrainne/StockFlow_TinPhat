@@ -4,6 +4,7 @@
 
 'use client';
 
+import { clampPopoverLeft, DATE_POPOVER_WIDTH } from '@/lib/ui/popover';
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
@@ -156,7 +157,7 @@ export default function TimeRangeFilter({
     let top = rect.top - offset;
     if (top + popoverHeight > window.innerHeight) top = Math.max(10, window.innerHeight - popoverHeight - 10);
     if (top < 10) top = 10;
-    return { top, left: rect.right + 10, arrowTop: Math.max(16, rect.top - top + rect.height / 2 - 8) };
+    return { top, left: clampPopoverLeft(rect.right + 10, DATE_POPOVER_WIDTH), arrowTop: Math.max(16, rect.top - top + rect.height / 2 - 8) };
   };
 
   const handleOpenPreset = () => {
@@ -278,7 +279,7 @@ export default function TimeRangeFilter({
   );
 
   const popoverCls =
-    'bg-white rounded-[8px] shadow-[rgba(169,180,203,0.32)_0px_8px_20px_0px] border border-slate-200 p-4 select-none animate-in fade-in zoom-in-95 duration-100';
+    'bg-white rounded-[8px] shadow-[rgba(169,180,203,0.32)_0px_8px_20px_0px] border border-slate-200 p-4 select-none animate-in fade-in zoom-in-95 duration-100 max-w-[calc(100vw-16px)] max-h-[calc(100vh-16px)] overflow-auto';
   const arrowCls =
     'absolute -left-[8px] w-0 h-0 border-y-[8px] border-y-transparent border-r-[8px] border-r-white drop-shadow-sm pointer-events-none';
 

@@ -52,8 +52,9 @@ export const orderService = {
     idOrCode: string | number,
     payload: {
       notes?: string;
-      orderType?: string;
+      sellerName?: string;
       salesRepName?: string;
+      orderType?: 'INVOICE' | 'BOOKING' | string;
       status?: string;
     }
   ): Promise<OrderDetail> {
@@ -61,4 +62,3 @@ export const orderService = {
     return data;
   },
 };
-

@@ -86,10 +86,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const handleMouseEnter = (tabId: string) => {
+  // Menu con rộng 256px: tab nằm sát mép phải thì canh menu theo mép phải để không bị cắt khi màn hình hẹp
+  const [dropdownAlignRight, setDropdownAlignRight] = useState(false);
+  const DROPDOWN_WIDTH = 256;
+
+  const handleMouseEnter = (tabId: string, anchor?: HTMLElement | null) => {
     if (hoverTimeoutRef.current) {
       clearTimeout(hoverTimeoutRef.current);
       hoverTimeoutRef.current = null;
+    }
+    if (anchor && typeof window !== 'undefined') {
+      setDropdownAlignRight(anchor.getBoundingClientRect().left + DROPDOWN_WIDTH > window.innerWidth - 8);
     }
     setOpenDropdownId(tabId);
   };
@@ -1150,8 +1157,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   };
 
   return (
-    <div ref={containerRef} className="bg-white border-b border-slate-200 px-6 py-2 flex items-center justify-between gap-2 select-none relative z-30 overflow-visible">
-      <div className="flex items-center gap-1.5 overflow-visible">
+    <div ref={containerRef} className="bg-white border-b border-slate-200 px-3 sm:px-6 py-2 flex flex-wrap items-center justify-between gap-2 select-none relative z-30 overflow-visible">
+      <div className="flex flex-wrap items-center gap-1.5 overflow-visible min-w-0 flex-1">
         {visibleTabs.map((tab) => {
           const active = isTabActive(tab);
           const Icon = tab.icon;
@@ -1161,9 +1168,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <div
               key={tab.id}
               className="relative shrink-0 tab-dropdown-group group"
-              onMouseEnter={() => {
+              onMouseEnter={(e) => {
                 if (tab.hasDropdown && tab.dropdownItems && tab.dropdownItems.length > 0) {
-                  handleMouseEnter(tab.id);
+                  handleMouseEnter(tab.id, e.currentTarget);
                 }
               }}
               onMouseLeave={() => {
@@ -1174,12 +1181,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
             >
               <button
                 type="button"
-                onClick={() => {
+                onClick={(e) => {
                   if (tab.hasDropdown && tab.dropdownItems && tab.dropdownItems.length > 0) {
                     if (isOpen) {
                       setOpenDropdownId(null);
                     } else {
-                      setOpenDropdownId(tab.id);
+                      handleMouseEnter(tab.id, e.currentTarget.parentElement);
                     }
                   } else {
                     setOpenDropdownId(null);
@@ -1214,53 +1221,57 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </button>
 
 
-              {/* Dropdown Menu Modal (Hiện mượt mà khi hover chuột) */}
-              {tab.hasDropdown && tab.dropdownItems && (
-                <div
-                  onMouseEnter={() => handleMouseEnter(tab.id)}
-                  onMouseLeave={handleMouseLeave}
-                  className={`tab-dropdown-menu absolute top-full left-0 pt-1.5 w-64 z-50 ${isOpen ? 'is-open' : ''
-                    }`}
-                >
-                  <div className="bg-white rounded-[10px] shadow-xl border border-slate-200 py-1.5 overflow-hidden">
-                    {tab.dropdownItems.map((item) => {
-                      const ItemIcon = item.icon;
-                      const isItemActive = activeScreen === item.id;
-                      return (
-                        <button
-                          key={item.id}
-                          type="button"
-                          onClick={() => {
-                            setOpenDropdownId(null);
-                            if (item.comingSoon) {
-                              message.info(`Chức năng ${item.title} đang được phát triển.`);
-                              return;
-                            }
-                            onNavigate(item.id);
-                          }}
-                          className={`w-full text-left px-3.5 py-2.5 flex items-start gap-3 transition cursor-pointer hover:bg-blue-50/70 ${isItemActive ? 'bg-blue-50 text-[#2B6CB0]' : 'text-slate-700'
-                            }`}
-                        >
-                          <div className={`mt-0.5 p-1 rounded-[6px] shrink-0 ${isItemActive ? 'text-[#2B6CB0]' : 'text-slate-400'}`}>
-                            <ItemIcon size={16} />
+            {/* Dropdown Menu Modal (Hiện mượt mà khi hover chuột) */}
+            {tab.hasDropdown && tab.dropdownItems && (
+              <div
+                onMouseEnter={() => handleMouseEnter(tab.id)}
+                onMouseLeave={handleMouseLeave}
+                className={`tab-dropdown-menu absolute top-full pt-1.5 w-64 max-w-[calc(100vw-1rem)] z-50 ${
+                  isOpen && dropdownAlignRight ? 'right-0' : 'left-0'
+                } ${
+                  isOpen ? 'is-open' : ''
+                }`}
+              >
+                <div className="bg-white rounded-[10px] shadow-xl border border-slate-200 py-1.5 overflow-hidden">
+                  {tab.dropdownItems.map((item) => {
+                    const ItemIcon = item.icon;
+                    const isItemActive = activeScreen === item.id;
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => {
+                          setOpenDropdownId(null);
+                          if (item.comingSoon) {
+                            message.info(`Chức năng ${item.title} đang được phát triển.`);
+                            return;
+                          }
+                          onNavigate(item.id);
+                        }}
+                        className={`w-full text-left px-3.5 py-2.5 flex items-start gap-3 transition cursor-pointer hover:bg-blue-50/70 ${
+                          isItemActive ? 'bg-blue-50 text-[#2B6CB0]' : 'text-slate-700'
+                        }`}
+                      >
+                        <div className={`mt-0.5 p-1 rounded-[6px] shrink-0 ${isItemActive ? 'text-[#2B6CB0]' : 'text-slate-400'}`}>
+                          <ItemIcon size={16} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-xs font-bold leading-tight flex items-center gap-1.5">
+                            <span>{item.title}</span>
+                            {item.comingSoon && (
+                              <span className="px-1.5 py-px rounded-full text-[10px] font-semibold bg-amber-50 text-amber-600 border border-amber-200">
+                                Đang phát triển
+                              </span>
+                            )}
                           </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="text-xs font-bold leading-tight flex items-center gap-1.5">
-                              <span>{item.title}</span>
-                              {item.comingSoon && (
-                                <span className="px-1.5 py-px rounded-full text-[10px] font-semibold bg-amber-50 text-amber-600 border border-amber-200">
-                                  Đang phát triển
-                                </span>
-                              )}
-                            </div>
-                            <div className="text-[11px] text-slate-400 mt-0.5 leading-tight">{item.desc}</div>
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
+                          <div className="text-[11px] text-slate-400 mt-0.5 leading-tight">{item.desc}</div>
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
-              )}
+              </div>
+            )}
             </div>
           );
         })}
