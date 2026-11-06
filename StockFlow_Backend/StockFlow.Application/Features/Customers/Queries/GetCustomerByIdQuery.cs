@@ -48,6 +48,8 @@ public class GetCustomerByIdQueryHandler : IRequestHandler<GetCustomerByIdQuery,
                 o.OrderCode,
                 o.OrderDate,
                 Total = o.TotalAmount ?? 0,
+                Paid = o.PaidAmount ?? 0,
+                Outstanding = o.OutstandingAmount ?? 0,
                 o.Status,
                 Seller = o.CreatedByNavigation.FullName ?? o.CreatedByNavigation.Username,
                 Warehouse = o.TrxStockIssues.Select(si => si.Warehouse.WarehouseName).FirstOrDefault(),
@@ -56,7 +58,7 @@ public class GetCustomerByIdQueryHandler : IRequestHandler<GetCustomerByIdQuery,
 
         var recentOrders = orders
             .Select(o => new CustomerRecentOrderDto(
-                o.OrderId, o.OrderCode ?? $"HD{o.OrderId:D6}", o.OrderDate, o.Total, o.Status, o.Seller, o.Warehouse))
+                o.OrderId, o.OrderCode ?? $"HD{o.OrderId:D6}", o.OrderDate, o.Total, o.Status, o.Seller, o.Warehouse, o.Paid, o.Outstanding))
             .ToList();
 
         // ── Sổ nợ cần thu: bán hàng (+), khách thanh toán (−) ──

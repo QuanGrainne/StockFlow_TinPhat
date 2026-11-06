@@ -54,7 +54,8 @@ export interface CustomerStats {
 export interface CustomerFilterState {
   search: string;
   status: 'ALL' | CustomerStatus;
-  createdWarehouseId: number | 'ALL';
+  /** Chi nhánh tạo: [] = tất cả */
+  createdWarehouseIds: number[];
   /** Ngày tạo */
   createdTimeRange: string;
   createdFrom: string;
@@ -105,6 +106,9 @@ export interface CustomerRecentOrder {
   status?: string;
   sellerName?: string | null;
   warehouseName?: string | null;
+  /** Khách đã trả / còn nợ của hóa đơn */
+  paidAmount: number;
+  outstandingAmount: number;
 }
 
 /** Một dòng sổ "Nợ cần thu từ khách" (amount > 0 tăng nợ, < 0 giảm nợ) */
@@ -121,4 +125,46 @@ export interface CustomerDebtLedgerEntry {
 export interface CustomerDetail extends Customer {
   recentOrders?: CustomerRecentOrder[];
   debtLedger?: CustomerDebtLedgerEntry[];
+}
+
+/** Kết quả tạo phiếu thu nợ khách hàng */
+export interface CustomerPaymentResult {
+  voucherCode: string;
+  amount: number;
+  allocatedAmount: number;
+  remainingDebt: number;
+}
+
+export interface CreateCustomerPaymentPayload {
+  amount: number;
+  paymentDate?: string;
+  paymentMethod: string;
+  notes?: string;
+  allocations: { orderId: number; amount: number }[];
+}
+
+/** 1 dòng phân bổ của phiếu thu vào hóa đơn */
+export interface CustomerReceiptAllocation {
+  orderId: number;
+  orderCode: string;
+  orderDate?: string | null;
+  orderTotal: number;
+  paidBefore: number;
+  amount: number;
+  paymentStatus?: string | null;
+}
+
+/** Chi tiết 1 phiếu thu của khách (TTHD... / PT...) */
+export interface CustomerReceiptDetail {
+  code: string;
+  transactionDate?: string | null;
+  createdByName?: string | null;
+  paymentMethod: string;
+  totalAmount: number;
+  description?: string | null;
+  status: string;
+  partnerId: number;
+  partnerCode: string;
+  partnerName: string;
+  allocations: CustomerReceiptAllocation[];
 }

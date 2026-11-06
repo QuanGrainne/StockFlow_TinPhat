@@ -112,7 +112,7 @@ import { productService } from '../../services/productService';
 import { adminService } from '../../services/adminService';
 import { WarehouseFacility } from '../../types';
 import { SkuAnalyticsModal } from './SkuAnalyticsModal';
-import { TIN_PHAT_WAREHOUSES, getActiveWarehouse, setActiveWarehouseGlobal } from '@/lib/warehouse/useActiveWarehouse';
+import { getActiveWarehouse } from '@/lib/warehouse/useActiveWarehouse';
 import ViewPriceBooksModal from './ViewPriceBooksModal';
 import GoodsExportModal from './GoodsExportModal';
 import GoodsExportDownloadDock from './GoodsExportDownloadDock';
@@ -1677,35 +1677,6 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
       warehouseName: entry ? entry.warehouseName : targetWh,
       breakdown: item.stockByWarehouse || [],
     };
-  };
-
-  // Đồng bộ thay đổi kho với Header và localStorage
-  const handleWarehouseFilterChange = (val: string) => {
-    setWarehouseFilter(val);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('stockflow_selected_branch', val);
-      const fac = (permittedFacilities.length > 0 ? permittedFacilities : facilities).find(
-        (f) => f.code === val || f.name === val
-      );
-      const branchName = fac ? fac.name : val === 'ALL' ? 'Tất cả các kho' : val;
-      window.dispatchEvent(
-        new CustomEvent('stockflow_branch_changed', {
-          detail: {
-            branch: val,
-            branchName,
-          },
-        })
-      );
-      const matchingWh = TIN_PHAT_WAREHOUSES.find(
-        (w) =>
-          w.name.toLowerCase() === branchName.toLowerCase() ||
-          (fac?.code && w.code.toLowerCase() === fac.code.toLowerCase()) ||
-          (fac?.name && w.name.toLowerCase() === fac.name.toLowerCase())
-      );
-      if (matchingWh) {
-        setActiveWarehouseGlobal(matchingWh);
-      }
-    }
   };
 
   // Tìm kho (theo tên hoặc mã) trong danh sách cơ sở kho lấy từ DB
@@ -4077,7 +4048,6 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
 
                               const totalActual = stockRows.reduce((sum, r) => sum + r.actual, 0);
                               const totalAvailable = stockRows.reduce((sum, r) => sum + r.available, 0);
-                              const totalValue = stockRows.reduce((sum, r) => sum + r.actual * r.costPrice, 0);
                               const currentStockRow = stockRows.find((r) => r.isCurrentFilter) || stockRows[0];
 
                               return (
@@ -4124,20 +4094,16 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                                           <th className="py-2.5 px-4 min-w-[200px]">Cơ sở chi nhánh</th>
                                           <th className="py-2.5 px-3 w-24">Mã kho</th>
                                           <th className="py-2.5 px-4 text-right min-w-[120px]">Tồn thực tế</th>
-                                          <th className="py-2.5 px-4 text-right min-w-[120px]">Khả dụng</th>
-                                          {canViewCostPrice && (
-                                            <>
-                                              <th className="py-2.5 px-4 text-right min-w-[120px]">Giá vốn BQ</th>
-                                              <th className="py-2.5 px-4 text-right min-w-[140px]">Giá trị tồn kho</th>
-                                            </>
-                                          )}
-                                          <th className="py-2.5 px-4 text-center w-28">Trạng thái</th>
-                                          <th className="py-2.5 px-4 text-center w-36">Thao tác</th>
+                                          <th className="py-2.5 px-4 text-right min-w-[120px]">Khách đặt</th>
+                                          <th className="py-2.5 px-4 text-center w-36">Trạng thái</th>
                                         </tr>
                                       </thead>
                                       <tbody className="divide-y divide-slate-100">
                                         {stockRows.map((r) => {
                                           const isOutOfStock = r.actual <= 0;
+                                          // Khách đặt = phần tồn đang giữ cho đơn khách (tồn thực tế − khả dụng)
+                                          const customerOrdered = Math.max(0, r.actual - r.available);
+                                          const isDiscontinued = item.status === 'DISCONTINUED';
                                           return (
                                             <tr
                                               key={r.code}
@@ -4176,46 +4142,20 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                                               </td>
                                               <td className="py-3 px-4 text-right">
                                                 <span className="font-mono text-xs font-semibold text-slate-600">
-                                                  {r.available.toLocaleString('vi-VN')}
+                                                  {customerOrdered.toLocaleString('vi-VN')}
                                                 </span>{' '}
                                                 <span className="text-[11px] text-slate-400">{item.uom}</span>
                                               </td>
-                                              {canViewCostPrice && (
-                                                <>
-                                                  <td className="py-3 px-4 text-right font-mono text-xs text-slate-600">
-                                                    {r.costPrice > 0 ? `${r.costPrice.toLocaleString('vi-VN')} đ` : '---'}
-                                                  </td>
-                                                  <td className="py-3 px-4 text-right font-mono text-xs font-bold text-slate-800">
-                                                    {(r.actual * r.costPrice) > 0 ? `${(r.actual * r.costPrice).toLocaleString('vi-VN')} đ` : '0 đ'}
-                                                  </td>
-                                                </>
-                                              )}
                                               <td className="py-3 px-4 text-center">
                                                 <span
                                                   className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                                                    r.actual > 0
-                                                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                                                      : 'bg-rose-50 text-rose-600 border border-rose-200'
+                                                    isDiscontinued
+                                                      ? 'bg-slate-100 text-slate-500 border border-slate-200'
+                                                      : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                                                   }`}
                                                 >
-                                                  {r.actual > 0 ? 'Còn hàng' : 'Hết hàng'}
+                                                  {isDiscontinued ? 'Ngừng kinh doanh' : 'Đang kinh doanh'}
                                                 </span>
-                                              </td>
-                                              <td className="py-3 px-4 text-center" onClick={(e) => e.stopPropagation()}>
-                                                <div className="flex items-center justify-center gap-1.5">
-                                                  <button
-                                                    type="button"
-                                                    onClick={() => handleWarehouseFilterChange(r.name)}
-                                                    className={`px-2 py-1 rounded text-[11px] font-semibold transition cursor-pointer ${
-                                                      r.isCurrentFilter
-                                                        ? 'bg-blue-600 text-white shadow-2xs'
-                                                        : 'bg-slate-100 hover:bg-blue-50 hover:text-blue-700 text-slate-700'
-                                                    }`}
-                                                    title={`Đổi kho active sang ${r.name}`}
-                                                  >
-                                                    {r.isCurrentFilter ? 'Đang kích hoạt' : 'Chọn kho'}
-                                                  </button>
-                                                </div>
                                               </td>
                                             </tr>
                                           );
@@ -4230,19 +4170,9 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                                             {totalActual.toLocaleString('vi-VN')} {item.uom}
                                           </td>
                                           <td className="py-3 px-4 text-right font-mono text-xs font-bold text-slate-800">
-                                            {totalAvailable.toLocaleString('vi-VN')} {item.uom}
+                                            {Math.max(0, totalActual - totalAvailable).toLocaleString('vi-VN')} {item.uom}
                                           </td>
-                                          {canViewCostPrice && (
-                                            <>
-                                              <td className="py-3 px-4 text-right text-slate-400 text-[11px]">
-                                                Bình quân
-                                              </td>
-                                              <td className="py-3 px-4 text-right font-mono text-xs font-extrabold text-blue-900">
-                                                {totalValue.toLocaleString('vi-VN')} đ
-                                              </td>
-                                            </>
-                                          )}
-                                          <td colSpan={2} className="py-3 px-4 text-right text-[11px] text-slate-500 font-normal">
+                                          <td className="py-3 px-4 text-center text-[11px] text-slate-500 font-normal">
                                             Tất cả {stockRows.length} chi nhánh
                                           </td>
                                         </tr>

@@ -181,7 +181,7 @@ public class GetOrderDetailQueryHandler : IRequestHandler<GetOrderDetailQuery, R
         var paymentTxsDto = financialTxs.Select(ft => new OrderPaymentTransactionDto
         {
             TxId = ft.TxId,
-            TxCode = ft.TxCode ?? $"PT{ft.TxId:D6}",
+            TxCode = ft.TxCode ?? $"TT{order.OrderCode}",
             TransactionDate = ft.TransactionDate,
             PaymentMethod = ft.PaymentMethod ?? "CASH",
             Amount = ft.Amount ?? 0,
@@ -239,7 +239,7 @@ public class GetOrderDetailQueryHandler : IRequestHandler<GetOrderDetailQuery, R
 
         // Xây dựng Timeline sự kiện
         var timeline = new List<OrderTimelineEventDto>();
-        var baseDate = order.OrderDate ?? DateTime.UtcNow;
+        var baseDate = order.OrderDate ?? VietnamTime.Now;
 
         timeline.Add(new OrderTimelineEventDto
         {

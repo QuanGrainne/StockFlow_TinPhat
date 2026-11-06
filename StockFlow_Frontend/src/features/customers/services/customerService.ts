@@ -10,6 +10,9 @@ import {
   UpdateCustomerPayload,
   CustomerDetail,
   CustomerGender,
+  CustomerPaymentResult,
+  CreateCustomerPaymentPayload,
+  CustomerReceiptDetail,
 } from '../types';
 
 interface BackendCustomerDto {
@@ -62,6 +65,8 @@ interface BackendCustomerDetailDto extends BackendCustomerDto {
     status?: string | null;
     sellerName?: string | null;
     warehouseName?: string | null;
+    paidAmount?: number | null;
+    outstandingAmount?: number | null;
   }>;
   debtLedger?: Array<{
     code: string;
@@ -136,7 +141,8 @@ export const customerService = {
     add('search', filter?.search);
     if (filter?.debtStatus && filter.debtStatus !== 'ALL') add('debtStatus', filter.debtStatus);
     if (filter?.status && filter.status !== 'ALL') add('status', filter.status);
-    if (filter?.createdWarehouseId && filter.createdWarehouseId !== 'ALL') add('createdWarehouseId', filter.createdWarehouseId);
+    // API nhận 1 chi nhánh; chọn nhiều thì màn danh sách lọc tiếp ở client
+    if (filter?.createdWarehouseIds?.length === 1) add('createdWarehouseId', filter.createdWarehouseIds[0]);
     add('createdFrom', filter?.createdFrom);
     add('createdTo', filter?.createdTo);
     if (filter?.gender && filter.gender !== 'ALL') add('gender', filter.gender);
@@ -171,6 +177,30 @@ export const customerService = {
   },
 
   /** Chi tiết hồ sơ khách hàng + lịch sử bán + sổ nợ cần thu */
+  /** Chi tiết 1 phiếu thu của khách theo mã (TTHD... / PT...) */
+  async getCustomerReceipt(partnerId: number, code: string): Promise<CustomerReceiptDetail> {
+    return apiClient.get<CustomerReceiptDetail>(`/api/customers/${partnerId}/receipts/${encodeURIComponent(code)}`);
+  },
+
+  /** Sửa phiếu thu: thời gian, phương thức, ghi chú */
+  async updateCustomerReceipt(
+    partnerId: number,
+    code: string,
+    payload: { transactionDate?: string; paymentMethod: string; notes?: string }
+  ): Promise<void> {
+    await apiClient.put(`/api/customers/${partnerId}/receipts/${encodeURIComponent(code)}`, payload);
+  },
+
+  /** Hủy phiếu thu: hoàn lại số đã trả của hóa đơn, cộng lại nợ khách */
+  async cancelCustomerReceipt(partnerId: number, code: string): Promise<void> {
+    await apiClient.post(`/api/customers/${partnerId}/receipts/${encodeURIComponent(code)}/cancel`, {});
+  },
+
+  /** Tạo phiếu thu nợ khách hàng (PT...), có phân bổ vào hóa đơn còn nợ */
+  async createCustomerPayment(partnerId: number, payload: CreateCustomerPaymentPayload): Promise<CustomerPaymentResult> {
+    return apiClient.post<CustomerPaymentResult>(`/api/customers/${partnerId}/payments`, payload);
+  },
+
   async getCustomerById(id: number | string): Promise<CustomerDetail> {
     const dto = await apiClient.get<BackendCustomerDetailDto>(`/api/customers/${id}`);
     return {
@@ -183,6 +213,8 @@ export const customerService = {
         status: o.status ?? undefined,
         sellerName: o.sellerName ?? null,
         warehouseName: o.warehouseName ?? null,
+        paidAmount: Number(o.paidAmount) || 0,
+        outstandingAmount: Number(o.outstandingAmount) || 0,
       })),
       debtLedger: (dto.debtLedger ?? []).map((l) => ({
         code: l.code,

@@ -4,8 +4,9 @@
 // Chi nhánh tạo, Ngày tạo, Giới tính, Tổng bán (giá trị + thời gian), Nợ hiện tại, Trạng thái.
 
 import React, { useState } from 'react';
-import { ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import TimeRangeFilter from '@/components/filters/TimeRangeFilter';
+import WarehouseMultiSelect from '@/components/filters/WarehouseMultiSelect';
 import { CustomerFilterState } from '../types';
 
 interface CustomerFilterSidebarProps {
@@ -131,26 +132,14 @@ export default function CustomerFilterSidebar({
       {!isCollapsed && (
         <div className="flex-1 min-h-0 p-3.5 space-y-4 overflow-y-auto">
           {/* 1. Chi nhánh tạo */}
-          <div>
-            <label className={labelCls}>Chi nhánh tạo</label>
-            <div className="relative">
-              <select
-                value={state.createdWarehouseId === 'ALL' ? 'ALL' : String(state.createdWarehouseId)}
-                onChange={(e) =>
-                  onChange({ createdWarehouseId: e.target.value === 'ALL' ? 'ALL' : Number(e.target.value) })
-                }
-                className="w-full h-8 pl-2.5 pr-7 bg-white rounded-[8px] border border-slate-300 text-[12px] text-[#15171a] focus:outline-none focus:border-[#0070f4] cursor-pointer appearance-none truncate"
-              >
-                <option value="ALL">Tất cả chi nhánh</option>
-                {warehousesList.map((wh) => (
-                  <option key={wh.warehouseId} value={wh.warehouseId}>
-                    {wh.name} ({wh.code})
-                  </option>
-                ))}
-              </select>
-              <ChevronDown size={13} className="absolute right-2 top-1/2 -translate-y-1/2 text-[#677484] pointer-events-none" />
-            </div>
-          </div>
+          <WarehouseMultiSelect
+            label="Chi nhánh tạo"
+            value={state.createdWarehouseIds}
+            warehouses={warehousesList}
+            onChange={(createdWarehouseIds) => onChange({ createdWarehouseIds })}
+          />
+
+          <div className="border-t border-slate-100" />
 
           {/* 2. Ngày tạo */}
           <TimeRangeFilter

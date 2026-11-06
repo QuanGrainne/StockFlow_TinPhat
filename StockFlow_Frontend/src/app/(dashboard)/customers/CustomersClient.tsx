@@ -18,13 +18,13 @@ import type { CreateCustomerPayload, Customer, CustomerDetail, CustomerFilterSta
 import { readDocumentLink, scrollToWhenReady } from '@/lib/navigation/documentLink';
 
 const money = new Intl.NumberFormat('vi-VN');
-const COLUMN_COUNT = 7;
+const COLUMN_COUNT = 8;
 const thCls = 'sticky top-0 z-20 bg-[#f7f8f9] py-2.5 px-3 border-b border-slate-200 whitespace-nowrap';
 
 const DEFAULT_FILTER: CustomerFilterState = {
   search: '',
   status: 'ACTIVE',
-  createdWarehouseId: 'ALL',
+  createdWarehouseIds: [],
   createdTimeRange: 'all_time',
   createdFrom: '',
   createdTo: '',
@@ -50,7 +50,7 @@ interface CustomersClientProps {
   onNavigate?: (screenId: string) => void;
 }
 
-export default function CustomersClient({}: CustomersClientProps = {}) {
+export default function CustomersClient({ }: CustomersClientProps = {}) {
   // Link mở thẳng 1 khách hàng (?code=KH...&id=..., VD từ hóa đơn)
   const searchParams = useSearchParams();
   const [custLink] = useState(() => readDocumentLink(searchParams));
@@ -77,6 +77,8 @@ export default function CustomersClient({}: CustomersClientProps = {}) {
   const requestKey = JSON.stringify({ ...serverFilter, reloadTick });
   const [result, setResult] = useState<{ key: string; items: Customer[] }>({ key: '', items: [] });
   const loading = result.key !== requestKey;
+  /** Chỉ hiện vòng tải ở lần đầu; tải lại (sau thanh toán, sửa phiếu...) giữ nguyên bảng để không đóng dòng đang mở */
+  const showLoading = loading && result.key === '';
 
   useEffect(() => {
     let stale = false;
@@ -103,7 +105,7 @@ export default function CustomersClient({}: CustomersClientProps = {}) {
       .then((whs) => {
         if (Array.isArray(whs) && whs.length > 0) setWarehouses(whs);
       })
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   // Mở thẳng khách theo link: tải chi tiết + cuộn tới dòng
@@ -132,11 +134,14 @@ export default function CustomersClient({}: CustomersClientProps = {}) {
   // Lọc từ khóa phía client: mã, tên, điện thoại 1/2, email, địa chỉ
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return result.items;
-    return result.items.filter((c) =>
+    const whIds = filter.createdWarehouseIds;
+    const byWarehouse =
+      whIds.length > 1 ? result.items.filter((c) => c.createdWarehouseId != null && whIds.includes(c.createdWarehouseId)) : result.items;
+    if (!q) return byWarehouse;
+    return byWarehouse.filter((c) =>
       [c.code, c.name, c.phone, c.phone2, c.email, c.address].some((v) => (v || '').toLowerCase().includes(q))
     );
-  }, [result.items, search]);
+  }, [result.items, search, filter.createdWarehouseIds]);
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
   const safePage = Math.min(page, pageCount);
@@ -321,11 +326,12 @@ export default function CustomersClient({}: CustomersClientProps = {}) {
                   <th className={`${thCls} text-right`}>Nợ hiện tại</th>
                   <th className={`${thCls} text-right`}>Tổng bán</th>
                   <th className={`${thCls} text-right`}>Tổng bán trừ trả hàng</th>
+                  <th className={`${thCls} text-right`}>Hạn mức nợ</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {/* Dòng tổng */}
-                {!loading && paged.length > 0 && (
+                {!showLoading && paged.length > 0 && (
                   <tr className="bg-white border-b border-slate-200 font-bold text-[13px]">
                     <td colSpan={4}></td>
                     <td className={`py-2.5 px-3 text-right font-mono ${totals.debt > 0 ? 'text-[#fb2c36]' : ''}`}>
@@ -333,10 +339,11 @@ export default function CustomersClient({}: CustomersClientProps = {}) {
                     </td>
                     <td className="py-2.5 px-3 text-right font-mono">{money.format(totals.sales)}</td>
                     <td className="py-2.5 px-3 text-right font-mono">{money.format(totals.net)}</td>
+                    <td></td>
                   </tr>
                 )}
 
-                {loading ? (
+                {showLoading ? (
                   <tr>
                     <td colSpan={COLUMN_COUNT} className="py-20 text-center text-[#677484]">
                       <RefreshCw size={20} className="animate-spin mx-auto mb-2 text-[#0070f4]" />
@@ -378,9 +385,8 @@ export default function CustomersClient({}: CustomersClientProps = {}) {
                         <tr
                           data-doc-row={c.id}
                           onClick={() => handleRowClick(c)}
-                          className={`hover:bg-[#f7f8f9] transition cursor-pointer select-none border-b border-slate-100 ${
-                            isExpanded ? 'bg-[#e6f1fe]/80 font-medium' : isSelected ? 'bg-[#e6f1fe]/50' : ''
-                          } ${inactive ? 'text-[#677484]' : ''}`}
+                          className={`hover:bg-[#f7f8f9] transition cursor-pointer select-none border-b border-slate-100 ${isExpanded ? 'bg-[#e6f1fe]/80 font-medium' : isSelected ? 'bg-[#e6f1fe]/50' : ''
+                            } ${inactive ? 'text-[#677484]' : ''}`}
                         >
                           <td className="py-2.5 px-3 text-center" onClick={(e) => e.stopPropagation()}>
                             <input
@@ -407,6 +413,12 @@ export default function CustomersClient({}: CustomersClientProps = {}) {
                           </td>
                           <td className="py-2.5 px-3 text-right font-mono">{money.format(c.totalSales || 0)}</td>
                           <td className="py-2.5 px-3 text-right font-mono">{money.format(c.totalSalesNetReturns || 0)}</td>
+                          <td
+                            className={`py-2.5 px-3 text-right font-mono ${c.isOverCreditLimit ? 'text-[#fb2c36] font-semibold' : ''}`}
+                            title={c.isOverCreditLimit ? 'Nợ hiện tại vượt hạn mức' : undefined}
+                          >
+                            {c.creditLimit > 0 ? money.format(c.creditLimit) : <span className="font-sans text-[#677484]">Không cho ghi nợ</span>}
+                          </td>
                         </tr>
                         {isExpanded && (
                           <CustomerExpandedRow
@@ -420,6 +432,15 @@ export default function CustomersClient({}: CustomersClientProps = {}) {
                             }}
                             onToggleStatus={handleToggleStatus}
                             onDelete={setDeleting}
+                            onPaymentCreated={(id, voucherCode) => {
+                              message.success(`Đã tạo phiếu thu ${voucherCode}`);
+                              void loadDetail(id);
+                              reload();
+                            }}
+                            onDataChanged={(id) => {
+                              void loadDetail(id);
+                              reload();
+                            }}
                           />
                         )}
                       </React.Fragment>

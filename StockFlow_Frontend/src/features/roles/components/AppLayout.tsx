@@ -528,7 +528,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ initialScreen, children })
           {renderActiveScreen()}
         </main>
       ) : activeScreen === 'orders' || activeScreen.includes('orders') ? (
-        <main className="flex-1 min-w-0 overflow-y-auto bg-[#F4F6F9]">
+        <main className="flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden bg-[#F8FAFC]">
           {renderActiveScreen()}
         </main>
       ) : activeScreen === 'admin-order-settings' || activeScreen.includes('order-settings') ? (

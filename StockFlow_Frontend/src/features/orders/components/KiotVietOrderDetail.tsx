@@ -2,21 +2,30 @@
 // Chi tiết 1 hóa đơn (mở rộng ngay dưới dòng trong màn Hóa đơn), theo mẫu KiotViet:
 // - Tab "Thông tin": khách, mã, trạng thái, người tạo/bán, ngày bán, kênh bán, bảng giá, dòng hàng, ghi chú, tổng kết.
 // - Tab "Lịch sử thanh toán": các phiếu thu của hóa đơn.
-// - Thao tác: Hủy, Sao chép (mở sang màn Bán hàng), Xuất file, Chỉnh sửa, Lưu, Trả hàng, In.
+// - Thao tác: Hủy, Sao chép (mở sang màn Bán hàng), Xuất file, Lưu, In.
+// Giao diện cùng chuẩn dòng mở rộng của Nhà cung cấp / Khách hàng.
 
 'use client';
 
 import React, { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Button, Input, Select, Skeleton, Tag, Tooltip, message } from 'antd';
-import { Calendar, Clock, Copy, FileOutput, Pencil, Printer, Save, Trash2, Undo2, X } from 'lucide-react';
+import { message } from 'antd';
+import { Copy, FileDown, Loader2, Printer, Save, Trash2, X } from 'lucide-react';
+import { PartnerLink, ProductCodeLink } from '@/components/links/EntityLinks';
 
 import type { OrderDetail } from '../types';
 import { orderService } from '../services/orderService';
-import { exportInvoiceDetailToXLSX, formatDateTime, paymentMethodLabel, printInvoice } from '../utils/invoiceUtils';
+import { exportInvoiceDetailToXLSX, formatDateTime, paymentMethodLabel, printInvoice, stripNoteTags } from '../utils/invoiceUtils';
 import { newPosId, queuePosTab, type PosLine } from '@/features/pos/utils/posTabs';
 
 const money = new Intl.NumberFormat('vi-VN');
+
+const textBtnCls =
+  'inline-flex items-center gap-1.5 px-2.5 h-8 rounded-[8px] text-[13px] font-semibold text-[#15171a] hover:bg-[#f7f8f9] transition cursor-pointer';
+const outlineBtnCls =
+  'inline-flex items-center gap-1.5 px-3 h-8 rounded-[8px] border border-slate-300 bg-white hover:bg-[#f7f8f9] text-[#15171a] text-[13px] font-semibold transition cursor-pointer';
+const primaryBtnCls =
+  'inline-flex items-center gap-1.5 px-3.5 h-8 rounded-[8px] bg-[#0070f4] hover:bg-[#005ac3] text-white text-[13px] font-semibold shadow-xs transition cursor-pointer';
 
 interface KiotVietOrderDetailProps {
   orderId?: number | string;
@@ -96,14 +105,13 @@ export const KiotVietOrderDetail: React.FC<KiotVietOrderDetailProps> = ({
   const [reloadTick, setReloadTick] = useState(0);
   const [notes, setNotes] = useState('');
   const [salesRep, setSalesRep] = useState('');
-  const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [cancelling, setCancelling] = useState(false);
 
   const applyOrder = useCallback((data: OrderDetail) => {
     setOrder(data);
-    setNotes(data.notes || '');
+    setNotes(stripNoteTags(data.notes));
     setSalesRep(data.salesRepName || data.createdByName || '');
   }, []);
 
@@ -138,7 +146,6 @@ export const KiotVietOrderDetail: React.FC<KiotVietOrderDetailProps> = ({
       setSaving(true);
       const updated = await orderService.updateOrder(order.orderId, { notes, salesRepName: salesRep });
       applyOrder(updated);
-      setIsEditing(false);
       message.success(`Đã lưu hóa đơn ${updated.orderCode || order.orderCode}.`);
       onReloadList?.();
     } catch (err) {
@@ -209,7 +216,7 @@ export const KiotVietOrderDetail: React.FC<KiotVietOrderDetailProps> = ({
       discountValue: order.orderDiscountAmount || 0,
       paid: null,
       payMethod: 'CASH',
-      notes: order.notes || '',
+      notes: stripNoteTags(order.notes),
     });
     message.success(`Đã sao chép ${order.orderCode} sang màn Bán hàng.`);
     openPos();
@@ -219,120 +226,151 @@ export const KiotVietOrderDetail: React.FC<KiotVietOrderDetailProps> = ({
     if (order && !printInvoice(order)) message.warning('Trình duyệt đã chặn cửa sổ in. Vui lòng cho phép cửa sổ bật lên.');
   };
 
+  const wrap = (body: React.ReactNode) => (
+    <div
+      className="cursor-default border-x border-b-2 border-[#0070f4] bg-white text-[13px] text-[#15171a] animate-in fade-in duration-150"
+      onClick={(e) => e.stopPropagation()}
+    >
+      {body}
+    </div>
+  );
+
   if (loading && !order) {
-    return (
-      <div className="bg-white p-6">
-        <Skeleton active paragraph={{ rows: 4 }} />
+    return wrap(
+      <div className="p-8 flex items-center justify-center text-slate-400 gap-2">
+        <Loader2 size={16} className="animate-spin text-[#0070f4]" />
+        <span className="text-xs">Đang tải chi tiết hóa đơn...</span>
       </div>
     );
   }
 
   if (!order) {
-    return <div className="bg-white p-6 text-center text-sm text-slate-500">Không tìm thấy thông tin hóa đơn.</div>;
+    return wrap(<div className="p-6 text-center text-xs text-[#677484]">Không tìm thấy thông tin hóa đơn.</div>);
   }
 
   const isCancelled = order.status === 'CANCELLED';
-  const customerName = order.customer?.partnerId ? order.customer.partnerName : 'Khách lẻ';
+  const cust = order.customer;
+  const hasCustomer = !!cust && cust.partnerId > 0 && cust.partnerCode !== 'KH00000';
+  const customerName = hasCustomer && cust ? cust.partnerName : 'Khách lẻ';
   const totalQty = order.totalQuantity || order.items.reduce((s, it) => s + it.quantity, 0);
+  const badge = isCancelled
+    ? { label: 'Đã hủy', cls: 'bg-[#fef2f2] text-[#fb2c36] border-[#fecaca]' }
+    : order.status === 'COMPLETED'
+    ? { label: 'Hoàn thành', cls: 'bg-[#e6f8ec] text-[#16a34a] border-[#bbf7d0]' }
+    : { label: 'Phiếu tạm', cls: 'bg-[#e6f1fe] text-[#0070f4] border-[#0070f4]/25' };
 
-  const tabClass = (on: boolean) =>
-    `-mb-px border-b-2 pb-2.5 text-sm font-medium transition ${
-      on ? 'border-[#0071BA] text-[#0071BA]' : 'border-transparent text-slate-600 hover:text-slate-900'
-    }`;
+  const tabs: { key: 'INFO' | 'PAYMENTS'; label: string }[] = [
+    { key: 'INFO', label: 'Thông tin' },
+    { key: 'PAYMENTS', label: 'Lịch sử thanh toán' },
+  ];
 
-  return (
-    <div className="cursor-default bg-white text-[13px] text-[#262626]" onClick={(e) => e.stopPropagation()}>
-      {/* ─── Tabs ─── */}
-      <div className="flex items-center gap-8 border-b border-slate-200 px-6 pt-3">
-        <button type="button" onClick={() => setActiveTab('INFO')} className={tabClass(activeTab === 'INFO')}>
-          Thông tin
-        </button>
-        <button type="button" onClick={() => setActiveTab('PAYMENTS')} className={tabClass(activeTab === 'PAYMENTS')}>
-          Lịch sử thanh toán
-        </button>
+  const fieldLabel = 'text-[12px] text-[#677484] mb-1';
+  const fieldValue = 'pb-2 border-b border-slate-200 text-[13px]';
+
+  return wrap(
+    <>
+      {/* 1. Thanh tab */}
+      <div className="border-b border-slate-200 px-5 flex items-center gap-7">
+        {tabs.map((tab) => (
+          <button
+            key={tab.key}
+            type="button"
+            onClick={() => setActiveTab(tab.key)}
+            className={`py-2.5 text-[13px] transition cursor-pointer border-b-2 -mb-px ${
+              activeTab === tab.key
+                ? 'border-[#0070f4] text-[#0070f4] font-semibold'
+                : 'border-transparent text-[#15171a] hover:text-[#0070f4]'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
 
       {activeTab === 'INFO' && (
         <>
-          <div className="space-y-5 px-6 py-5">
+          <div className="px-5 py-4 space-y-5">
             {/* Khách hàng + mã + trạng thái | Chi nhánh */}
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <span className="text-lg font-bold text-slate-900">{customerName}</span>
-                <span className="text-sm text-slate-600">{order.orderCode}</span>
-                <Tag color={isCancelled ? 'error' : order.status === 'COMPLETED' ? 'success' : 'warning'} className="!m-0">
-                  {isCancelled ? 'Đã hủy' : order.status === 'COMPLETED' ? 'Hoàn thành' : 'Phiếu tạm'}
-                </Tag>
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-center gap-2 min-w-0">
+                <h3 className="text-[16px] font-bold text-[#15171a] truncate">
+                  {hasCustomer && cust ? (
+                    <PartnerLink kind="customer" code={cust.partnerCode} partnerId={cust.partnerId}>
+                      {customerName}
+                    </PartnerLink>
+                  ) : (
+                    customerName
+                  )}
+                </h3>
+                <span className="text-[13px] text-[#677484] shrink-0">{order.orderCode}</span>
+                <span className={`shrink-0 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${badge.cls}`}>{badge.label}</span>
               </div>
-              <span className="text-slate-700">{order.warehouseName}</span>
+              <span className="shrink-0 text-[13px] text-[#677484]">
+                Chi nhánh: <span className="text-[#15171a] font-medium">{order.warehouseName || '—'}</span>
+              </span>
             </div>
 
-            {/* Người tạo / Người bán / Ngày bán / Kênh bán / Bảng giá */}
-            <div className="grid grid-cols-1 gap-x-10 gap-y-3 md:grid-cols-3">
-              <div className="flex items-center gap-3">
-                <span className="w-[72px] shrink-0 text-slate-500">Người tạo:</span>
-                <span>{order.createdByName || order.createdByUsername || '—'}</span>
+            {/* Người tạo / Người bán / Ngày bán / Bảng giá */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-4">
+              <div>
+                <div className={fieldLabel}>Người tạo</div>
+                <div className={fieldValue}>{order.createdByName || order.createdByUsername || '—'}</div>
               </div>
-              <div className="flex items-center gap-3">
-                <span className="w-[72px] shrink-0 text-slate-500">Người bán:</span>
-                {isEditing ? (
-                  <Input size="small" value={salesRep} onChange={(e) => setSalesRep(e.target.value)} className="max-w-[260px]" />
-                ) : (
-                  <Select size="small" value={salesRep || undefined} disabled options={salesRep ? [{ value: salesRep, label: salesRep }] : []} className="w-full max-w-[260px]" />
-                )}
+              <div>
+                <div className={fieldLabel}>Người bán</div>
+                <input
+                  value={salesRep}
+                  onChange={(e) => setSalesRep(e.target.value)}
+                  disabled={isCancelled}
+                  className="w-full pb-2 border-0 border-b border-slate-200 bg-transparent text-[13px] focus:outline-none focus:border-[#0070f4] disabled:text-[#677484]"
+                />
               </div>
-              <div className="flex items-center gap-3">
-                <span className="w-[72px] shrink-0 text-slate-500">Ngày bán:</span>
-                <span className="inline-flex h-7 items-center gap-2 rounded border border-slate-300 px-2.5">
-                  {formatDateTime(order.orderDate)}
-                  <Calendar size={13} className="text-slate-400" />
-                  <Clock size={13} className="text-slate-400" />
-                </span>
+              <div>
+                <div className={fieldLabel}>Ngày bán</div>
+                <div className={fieldValue}>{formatDateTime(order.orderDate)}</div>
               </div>
-              <div className="flex items-center gap-3">
-                <span className="w-[72px] shrink-0 text-slate-500">Kênh bán:</span>
-                <Select size="small" value="DIRECT" disabled options={[{ value: 'DIRECT', label: 'Bán trực tiếp' }]} className="w-full max-w-[260px]" />
-              </div>
-              <div className="flex items-center gap-3">
-                <span className="w-[72px] shrink-0 text-slate-500">Bảng giá:</span>
-                <span>{order.priceBookName || 'Bảng giá chung'}</span>
+              <div>
+                <div className={fieldLabel}>Bảng giá</div>
+                <div className={fieldValue}>{order.priceBookName || 'Bảng giá chung'}</div>
               </div>
             </div>
 
             {/* Dòng hàng */}
-            <div className="overflow-x-auto rounded border border-slate-200">
-              <table className="w-full min-w-[720px] border-collapse text-left">
-                <thead>
-                  <tr className="bg-[#f5f6f8] text-[12px] font-semibold text-slate-700">
-                    <th className="px-4 py-2.5">Mã hàng</th>
-                    <th className="px-4 py-2.5">Tên hàng</th>
-                    <th className="px-4 py-2.5 text-right">Số lượng</th>
-                    <th className="px-4 py-2.5 text-right">Đơn giá</th>
-                    <th className="px-4 py-2.5 text-right">Giảm giá</th>
-                    <th className="px-4 py-2.5 text-right">Giá bán</th>
-                    <th className="px-4 py-2.5 text-right">Thành tiền</th>
+            <div className="rounded-[8px] border border-slate-200 overflow-hidden">
+              <table className="w-full text-left border-collapse">
+                <thead className="bg-[#f7f8f9] border-b border-slate-200 text-[12px] font-semibold text-[#677484]">
+                  <tr>
+                    <th className="py-2 px-3 w-36">Mã hàng</th>
+                    <th className="py-2 px-3">Tên hàng</th>
+                    <th className="py-2 px-3 w-24 text-right">Số lượng</th>
+                    <th className="py-2 px-3 w-32 text-right">Đơn giá</th>
+                    <th className="py-2 px-3 w-28 text-right">Giảm giá</th>
+                    <th className="py-2 px-3 w-32 text-right">Giá bán</th>
+                    <th className="py-2 px-3 w-36 text-right">Thành tiền</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-slate-100 text-[13px]">
                   {order.items.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="py-4 text-center text-slate-400">
+                      <td colSpan={7} className="py-6 text-center text-[#677484] text-xs">
                         Hóa đơn không có dòng hàng.
                       </td>
                     </tr>
                   ) : (
                     order.items.map((it) => (
-                      <tr key={it.orderItemId}>
-                        <td className="px-4 py-2.5 text-[#0071BA]">{it.productCode}</td>
-                        <td className="px-4 py-2.5">
-                          {it.productName}
-                          {it.unitName ? <span className="text-slate-500"> ({it.unitName})</span> : null}
+                      <tr key={it.orderItemId} className="hover:bg-[#f7f8f9]">
+                        <td className="py-2.5 px-3 font-medium">
+                          <ProductCodeLink code={it.productCode} productId={it.productId} />
                         </td>
-                        <td className="px-4 py-2.5 text-right">{money.format(it.quantity)}</td>
-                        <td className="px-4 py-2.5 text-right">{money.format(it.originalPrice || it.unitPrice)}</td>
-                        <td className="px-4 py-2.5 text-right">{it.discountAmount > 0 ? money.format(it.discountAmount) : ''}</td>
-                        <td className="px-4 py-2.5 text-right">{money.format(it.unitPrice)}</td>
-                        <td className="px-4 py-2.5 text-right font-semibold">{money.format(it.lineTotal)}</td>
+                        <td className="py-2.5 px-3">
+                          {it.productName}
+                          {it.unitName ? <span className="text-[#677484]"> ({it.unitName})</span> : null}
+                        </td>
+                        <td className="py-2.5 px-3 text-right font-mono">{money.format(it.quantity)}</td>
+                        <td className="py-2.5 px-3 text-right font-mono">{money.format(it.originalPrice || it.unitPrice)}</td>
+                        <td className="py-2.5 px-3 text-right font-mono">{it.discountAmount > 0 ? money.format(it.discountAmount) : ''}</td>
+                        <td className="py-2.5 px-3 text-right font-mono">{money.format(it.unitPrice)}</td>
+                        <td className="py-2.5 px-3 text-right font-mono font-semibold">{money.format(it.lineTotal)}</td>
                       </tr>
                     ))
                   )}
@@ -343,33 +381,34 @@ export const KiotVietOrderDetail: React.FC<KiotVietOrderDetailProps> = ({
             {/* Ghi chú | Tổng kết */}
             <div className="grid grid-cols-1 gap-6 md:grid-cols-12">
               <textarea
-                rows={5}
+                rows={4}
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
+                disabled={isCancelled}
                 placeholder="Ghi chú..."
-                className="w-full resize-none rounded border border-slate-300 p-3 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 md:col-span-8"
+                className="w-full resize-none rounded-[8px] border border-slate-300 p-2.5 text-[13px] focus:outline-none focus:border-[#0070f4] placeholder:text-[#677484] disabled:bg-[#f7f8f9] md:col-span-7"
               />
-              <dl className="space-y-2.5 md:col-span-4">
+              <dl className="space-y-2 md:col-span-5 text-[13px]">
                 <div className="flex justify-between">
-                  <dt className="text-slate-600">Tổng tiền hàng ({money.format(totalQty)})</dt>
-                  <dd>{money.format(order.itemsTotalAmount || order.subTotal)}</dd>
+                  <dt className="text-[#677484]">Tổng tiền hàng ({money.format(totalQty)})</dt>
+                  <dd className="font-mono">{money.format(order.items.reduce((s, it) => s + (it.lineTotal || 0), 0))}</dd>
                 </div>
                 <div className="flex justify-between">
-                  <dt className="text-slate-600">Giảm giá hóa đơn</dt>
-                  <dd>{money.format(order.orderDiscountAmount || 0)}</dd>
+                  <dt className="text-[#677484]">Giảm giá hóa đơn</dt>
+                  <dd className="font-mono">{money.format(order.orderDiscountAmount || 0)}</dd>
                 </div>
                 <div className="flex justify-between">
-                  <dt className="text-slate-600">Khách cần trả</dt>
-                  <dd>{money.format(order.totalAmount)}</dd>
+                  <dt className="text-[#677484]">Khách cần trả</dt>
+                  <dd className="font-mono font-semibold">{money.format(order.totalAmount)}</dd>
                 </div>
-                <div className="flex justify-between font-semibold">
-                  <dt className="text-slate-700">Khách đã trả</dt>
-                  <dd>{money.format(order.paidAmount)}</dd>
+                <div className="flex justify-between">
+                  <dt className="text-[#677484]">Khách đã trả</dt>
+                  <dd className="font-mono font-semibold">{money.format(order.paidAmount)}</dd>
                 </div>
                 {order.outstandingAmount > 0 && (
-                  <div className="flex justify-between font-semibold text-rose-600">
+                  <div className="flex justify-between font-semibold text-[#fb2c36]">
                     <dt>Còn nợ</dt>
-                    <dd>{money.format(order.outstandingAmount)}</dd>
+                    <dd className="font-mono">{money.format(order.outstandingAmount)}</dd>
                   </div>
                 )}
               </dl>
@@ -377,64 +416,63 @@ export const KiotVietOrderDetail: React.FC<KiotVietOrderDetailProps> = ({
           </div>
 
           {/* Thanh thao tác */}
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 px-6 py-3">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 px-5 py-2.5">
             <div className="flex items-center gap-1">
-              <Button type="text" icon={<Trash2 size={15} />} disabled={isCancelled} onClick={() => setConfirmCancel(true)}>
-                Hủy
-              </Button>
-              <Button type="text" icon={<Copy size={15} />} onClick={handleCopy}>
-                Sao chép
-              </Button>
-              <Button type="text" icon={<FileOutput size={15} />} onClick={() => exportInvoiceDetailToXLSX(order)}>
-                Xuất file
-              </Button>
+              <button
+                type="button"
+                disabled={isCancelled}
+                onClick={() => setConfirmCancel(true)}
+                className={`${textBtnCls} !text-[#fb2c36] disabled:opacity-40 disabled:cursor-not-allowed`}
+              >
+                <Trash2 size={14} /> Hủy
+              </button>
+              <button type="button" onClick={handleCopy} className={textBtnCls}>
+                <Copy size={14} /> Sao chép
+              </button>
+              <button type="button" onClick={() => exportInvoiceDetailToXLSX(order)} className={textBtnCls}>
+                <FileDown size={14} /> Xuất file
+              </button>
             </div>
             <div className="flex items-center gap-2">
-              <Button
-                type="primary"
-                icon={<Pencil size={14} />}
-                disabled={isCancelled}
-                onClick={() => setIsEditing((v) => !v)}
-                className="!bg-[#0071BA] font-medium hover:!bg-[#005f9d]"
+              <button
+                type="button"
+                disabled={isCancelled || saving}
+                onClick={() => void handleSave()}
+                className={`${primaryBtnCls} disabled:opacity-50 disabled:cursor-not-allowed`}
               >
-                {isEditing ? 'Bỏ sửa' : 'Chỉnh sửa'}
-              </Button>
-              <Button icon={<Save size={14} />} loading={saving} disabled={isCancelled} onClick={handleSave}>
-                Lưu
-              </Button>
-              <Tooltip title="Chức năng trả hàng đang được phát triển">
-                <Button icon={<Undo2 size={14} />} disabled>
-                  Trả hàng
-                </Button>
-              </Tooltip>
-              <Button icon={<Printer size={14} />} onClick={handlePrint}>
-                In
-              </Button>
-              {onClose && <Button onClick={onClose}>Đóng</Button>}
+                {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Lưu
+              </button>
+              <button type="button" onClick={handlePrint} className={outlineBtnCls}>
+                <Printer size={14} /> In
+              </button>
+              {onClose && (
+                <button type="button" onClick={onClose} className={outlineBtnCls}>
+                  Đóng
+                </button>
+              )}
             </div>
           </div>
         </>
       )}
 
       {activeTab === 'PAYMENTS' && (
-        <div className="px-6 py-4">
-          <div className="overflow-x-auto rounded border border-slate-200">
-            <table className="w-full min-w-[760px] border-collapse text-left">
-              <thead>
-                <tr className="bg-[#f5f6f8] text-[12px] font-semibold text-slate-700">
-                  <th className="px-4 py-2.5">Mã phiếu</th>
-                  <th className="px-4 py-2.5">Thời gian</th>
-                  <th className="px-4 py-2.5">Người tạo</th>
-                  <th className="px-4 py-2.5 text-right">Giá trị phiếu</th>
-                  <th className="px-4 py-2.5">Phương thức</th>
-                  <th className="px-4 py-2.5">Trạng thái</th>
-                  <th className="px-4 py-2.5 text-right">Tiền thu/chi</th>
+        <div className="px-5 py-4">
+          <div className="rounded-[8px] border border-slate-200 overflow-hidden">
+            <table className="w-full text-left border-collapse">
+              <thead className="bg-[#f7f8f9] border-b border-slate-200 text-[12px] font-semibold text-[#677484]">
+                <tr>
+                  <th className="py-2 px-3 w-40">Mã phiếu</th>
+                  <th className="py-2 px-3 w-40">Thời gian</th>
+                  <th className="py-2 px-3">Người tạo</th>
+                  <th className="py-2 px-3 w-36">Phương thức</th>
+                  <th className="py-2 px-3 w-32">Trạng thái</th>
+                  <th className="py-2 px-3 w-36 text-right">Tiền thu</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-slate-100 text-[13px]">
                 {order.paymentTransactions.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="py-6 text-center text-slate-400">
+                    <td colSpan={6} className="py-6 text-center text-[#677484] text-xs">
                       Chưa có phiếu thanh toán nào cho hóa đơn này.
                     </td>
                   </tr>
@@ -442,18 +480,23 @@ export const KiotVietOrderDetail: React.FC<KiotVietOrderDetailProps> = ({
                   order.paymentTransactions.map((tx) => {
                     const cancelledTx = tx.status === 'CANCELLED';
                     return (
-                      <tr key={tx.txId}>
-                        <td className="px-4 py-2.5 text-[#0071BA]">{tx.txCode}</td>
-                        <td className="px-4 py-2.5">{formatDateTime(tx.transactionDate)}</td>
-                        <td className="px-4 py-2.5">{tx.createdByName || '—'}</td>
-                        <td className="px-4 py-2.5 text-right">{money.format(tx.amount)}</td>
-                        <td className="px-4 py-2.5">{paymentMethodLabel(tx.paymentMethod)}</td>
-                        <td className="px-4 py-2.5">
-                          <Tag color={cancelledTx ? 'error' : 'success'} className="!m-0">
+                      <tr key={tx.txId} className="hover:bg-[#f7f8f9]">
+                        <td className="py-2.5 px-3 font-medium text-[#0070f4]">{tx.txCode}</td>
+                        <td className="py-2.5 px-3 whitespace-nowrap">{formatDateTime(tx.transactionDate)}</td>
+                        <td className="py-2.5 px-3">{tx.createdByName || '—'}</td>
+                        <td className="py-2.5 px-3">{paymentMethodLabel(tx.paymentMethod)}</td>
+                        <td className="py-2.5 px-3">
+                          <span
+                            className={`px-2 py-0.5 rounded-full text-[11px] font-semibold border ${
+                              cancelledTx ? 'bg-[#fef2f2] text-[#fb2c36] border-[#fecaca]' : 'bg-[#e6f8ec] text-[#16a34a] border-[#bbf7d0]'
+                            }`}
+                          >
                             {cancelledTx ? 'Đã hủy' : 'Đã thanh toán'}
-                          </Tag>
+                          </span>
                         </td>
-                        <td className="px-4 py-2.5 text-right">{money.format(tx.amount)}</td>
+                        <td className={`py-2.5 px-3 text-right font-mono ${cancelledTx ? 'line-through text-[#677484]' : ''}`}>
+                          {money.format(tx.amount)}
+                        </td>
                       </tr>
                     );
                   })
@@ -467,6 +510,6 @@ export const KiotVietOrderDetail: React.FC<KiotVietOrderDetailProps> = ({
       {confirmCancel && (
         <CancelConfirmDialog orderCode={order.orderCode} busy={cancelling} onConfirm={handleCancel} onClose={() => setConfirmCancel(false)} />
       )}
-    </div>
+    </>
   );
 };
