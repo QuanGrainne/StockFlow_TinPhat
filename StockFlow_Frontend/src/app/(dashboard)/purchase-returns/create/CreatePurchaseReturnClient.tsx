@@ -685,7 +685,7 @@ export default function CreatePurchaseReturnClient() {
           </div>
 
           {rows.length > 0 && (
-            <div className="h-10 bg-[#f7f8f9] border-t border-slate-200 px-4 flex items-center justify-between text-xs text-[#677484] shrink-0">
+            <div className="min-h-10 bg-[#f7f8f9] border-t border-slate-200 px-3 sm:px-4 py-1.5 flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5 text-xs text-[#677484] shrink-0">
               <span>
                 Số mặt hàng trả: <strong className="text-[#15171a]">{activeRows.length}</strong>
                 <span className="ml-4">

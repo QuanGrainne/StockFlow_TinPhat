@@ -1,6 +1,7 @@
 // src/features/transfers/components/TransferFilterSidebar.tsx
 // Sidebar bộ lọc chuẩn giao diện KiotViet cho Màn hình 1 (Danh sách chuyển hàng)
 
+import { clampPopoverLeft, DATE_POPOVER_WIDTH, PRESET_POPOVER_WIDTH } from '@/lib/ui/popover';
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { WarehouseFacility } from '@/features/roles/types';
@@ -241,7 +242,7 @@ export const TransferFilterSidebar: React.FC<Props> = ({
       const arrowTop = Math.max(16, rect.top - top + rect.height / 2 - 8);
       setPresetCoords({
         top,
-        left: rect.right + 10,
+        left: clampPopoverLeft(rect.right + 10, PRESET_POPOVER_WIDTH),
         arrowTop,
       });
     }
@@ -279,7 +280,7 @@ export const TransferFilterSidebar: React.FC<Props> = ({
       const arrowTop = Math.max(16, rect.top - top + rect.height / 2 - 8);
       setCustomCoords({
         top,
-        left: rect.right + 10,
+        left: clampPopoverLeft(rect.right + 10, DATE_POPOVER_WIDTH),
         arrowTop,
       });
     }
@@ -818,7 +819,7 @@ export const TransferFilterSidebar: React.FC<Props> = ({
               left: customCoords.left,
               zIndex: 9999,
             }}
-            className="bg-white rounded-[8px] shadow-[rgba(169,180,203,0.32)_0px_8px_20px_0px] border border-slate-200 p-4 select-none animate-in fade-in zoom-in-95 duration-100 w-[580px]"
+            className="bg-white rounded-[8px] shadow-[rgba(169,180,203,0.32)_0px_8px_20px_0px] border border-slate-200 p-4 select-none animate-in fade-in zoom-in-95 duration-100 w-[580px] max-w-[calc(100vw-16px)] max-h-[calc(100vh-16px)] overflow-auto"
           >
             {/* Mũi tên chỉ sang nút trigger ở sidebar */}
             <div

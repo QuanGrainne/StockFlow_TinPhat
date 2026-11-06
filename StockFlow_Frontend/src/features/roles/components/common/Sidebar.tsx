@@ -82,10 +82,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const handleMouseEnter = (tabId: string) => {
+  // Menu con rộng 256px: tab nằm sát mép phải thì canh menu theo mép phải để không bị cắt khi màn hình hẹp
+  const [dropdownAlignRight, setDropdownAlignRight] = useState(false);
+  const DROPDOWN_WIDTH = 256;
+
+  const handleMouseEnter = (tabId: string, anchor?: HTMLElement | null) => {
     if (hoverTimeoutRef.current) {
       clearTimeout(hoverTimeoutRef.current);
       hoverTimeoutRef.current = null;
+    }
+    if (anchor && typeof window !== 'undefined') {
+      setDropdownAlignRight(anchor.getBoundingClientRect().left + DROPDOWN_WIDTH > window.innerWidth - 8);
     }
     setOpenDropdownId(tabId);
   };
@@ -1170,8 +1177,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   };
 
   return (
-    <div ref={containerRef} className="bg-white border-b border-slate-200 px-6 py-2 flex items-center justify-between gap-2 select-none relative z-30 overflow-visible">
-      <div className="flex items-center gap-1.5 overflow-visible">
+    <div ref={containerRef} className="bg-white border-b border-slate-200 px-3 sm:px-6 py-2 flex flex-wrap items-center justify-between gap-2 select-none relative z-30 overflow-visible">
+      <div className="flex flex-wrap items-center gap-1.5 overflow-visible min-w-0 flex-1">
         {visibleTabs.map((tab) => {
           const active = isTabActive(tab);
           const Icon = tab.icon;
@@ -1181,9 +1188,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <div
               key={tab.id}
               className="relative shrink-0 tab-dropdown-group group"
-              onMouseEnter={() => {
+              onMouseEnter={(e) => {
                 if (tab.hasDropdown && tab.dropdownItems && tab.dropdownItems.length > 0) {
-                  handleMouseEnter(tab.id);
+                  handleMouseEnter(tab.id, e.currentTarget);
                 }
               }}
               onMouseLeave={() => {
@@ -1194,12 +1201,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
             >
               <button
                 type="button"
-                onClick={() => {
+                onClick={(e) => {
                   if (tab.hasDropdown && tab.dropdownItems && tab.dropdownItems.length > 0) {
                     if (isOpen) {
                       setOpenDropdownId(null);
                     } else {
-                      setOpenDropdownId(tab.id);
+                      handleMouseEnter(tab.id, e.currentTarget.parentElement);
                     }
                   } else {
                     setOpenDropdownId(null);
@@ -1242,7 +1249,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <div
                 onMouseEnter={() => handleMouseEnter(tab.id)}
                 onMouseLeave={handleMouseLeave}
-                className={`tab-dropdown-menu absolute top-full left-0 pt-1.5 w-64 z-50 ${
+                className={`tab-dropdown-menu absolute top-full pt-1.5 w-64 max-w-[calc(100vw-1rem)] z-50 ${
+                  isOpen && dropdownAlignRight ? 'right-0' : 'left-0'
+                } ${
                   isOpen ? 'is-open' : ''
                 }`}
               >

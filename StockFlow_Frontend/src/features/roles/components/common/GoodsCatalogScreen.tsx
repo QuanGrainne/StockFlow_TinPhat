@@ -3148,9 +3148,9 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
       )}
 
       {/* 1. Header Toolbar Bar (Chuẩn thiết kế KiotViet giống Chuyển hàng) */}
-      <header className="h-12 bg-white border-b border-slate-200 px-4 flex items-center justify-between gap-3 shrink-0">
+      <header className="min-h-12 bg-white border-b border-slate-200 px-3 sm:px-4 py-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 shrink-0">
         {/* Left: Title & Search bar */}
-        <div className="flex items-center gap-4 flex-1 max-w-xl">
+        <div className="flex items-center gap-4 flex-1 basis-[320px] min-w-[260px] max-w-xl">
           <h1 className="text-[20px] font-bold text-[#15171a] leading-7 tracking-tight whitespace-nowrap">
             Hàng hóa
           </h1>
@@ -3244,7 +3244,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
         </div>
 
         {/* Right: Actions */}
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {canManageMaster && (
             <button
               type="button"

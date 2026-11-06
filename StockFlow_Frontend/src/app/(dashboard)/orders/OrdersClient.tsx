@@ -336,9 +336,9 @@ export default function OrdersClient({ onNavigate }: OrdersClientProps) {
   const warehouseOptions = warehouses.map((w) => ({ value: w.warehouseId, label: w.name }));
 
   return (
-    <div className="flex h-full min-h-[calc(100vh-56px)] gap-4 bg-[#f0f2f5] p-4 text-[#262626]">
-      {/* ─── CỘT TRÁI: BỘ LỌC ─── */}
-      <aside className="hidden w-[260px] shrink-0 flex-col gap-3 lg:flex">
+    <div className="flex h-full min-h-[calc(100vh-56px)] flex-col gap-4 bg-[#f0f2f5] p-3 text-[#262626] sm:p-4 md:flex-row">
+      {/* ─── CỘT TRÁI: BỘ LỌC (màn hẹp: xếp lên trên bảng, không ẩn) ─── */}
+      <aside className="flex w-full shrink-0 flex-col gap-3 md:w-[260px]">
         <h1 className="px-1 text-[20px] font-bold tracking-tight text-slate-900">Hóa đơn</h1>
 
         <FilterCard title="Chi nhánh">

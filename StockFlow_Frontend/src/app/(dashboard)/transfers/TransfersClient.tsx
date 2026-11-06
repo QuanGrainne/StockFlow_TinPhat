@@ -169,9 +169,9 @@ export default function TransfersClient() {
   return (
     <div className="flex-1 h-full min-h-0 flex flex-col bg-[#f5f5f5] overflow-hidden select-none text-[13px] text-[#15171a] font-sans">
       {/* 1. Header Toolbar Bar (Theo đúng thiết kế KiotViet) */}
-      <header className="h-12 bg-white border-b border-slate-200 px-4 flex items-center justify-between gap-3 shrink-0">
+      <header className="min-h-12 bg-white border-b border-slate-200 px-3 sm:px-4 py-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 shrink-0">
         {/* Left: Title & Search bar */}
-        <div className="flex items-center gap-4 flex-1 max-w-xl">
+        <div className="flex items-center gap-4 flex-1 basis-[320px] min-w-[260px] max-w-xl">
           <h1 className="text-[20px] font-bold text-[#15171a] leading-7 tracking-tight whitespace-nowrap">
             Chuyển hàng
           </h1>
@@ -199,7 +199,7 @@ export default function TransfersClient() {
         </div>
 
         {/* Right: Actions */}
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {/* Nút + Chuyển hàng */}
           <Link
             href="/transfers/create"
@@ -446,7 +446,7 @@ export default function TransfersClient() {
           </div>
 
           {/* Footer Bar */}
-          <footer className="h-10 bg-white border-t border-slate-200 px-4 flex items-center justify-between text-[12px] text-[#677484] shrink-0">
+          <footer className="min-h-10 bg-white border-t border-slate-200 px-3 sm:px-4 py-1.5 flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5 text-[12px] text-[#677484] shrink-0">
             <div>
               Hiển thị <strong className="text-[#15171a] font-bold">{transfers.length}</strong> trên{' '}
               <strong className="text-[#15171a] font-bold">{transfers.length}</strong> giao dịch

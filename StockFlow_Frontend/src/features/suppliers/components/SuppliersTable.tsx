@@ -248,7 +248,7 @@ export default function SuppliersTable({
       </div>
 
       {/* Footer Bar */}
-      <footer className="h-10 bg-white border-t border-slate-200 px-4 flex items-center justify-between text-[12px] text-[#677484] shrink-0">
+      <footer className="min-h-10 bg-white border-t border-slate-200 px-3 sm:px-4 py-1.5 flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5 text-[12px] text-[#677484] shrink-0">
         <div className="flex items-center gap-3">
           <span>
             Hiển thị <strong className="text-[#15171a] font-bold">{rangeStart}</strong>

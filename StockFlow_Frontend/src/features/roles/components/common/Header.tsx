@@ -493,9 +493,9 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   return (
-    <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-6 sticky top-0 z-40 select-none">
+    <header className="min-h-16 bg-white border-b border-slate-200 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-3 sm:px-6 py-2 sticky top-0 z-40 select-none">
       {/* Left: Logo & Role Badge */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 min-w-0">
         <div className="w-9 h-9 rounded-[8px] bg-[#1E56A0] text-white flex items-center justify-center font-bold text-sm tracking-tight shadow-xs">
           SF
         </div>
@@ -513,7 +513,7 @@ export const Header: React.FC<HeaderProps> = ({
       </div>
 
       {/* Right: Branch Selector (Khớp Ảnh 1 KiotViet) & User Profile */}
-      <div className="flex items-center gap-3 relative">
+      <div className="flex flex-wrap items-center gap-3 relative ml-auto">
         {/* Bộ chọn Chi Nhánh Kho theo Phân Quyền (Data Isolation) */}
         {permittedFacilities.length === 0 ? (
           <div
@@ -580,7 +580,7 @@ export const Header: React.FC<HeaderProps> = ({
             {branchDropdownOpen && (
               <>
                 <div className="fixed inset-0 z-40" onClick={() => setBranchDropdownOpen(false)} />
-                <div className="absolute right-0 top-11 w-80 bg-white text-slate-800 rounded-2xl shadow-2xl border border-slate-200/90 p-3 z-50 animate-in fade-in zoom-in-95 duration-150">
+                <div className="absolute right-0 top-11 w-80 max-w-[calc(100vw-1.5rem)] bg-white text-slate-800 rounded-2xl shadow-2xl border border-slate-200/90 p-3 z-50 animate-in fade-in zoom-in-95 duration-150">
                   <div className="px-2 pb-2 text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center justify-between border-b border-slate-100">
                     <span>Chi nhánh kho làm việc</span>
                     <span className="text-[10px] text-blue-600 font-semibold bg-blue-50 px-2 py-0.5 rounded-full">
@@ -687,7 +687,7 @@ export const Header: React.FC<HeaderProps> = ({
         {roleDropdownOpen && (
           <>
             <div className="fixed inset-0 z-40" onClick={() => setRoleDropdownOpen(false)} />
-            <div className="absolute right-0 top-14 w-84 bg-white text-slate-800 rounded-2xl shadow-2xl border border-slate-100 p-3 z-50 animate-in fade-in zoom-in-95 duration-150">
+            <div className="absolute right-0 top-14 w-84 max-w-[calc(100vw-1.5rem)] bg-white text-slate-800 rounded-2xl shadow-2xl border border-slate-100 p-3 z-50 animate-in fade-in zoom-in-95 duration-150">
               {/* Header profile inside dropdown */}
               <div className="flex items-center gap-3 p-2 border-b border-slate-100 pb-3">
                 {currentUser.avatar ? (
