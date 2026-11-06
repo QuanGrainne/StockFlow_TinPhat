@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using StockFlow.Application.Common;
 using StockFlow.Application.Common.Interfaces;
 using StockFlow.Application.Features.Purchases.DTOs;
+using StockFlow.Application.Features.PurchaseOrders.Helpers;
 using StockFlow.Application.Features.PurchaseReturns.Helpers;
 using StockFlow.Application.Features.Purchases.Helpers;
 
@@ -118,6 +119,7 @@ public class CancelPurchaseCommandHandler : IRequestHandler<CancelPurchaseComman
             }
 
             await _context.SaveChangesAsync(cancellationToken);
+            await PurchaseOrderHelper.RecalculateStatusAsync(_context, receipt.PurchaseOrderId, cancellationToken);
             if (transaction != null) await transaction.CommitAsync(cancellationToken);
 
             return Result.Success(true);

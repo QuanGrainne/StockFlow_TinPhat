@@ -336,8 +336,8 @@ public static class PurchaseReturnLogic
             .AsNoTracking()
             .Include(t => t.CreatedByNavigation)
             .Where(t => t.TxType == RefundTxType && t.ReferenceType == ReferenceType && t.ReferenceId == ret.PurchaseReturnId)
-            .OrderBy(t => t.TransactionDate)
-            .ThenBy(t => t.TxId)
+            .OrderByDescending(t => t.TransactionDate) // phiếu mới nhất lên đầu
+            .ThenByDescending(t => t.TxId)
             .ToListAsync(ct);
         var code = ret.ReturnCode ?? $"THN{ret.PurchaseReturnId:D6}";
         return txs.Select(t => new PurchaseReturnPaymentDto(

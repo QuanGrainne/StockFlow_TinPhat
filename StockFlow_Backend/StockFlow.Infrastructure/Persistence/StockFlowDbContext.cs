@@ -69,6 +69,10 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
 
     public virtual DbSet<TrxGoodsReceipt> TrxGoodsReceipts { get; set; }
 
+    public virtual DbSet<TrxPurchaseOrder> TrxPurchaseOrders { get; set; }
+
+    public virtual DbSet<DtlPurchaseOrderItem> DtlPurchaseOrderItems { get; set; }
+
     public virtual DbSet<TrxPurchaseReturn> TrxPurchaseReturns { get; set; }
 
     public virtual DbSet<DtlPurchaseReturnItem> DtlPurchaseReturnItems { get; set; }
@@ -1131,6 +1135,13 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
                 .HasPrecision(18, 2)
                 .HasColumnName("discount_amount");
 
+            entity.Property(e => e.PurchaseOrderId).HasColumnName("purchase_order_id");
+
+            entity.HasOne(d => d.PurchaseOrder).WithMany(p => p.TrxGoodsReceipts)
+                .HasForeignKey(d => d.PurchaseOrderId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("fk_trx_goods_receipts_purchase_order_id");
+
             entity.HasOne(d => d.Partner).WithMany(p => p.TrxGoodsReceipts)
                 .HasForeignKey(d => d.PartnerId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
@@ -1145,6 +1156,93 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
                 .HasForeignKey(d => d.WarehouseId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("fk_trx_goods_receipts_warehouse_id");
+        });
+
+        modelBuilder.Entity<TrxPurchaseOrder>(entity =>
+        {
+            entity.HasKey(e => e.PoId).HasName("trx_purchase_orders_pkey");
+
+            entity.ToTable("trx_purchase_orders", "stockflow");
+
+            entity.HasIndex(e => e.PoCode, "uq_trx_purchase_orders_code").IsUnique();
+
+            entity.Property(e => e.PoId).HasColumnName("po_id");
+            entity.Property(e => e.PoCode)
+                .HasMaxLength(30)
+                .HasColumnName("po_code");
+            entity.Property(e => e.PartnerId).HasColumnName("partner_id");
+            entity.Property(e => e.WarehouseId).HasColumnName("warehouse_id");
+            entity.Property(e => e.Status)
+                .HasMaxLength(20)
+                .HasColumnName("status");
+            entity.Property(e => e.OrderDate)
+                .HasColumnType("timestamp without time zone")
+                .HasColumnName("order_date");
+            entity.Property(e => e.DiscountAmount)
+                .HasPrecision(18, 2)
+                .HasColumnName("discount_amount");
+            entity.Property(e => e.TotalAmount)
+                .HasPrecision(18, 2)
+                .HasColumnName("total_amount");
+            entity.Property(e => e.Notes)
+                .HasMaxLength(500)
+                .HasColumnName("notes");
+            entity.Property(e => e.CreatedBy).HasColumnName("created_by");
+            entity.Property(e => e.UpdatedAt)
+                .HasColumnType("timestamp without time zone")
+                .HasColumnName("updated_at");
+            entity.Property(e => e.UpdatedBy).HasColumnName("updated_by");
+            entity.Property(e => e.MergedIntoPoId).HasColumnName("merged_into_po_id");
+
+            entity.HasOne(d => d.MergedIntoPo).WithMany(p => p.MergedFromPos)
+                .HasForeignKey(d => d.MergedIntoPoId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("fk_trx_purchase_orders_merged_into_po_id");
+
+            entity.HasOne(d => d.Partner).WithMany()
+                .HasForeignKey(d => d.PartnerId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("fk_trx_purchase_orders_partner_id");
+
+            entity.HasOne(d => d.Warehouse).WithMany()
+                .HasForeignKey(d => d.WarehouseId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("fk_trx_purchase_orders_warehouse_id");
+
+            entity.HasOne(d => d.CreatedByNavigation).WithMany()
+                .HasForeignKey(d => d.CreatedBy)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("fk_trx_purchase_orders_created_by");
+        });
+
+        modelBuilder.Entity<DtlPurchaseOrderItem>(entity =>
+        {
+            entity.HasKey(e => e.PoItemId).HasName("dtl_purchase_order_items_pkey");
+
+            entity.ToTable("dtl_purchase_order_items", "stockflow");
+
+            entity.Property(e => e.PoItemId).HasColumnName("po_item_id");
+            entity.Property(e => e.PoId).HasColumnName("po_id");
+            entity.Property(e => e.ProductId).HasColumnName("product_id");
+            entity.Property(e => e.OrderedQty)
+                .HasPrecision(18, 2)
+                .HasColumnName("ordered_qty");
+            entity.Property(e => e.UnitPrice)
+                .HasPrecision(18, 4)
+                .HasColumnName("unit_price");
+            entity.Property(e => e.DiscountPercent)
+                .HasPrecision(9, 4)
+                .HasColumnName("discount_percent");
+
+            entity.HasOne(d => d.Po).WithMany(p => p.DtlPurchaseOrderItems)
+                .HasForeignKey(d => d.PoId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("fk_dtl_purchase_order_items_po_id");
+
+            entity.HasOne(d => d.Product).WithMany()
+                .HasForeignKey(d => d.ProductId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("fk_dtl_purchase_order_items_product_id");
         });
 
         modelBuilder.Entity<TrxInboundCost>(entity =>

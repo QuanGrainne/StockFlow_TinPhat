@@ -8,6 +8,7 @@ import SuppliersClient from '@/app/(dashboard)/suppliers/SuppliersClient';
 import CustomersClient from '@/app/(dashboard)/customers/CustomersClient';
 import PurchasesClient from '@/app/(dashboard)/purchases/PurchasesClient';
 import PurchaseReturnsClient from '@/app/(dashboard)/purchase-returns/PurchaseReturnsClient';
+import PurchaseOrdersClient from '@/app/(dashboard)/purchase-orders/PurchaseOrdersClient';
 import PriceBooksClient from '@/features/price-books/screens/PriceBooksClient';
 import TransfersClient from '@/app/(dashboard)/transfers/TransfersClient';
 import StocktakesClient from '@/app/(dashboard)/stocktakes/StocktakesClient';
@@ -56,6 +57,7 @@ const SCREEN_MODULE_MAP: Record<string, string> = {
   'manager-purchases': 'PURCHASE',
   'warehouse-purchases': 'PURCHASE',
   'purchase-returns': 'PURCHASE',
+  'purchase-orders': 'PURCHASE',
   'suppliers': 'PARTNER',
   'admin-suppliers': 'PARTNER',
   'manager-suppliers': 'PARTNER',
@@ -78,6 +80,7 @@ const SCREEN_FEATURE_MAP: Record<string, string> = {
   'manager-purchases': 'feat-purchase',
   'warehouse-purchases': 'feat-purchase',
   'purchase-returns': 'feat-purchase',
+  'purchase-orders': 'feat-purchase',
   'warehouse-inbound': 'feat-purchase',
   'manager-landed-cost': 'feat-purchase',
   'transfers': 'feat-transfers',
@@ -175,6 +178,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ initialScreen, children })
   // Trước đây khởi tạo 'SALES' rồi mới cập nhật trong effect, khiến lần kiểm tra quyền đầu tiên chạy
   // với vai trò SALES và đẩy màn hình (VD: Chuyển hàng) về trang mặc định.
   const [currentRole, setCurrentRole] = useState<UserRole>(() => getStoredRole());
+  const [purchaseOrdersKey, setPurchaseOrdersKey] = useState(0);
   const [activeScreen, setActiveScreen] = useState<string>(
     () => initialScreen || getStoredScreen(getStoredRole())
   );
@@ -254,6 +258,8 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ initialScreen, children })
   }, [currentRole, activeScreen]);
 
   const handleNavigate = (newScreen: string) => {
+    // Bấm lại menu Đặt hàng nhập: về danh sách mặc định (xóa từ khóa / bộ lọc đang giữ)
+    if (newScreen === 'purchase-orders') setPurchaseOrdersKey((k) => k + 1);
     if (newScreen === 'pos' || newScreen === '/pos') { router.push('/pos'); return; }
     if (newScreen === 'orders' || newScreen === '/orders' || newScreen === 'sales-orders-management') {
       setActiveScreen('orders');
@@ -284,6 +290,8 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ initialScreen, children })
         window.history.pushState(null, '', '/suppliers');
       } else if (newScreen === 'purchases' || newScreen === '/purchases') {
         window.history.pushState(null, '', '/purchases');
+      } else if (newScreen === 'purchase-orders' || newScreen === '/purchase-orders') {
+        window.history.pushState(null, '', '/purchase-orders');
       } else if (newScreen === 'purchase-returns' || newScreen === '/purchase-returns') {
         window.history.pushState(null, '', '/purchase-returns');
       } else if (newScreen === 'goods-catalog' || newScreen === 'products' || newScreen === '/products') {
@@ -293,7 +301,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ initialScreen, children })
 
       } else if (newScreen === 'stocktakes' || newScreen === '/stocktakes') {
         window.history.pushState(null, '', '/stocktakes');
-      } else if (window.location.pathname.includes('/stocktakes') || window.location.pathname.includes('/suppliers') || window.location.pathname.includes('/purchases') || window.location.pathname.includes('/purchase-returns') || window.location.pathname.includes('/products') || window.location.pathname.includes('/transfers') || window.location.pathname.includes('/customers')) {
+      } else if (window.location.pathname.includes('/stocktakes') || window.location.pathname.includes('/suppliers') || window.location.pathname.includes('/purchases') || window.location.pathname.includes('/purchase-returns') || window.location.pathname.includes('/purchase-orders') || window.location.pathname.includes('/products') || window.location.pathname.includes('/transfers') || window.location.pathname.includes('/customers')) {
         window.history.pushState(null, '', '/dashboard');
       }
     }
@@ -454,6 +462,9 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ initialScreen, children })
       case 'purchase-returns':
         return <PurchaseReturnsClient />;
 
+      case 'purchase-orders':
+        return <PurchaseOrdersClient key={purchaseOrdersKey} onNavigate={handleNavigate} />;
+
       case 'goods-catalog':
       case 'admin-goods':
       case 'manager-goods':
@@ -517,6 +528,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ initialScreen, children })
         activeScreen === 'warehouse-transfer' ||
         activeScreen === 'purchases' || activeScreen.includes('purchases') ||
         activeScreen === 'purchase-returns' ||
+        activeScreen === 'purchase-orders' ||
         activeScreen === 'suppliers' || activeScreen.includes('suppliers') ||
         activeScreen === 'customers' || activeScreen.includes('customers') ||
         activeScreen === 'goods-catalog' || activeScreen === 'products' ||

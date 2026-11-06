@@ -2,6 +2,7 @@
 
 import { Suspense } from 'react';
 import dynamic from 'next/dynamic';
+import { useRouter } from 'next/navigation';
 
 const CreateStocktakeClient = dynamic(() => import('./CreateStocktakeClient'), {
   ssr: false,
@@ -13,9 +14,11 @@ const CreateStocktakeClient = dynamic(() => import('./CreateStocktakeClient'), {
 });
 
 export default function CreateStocktakePage() {
+  // cacheComponents giữ state trang khi rời đi (Activity) → key theo bfcacheId để mỗi lần vào là form mới
+  const { bfcacheId } = useRouter();
   return (
     <Suspense fallback={null}>
-      <CreateStocktakeClient />
+      <CreateStocktakeClient key={bfcacheId} />
     </Suspense>
   );
 }

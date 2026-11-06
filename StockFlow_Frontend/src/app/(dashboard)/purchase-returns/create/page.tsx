@@ -1,6 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
+import { useRouter } from 'next/navigation';
 
 const CreatePurchaseReturnClient = dynamic(() => import('./CreatePurchaseReturnClient'), {
   ssr: false,
@@ -12,5 +13,7 @@ const CreatePurchaseReturnClient = dynamic(() => import('./CreatePurchaseReturnC
 });
 
 export default function CreatePurchaseReturnPage() {
-  return <CreatePurchaseReturnClient />;
+  // cacheComponents giữ state trang khi rời đi (Activity) → key theo bfcacheId để mỗi lần vào là form mới
+  const { bfcacheId } = useRouter();
+  return <CreatePurchaseReturnClient key={bfcacheId} />;
 }

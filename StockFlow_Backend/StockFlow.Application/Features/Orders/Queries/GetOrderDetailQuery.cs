@@ -178,7 +178,8 @@ public class GetOrderDetailQueryHandler : IRequestHandler<GetOrderDetailQuery, R
         }
 
         // Mapped Payment Transactions
-        var paymentTxsDto = financialTxs.Select(ft => new OrderPaymentTransactionDto
+        // Lịch sử thanh toán: phiếu mới nhất lên đầu
+        var paymentTxsDto = financialTxs.OrderByDescending(ft => ft.TransactionDate).ThenByDescending(ft => ft.TxId).Select(ft => new OrderPaymentTransactionDto
         {
             TxId = ft.TxId,
             TxCode = ft.TxCode ?? $"TT{order.OrderCode}",
