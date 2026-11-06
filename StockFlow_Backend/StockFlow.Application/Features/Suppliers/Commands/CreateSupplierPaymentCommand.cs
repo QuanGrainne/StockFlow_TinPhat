@@ -13,7 +13,8 @@ namespace StockFlow.Application.Features.Suppliers.Commands;
 /// <summary>
 /// Tạo phiếu chi thanh toán nợ cho nhà cung cấp (mã PC000001...).
 /// Số tiền được phân bổ vào các phiếu nhập còn nợ (mỗi phần phân bổ là 1 dòng giao dịch cùng mã phiếu chi);
-/// phần chưa phân bổ vẫn ghi nhận vào phiếu chi và trừ vào tổng nợ NCC.
+/// tiền chưa phân bổ tự trừ tiếp vào các phiếu còn nợ (cũ nhất trước) để nợ NCC luôn khớp nợ các phiếu,
+/// chỉ phần vượt quá tổng nợ các phiếu mới là dòng không gắn phiếu.
 /// </summary>
 public record CreateSupplierPaymentCommand(int PartnerId, CreateSupplierPaymentRequest Request)
     : IRequest<Result<SupplierPaymentResultDto>>;
@@ -127,6 +128,38 @@ public class CreateSupplierPaymentCommandHandler
                         $"Tiền trả cho phiếu {receipt.GrCode} ({Money(alloc.Amount)}) vượt quá số còn cần trả ({Money(remaining)}).");
                 }
             }
+        }
+
+        // ── Tiền chưa phân bổ: tự trừ tiếp vào các phiếu nhập còn nợ (cũ nhất trước) ──
+        var leftover = amount - allocatedTotal;
+        if (leftover > 0)
+        {
+            var openReceipts = await _context.TrxGoodsReceipts
+                .AsNoTracking()
+                .Include(r => r.DtlGoodsReceiptItems)
+                .Where(r => r.PartnerId == partner.PartnerId && r.Status == "COMPLETED")
+                .OrderBy(r => r.ReceivedDate).ThenBy(r => r.GrId)
+                .ToListAsync(cancellationToken);
+            var openIds = openReceipts.Select(r => r.GrId).ToList();
+            var paidByReceipt = await StockFlow.Application.Features.PurchaseReturns.Helpers.ReturnOffsetCalculator
+                .PaidByReceiptAsync(_context, openIds, cancellationToken);
+            var offsets = await StockFlow.Application.Features.PurchaseReturns.Helpers.ReturnOffsetCalculator
+                .ComputeForReceiptsAsync(_context, openIds, cancellationToken);
+
+            foreach (var receipt in openReceipts)
+            {
+                if (leftover <= 0) break;
+                var remaining = Math.Max(0, SupplierDebtCalculator.ReceiptDebt(receipt, paidByReceipt)
+                                            - offsets.OffsetByReceipt.GetValueOrDefault(receipt.GrId));
+                var idx = allocations.FindIndex(a => a.ReceiptId == receipt.GrId);
+                var room = remaining - (idx >= 0 ? allocations[idx].Amount : 0);
+                if (room <= 0) continue;
+                var take = Math.Min(room, leftover);
+                if (idx >= 0) allocations[idx] = new { ReceiptId = receipt.GrId, Amount = allocations[idx].Amount + take };
+                else allocations.Add(new { ReceiptId = receipt.GrId, Amount = take });
+                leftover -= take;
+            }
+            allocatedTotal = allocations.Sum(a => a.Amount);
         }
 
         var dbContext = _context as DbContext;

@@ -8,6 +8,7 @@ using Microsoft.EntityFrameworkCore;
 using StockFlow.Application.Common;
 using StockFlow.Application.Common.Interfaces;
 using StockFlow.Application.Features.Purchases.DTOs;
+using StockFlow.Application.Features.PurchaseOrders.Helpers;
 using StockFlow.Application.Features.Purchases.Helpers;
 using StockFlow.Domain.Entities;
 
@@ -85,6 +86,26 @@ public class CreatePurchaseCommandHandler : IRequestHandler<CreatePurchaseComman
             return Result.Failure<PurchaseDetailDto>($"Không tìm thấy nhà cung cấp ID #{req.PartnerId}.");
         }
 
+        // Nhập hàng theo phiếu đặt hàng nhập: phải đúng NCC, đúng kho và phiếu còn đang chờ nhập
+        TrxPurchaseOrder? purchaseOrder = null;
+        if (req.PurchaseOrderId is > 0)
+        {
+            purchaseOrder = await _context.TrxPurchaseOrders
+                .FirstOrDefaultAsync(p => p.PoId == req.PurchaseOrderId.Value, cancellationToken);
+            if (purchaseOrder == null)
+            {
+                return Result.Failure<PurchaseDetailDto>("Không tìm thấy phiếu đặt hàng nhập.");
+            }
+            if (purchaseOrder.Status != PurchaseOrderHelper.Ordered && purchaseOrder.Status != PurchaseOrderHelper.Partial)
+            {
+                return Result.Failure<PurchaseDetailDto>($"Phiếu đặt hàng nhập {purchaseOrder.PoCode} không ở trạng thái chờ nhập hàng.");
+            }
+            if (purchaseOrder.PartnerId != partner.PartnerId || purchaseOrder.WarehouseId != warehouseId)
+            {
+                return Result.Failure<PurchaseDetailDto>($"Nhà cung cấp và kho nhập phải trùng với phiếu đặt hàng nhập {purchaseOrder.PoCode}.");
+            }
+        }
+
         // 4. Kiểm tra các sản phẩm
         var productIds = req.Items.Select(i => i.ProductId).Distinct().ToList();
         var products = await _context.MstProducts
@@ -134,7 +155,8 @@ public class CreatePurchaseCommandHandler : IRequestHandler<CreatePurchaseComman
             var goodsReceipt = new TrxGoodsReceipt
             {
                 GrCode = grCode,
-                ExternalPoNumber = req.ExternalPoNumber?.Trim(),
+                ExternalPoNumber = purchaseOrder?.PoCode ?? req.ExternalPoNumber?.Trim(),
+                PurchaseOrderId = purchaseOrder?.PoId,
                 PartnerId = partner.PartnerId,
                 WarehouseId = warehouse.WarehouseId,
                 ReceivedBy = currentUserId,
@@ -288,6 +310,11 @@ public class CreatePurchaseCommandHandler : IRequestHandler<CreatePurchaseComman
 
                 // Lưu các thay đổi về tồn kho, thẻ kho và giao dịch tài chính
                 await _context.SaveChangesAsync(cancellationToken);
+            }
+
+            if (status == "COMPLETED")
+            {
+                await PurchaseOrderHelper.RecalculateStatusAsync(_context, goodsReceipt.PurchaseOrderId, cancellationToken);
             }
 
             if (transaction != null)

@@ -1125,7 +1125,12 @@ export default function PurchasesClient({ onNavigate }: { onNavigate?: (screen: 
                                           {statusTag(record.status)}
                                           {record.externalPoNumber && (
                                             <span className="text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-600 font-mono">
-                                              PO: {record.externalPoNumber}
+                                              PO:{' '}
+                                              {/^PDN\d+$/.test(record.externalPoNumber) ? (
+                                                <DocumentCodeLink kind="purchase-order" code={record.externalPoNumber} />
+                                              ) : (
+                                                record.externalPoNumber
+                                              )}
                                             </span>
                                           )}
                                         </div>

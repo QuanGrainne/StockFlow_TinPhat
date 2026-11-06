@@ -109,7 +109,8 @@ public record CreatePurchaseRequest(
     string? Notes,
     List<CreatePurchaseItemRequest> Items,
     string? PurchaseCode = null,
-    decimal DiscountAmount = 0 // Giảm giá toàn phiếu (VND)
+    decimal DiscountAmount = 0, // Giảm giá toàn phiếu (VND)
+    int? PurchaseOrderId = null // Nhập hàng theo phiếu đặt hàng nhập
 );
 
 public record UpdatePurchaseRequest(

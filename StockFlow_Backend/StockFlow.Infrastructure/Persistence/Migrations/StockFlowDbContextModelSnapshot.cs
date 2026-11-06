@@ -355,6 +355,48 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                     b.ToTable("dtl_price_book_items", "stockflow");
                 });
 
+            modelBuilder.Entity("StockFlow.Domain.Entities.DtlPurchaseOrderItem", b =>
+                {
+                    b.Property<int>("PoItemId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("po_item_id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("PoItemId"));
+
+                    b.Property<decimal>("DiscountPercent")
+                        .HasPrecision(9, 4)
+                        .HasColumnType("numeric(9,4)")
+                        .HasColumnName("discount_percent");
+
+                    b.Property<decimal>("OrderedQty")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("ordered_qty");
+
+                    b.Property<int>("PoId")
+                        .HasColumnType("integer")
+                        .HasColumnName("po_id");
+
+                    b.Property<int>("ProductId")
+                        .HasColumnType("integer")
+                        .HasColumnName("product_id");
+
+                    b.Property<decimal>("UnitPrice")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("unit_price");
+
+                    b.HasKey("PoItemId")
+                        .HasName("dtl_purchase_order_items_pkey");
+
+                    b.HasIndex("PoId");
+
+                    b.HasIndex("ProductId");
+
+                    b.ToTable("dtl_purchase_order_items", "stockflow");
+                });
+
             modelBuilder.Entity("StockFlow.Domain.Entities.DtlPurchaseReturnItem", b =>
                 {
                     b.Property<int>("PrItemId")
@@ -1813,6 +1855,10 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("partner_id");
 
+                    b.Property<int?>("PurchaseOrderId")
+                        .HasColumnType("integer")
+                        .HasColumnName("purchase_order_id");
+
                     b.Property<int>("ReceivedBy")
                         .HasColumnType("integer")
                         .HasColumnName("received_by");
@@ -1834,6 +1880,8 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                         .HasName("trx_goods_receipts_pkey");
 
                     b.HasIndex("PartnerId");
+
+                    b.HasIndex("PurchaseOrderId");
 
                     b.HasIndex("ReceivedBy");
 
@@ -2368,6 +2416,85 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                     b.HasIndex("ReportedBy");
 
                     b.ToTable("trx_production_reports", "stockflow");
+                });
+
+            modelBuilder.Entity("StockFlow.Domain.Entities.TrxPurchaseOrder", b =>
+                {
+                    b.Property<int>("PoId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("po_id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("PoId"));
+
+                    b.Property<int>("CreatedBy")
+                        .HasColumnType("integer")
+                        .HasColumnName("created_by");
+
+                    b.Property<decimal>("DiscountAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("discount_amount");
+
+                    b.Property<int?>("MergedIntoPoId")
+                        .HasColumnType("integer")
+                        .HasColumnName("merged_into_po_id");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("notes");
+
+                    b.Property<DateTime?>("OrderDate")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("order_date");
+
+                    b.Property<int>("PartnerId")
+                        .HasColumnType("integer")
+                        .HasColumnName("partner_id");
+
+                    b.Property<string>("PoCode")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("po_code");
+
+                    b.Property<string>("Status")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.Property<decimal>("TotalAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("total_amount");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<int?>("UpdatedBy")
+                        .HasColumnType("integer")
+                        .HasColumnName("updated_by");
+
+                    b.Property<int>("WarehouseId")
+                        .HasColumnType("integer")
+                        .HasColumnName("warehouse_id");
+
+                    b.HasKey("PoId")
+                        .HasName("trx_purchase_orders_pkey");
+
+                    b.HasIndex("CreatedBy");
+
+                    b.HasIndex("MergedIntoPoId");
+
+                    b.HasIndex("PartnerId");
+
+                    b.HasIndex("WarehouseId");
+
+                    b.HasIndex(new[] { "PoCode" }, "uq_trx_purchase_orders_code")
+                        .IsUnique();
+
+                    b.ToTable("trx_purchase_orders", "stockflow");
                 });
 
             modelBuilder.Entity("StockFlow.Domain.Entities.TrxPurchaseReturn", b =>
@@ -2938,6 +3065,26 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                     b.Navigation("Product");
                 });
 
+            modelBuilder.Entity("StockFlow.Domain.Entities.DtlPurchaseOrderItem", b =>
+                {
+                    b.HasOne("StockFlow.Domain.Entities.TrxPurchaseOrder", "Po")
+                        .WithMany("DtlPurchaseOrderItems")
+                        .HasForeignKey("PoId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_dtl_purchase_order_items_po_id");
+
+                    b.HasOne("StockFlow.Domain.Entities.MstProduct", "Product")
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .IsRequired()
+                        .HasConstraintName("fk_dtl_purchase_order_items_product_id");
+
+                    b.Navigation("Po");
+
+                    b.Navigation("Product");
+                });
+
             modelBuilder.Entity("StockFlow.Domain.Entities.DtlPurchaseReturnItem", b =>
                 {
                     b.HasOne("StockFlow.Domain.Entities.DtlGoodsReceiptItem", "GrItem")
@@ -3376,6 +3523,11 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasConstraintName("fk_trx_goods_receipts_partner_id");
 
+                    b.HasOne("StockFlow.Domain.Entities.TrxPurchaseOrder", "PurchaseOrder")
+                        .WithMany("TrxGoodsReceipts")
+                        .HasForeignKey("PurchaseOrderId")
+                        .HasConstraintName("fk_trx_goods_receipts_purchase_order_id");
+
                     b.HasOne("StockFlow.Domain.Entities.SecUser", "ReceivedByNavigation")
                         .WithMany("TrxGoodsReceipts")
                         .HasForeignKey("ReceivedBy")
@@ -3389,6 +3541,8 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_trx_goods_receipts_warehouse_id");
 
                     b.Navigation("Partner");
+
+                    b.Navigation("PurchaseOrder");
 
                     b.Navigation("ReceivedByNavigation");
 
@@ -3618,6 +3772,40 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                     b.Navigation("ProductionOrder");
 
                     b.Navigation("ReportedByNavigation");
+                });
+
+            modelBuilder.Entity("StockFlow.Domain.Entities.TrxPurchaseOrder", b =>
+                {
+                    b.HasOne("StockFlow.Domain.Entities.SecUser", "CreatedByNavigation")
+                        .WithMany()
+                        .HasForeignKey("CreatedBy")
+                        .IsRequired()
+                        .HasConstraintName("fk_trx_purchase_orders_created_by");
+
+                    b.HasOne("StockFlow.Domain.Entities.TrxPurchaseOrder", "MergedIntoPo")
+                        .WithMany("MergedFromPos")
+                        .HasForeignKey("MergedIntoPoId")
+                        .HasConstraintName("fk_trx_purchase_orders_merged_into_po_id");
+
+                    b.HasOne("StockFlow.Domain.Entities.MstBusinessPartner", "Partner")
+                        .WithMany()
+                        .HasForeignKey("PartnerId")
+                        .IsRequired()
+                        .HasConstraintName("fk_trx_purchase_orders_partner_id");
+
+                    b.HasOne("StockFlow.Domain.Entities.MstWarehouse", "Warehouse")
+                        .WithMany()
+                        .HasForeignKey("WarehouseId")
+                        .IsRequired()
+                        .HasConstraintName("fk_trx_purchase_orders_warehouse_id");
+
+                    b.Navigation("CreatedByNavigation");
+
+                    b.Navigation("MergedIntoPo");
+
+                    b.Navigation("Partner");
+
+                    b.Navigation("Warehouse");
                 });
 
             modelBuilder.Entity("StockFlow.Domain.Entities.TrxPurchaseReturn", b =>
@@ -4058,6 +4246,15 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("StockFlow.Domain.Entities.TrxProductionReport", b =>
                 {
                     b.Navigation("TrxFinishedGoodsReceipt");
+                });
+
+            modelBuilder.Entity("StockFlow.Domain.Entities.TrxPurchaseOrder", b =>
+                {
+                    b.Navigation("DtlPurchaseOrderItems");
+
+                    b.Navigation("MergedFromPos");
+
+                    b.Navigation("TrxGoodsReceipts");
                 });
 
             modelBuilder.Entity("StockFlow.Domain.Entities.TrxPurchaseReturn", b =>

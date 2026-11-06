@@ -1,5 +1,5 @@
 import { Suspense } from 'react';
-import CreateTransferClient from './CreateTransferClient';
+import FreshCreateTransfer from './FreshCreateTransfer';
 
 export const metadata = {
   title: 'Tạo phiếu chuyển hàng | StockFlow Tín Phát',
@@ -15,7 +15,7 @@ export default function CreateTransferPage() {
         </div>
       }
     >
-      <CreateTransferClient />
+      <FreshCreateTransfer />
     </Suspense>
   );
 }

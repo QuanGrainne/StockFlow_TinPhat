@@ -98,6 +98,8 @@ export interface CreatePurchasePayload {
   warehouseId?: number;
   partnerId: number;
   purchaseCode?: string | null;
+  /** Nhập hàng theo phiếu đặt hàng nhập */
+  purchaseOrderId?: number;
   externalPoNumber?: string | null;
   receivedDate?: string | null;
   status: 'DRAFT' | 'COMPLETED';

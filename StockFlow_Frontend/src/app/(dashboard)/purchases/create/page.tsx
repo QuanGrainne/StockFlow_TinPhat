@@ -1,6 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
+import { useRouter } from 'next/navigation';
 
 const CreatePurchaseClient = dynamic(() => import('./CreatePurchaseClient'), {
   ssr: false,
@@ -12,5 +13,7 @@ const CreatePurchaseClient = dynamic(() => import('./CreatePurchaseClient'), {
 });
 
 export default function CreatePurchasePage() {
-  return <CreatePurchaseClient />;
+  // cacheComponents giữ state trang khi rời đi (Activity) → key theo bfcacheId để mỗi lần vào là form mới
+  const { bfcacheId } = useRouter();
+  return <CreatePurchaseClient key={bfcacheId} />;
 }

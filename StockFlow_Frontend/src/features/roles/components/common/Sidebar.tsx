@@ -325,6 +325,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
       requiredFeature: 'feat-purchase',
       dropdownItems: [
         {
+          id: 'purchase-orders',
+          title: 'Đặt hàng nhập',
+          desc: 'Đặt hàng NCC & đối chiếu thực nhập',
+          icon: ClipboardList,
+          requiredModule: 'PURCHASE',
+          requiredFeature: 'feat-purchase',
+        },
+        {
           id: 'purchases',
           title: 'Nhập hàng',
           desc: 'Quản lý phiếu nhập kho & thanh toán',
@@ -610,6 +618,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
       requiredFeature: 'feat-purchase',
       dropdownItems: [
         {
+          id: 'purchase-orders',
+          title: 'Đặt hàng nhập',
+          desc: 'Đặt hàng NCC & đối chiếu thực nhập',
+          icon: ClipboardList,
+          requiredModule: 'PURCHASE',
+          requiredFeature: 'feat-purchase',
+        },
+        {
           id: 'purchases',
           title: 'Nhập hàng',
           desc: 'Quản lý phiếu nhập kho & thanh toán',
@@ -791,6 +807,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
       requiredFeature: 'feat-purchase',
       dropdownItems: [
         {
+          id: 'purchase-orders',
+          title: 'Đặt hàng nhập',
+          desc: 'Đặt hàng NCC & đối chiếu thực nhập',
+          icon: ClipboardList,
+          requiredModule: 'PURCHASE',
+          requiredFeature: 'feat-purchase',
+        },
+        {
           id: 'purchases',
           title: 'Nhập hàng',
           desc: 'Quản lý phiếu nhập kho & thanh toán',
@@ -917,6 +941,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
       requiredFeature: 'feat-purchase',
       dropdownItems: [
         {
+          id: 'purchase-orders',
+          title: 'Đặt hàng nhập',
+          desc: 'Đặt hàng NCC & đối chiếu thực nhập',
+          icon: ClipboardList,
+          requiredModule: 'PURCHASE',
+          requiredFeature: 'feat-purchase',
+        },
+        {
           id: 'purchases',
           title: 'Nhập hàng',
           desc: 'Quản lý phiếu nhập kho & thanh toán',
@@ -1014,6 +1046,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
       requiredModule: 'PURCHASE',
       requiredFeature: 'feat-purchase',
       dropdownItems: [
+        {
+          id: 'purchase-orders',
+          title: 'Đặt hàng nhập',
+          desc: 'Đặt hàng NCC & đối chiếu thực nhập',
+          icon: ClipboardList,
+          requiredModule: 'PURCHASE',
+          requiredFeature: 'feat-purchase',
+        },
         {
           id: 'purchases',
           title: 'Nhập hàng',
@@ -1147,8 +1187,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
     if (tab.id === 'admin-warehouse-perms' && activeScreen === 'admin-warehouse-facilities') return true;
     if (tab.id === 'manager-production' && activeScreen === 'manager-bom') return true;
     if (tab.id === 'manager-partners' && activeScreen === 'manager-cashflow') return true;
-    if (tab.id === 'sales-orders' && (activeScreen === 'sales-orders' || activeScreen === 'orders' || activeScreen.includes('orders') || activeScreen === 'sales-consolidate' || activeScreen === 'sales-returns')) return true;
-    if (tab.id === 'warehouse-inbound' && (activeScreen === 'warehouse-inbound' || activeScreen === 'purchases' || activeScreen.includes('purchases') || activeScreen === 'manager-landed-cost' || activeScreen === 'purchase-returns')) return true;
+    if (tab.id === 'sales-orders' && (activeScreen === 'sales-orders' || activeScreen === 'orders' || (activeScreen.includes('orders') && activeScreen !== 'purchase-orders') || activeScreen === 'sales-consolidate' || activeScreen === 'sales-returns')) return true;
+    if (tab.id === 'warehouse-inbound' && (activeScreen === 'warehouse-inbound' || activeScreen === 'purchases' || activeScreen.includes('purchases') || activeScreen === 'manager-landed-cost' || activeScreen === 'purchase-returns' || activeScreen === 'purchase-orders')) return true;
     if (tab.id === 'warehouse-overview' && (activeScreen === 'warehouse-overview' || activeScreen === 'warehouse-outbound' || activeScreen === 'warehouse-transfer' || activeScreen === 'warehouse-audit' || activeScreen === 'warehouse-returns')) return true;
     if (tab.id === 'production-orders' && (activeScreen === 'production-orders' || activeScreen === 'production-import' || activeScreen === 'production-logs')) return true;
     if (tab.id === 'manager-cashflow' && (activeScreen === 'manager-cashflow' || activeScreen === 'manager-reports')) return true;

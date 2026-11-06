@@ -65,10 +65,11 @@ export function PartnerLink({
   );
 }
 
-export type DocumentKind = 'purchase' | 'purchase-return' | 'transfer' | 'stocktake';
+export type DocumentKind = 'purchase' | 'purchase-order' | 'purchase-return' | 'transfer' | 'stocktake';
 
 const DOC_PATH: Record<DocumentKind, string> = {
   purchase: '/purchases',
+  'purchase-order': '/purchase-orders',
   'purchase-return': '/purchase-returns',
   transfer: '/transfers',
   stocktake: '/stocktakes',

@@ -32,6 +32,9 @@ import { productService, BackendProduct } from '@/features/products/services/pro
 import { supplierService } from '@/features/suppliers/services/supplierService';
 import { Supplier } from '@/features/suppliers/types';
 import { purchaseService } from '@/features/purchases/services/purchaseService';
+import { purchaseOrderService } from '@/features/purchase-orders/services/purchaseOrderService';
+import type { PurchaseOrderItem } from '@/features/purchase-orders/types';
+import { PO_STATUS } from '@/features/purchase-orders/utils/purchaseOrderUtils';
 import { toLocalDatetimeInputString } from '@/features/transfers/utils/dateUtils';
 import { QuickAddSupplierModal } from '@/features/purchases/components/QuickAddSupplierModal';
 import { AddFromCategoryPopover } from '@/features/purchases/components/AddFromCategoryPopover';
@@ -111,7 +114,35 @@ function buildRowFromProduct(prod: BackendProduct): CreatePurchaseItemRow {
 
 const COPY_CODE_PREFIX = 'Copy_';
 
-export default function CreatePurchaseClient() {
+/** Dòng phiếu từ dòng phiếu đặt hàng nhập (bổ sung tồn / giá vốn / ảnh từ danh mục) */
+function buildRowFromOrderItem(it: PurchaseOrderItem, quantity: number, prod?: BackendProduct): CreatePurchaseItemRow {
+  const percent = it.discountPercent || 0;
+  return recalcRow({
+    productId: it.productId,
+    productCode: it.productCode,
+    productName: it.productName,
+    unitName: it.unit || 'Cái',
+    currentStock: prod?.stockQuantity ?? 0,
+    costPrice: prod?.costPrice ?? 0,
+    salePrice: prod?.standardPrice ?? 0,
+    imageUrl: prod?.imageUrl ?? null,
+    categoryName: prod?.categoryName,
+    quantity,
+    unitPrice: Math.round(it.unitPrice),
+    discountType: 'PERCENT',
+    discountValue: percent,
+    discountPercent: percent,
+    lineTotal: 0,
+  });
+}
+
+interface CreatePurchaseClientProps {
+  /** receipt = phiếu nhập hàng (mặc định); order = phiếu đặt hàng nhập (không nhập kho, không thanh toán) */
+  mode?: 'receipt' | 'order';
+}
+
+export default function CreatePurchaseClient({ mode = 'receipt' }: CreatePurchaseClientProps = {}) {
+  const isOrder = mode === 'order';
   const router = useRouter();
   const searchParams = useSearchParams();
   const editPurchaseId = searchParams.get('id') || searchParams.get('edit');
@@ -120,6 +151,8 @@ export default function CreatePurchaseClient() {
   const sourcePurchaseId = editPurchaseId || copyPurchaseId;
   // Nhập hàng từ danh mục hàng hóa: ?products=1,2,3 → thêm sẵn các hàng đã chọn vào phiếu mới
   const prefillProductIds = sourcePurchaseId ? null : searchParams.get('products');
+  // Nhập hàng theo phiếu đặt hàng nhập: ?po=<id> → nạp phần chưa nhập của phiếu đặt
+  const fromPoId = isOrder || sourcePurchaseId ? null : searchParams.get('po');
 
   const { activeWarehouse, setActiveWarehouse, warehouses: allWarehouses } = useActiveWarehouse();
 
@@ -197,6 +230,12 @@ export default function CreatePurchaseClient() {
   const [originalStatus, setOriginalStatus] = useState<'DRAFT' | 'COMPLETED' | null>(null);
   const isCompletedEdit = Boolean(editPurchaseId) && originalStatus === 'COMPLETED';
   const loadedSourceRef = useRef<string | null>(null);
+  // Phiếu đặt hàng nhập đang sửa: trạng thái gốc (null = phiếu mới / sao chép)
+  const [orderOriginalStatus, setOrderOriginalStatus] = useState<'DRAFT' | 'ORDERED' | null>(null);
+  // Phiếu nhập theo phiếu đặt hàng nhập
+  const [linkedPo, setLinkedPo] = useState<{ id: number; code: string; orderDate?: string | null } | null>(null);
+  // Kho cố định theo phiếu nguồn (sửa phiếu đặt / nhập theo phiếu đặt), không theo kho làm việc
+  const [fixedWarehouse, setFixedWarehouse] = useState<{ id: number; name: string } | null>(null);
 
   // ─── Products & Lines State ─────────────────────────────────────────────────
   const [items, setItems] = useState<CreatePurchaseItemRow[]>([]);
@@ -288,7 +327,7 @@ export default function CreatePurchaseClient() {
 
   // ─── Load phiếu nguồn: sửa (?edit=) hoặc sao chép (?copy=) ─────────────────────
   useEffect(() => {
-    if (!sourcePurchaseId || loadedSourceRef.current === sourcePurchaseId) return;
+    if (isOrder || !sourcePurchaseId || loadedSourceRef.current === sourcePurchaseId) return;
     loadedSourceRef.current = sourcePurchaseId;
     const isCopy = Boolean(copyPurchaseId);
     async function loadEditData() {
@@ -381,6 +420,77 @@ export default function CreatePurchaseClient() {
     loadEditData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sourcePurchaseId, copyPurchaseId]);
+
+  // ─── Nạp phiếu đặt hàng nhập: sửa / sao chép (mode order) hoặc nhập theo phiếu đặt (?po=) ───
+  const loadedOrderRef = useRef<string | null>(null);
+  useEffect(() => {
+    const poId = isOrder ? sourcePurchaseId : fromPoId;
+    if (!poId || loadedOrderRef.current === poId) return;
+    loadedOrderRef.current = poId;
+    const isCopy = Boolean(copyPurchaseId);
+    async function loadOrder() {
+      try {
+        const po = await purchaseOrderService.getPurchaseOrder(Number(poId));
+        let productMap = new Map<number, BackendProduct>();
+        try {
+          const prods = await productService.getProducts({ warehouseId: po.warehouseId });
+          productMap = new Map(prods.map((p) => [p.productId, p]));
+        } catch {
+          // thiếu thông tin phụ thì vẫn hiển thị phiếu
+        }
+        const backTo = '/purchase-orders';
+        setSelectedSupplier({
+          id: String(po.partnerId),
+          code: po.partnerCode,
+          name: po.partnerName,
+          phone: po.partnerPhone || undefined,
+          status: 'ACTIVE',
+        } as Supplier);
+
+        if (!isOrder) {
+          // Nhập theo phiếu đặt: chỉ nạp phần chưa nhập
+          if (po.status !== 'ORDERED' && po.status !== 'PARTIAL') {
+            showToast('Phiếu đặt hàng nhập không ở trạng thái chờ nhập hàng', 'error');
+            router.replace(backTo);
+            return;
+          }
+          const remaining = po.items.filter((it) => it.orderedQty > it.receivedQty);
+          setItems(remaining.map((it) => buildRowFromOrderItem(it, it.orderedQty - it.receivedQty, productMap.get(it.productId))));
+          setLinkedPo({ id: po.poId, code: po.poCode, orderDate: po.orderDate });
+          setFixedWarehouse({ id: po.warehouseId, name: po.warehouseName });
+          setExternalPoNumber(po.poCode);
+          // Giảm giá phiếu đặt chỉ áp vào lần nhập đầu tiên
+          setOrderDiscountType('VND');
+          setOrderDiscountValue(po.items.some((it) => it.receivedQty > 0) ? 0 : po.discountAmount || 0);
+          return;
+        }
+
+        if (!isCopy && po.status !== 'DRAFT' && po.status !== 'ORDERED') {
+          showToast('Chỉ sửa được phiếu tạm hoặc phiếu đã đặt hàng', 'error');
+          router.replace(backTo);
+          return;
+        }
+        const lines = po.items.filter((it) => it.orderedQty > 0);
+        setItems(lines.map((it) => buildRowFromOrderItem(it, it.orderedQty, productMap.get(it.productId))));
+        setOrderDiscountType('VND');
+        setOrderDiscountValue(po.discountAmount || 0);
+        if (isCopy) {
+          setPurchaseCode(`${COPY_CODE_PREFIX}${po.poCode}`);
+        } else {
+          setPurchaseCode(po.poCode);
+          setNotes(po.notes || '');
+          setOrderOriginalStatus(po.status as 'DRAFT' | 'ORDERED');
+          setFixedWarehouse({ id: po.warehouseId, name: po.warehouseName });
+          if (po.orderDate) setPurchaseDateTime(toLocalDatetimeInputString(po.orderDate));
+        }
+      } catch (err) {
+        console.error('Lỗi tải phiếu đặt hàng nhập:', err);
+        showToast('Không tải được phiếu đặt hàng nhập', 'error');
+      }
+    }
+    loadOrder();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOrder, sourcePurchaseId, fromPoId, copyPurchaseId]);
 
   // ─── Nạp sẵn hàng đã tick ở danh mục hàng hóa (?products=) ─────────────────────
   const loadedPrefillRef = useRef<string | null>(null);
@@ -615,6 +725,53 @@ export default function CreatePurchaseClient() {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
+  // ─── Lưu phiếu đặt hàng nhập (mode order) ────────────────────────────────────
+  const executeSaveOrder = async (targetStatus: 'DRAFT' | 'ORDERED') => {
+    if (items.length === 0) {
+      showToast('Vui lòng chọn ít nhất 1 mặt hàng vào phiếu đặt', 'warning');
+      searchInputRef.current?.focus();
+      return;
+    }
+    if (!selectedSupplier) {
+      showToast('Vui lòng chọn Nhà cung cấp', 'warning');
+      setIsSidebarCollapsed(false);
+      return;
+    }
+    try {
+      setIsSubmitting(true);
+      const payload = {
+        partnerId: Number(selectedSupplier.id),
+        orderDate: purchaseDateTime ? new Date(purchaseDateTime).toISOString() : undefined,
+        status: targetStatus,
+        notes: notes.trim() || null,
+        discountAmount: Math.round(orderDiscount),
+        items: items.map((i) => ({
+          productId: i.productId,
+          quantity: i.quantity,
+          unitPrice: i.unitPrice,
+          discountPercent: i.discountPercent || 0,
+        })),
+      };
+      if (editPurchaseId) {
+        await purchaseOrderService.updatePurchaseOrder(editPurchaseId, payload);
+        showToast('Đã cập nhật phiếu đặt hàng nhập');
+      } else {
+        const code = purchaseCode.trim();
+        await purchaseOrderService.createPurchaseOrder({
+          ...payload,
+          warehouseId: activeWarehouse?.warehouseId,
+          poCode: code && !code.startsWith(COPY_CODE_PREFIX) ? code : undefined,
+        });
+        showToast(targetStatus === 'ORDERED' ? 'Đã đặt hàng nhập' : 'Đã lưu tạm phiếu đặt hàng nhập');
+      }
+      setTimeout(() => router.push('/purchase-orders'), 600);
+    } catch (err: unknown) {
+      showToast(err instanceof Error && err.message ? err.message : 'Lỗi khi lưu phiếu đặt hàng nhập', 'error');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   // ─── Submit Actions (Save Draft / Complete) ──────────────────────────────────
   const executeSave = async (targetStatus: 'DRAFT' | 'COMPLETED') => {
     if (items.length === 0) {
@@ -659,8 +816,9 @@ export default function CreatePurchaseClient() {
         }
       } else {
         const result = await purchaseService.createPurchase({
-          warehouseId: activeWarehouse?.warehouseId || 1,
+          warehouseId: fixedWarehouse?.id ?? (activeWarehouse?.warehouseId || 1),
           partnerId: Number(selectedSupplier.id) || 1,
+          purchaseOrderId: linkedPo?.id,
           // Mã "Copy_PN..." chỉ để nhận biết phiếu sao chép → để backend tự sinh mã PN mới
           purchaseCode: purchaseCode.trim().startsWith(COPY_CODE_PREFIX) ? undefined : purchaseCode.trim() || undefined,
           externalPoNumber: externalPoNumber.trim() || null,
@@ -680,7 +838,8 @@ export default function CreatePurchaseClient() {
       }
 
       setTimeout(() => {
-        router.push('/purchases');
+        // Nhập theo phiếu đặt: về danh sách đặt hàng nhập, mở sẵn phiếu để xem đối chiếu số lượng
+        router.push(linkedPo ? `/purchase-orders?open=${linkedPo.id}` : '/purchases');
       }, 600);
     } catch (err: unknown) {
       showToast(err instanceof Error && err.message ? err.message : 'Lỗi khi lưu phiếu nhập hàng', 'error');
@@ -726,7 +885,7 @@ export default function CreatePurchaseClient() {
       isOpen: true,
       title: 'Xác nhận hoàn thành nhập kho',
       message:
-        `Bạn có chắc chắn muốn hoàn thành phiếu nhập hàng từ nhà cung cấp "${selectedSupplier.name}"? Tồn kho tại kho "${activeWarehouse?.name || 'Kho làm việc'}" sẽ được cập nhật ngay lập tức.`,
+        `Bạn có chắc chắn muốn hoàn thành phiếu nhập hàng từ nhà cung cấp "${selectedSupplier.name}"? Tồn kho tại kho "${fixedWarehouse?.name || activeWarehouse?.name || 'Kho làm việc'}" sẽ được cập nhật ngay lập tức.`,
       onConfirm: () => {
         setConfirmModal(null);
         executeSave('COMPLETED');
@@ -792,14 +951,14 @@ export default function CreatePurchaseClient() {
         {/* Left: Back Arrow + Nhập hàng title */}
         <div className="flex items-center gap-3">
           <Link
-            href="/purchases"
+            href={isOrder || linkedPo ? '/purchase-orders' : '/purchases'}
             className="p-1 rounded-[8px] text-[#677484] hover:text-[#15171a] hover:bg-[#f7f8f9] transition cursor-pointer"
-            title="Quay lại danh sách phiếu nhập"
+            title={isOrder ? 'Quay lại danh sách đặt hàng nhập' : 'Quay lại danh sách phiếu nhập'}
           >
             <ArrowLeft size={18} className="stroke-[2.5]" />
           </Link>
           <span className="text-[20px] font-semibold text-[#15171a] tracking-tight whitespace-nowrap leading-[36px]">
-            Nhập hàng
+            {isOrder ? 'Đặt hàng nhập' : 'Nhập hàng'}
           </span>
         </div>
 
@@ -1206,7 +1365,7 @@ export default function CreatePurchaseClient() {
                   Số mặt hàng: <strong className="text-[#15171a]">{items.length}</strong>
                 </span>
                 <span>
-                  Tổng số lượng nhập:{' '}
+                  {isOrder ? 'Tổng số lượng đặt' : 'Tổng số lượng nhập'}:{' '}
                   <strong className="text-[#0070f4] text-sm font-bold">
                     {totalQuantity.toLocaleString('vi-VN')}
                   </strong>
@@ -1249,7 +1408,7 @@ export default function CreatePurchaseClient() {
                   value={purchaseDateTime}
                   onChange={(e) => setPurchaseDateTime(e.target.value)}
                   className="h-8 px-2 rounded-[8px] border border-slate-300 text-[12px] text-[#677484] bg-white hover:border-[#0070f4] focus:border-[#0070f4] focus:outline-none cursor-pointer transition"
-                  title="Thời gian nhập hàng"
+                  title={isOrder ? 'Thời gian đặt hàng' : 'Thời gian nhập hàng'}
                 />
               </div>
 
@@ -1261,14 +1420,16 @@ export default function CreatePurchaseClient() {
                       {selectedSupplier.name}
                       <span className="ml-1.5 font-normal text-[#677484]">{selectedSupplier.code}</span>
                     </span>
-                    <button
-                      type="button"
-                      onClick={() => setSelectedSupplier(null)}
-                      className="text-[#677484] hover:text-[#fb2c36] cursor-pointer shrink-0"
-                      title="Bỏ chọn nhà cung cấp"
-                    >
-                      <X size={14} />
-                    </button>
+                    {!linkedPo && (
+                      <button
+                        type="button"
+                        onClick={() => setSelectedSupplier(null)}
+                        className="text-[#677484] hover:text-[#fb2c36] cursor-pointer shrink-0"
+                        title="Bỏ chọn nhà cung cấp"
+                      >
+                        <X size={14} />
+                      </button>
+                    )}
                   </div>
                 ) : (
                   <div className="h-8 px-2.5 rounded-[8px] border border-slate-300 focus-within:border-[#0070f4] flex items-center gap-2 bg-white">
@@ -1323,7 +1484,7 @@ export default function CreatePurchaseClient() {
 
               {/* Mã phiếu nhập */}
               <div className="flex items-center justify-between gap-3">
-                <span>Mã phiếu nhập</span>
+                <span>{isOrder ? 'Mã đặt hàng nhập' : 'Mã phiếu nhập'}</span>
                 <input
                   type="text"
                   value={purchaseCode}
@@ -1337,19 +1498,27 @@ export default function CreatePurchaseClient() {
               {/* Kho nhận hàng (giữ từ form cũ) */}
               <div className="flex items-center justify-between gap-3">
                 <span>Kho nhận hàng</span>
-                <span className="text-right truncate">{activeWarehouse?.name || 'Kho Tổng Gia Lâm'}</span>
+                <span className="text-right truncate">{fixedWarehouse?.name || activeWarehouse?.name || 'Kho Tổng Gia Lâm'}</span>
               </div>
 
               {/* Mã đặt hàng nhập */}
-              <div className="flex items-center justify-between gap-3">
-                <span>Mã đặt hàng nhập</span>
-                <span className="text-right text-[#677484]">{externalPoNumber}</span>
-              </div>
+              {!isOrder && (
+                <div className="flex items-center justify-between gap-3">
+                  <span>Mã đặt hàng nhập</span>
+                  <span className="text-right text-[#677484]">{externalPoNumber}</span>
+                </div>
+              )}
 
               {/* Trạng thái */}
               <div className="flex items-center justify-between gap-3">
                 <span>Trạng thái</span>
-                <span>{status === 'COMPLETED' ? 'Đã nhập hàng' : 'Phiếu tạm'}</span>
+                <span>
+                  {isOrder
+                    ? PO_STATUS[orderOriginalStatus ?? 'DRAFT'].label
+                    : status === 'COMPLETED'
+                    ? 'Đã nhập hàng'
+                    : 'Phiếu tạm'}
+                </span>
               </div>
 
               {/* Tổng tiền hàng */}
@@ -1385,11 +1554,12 @@ export default function CreatePurchaseClient() {
 
               {/* Cần trả nhà cung cấp */}
               <div className="flex items-center justify-between gap-3">
-                <span className="font-bold">Cần trả nhà cung cấp</span>
+                <span className="font-bold">{isOrder ? 'Tổng cộng' : 'Cần trả nhà cung cấp'}</span>
                 <span className="font-bold text-[#0070f4]">{Math.round(finalPayable).toLocaleString('vi-VN')}</span>
               </div>
 
               {/* Tiền trả nhà cung cấp + hình thức thanh toán */}
+              {!isOrder && (
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <span>Tiền trả nhà cung cấp</span>
@@ -1429,11 +1599,15 @@ export default function CreatePurchaseClient() {
                 )}
               </div>
 
+              )}
+
               {/* Tính vào công nợ (âm = còn nợ nhà cung cấp, giống KiotViet) */}
+              {!isOrder && (
               <div className="flex items-center justify-between gap-3">
                 <span>Tính vào công nợ</span>
                 <span>{debtAmount > 0 ? `-${Math.round(debtAmount).toLocaleString('vi-VN')}` : '0'}</span>
               </div>
+              )}
 
               {/* Ghi chú */}
               <textarea
@@ -1446,7 +1620,39 @@ export default function CreatePurchaseClient() {
             </div>
 
             {/* Lưu tạm / Hoàn thành */}
-            {isCompletedEdit ? (
+            {isOrder ? (
+              orderOriginalStatus === 'ORDERED' ? (
+                <div className="p-4">
+                  <button
+                    type="button"
+                    disabled={isSubmitting}
+                    onClick={() => void executeSaveOrder('ORDERED')}
+                    className="w-full h-11 rounded-[8px] bg-[#0070f4] hover:bg-[#005ac3] text-white font-semibold text-[14px] transition cursor-pointer disabled:opacity-50"
+                  >
+                    Lưu
+                  </button>
+                </div>
+              ) : (
+                <div className="p-4 grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    disabled={isSubmitting}
+                    onClick={() => void executeSaveOrder('DRAFT')}
+                    className="h-11 rounded-[8px] border border-[#0070f4] bg-white hover:bg-[#eff6ff] text-[#0070f4] font-semibold text-[14px] transition cursor-pointer disabled:opacity-50"
+                  >
+                    Lưu tạm
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isSubmitting}
+                    onClick={() => void executeSaveOrder('ORDERED')}
+                    className="h-11 rounded-[8px] bg-[#0070f4] hover:bg-[#005ac3] text-white font-semibold text-[14px] transition cursor-pointer disabled:opacity-50"
+                  >
+                    Đặt hàng
+                  </button>
+                </div>
+              )
+            ) : isCompletedEdit ? (
               <div className="p-4">
                 <button
                   type="button"

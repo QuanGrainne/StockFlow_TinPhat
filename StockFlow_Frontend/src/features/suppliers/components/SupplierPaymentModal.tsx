@@ -284,6 +284,11 @@ export default function SupplierPaymentModal({
                 </tbody>
               </table>
               <div className="flex items-center justify-end gap-10 px-3 py-2.5 border-t border-slate-100">
+                {unallocated > 0 && allocatedTotal < totalRemaining && (
+                  <span className="mr-auto text-[12px] text-[#677484]">
+                    Tiền chưa phân bổ sẽ tự trừ vào phiếu nhập còn nợ cũ nhất khi tạo phiếu chi.
+                  </span>
+                )}
                 <span>Tiền chưa phân bổ:</span>
                 <span className={`font-bold ${unallocated < 0 ? 'text-[#fb2c36]' : ''}`}>{fmt(unallocated)}</span>
               </div>
