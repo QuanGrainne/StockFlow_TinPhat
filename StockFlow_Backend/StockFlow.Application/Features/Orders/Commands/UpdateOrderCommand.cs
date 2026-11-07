@@ -52,9 +52,11 @@ public class UpdateOrderCommandHandler : IRequestHandler<UpdateOrderCommand, Res
         if (!string.IsNullOrWhiteSpace(request.Dto.OrderType))
         {
             var type = request.Dto.OrderType.Trim().ToUpperInvariant();
+            // Không đổi qua lại hóa đơn ↔ đơn đặt hàng (2 nghiệp vụ khác nhau: trừ kho / không trừ kho)
             if (type is "INVOICE" or "BOOKING")
             {
-                order.OrderType = type;
+                if (!string.Equals(order.OrderType, type, StringComparison.OrdinalIgnoreCase))
+                    return Result<OrderDetailDto>.Failure("Không đổi được loại chứng từ giữa hóa đơn và đơn đặt hàng.");
             }
             else
             {

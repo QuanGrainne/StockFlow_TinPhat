@@ -43,6 +43,7 @@ public class GetPosOrdersQueryHandler : IRequestHandler<GetPosOrdersQuery, Resul
             .Include(o => o.TrxStockIssues).ThenInclude(si => si.Warehouse)
             .Include(o => o.TrxReturnRequests)
             .AsNoTracking()
+            .Where(o => o.OrderType != "BOOKING") // đơn đặt hàng xem ở màn Đặt hàng
             .AsQueryable();
 
         // 1. Phân quyền truy cập kho (Data Isolation)

@@ -25,6 +25,11 @@ public class OrderDetailDto
     public string SalesRepName { get; set; } = "Trần Minh Tuấn";
     public string? Notes { get; set; }
     public string? PriceBookName { get; set; }
+    /// <summary>Hóa đơn tạo từ đơn đặt hàng nào</summary>
+    public int? BookingOrderId { get; set; }
+    public string? BookingOrderCode { get; set; }
+    /// <summary>Tiền khách trả trước ở đơn đặt hàng đã trừ vào hóa đơn</summary>
+    public decimal DepositAmount { get; set; }
 
     // B. Thông tin khách hàng
     public OrderCustomerDto Customer { get; set; } = new();

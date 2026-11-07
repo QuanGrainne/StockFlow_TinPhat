@@ -250,12 +250,6 @@ export default function SupplierExpandedRow({
                         <InfoField label="Địa chỉ" value={supplier.address} />
                       </div>
                     </div>
-
-                    {/* Ghi chú */}
-                    <div className="flex items-center gap-2 text-[13px] text-[#677484]">
-                      <Pencil size={14} />
-                      <span>Chưa có ghi chú</span>
-                    </div>
                   </div>
 
                   {/* Footer: Xóa (trái) — Chỉnh sửa, Ngừng hoạt động (phải) */}

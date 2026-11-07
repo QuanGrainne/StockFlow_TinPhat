@@ -2,28 +2,11 @@
 // Màn hình Phân quyền vai trò: Cấu hình quyền hiển thị chức năng trên thanh Navbar cho từng vai trò
 
 import React, { useState, useEffect, useMemo } from 'react';
-import {
-  Shield,
-  Save,
-  RotateCcw,
-  CheckCircle2,
-  Check,
-  Search,
-  Users,
-  ShieldCheck,
-  Building2,
-  Package,
-  ShoppingBag,
-  ArrowDownToLine,
-  Warehouse,
-  Layers,
-  Sliders,
-  BarChart3,
-  Repeat,
-  ClipboardCheck,
-} from 'lucide-react';
+import { Shield, Save, RotateCcw, CheckCircle2, Check, Search, Package } from 'lucide-react';
 import { UserRole, RoleDefinition } from '../../../types';
 import { adminService, NAVBAR_FEATURES } from '../../../services/adminService';
+import { DEFAULT_ROLE_FEATURE_PERMS } from '../../../services/permissionService';
+import { ADMIN_LOCKED_FEATURES, NAV_ITEMS_FLAT } from '../../../config/navbar';
 
 interface RoleColumn {
   code: string;
@@ -40,23 +23,9 @@ const DEFAULT_SYSTEM_ROLES: RoleColumn[] = [
   { code: 'ROLE_PRODUCTION', name: 'Nhân viên sản xuất', badge: 'PRODUCTION', isSystem: true },
 ];
 
-const FEATURE_ICONS: Record<string, React.FC<{ size?: number; className?: string }>> = {
-  'feat-staff': Users,
-  'feat-roles': ShieldCheck,
-  'feat-warehouse-perms': Building2,
-  'feat-goods': Package,
-  'feat-customers': Users,
-  'feat-transfers': Repeat,
-  'feat-stocktake': ClipboardCheck,
-  'feat-sales': ShoppingBag,
-  'feat-purchase': ArrowDownToLine,
-  'feat-suppliers': Building2,
-  'feat-stock': Warehouse,
-  'feat-prod': Layers,
-  'feat-bom': Sliders,
-  'feat-partner': Users,
-  'feat-fin': BarChart3,
-};
+/** Icon của từng chức năng = icon của mục tương ứng trên navbar */
+const FEATURE_ICONS = Object.fromEntries(NAV_ITEMS_FLAT.map((i) => [i.featureId, i.icon]));
+
 
 interface PermissionMatrixScreenProps {
   initialRoleCode?: string;
@@ -118,7 +87,7 @@ export const PermissionMatrixScreen: React.FC<PermissionMatrixScreenProps> = ({
   // 2. Xử lý Toggle 1 ô Checkbox [Tính năng, Vai trò]
   const handleToggleCell = (roleCode: string, featureId: string) => {
     // Bảo vệ Quản trị viên không bị tắt các quyền cốt lõi
-    if (roleCode === 'ROLE_ADMIN' && ['feat-staff', 'feat-roles'].includes(featureId)) {
+    if (roleCode === 'ROLE_ADMIN' && ADMIN_LOCKED_FEATURES.includes(featureId)) {
       return;
     }
 
@@ -145,7 +114,7 @@ export const PermissionMatrixScreen: React.FC<PermissionMatrixScreenProps> = ({
     setMatrix((prev) => {
       if (isAllChecked) {
         // Nếu là ADMIN, giữ lại quyền cốt lõi
-        const retained = roleCode === 'ROLE_ADMIN' ? ['feat-staff', 'feat-roles'] : [];
+        const retained = roleCode === 'ROLE_ADMIN' ? ADMIN_LOCKED_FEATURES : [];
         return { ...prev, [roleCode]: retained };
       }
       return { ...prev, [roleCode]: allIds };
@@ -174,10 +143,10 @@ export const PermissionMatrixScreen: React.FC<PermissionMatrixScreenProps> = ({
     if (!confirm('Bạn có chắc chắn muốn đặt lại phân quyền về cấu hình chuẩn ban đầu?')) {
       return;
     }
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('stockflow_feature_matrix');
-    }
-    const freshMatrix = await adminService.getFeatureMatrix();
+    // Vai trò hệ thống về bộ chức năng mặc định; vai trò tự tạo về rỗng
+    const freshMatrix: Record<string, string[]> = Object.fromEntries(
+      Object.keys(matrix).map((code) => [code, [...(DEFAULT_ROLE_FEATURE_PERMS[code] ?? [])]])
+    );
     setMatrix(freshMatrix);
     try {
       await adminService.saveFeatureMatrix(freshMatrix);
@@ -187,12 +156,12 @@ export const PermissionMatrixScreen: React.FC<PermissionMatrixScreenProps> = ({
     }
   };
 
-  // Lọc tính năng theo từ khóa tìm kiếm (Flat list, không có hàng tiêu đề nhóm)
+  // Lọc tính năng theo từ khóa (tên, mô tả hoặc tên nhóm navbar)
   const filteredFeatures = useMemo(() => {
     if (!searchTerm.trim()) return NAVBAR_FEATURES;
     const q = searchTerm.toLowerCase().trim();
     return NAVBAR_FEATURES.filter(
-      (f) => f.name.toLowerCase().includes(q) || f.desc.toLowerCase().includes(q)
+      (f) => f.name.toLowerCase().includes(q) || f.desc.toLowerCase().includes(q) || f.group.toLowerCase().includes(q)
     );
   }, [searchTerm]);
 
@@ -307,14 +276,25 @@ export const PermissionMatrixScreen: React.FC<PermissionMatrixScreenProps> = ({
               </tr>
             </thead>
 
-            {/* Table Body: Flat List of Features (No category headers) */}
+            {/* Chức năng theo nhóm trên navbar */}
             <tbody className="divide-y divide-slate-100">
               {filteredFeatures.map((feat, index) => {
                 const IconComponent = FEATURE_ICONS[feat.id] || Package;
+                const isFirstOfGroup = index === 0 || filteredFeatures[index - 1].group !== feat.group;
 
                 return (
+                  <React.Fragment key={feat.id}>
+                  {isFirstOfGroup && (
+                    <tr className="bg-slate-100/70">
+                      <td
+                        colSpan={roles.length + 1}
+                        className="sticky left-0 px-5 py-2 text-[11px] font-bold uppercase tracking-wide text-slate-500"
+                      >
+                        {feat.group}
+                      </td>
+                    </tr>
+                  )}
                   <tr
-                    key={feat.id}
                     className={`hover:bg-blue-50/40 transition-colors ${
                       index % 2 === 0 ? 'bg-white' : 'bg-slate-50/30'
                     }`}
@@ -341,8 +321,7 @@ export const PermissionMatrixScreen: React.FC<PermissionMatrixScreenProps> = ({
                       const roleFeats = matrix[role.code] || [];
                       const isChecked = roleFeats.includes(feat.id);
                       const isLockedAdmin =
-                        role.code === 'ROLE_ADMIN' &&
-                        ['feat-staff', 'feat-roles'].includes(feat.id);
+                        role.code === 'ROLE_ADMIN' && ADMIN_LOCKED_FEATURES.includes(feat.id);
 
                       return (
                         <td
@@ -367,6 +346,7 @@ export const PermissionMatrixScreen: React.FC<PermissionMatrixScreenProps> = ({
                       );
                     })}
                   </tr>
+                  </React.Fragment>
                 );
               })}
 

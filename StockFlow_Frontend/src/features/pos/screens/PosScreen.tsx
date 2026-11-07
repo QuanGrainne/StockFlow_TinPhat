@@ -35,10 +35,25 @@ import { CustomerFormModal } from '@/features/customers/components/CustomerFormM
 import { customerService } from '@/features/customers/services/customerService';
 import type { CreateCustomerPayload } from '@/features/customers/types';
 import { orderSettingsService } from '@/features/settings/services/orderSettingsService';
-import { useActiveWarehouse } from '@/lib/warehouse/useActiveWarehouse';
+import { salesBookingService } from '@/features/sales-bookings/services/salesBookingService';
+import type { SaveSalesBookingPayload } from '@/features/sales-bookings/types';
+import { permissionService } from '@/features/roles/services/permissionService';
+import { getStoredRole } from '@/features/roles/config/currentRole';
+import { getActiveWarehouse, TIN_PHAT_WAREHOUSES, useActiveWarehouse } from '@/lib/warehouse/useActiveWarehouse';
 import { posService, type PosSaleRequest } from '../services/posService';
 import type { PosCustomer, PosPriceBook, PosProduct } from '../types';
-import { newPosId as newId, POS_TABS_KEY as TABS_KEY, readPosTabs, type DiscountMode, type PayMethod, type PosLine, type PosTab } from '../utils/posTabs';
+import {
+  newPosId as newId,
+  nextTabNumber,
+  POS_TABS_KEY as TABS_KEY,
+  readPosTabs,
+  tabPrefix,
+  type DiscountMode,
+  type PayMethod,
+  type PosLine,
+  type PosTab,
+  type PosTabKind,
+} from '../utils/posTabs';
 
 // ─── Kiểu dữ liệu ─────────────────────────────────────────────────────────────
 interface DisplayPrefs {
@@ -58,10 +73,11 @@ const PAY_METHODS: { value: PayMethod; label: string }[] = [
 const fmt = (n: number) => Math.round(n || 0).toLocaleString('vi-VN');
 const parseNum = (s: string) => Number(s.replace(/[^\d]/g, '')) || 0;
 
-function emptyTab(index: number, priceBookId: number | null): PosTab {
+function emptyTab(index: number, priceBookId: number | null, kind: PosTabKind = 'INVOICE'): PosTab {
   return {
     id: newId(),
-    name: `Hóa đơn ${index}`,
+    kind,
+    name: `${tabPrefix(kind)} ${index}`,
     lines: [],
     customer: null,
     priceBookId,
@@ -76,6 +92,12 @@ function emptyTab(index: number, priceBookId: number | null): PosTab {
 /** Giảm giá trên 1 đơn vị (không vượt đơn giá). Giá trị âm (VND) = bán cao hơn đơn giá. */
 const unitDiscount = (price: number, mode: DiscountMode, value: number) =>
   Math.min(price, mode === 'PERCENT' ? Math.round((price * Math.min(value, 100)) / 100) : value);
+
+/** Ngày giờ API (giờ VN, không múi giờ) → giá trị ô datetime-local */
+function toLocalInput(value?: string | null): string | null {
+  const m = value?.match(/^(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2})/);
+  return m ? `${m[1]}T${m[2]}` : null;
+}
 
 function readStorage<T>(key: string, fallback: T): T {
   try {
@@ -215,8 +237,19 @@ function DiscountPopover({
 
 // ─── Màn hình chính ───────────────────────────────────────────────────────────
 export default function PosScreen() {
-  const { activeWarehouse } = useActiveWarehouse();
+  const { activeWarehouse, setActiveWarehouse } = useActiveWarehouse();
   const warehouseId = activeWarehouse?.warehouseId ?? 3;
+  /** Hàng khách đặt chưa giao tại chi nhánh (productId → SL) */
+  const [reserved, setReserved] = useState<Record<number, number>>({});
+  /** Quyền theo ma trận chức năng: Bán hàng (hóa đơn) / Đặt hàng */
+  const [canInvoice, setCanInvoice] = useState(true);
+  const [canBooking, setCanBooking] = useState(true);
+  /** Menu thêm tab theo loại (vẽ ngoài vùng cuộn ngang của thanh tab để không bị cắt) */
+  const [tabMenu, setTabMenu] = useState<{ left: number; top: number } | null>(null);
+  const openAddMenu = (e: React.MouseEvent<HTMLElement>) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    setTabMenu((m) => (m ? null : { left: r.left, top: r.bottom + 6 }));
+  };
 
   const [products, setProducts] = useState<PosProduct[]>([]);
   const [priceBooks, setPriceBooks] = useState<PosPriceBook[]>([]);
@@ -228,11 +261,18 @@ export default function PosScreen() {
   const [saleTime, setSaleTime] = useState<string | null>(null);
   const [reloadTick, setReloadTick] = useState(0);
 
-  const [tabs, setTabs] = useState<PosTab[]>(() => {
+  // Tab đã lưu; mở từ "+ Đặt hàng" (?newBooking=1) thì thêm sẵn 1 tab đặt hàng trống và mở tab đó
+  const [initialTabs] = useState(() => {
     const saved = readPosTabs();
-    return saved.length > 0 ? saved : [emptyTab(1, null)];
+    const base = saved.length > 0 ? saved : [emptyTab(1, null)];
+    if (new URLSearchParams(window.location.search).has('newBooking')) {
+      const t = emptyTab(nextTabNumber(base, 'BOOKING'), null, 'BOOKING');
+      return { tabs: [...base, t], activeId: t.id };
+    }
+    return { tabs: base, activeId: base[0]?.id ?? '' };
   });
-  const [activeTabId, setActiveTabId] = useState<string>(() => tabs[0]?.id ?? '');
+  const [tabs, setTabs] = useState<PosTab[]>(initialTabs.tabs);
+  const [activeTabId, setActiveTabId] = useState<string>(initialTabs.activeId);
   const [prefs, setPrefs] = useState<DisplayPrefs>(() => ({ ...DEFAULT_PREFS, ...readStorage<Partial<DisplayPrefs>>(PREFS_KEY, {}) }));
 
   const [productQuery, setProductQuery] = useState('');
@@ -271,23 +311,152 @@ export default function PosScreen() {
       posService.getPriceBooks(),
       posService.getPriceMatrix(),
       orderSettingsService.getSettings().catch(() => null),
-    ]).then(([prods, pbs, matrix, settings]) => {
+      salesBookingService.getReserved(warehouseId),
+    ]).then(([prods, pbs, matrix, settings, reservedMap]) => {
       if (cancelled) return;
+      setReserved(reservedMap);
       setProducts(prods.filter((p) => p.status !== 'INACTIVE'));
       setPriceBooks(pbs.filter((p) => p.isActive !== false));
       setPriceMatrix(matrix);
       setAllowNegativeStock(Boolean(settings?.allowNegativeStockSale));
       setLockSaleTime(Boolean(settings?.lockTransactionTime));
       // Đổi kho làm việc → tồn kho của các dòng đang có trong giỏ lấy theo kho mới
-      const stockOf = new Map(prods.map((p) => [p.productId, p.stockQuantity]));
+      // (dòng nạp từ đơn đặt hàng chưa có ảnh → lấy ảnh theo danh mục hàng)
+      const prodOf = new Map(prods.map((p) => [p.productId, p]));
       setTabs((prev) =>
-        prev.map((t) => ({ ...t, lines: t.lines.map((l) => ({ ...l, stock: stockOf.get(l.productId) ?? 0 })) }))
+        prev.map((t) => ({
+          ...t,
+          lines: t.lines.map((l) => ({
+            ...l,
+            stock: prodOf.get(l.productId)?.stockQuantity ?? 0,
+            imageUrl: l.imageUrl ?? prodOf.get(l.productId)?.imageUrl ?? null,
+          })),
+        }))
       );
     });
     return () => {
       cancelled = true;
     };
   }, [warehouseId, reloadTick]);
+
+  // Quyền: chỉ hiện loại tab người dùng được dùng (backend vẫn chặn API)
+  useEffect(() => {
+    let alive = true;
+    permissionService
+      .getAllowedFeatures(`ROLE_${getStoredRole()}`)
+      .then((feats) => {
+        if (!alive) return;
+        const inv = feats.has('feat-pos');
+        const bk = feats.has('feat-sales-booking');
+        setCanInvoice(inv);
+        setCanBooking(bk);
+        // Chỉ được đặt hàng: tab hóa đơn trống đổi thành tab đặt hàng
+        if (!inv && bk) {
+          setTabs((prev) =>
+            prev.map((t) =>
+              (t.kind ?? 'INVOICE') === 'INVOICE' && !t.bookingId && t.lines.length === 0
+                ? { ...t, kind: 'BOOKING', name: `${tabPrefix('BOOKING')} ${nextTabNumber(prev, 'BOOKING')}` }
+                : t
+            )
+          );
+        }
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  // Mở từ màn Đặt hàng: ?booking=<id> (sửa đơn), ?bookingInvoice=<id> (tạo hóa đơn giao hàng), ?newBooking=1
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const editId = Number(params.get('booking')) || 0;
+    const invoiceId = Number(params.get('bookingInvoice')) || 0;
+    const isNew = params.has('newBooking');
+    if (!editId && !invoiceId && !isNew) return;
+    window.history.replaceState(null, '', window.location.pathname);
+
+    if (isNew) return; // tab đặt hàng trống đã thêm lúc khởi tạo
+
+    const kind: PosTabKind = editId ? 'BOOKING' : 'INVOICE';
+    const id = editId || invoiceId;
+    salesBookingService
+      .getBooking(id)
+      .then((b) => {
+        // Đơn thuộc chi nhánh khác → chuyển chi nhánh làm việc sang chi nhánh xử lý của đơn
+        if (b.warehouseId !== getActiveWarehouse().warehouseId) {
+          const wh = TIN_PHAT_WAREHOUSES.find((w) => w.warehouseId === b.warehouseId);
+          if (wh) {
+            setActiveWarehouse(wh);
+            message.info(`Đã chuyển chi nhánh làm việc sang ${wh.name} (chi nhánh xử lý của đơn ${b.orderCode}).`);
+          }
+        }
+        const firstDelivery = b.invoices.every((i) => i.status !== 'COMPLETED');
+        const lines: PosLine[] = b.items
+          .map((it) => ({ it, qty: kind === 'BOOKING' ? it.quantity : Math.max(0, it.quantity - it.deliveredQuantity) }))
+          .filter((x) => x.qty > 0)
+          .map(({ it, qty }) => ({
+            key: newId(),
+            productId: it.productId,
+            code: it.productCode,
+            name: it.productName,
+            imageUrl: null,
+            uom: it.unit,
+            unitId: it.unitId,
+            stock: 0,
+            unitPrice: it.originalPrice,
+            discountMode: it.discountType === 'PERCENT' ? 'PERCENT' : 'VND',
+            discountValue: it.discountType === 'PERCENT' ? it.discountValue : it.originalPrice - it.unitPrice,
+            quantity: qty,
+            note: '',
+          }));
+        if (lines.length === 0) {
+          message.warning(`Đơn ${b.orderCode} đã giao đủ hàng.`);
+          return;
+        }
+        // Giảm giá đơn: áp vào đơn khi sửa, và vào hóa đơn giao đầu tiên
+        const keepDiscount = kind === 'BOOKING' || firstDelivery;
+        const tabData: PosTab = {
+          id: newId(),
+          kind,
+          name: kind === 'BOOKING' ? b.orderCode : `Hóa đơn · ${b.orderCode}`,
+          lines,
+          customer: {
+            id: b.partnerId,
+            partnerId: b.partnerId,
+            code: b.partnerCode,
+            name: b.partnerName,
+            phone: b.partnerPhone ?? '',
+            creditLimit: b.partnerCreditLimit,
+            currentDebt: b.partnerDebt,
+            isOverCreditLimit: false,
+          },
+          priceBookId: null,
+          discountMode: keepDiscount && b.discountType === 'PERCENT' ? 'PERCENT' : 'VND',
+          discountValue: !keepDiscount ? 0 : b.discountType === 'PERCENT' ? b.discountValue : b.discountAmount,
+          paid: null,
+          payMethod: 'CASH',
+          // Bảng giá được ghi lại khi lưu → bỏ thẻ cũ để không lặp
+          notes: (b.notes ?? '').replace(/\[Bảng giá:[^\]]*\]\s*/g, '').trim(),
+          bookingId: b.orderId,
+          bookingCode: b.orderCode,
+          bookingPaid: kind === 'BOOKING' ? b.paidAmount : b.remainingDeposit,
+          warehouseId: b.warehouseId,
+          deliveryDate: toLocalInput(b.deliveryDate),
+        };
+        setTabs((prev) => {
+          // Đã mở đơn này ở 1 tab cùng loại → thay bằng dữ liệu mới nhất
+          const rest = prev.filter((t) => !(t.bookingId === b.orderId && (t.kind ?? 'INVOICE') === kind));
+          // Bỏ tab hóa đơn trống mặc định cho gọn
+          const cleaned = rest.filter((t) => t.lines.length > 0 || t.bookingId);
+          return [...cleaned, tabData];
+        });
+        setActiveTabId(tabData.id);
+        setReloadTick((t) => t + 1); // nạp tồn kho cho các dòng
+      })
+      .catch((err: unknown) => message.error(err instanceof Error ? err.message : 'Không tải được đơn đặt hàng.'));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Lưu các tab hóa đơn để tải lại trang không mất giỏ hàng
   useEffect(() => {
@@ -329,6 +498,7 @@ export default function PosScreen() {
       if (productBoxRef.current && !productBoxRef.current.contains(t)) setProductDropdown(false);
       if (customerBoxRef.current && !customerBoxRef.current.contains(t)) setCustomerDropdown(false);
       if (menuRef.current && !menuRef.current.contains(t)) setMenuOpen(false);
+      if (!(t instanceof Element) || !t.closest('[data-pos-menu]')) setTabMenu(null);
     };
     document.addEventListener('mousedown', onDown);
     return () => document.removeEventListener('mousedown', onDown);
@@ -346,8 +516,15 @@ export default function PosScreen() {
   const totalQty = tab.lines.reduce((s, l) => s + l.quantity, 0);
   const orderDiscount = Math.min(subTotal, unitDiscount(subTotal, tab.discountMode, tab.discountValue));
   const due = Math.max(0, subTotal - orderDiscount);
-  const paid = tab.paid ?? due;
-  const change = paid - due;
+  const isBooking = (tab.kind ?? 'INVOICE') === 'BOOKING';
+  /** Hóa đơn từ đơn đặt: tiền khách đã trả trước được trừ vào hóa đơn */
+  const depositApplied = !isBooking && tab.bookingId ? Math.min(due, tab.bookingPaid ?? 0) : 0;
+  const dueNow = due - depositApplied;
+  // Đơn đặt hàng: khách trả trước mặc định 0; hóa đơn: mặc định trả đủ
+  const paid = tab.paid ?? (isBooking ? 0 : dueNow);
+  const change = paid - dueNow;
+  /** Đặt hàng: tiền đã trả trước (khi sửa đơn) + trả thêm lần này không vượt giá trị đơn */
+  const bookingPaidTotal = isBooking ? (tab.bookingPaid ?? 0) + paid : 0;
 
   const qtyByProduct = useMemo(() => {
     const m = new Map<number, number>();
@@ -412,25 +589,34 @@ export default function PosScreen() {
       .slice(0, 30);
   }, [products, productQuery]);
 
-  // ── Tab hóa đơn ──
-  const addTab = () => {
-    const used = new Set(tabs.map((t) => Number(t.name.replace(/\D/g, '')) || 0));
-    let n = 1;
-    while (used.has(n)) n++;
-    const t = emptyTab(n, defaultPriceBookId);
+  // ── Tab hóa đơn / đặt hàng ──
+  const defaultKind: PosTabKind = canInvoice || !canBooking ? 'INVOICE' : 'BOOKING';
+  const addTab = (kind: PosTabKind = defaultKind) => {
+    const t = emptyTab(nextTabNumber(tabs, kind), defaultPriceBookId, kind);
     setTabs((prev) => [...prev, t]);
     setActiveTabId(t.id);
+    setTabMenu(null);
   };
   const closeTab = (id: string) => {
     const remaining = tabs.filter((t) => t.id !== id);
     if (remaining.length === 0) {
-      const t = emptyTab(1, defaultPriceBookId);
+      const t = emptyTab(1, defaultPriceBookId, defaultKind);
       setTabs([t]);
       setActiveTabId(t.id);
       return;
     }
     setTabs(remaining);
     if (id === activeTabId) setActiveTabId(remaining[remaining.length - 1].id);
+  };
+  /** Chuyển tab Hóa đơn ↔ Đặt hàng (giữ nguyên hàng hóa, khách hàng) */
+  const switchTabKind = (t: PosTab) => {
+    const next: PosTabKind = (t.kind ?? 'INVOICE') === 'BOOKING' ? 'INVOICE' : 'BOOKING';
+    const others = tabs.filter((x) => x.id !== t.id);
+    setTabs((prev) =>
+      prev.map((x) =>
+        x.id === t.id ? { ...x, kind: next, name: `${tabPrefix(next)} ${nextTabNumber(others, next)}`, paid: null } : x
+      )
+    );
   };
 
   // ── Khách hàng ──
@@ -456,9 +642,74 @@ export default function PosScreen() {
     message.success(`Đã thêm khách hàng ${created.name}`);
   };
 
+  /** Ghi chú gửi server: bảng giá + ghi chú đơn + ghi chú từng dòng */
+  const buildNotes = () => {
+    const lineNotes = tab.lines.filter((l) => l.note.trim()).map((l) => `${l.code}: ${l.note.trim()}`);
+    const bookName = priceBooks.find((p) => p.priceBookId === priceBookId)?.priceBookName;
+    return [bookName ? `[Bảng giá: ${bookName}]` : '', tab.notes.trim(), ...lineNotes].filter(Boolean).join(' ');
+  };
+
+  // ── Đặt hàng: lưu đơn đặt (không trừ kho), khách có thể trả trước ──
+  const handleSaveBooking = async () => {
+    if (submitting) return;
+    if (!canBooking) return message.error('Vai trò của bạn chưa được phân quyền chức năng Đặt hàng.');
+    if (!tab.customer) {
+      customerSearchRef.current?.focus();
+      return message.warning('Vui lòng chọn khách hàng đặt hàng.');
+    }
+    if (tab.lines.length === 0) return message.warning('Đơn đặt hàng chưa có hàng hóa.');
+    if (tab.lines.some((l) => l.quantity <= 0)) return message.warning('Số lượng hàng hóa phải lớn hơn 0.');
+    if (tab.warehouseId && tab.warehouseId !== warehouseId)
+      return message.error('Đơn thuộc chi nhánh khác — hãy đổi chi nhánh làm việc về chi nhánh xử lý của đơn.');
+    if (bookingPaidTotal > due) return message.error(`Tiền khách trả trước (${fmt(bookingPaidTotal)}) vượt quá giá trị đơn (${fmt(due)}).`);
+    if (!tab.bookingId && !lockSaleTime && saleTime && new Date(saleTime).getTime() > Date.now())
+      return message.error('Không được đặt hàng với thời gian trong tương lai.');
+
+    const payload: SaveSalesBookingPayload = {
+      partnerId: tab.customer.id,
+      warehouseId,
+      orderDate: !tab.bookingId && !lockSaleTime && saleTime ? new Date(saleTime).toISOString() : undefined,
+      deliveryDate: tab.deliveryDate ? new Date(tab.deliveryDate).toISOString() : null,
+      discountType: tab.discountMode === 'PERCENT' ? 'PERCENT' : 'AMOUNT',
+      discountValue: tab.discountMode === 'PERCENT' ? tab.discountValue : orderDiscount,
+      paidAmount: paid,
+      paymentMethod: tab.payMethod,
+      notes: buildNotes() || null,
+      items: tab.lines.map((l) => {
+        const c = lineCalc(l);
+        const markup = c.disc < 0; // bán cao hơn đơn giá: gửi giá bán làm đơn giá
+        return {
+          productId: l.productId,
+          unitId: l.unitId,
+          quantity: l.quantity,
+          originalPrice: markup ? c.sale : l.unitPrice,
+          discountType: l.discountMode === 'PERCENT' && !markup ? 'PERCENT' : 'AMOUNT',
+          discountValue: markup ? 0 : l.discountMode === 'PERCENT' ? l.discountValue : c.disc,
+        };
+      }),
+    };
+
+    setSubmitting(true);
+    try {
+      const res = tab.bookingId
+        ? await salesBookingService.updateBooking(tab.bookingId, payload)
+        : await salesBookingService.createBooking(payload);
+      message.success(tab.bookingId ? `Đã lưu đơn đặt hàng ${res.orderCode}` : `Đã tạo đơn đặt hàng ${res.orderCode}`);
+      closeTab(tab.id);
+      setSaleTime(null);
+      setReloadTick((t) => t + 1); // cập nhật SL khách đặt
+    } catch (err) {
+      message.error(err instanceof Error ? err.message : 'Không lưu được đơn đặt hàng.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   // ── Thanh toán ──
   const handleCheckout = async () => {
+    if (isBooking) return handleSaveBooking();
     if (submitting) return;
+    if (!canInvoice) return message.error('Vai trò của bạn chưa được phân quyền chức năng Bán hàng.');
     if (tab.lines.length === 0) return message.warning('Hóa đơn chưa có hàng hóa.');
     if (tab.lines.some((l) => l.quantity <= 0)) return message.warning('Số lượng hàng hóa phải lớn hơn 0.');
     if (!allowNegativeStock) {
@@ -467,11 +718,11 @@ export default function PosScreen() {
     }
     if (!lockSaleTime && saleTime && new Date(saleTime).getTime() > Date.now())
       return message.error('Không được bán với thời gian trong tương lai.');
-    if (!tab.customer && paid < due) return message.error('Khách lẻ phải thanh toán đủ. Chọn khách hàng để ghi nợ phần còn thiếu.');
+    if (tab.warehouseId && tab.warehouseId !== warehouseId)
+      return message.error('Hóa đơn của đơn đặt hàng phải xuất từ chi nhánh xử lý của đơn — hãy đổi chi nhánh làm việc.');
+    if (!tab.customer && paid < dueNow) return message.error('Khách lẻ phải thanh toán đủ. Chọn khách hàng để ghi nợ phần còn thiếu.');
 
-    const lineNotes = tab.lines.filter((l) => l.note.trim()).map((l) => `${l.code}: ${l.note.trim()}`);
-    const bookName = priceBooks.find((p) => p.priceBookId === priceBookId)?.priceBookName;
-    const notes = [bookName ? `[Bảng giá: ${bookName}]` : '', tab.notes.trim(), ...lineNotes].filter(Boolean).join(' ');
+    const notes = buildNotes();
 
     const req: PosSaleRequest = {
       partnerId: tab.customer?.id ?? 0,
@@ -486,6 +737,7 @@ export default function PosScreen() {
       notes,
       clientRequestId: `${tab.id}-${tab.lines.length}-${subTotal}`,
       orderDate: !lockSaleTime && saleTime ? new Date(saleTime).toISOString() : undefined,
+      bookingOrderId: tab.bookingId ?? undefined,
       items: tab.lines.map((l) => {
         const c = lineCalc(l);
         // Bán cao hơn đơn giá: gửi giá bán làm đơn giá gốc, không giảm giá (server không nhận giảm giá âm)
@@ -507,9 +759,12 @@ export default function PosScreen() {
     try {
       const res = await posService.submitSale(req);
       message.success(
-        res.changeAmount > 0
-          ? `Đã thanh toán hóa đơn ${res.orderCode}. Tiền thừa trả khách: ${fmt(res.changeAmount)}`
-          : `Đã thanh toán hóa đơn ${res.orderCode}`
+        [
+          `Đã thanh toán hóa đơn ${res.orderCode}`,
+          tab.bookingCode ? ` (giao theo đơn ${tab.bookingCode})` : '',
+          res.depositAmount ? `. Đã trừ ${fmt(res.depositAmount)} tiền khách trả trước` : '',
+          res.changeAmount > 0 ? `. Tiền thừa trả khách: ${fmt(res.changeAmount)}` : '',
+        ].join('')
       );
       closeTab(tab.id);
       setSaleTime(null);
@@ -599,7 +854,8 @@ export default function PosScreen() {
                         {p.code} • Giá bán: {fmt(priceOf(p.productId, p.standardPrice))}
                       </div>
                       <div className="text-[12px] text-[#677484]">
-                        Tồn: <span className={p.stockQuantity > 0 ? 'text-[#16a34a] font-semibold' : ''}>{fmt(p.stockQuantity)}</span> • Khách đặt: 0
+                        Tồn: <span className={p.stockQuantity > 0 ? 'text-[#16a34a] font-semibold' : ''}>{fmt(p.stockQuantity)}</span> • Khách
+                        đặt: {fmt(reserved[p.productId] ?? 0)}
                       </div>
                     </div>
                   </button>
@@ -613,16 +869,33 @@ export default function PosScreen() {
         <div className="flex-1 min-w-0 flex items-end gap-1 overflow-x-auto">
           {tabs.map((t) => {
             const active = t.id === tab.id;
+            const tabIsBooking = (t.kind ?? 'INVOICE') === 'BOOKING';
+            // Tab gắn với đơn đặt (sửa đơn / hóa đơn giao hàng) không chuyển loại được
+            const canSwitch = !t.bookingId && (tabIsBooking ? canInvoice : canBooking);
             return (
               <div
                 key={t.id}
                 onClick={() => setActiveTabId(t.id)}
-                className={`h-[44px] shrink-0 px-4 flex items-center gap-2.5 rounded-t-lg cursor-pointer ${
+                className={`relative h-[44px] shrink-0 px-4 flex items-center gap-2.5 rounded-t-lg cursor-pointer ${
                   active ? 'bg-[#e9ebef] text-[#15171a] font-bold' : 'text-white/90 hover:bg-white/10'
                 }`}
               >
-                <ArrowLeftRight size={15} className={active ? 'text-[#0070f4]' : ''} />
-                <span>{t.name}</span>
+                <button
+                  type="button"
+                  disabled={!canSwitch}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setActiveTabId(t.id);
+                    switchTabKind(t);
+                  }}
+                  title={canSwitch ? (tabIsBooking ? 'Chuyển sang hóa đơn' : 'Chuyển sang đặt hàng') : undefined}
+                  className={`p-1 rounded-full ${canSwitch ? 'cursor-pointer hover:bg-black/10' : 'cursor-default'} ${
+                    active ? (tabIsBooking ? 'bg-[#fff1e6] text-[#f97316]' : 'bg-[#e6f1fe] text-[#0070f4]') : ''
+                  }`}
+                >
+                  <ArrowLeftRight size={15} />
+                </button>
+                <span className={tabIsBooking && active ? 'text-[#f97316]' : ''}>{t.name}</span>
                 {t.lines.length > 0 && !active && <span className="text-[11px] opacity-80">({t.lines.length})</span>}
                 <button
                   type="button"
@@ -638,15 +911,44 @@ export default function PosScreen() {
               </div>
             );
           })}
-          <button
-            type="button"
-            onClick={addTab}
-            className="h-[44px] shrink-0 px-2 text-white hover:bg-white/10 rounded-t-lg cursor-pointer"
-            title="Thêm hóa đơn mới"
-          >
-            <PlusCircle size={20} />
-          </button>
+          <div className="h-[44px] shrink-0 flex items-center">
+            <button
+              type="button"
+              onClick={() => addTab()}
+              className="h-full px-2 text-white hover:bg-white/10 rounded-t-lg cursor-pointer"
+              title={defaultKind === 'BOOKING' ? 'Thêm đặt hàng mới' : 'Thêm hóa đơn mới'}
+            >
+              <PlusCircle size={20} />
+            </button>
+            {canInvoice && canBooking && (
+              <button
+                type="button"
+                data-pos-menu
+                onClick={openAddMenu}
+                className="h-full px-1 text-white hover:bg-white/10 rounded-t-lg cursor-pointer"
+                title="Thêm hóa đơn / đặt hàng"
+              >
+                <ChevronDown size={16} />
+              </button>
+            )}
+          </div>
         </div>
+
+        {/* Menu nổi của thanh tab */}
+        {tabMenu && (
+          <div
+            data-pos-menu
+            style={{ left: tabMenu.left, top: tabMenu.top }}
+            className="fixed z-[60] min-w-44 bg-white rounded-lg shadow-[0_8px_24px_rgba(15,23,42,0.18)] border border-slate-200 py-1 text-[14px] text-[#15171a] whitespace-nowrap"
+          >
+            <button type="button" onClick={() => addTab('INVOICE')} className="w-full text-left px-4 py-2 hover:bg-[#eff6ff] cursor-pointer">
+              Thêm hóa đơn
+            </button>
+            <button type="button" onClick={() => addTab('BOOKING')} className="w-full text-left px-4 py-2 hover:bg-[#eff6ff] cursor-pointer">
+              Thêm đặt hàng
+            </button>
+          </div>
+        )}
 
         {/* Bên phải: kho làm việc + người dùng, menu */}
         <div className="self-center mb-2 flex items-center gap-1 text-white">
@@ -689,6 +991,11 @@ export default function PosScreen() {
                   <Link href="/orders" className="block py-1.5 text-[#0070f4] hover:underline">
                     Danh sách hóa đơn
                   </Link>
+                  {canBooking && (
+                    <Link href="/sales-booking" className="block py-1.5 text-[#0070f4] hover:underline">
+                      Danh sách đặt hàng
+                    </Link>
+                  )}
                   <Link href="/products" className="block py-1.5 text-[#0070f4] hover:underline">
                     Về trang quản lý
                   </Link>
@@ -707,12 +1014,13 @@ export default function PosScreen() {
             {tab.lines.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center text-[#94a3b8]">
                 <Search size={36} strokeWidth={1.5} />
-                <p className="mt-2 text-[14px]">Tìm hàng hóa (F3) để thêm vào hóa đơn</p>
+                <p className="mt-2 text-[14px]">Tìm hàng hóa (F3) để thêm vào {isBooking ? 'đơn đặt hàng' : 'hóa đơn'}</p>
               </div>
             ) : (
               tab.lines.map((l, idx) => {
                 const c = lineCalc(l);
-                const overStock = !allowNegativeStock && (qtyByProduct.get(l.productId) ?? 0) > l.stock;
+                // Đặt hàng không trừ kho → không chặn theo tồn
+                const overStock = !isBooking && !allowNegativeStock && (qtyByProduct.get(l.productId) ?? 0) > l.stock;
                 const active = pricePopoverKey === l.key;
                 return (
                   <div
@@ -769,7 +1077,7 @@ export default function PosScreen() {
                         {prefs.stock && (
                           <div className="hidden group-hover:block absolute left-1/2 -translate-x-1/2 top-full mt-2 z-30 bg-white rounded-lg shadow-lg border border-slate-200 px-4 py-2 text-[13px] whitespace-nowrap">
                             <div>Tồn: {fmt(l.stock)}</div>
-                            <div>Đặt: 0</div>
+                            <div>Khách đặt: {fmt(reserved[l.productId] ?? 0)}</div>
                           </div>
                         )}
                       </div>
@@ -878,9 +1186,12 @@ export default function PosScreen() {
                   {tab.customer.currentDebt > 0 && (
                     <span className="text-[12px] text-[#fb2c36] shrink-0">Nợ: {fmt(tab.customer.currentDebt)}</span>
                   )}
-                  <button type="button" onClick={() => selectCustomer(null)} className="ml-auto p-0.5 rounded hover:bg-black/5 cursor-pointer">
-                    <X size={15} />
-                  </button>
+                  {/* Tab gắn với đơn đặt: khách hàng cố định theo đơn */}
+                  {!tab.bookingId && (
+                    <button type="button" onClick={() => selectCustomer(null)} className="ml-auto p-0.5 rounded hover:bg-black/5 cursor-pointer">
+                      <X size={15} />
+                    </button>
+                  )}
                 </div>
               ) : (
                 <>
@@ -977,12 +1288,26 @@ export default function PosScreen() {
                 )}
               </div>
             </div>
+            {!isBooking && tab.bookingId && (
+              <div className="flex items-center justify-between">
+                <span>
+                  Khách đã trả trước <span className="text-[13px] text-[#677484]">({tab.bookingCode})</span>
+                </span>
+                <span>{fmt(depositApplied)}</span>
+              </div>
+            )}
             <div className="flex items-center justify-between font-bold">
               <span>Khách cần trả</span>
-              <span className="text-[20px] text-[#0070f4]">{fmt(due)}</span>
+              <span className="text-[20px] text-[#0070f4]">{fmt(isBooking ? due : dueNow)}</span>
             </div>
+            {isBooking && (tab.bookingPaid ?? 0) > 0 && (
+              <div className="flex items-center justify-between">
+                <span>Khách đã trả</span>
+                <span>{fmt(tab.bookingPaid ?? 0)}</span>
+              </div>
+            )}
             <div className="flex items-center justify-between font-bold">
-              <span>Khách thanh toán</span>
+              <span>{isBooking ? (tab.bookingId ? 'Khách trả thêm' : 'Khách trả trước') : 'Khách thanh toán'}</span>
               <div className="w-36">
                 <MoneyInput value={paid} onChange={(v) => updateTab({ paid: v })} className="text-[18px] font-semibold" />
               </div>
@@ -1011,17 +1336,38 @@ export default function PosScreen() {
               </div>
             )}
 
-            {change > 0 && (
-              <div className="flex items-center justify-between">
-                <span>Tiền thừa trả khách</span>
-                <span className="font-semibold">{fmt(change)}</span>
-              </div>
-            )}
-            {change < 0 && (
-              <div className="flex items-center justify-between">
-                <span>{tab.customer ? 'Tính vào công nợ' : 'Còn thiếu'}</span>
-                <span className="font-semibold text-[#fb2c36]">{fmt(-change)}</span>
-              </div>
+            {isBooking ? (
+              <>
+                <div className="flex items-center justify-between">
+                  <span>Còn phải thu khi giao</span>
+                  <span className={`font-semibold ${bookingPaidTotal > due ? 'text-[#fb2c36]' : ''}`}>{fmt(Math.max(0, due - bookingPaidTotal))}</span>
+                </div>
+                {/* Thời gian giao hàng dự kiến */}
+                <div className="flex items-center justify-between gap-3">
+                  <span>Thời gian giao hàng</span>
+                  <input
+                    type="datetime-local"
+                    value={tab.deliveryDate ?? ''}
+                    onChange={(e) => updateTab({ deliveryDate: e.target.value || null })}
+                    className="h-8 px-2 rounded-lg border border-slate-300 text-[14px] text-[#15171a] outline-none focus:border-[#0070f4] cursor-pointer"
+                  />
+                </div>
+              </>
+            ) : (
+              <>
+                {change > 0 && (
+                  <div className="flex items-center justify-between">
+                    <span>Tiền thừa trả khách</span>
+                    <span className="font-semibold">{fmt(change)}</span>
+                  </div>
+                )}
+                {change < 0 && (
+                  <div className="flex items-center justify-between">
+                    <span>{tab.customer ? 'Tính vào công nợ' : 'Còn thiếu'}</span>
+                    <span className="font-semibold text-[#fb2c36]">{fmt(-change)}</span>
+                  </div>
+                )}
+              </>
             )}
           </div>
 
@@ -1029,11 +1375,12 @@ export default function PosScreen() {
           <button
             type="button"
             onClick={() => void handleCheckout()}
-            disabled={submitting}
-            className="mt-auto h-14 rounded-xl bg-[#0070f4] hover:bg-[#005ac3] text-white text-[17px] font-bold tracking-wide flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
+            disabled={submitting || (isBooking ? !canBooking : !canInvoice)}
+            title={isBooking ? (canBooking ? undefined : 'Chưa được phân quyền Đặt hàng') : canInvoice ? 'F9' : 'Chưa được phân quyền Bán hàng'}
+            className="mt-auto h-14 rounded-xl bg-[#0070f4] hover:bg-[#005ac3] text-white text-[17px] font-bold tracking-wide flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
           >
             {submitting ? <RefreshCw size={18} className="animate-spin" /> : <Check size={18} className="hidden" />}
-            THANH TOÁN
+            {isBooking ? (tab.bookingId ? 'LƯU ĐƠN ĐẶT HÀNG' : 'ĐẶT HÀNG') : 'THANH TOÁN'}
           </button>
         </aside>
       </div>

@@ -306,10 +306,16 @@ public class GetOrderDetailQueryHandler : IRequestHandler<GetOrderDetailQuery, R
         decimal subTotalAfterItemDisc = subTotalGross - itemsTotalDiscount;
         decimal orderDiscount = order.DiscountAmount;
 
+        var bookingCode = order.BookingOrderId.HasValue
+            ? await _context.TrxOrders.AsNoTracking().Where(o => o.OrderId == order.BookingOrderId.Value).Select(o => o.OrderCode).FirstOrDefaultAsync(cancellationToken)
+            : null;
         var dto = new OrderDetailDto
         {
             OrderId = order.OrderId,
             OrderCode = order.OrderCode ?? $"HD{order.OrderId:D5}",
+            BookingOrderId = order.BookingOrderId,
+            BookingOrderCode = bookingCode,
+            DepositAmount = order.DepositAmount,
             OrderType = order.OrderType ?? (order.OrderCode?.StartsWith("HD") == true ? "INVOICE" : "BOOKING"),
             DocumentType = (order.OrderType == "BOOKING" || string.Equals(order.Status, "DRAFT", StringComparison.OrdinalIgnoreCase) || string.Equals(order.Status, "PENDING", StringComparison.OrdinalIgnoreCase)) ? "SALES_ORDER" : "SALES_INVOICE",
             Status = order.Status ?? "COMPLETED",

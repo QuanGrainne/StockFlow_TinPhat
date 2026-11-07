@@ -1466,6 +1466,21 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
                 .HasMaxLength(20)
                 .HasDefaultValue("INVOICE")
                 .HasColumnName("order_type");
+            entity.Property(e => e.WarehouseId).HasColumnName("warehouse_id");
+            entity.Property(e => e.DeliveryDate)
+                .HasColumnType("timestamp without time zone")
+                .HasColumnName("delivery_date");
+            entity.Property(e => e.BookingOrderId).HasColumnName("booking_order_id");
+            entity.Property(e => e.DepositAmount)
+                .HasPrecision(18, 2)
+                .HasDefaultValue(0m)
+                .HasColumnName("deposit_amount");
+            entity.HasOne(d => d.Warehouse).WithMany()
+                .HasForeignKey(d => d.WarehouseId)
+                .HasConstraintName("fk_trx_orders_warehouse_id");
+            entity.HasOne(d => d.BookingOrder).WithMany(p => p.BookingInvoices)
+                .HasForeignKey(d => d.BookingOrderId)
+                .HasConstraintName("fk_trx_orders_booking_order_id");
             entity.Property(e => e.UpdatedAt)
                 .HasColumnType("timestamp without time zone")
                 .HasColumnName("updated_at");

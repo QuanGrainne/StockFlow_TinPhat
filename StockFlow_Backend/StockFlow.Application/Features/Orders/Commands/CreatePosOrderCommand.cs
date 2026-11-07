@@ -9,6 +9,7 @@ using Microsoft.EntityFrameworkCore;
 using StockFlow.Application.Common;
 using StockFlow.Application.Common.Interfaces;
 using StockFlow.Application.Features.Orders.DTOs;
+using StockFlow.Application.Features.SalesBookings.Common;
 using StockFlow.Domain.Entities;
 
 namespace StockFlow.Application.Features.Orders.Commands;
@@ -182,6 +183,22 @@ public class CreatePosOrderCommandHandler : IRequestHandler<CreatePosOrderComman
             return Result<PosOrderResultDto>.Failure($"Khách hàng '{customer.PartnerName}' đang trong trạng thái ngừng hoạt động, từ chối giao dịch (CUS-003).");
         }
 
+        // 3b. Tạo hóa đơn từ đơn đặt hàng: cùng khách, cùng chi nhánh, đơn còn đang giao
+        TrxOrder? booking = null;
+        if (req.BookingOrderId is > 0)
+        {
+            booking = await _context.TrxOrders
+                .FirstOrDefaultAsync(o => o.OrderId == req.BookingOrderId.Value && o.OrderType == SalesBookingOps.OrderType, cancellationToken);
+            if (booking == null)
+                return Result<PosOrderResultDto>.Failure("Không tìm thấy đơn đặt hàng để tạo hóa đơn.");
+            if (!SalesBookingOps.IsOpen(booking.Status))
+                return Result<PosOrderResultDto>.Failure($"Đơn đặt hàng {booking.OrderCode} đã hoàn thành hoặc đã hủy.");
+            if (booking.PartnerId != customer.PartnerId)
+                return Result<PosOrderResultDto>.Failure($"Hóa đơn phải cùng khách hàng với đơn đặt hàng {booking.OrderCode}.");
+            if (booking.WarehouseId.HasValue && booking.WarehouseId.Value != req.WarehouseId)
+                return Result<PosOrderResultDto>.Failure($"Đơn đặt hàng {booking.OrderCode} thuộc chi nhánh khác — hóa đơn phải xuất từ chi nhánh xử lý của đơn.");
+        }
+
         // 4. Kiểm tra sản phẩm và trạng thái kinh doanh (POS-001 -> POS-008, POS-011)
         var productIds = req.Items.Select(i => i.ProductId).Distinct().ToList();
         var products = await _context.MstProducts
@@ -310,24 +327,11 @@ public class CreatePosOrderCommandHandler : IRequestHandler<CreatePosOrderComman
         }
 
         // Group A3: Tính toán lượng hàng đang tạm giữ cho các đơn đặt hàng khác
+        // (hàng khách đặt ở các đơn đặt hàng còn mở của chi nhánh, trừ chính đơn đang giao)
         Dictionary<int, decimal> reservedMap = new();
         if (!settings.AllowSellingReservedStock && req.IssueStockNow && isCompleted)
         {
-            var pendingOrderIds = await _context.TrxOrders
-                .Where(o => o.Status == "PENDING")
-                .Select(o => o.OrderId)
-                .ToListAsync(cancellationToken);
-
-            if (pendingOrderIds.Count > 0)
-            {
-                var reservedList = await _context.DtlOrderItems
-                    .Where(d => pendingOrderIds.Contains(d.OrderId) && productIds.Contains(d.ProductId))
-                    .GroupBy(d => d.ProductId)
-                    .Select(g => new { ProductId = g.Key, ReservedQty = g.Sum(x => x.Quantity) })
-                    .ToListAsync(cancellationToken);
-
-                reservedMap = reservedList.ToDictionary(r => r.ProductId, r => r.ReservedQty ?? 0m);
-            }
+            reservedMap = await SalesBookingOps.ReservedQtyAsync(_context, req.WarehouseId, productIds, booking?.OrderId, cancellationToken);
         }
 
         // Group B1 & A3: Kiểm tra khi xuất kho ngay
@@ -364,13 +368,19 @@ public class CreatePosOrderCommandHandler : IRequestHandler<CreatePosOrderComman
         bool isWalkIn = customer.PartnerCode == "KH00000"
                      || (customer.PartnerName != null && customer.PartnerName.Contains("Khách lẻ"));
 
+        // Hóa đơn từ đơn đặt hàng: tiền khách đã trả trước (còn dư) được trừ vào hóa đơn
+        decimal depositApplied = booking != null
+            ? Math.Min(finalTotal, await SalesBookingOps.RemainingDepositAsync(_context, booking, cancellationToken))
+            : 0;
+        decimal dueNow = finalTotal - depositApplied;
+
         bool isRecordDebtExcess = !isWalkIn && string.Equals(req.ExcessAction, "RECORD_DEBT", StringComparison.OrdinalIgnoreCase);
-        decimal rawChangeAmount = Math.Max(0, req.PaidAmount - finalTotal);
+        decimal rawChangeAmount = Math.Max(0, req.PaidAmount - dueNow);
         decimal actualReceived;
         decimal changeAmount;
         decimal outstanding;
 
-        if (req.PaidAmount >= finalTotal)
+        if (req.PaidAmount >= dueNow)
         {
             if (isRecordDebtExcess && rawChangeAmount > 0)
             {
@@ -380,7 +390,7 @@ public class CreatePosOrderCommandHandler : IRequestHandler<CreatePosOrderComman
             }
             else
             {
-                actualReceived = finalTotal;
+                actualReceived = dueNow;
                 changeAmount = rawChangeAmount; // Thối tiền thừa cho khách tại quầy
                 outstanding = 0;
             }
@@ -389,7 +399,7 @@ public class CreatePosOrderCommandHandler : IRequestHandler<CreatePosOrderComman
         {
             actualReceived = req.PaidAmount;
             changeAmount = 0;
-            outstanding = finalTotal - actualReceived;
+            outstanding = dueNow - actualReceived;
         }
 
         if (isWalkIn && outstanding > 0)
@@ -410,6 +420,8 @@ public class CreatePosOrderCommandHandler : IRequestHandler<CreatePosOrderComman
                     $"Khách hàng '{customer.PartnerName}' không có hạn mức tín dụng (Hạn mức: 0 đ). Không thể thực hiện ghi công nợ (CUS-007).");
             }
 
+            // Tiền trả trước của đơn đặt đã giảm dư nợ từ trước → cộng lại khi so hạn mức (BR-10)
+            currentDebt += depositApplied;
             decimal remainingCredit = Math.Max(0, creditLimit - currentDebt);
 
             if (currentDebt >= creditLimit)
@@ -448,9 +460,10 @@ public class CreatePosOrderCommandHandler : IRequestHandler<CreatePosOrderComman
             }
         }
 
+        decimal totalPaid = actualReceived + depositApplied;
         string paymentStatus = finalTotal == 0
             ? "PAID"
-            : (actualReceived >= finalTotal ? "PAID" : (actualReceived > 0 ? "PARTIAL" : "DEBT"));
+            : (totalPaid >= finalTotal ? "PAID" : (totalPaid > 0 ? "PARTIAL" : "DEBT"));
 
         string clientReqTag = !string.IsNullOrWhiteSpace(req.ClientRequestId) ? $" [REQ:{req.ClientRequestId}]" : "";
         string finalNotes = $"{req.Notes ?? ""}{clientReqTag}".Trim();
@@ -464,18 +477,22 @@ var dbContext = _context as DbContext;
             {
                 OrderCode = orderCode,
                 PartnerId = customer.PartnerId,
-                Status = isCompleted ? "COMPLETED" : (isPendingBooking ? "PENDING" : "DRAFT"),
+                Status = isCompleted ? "COMPLETED" : (isPendingBooking ? SalesBookingOps.Draft : "DRAFT"),
                 SubTotal = serverSubTotal,
                 DiscountType = orderDiscountType,
                 DiscountValue = orderDiscountValue,
                 DiscountAmount = orderDiscountAmount,
                 TotalAmount = finalTotal,
-                PaidAmount = actualReceived,
+                PaidAmount = totalPaid,
                 OutstandingAmount = outstanding,
                 PaymentStatus = paymentStatus,
                 CreatedBy = currentUserId,
                 OrderDate = finalOrderDate,
-                Notes = string.IsNullOrWhiteSpace(finalNotes) ? null : finalNotes
+                Notes = string.IsNullOrWhiteSpace(finalNotes) ? null : finalNotes,
+                OrderType = isPendingBooking ? SalesBookingOps.OrderType : SalesBookingOps.InvoiceType,
+                WarehouseId = req.WarehouseId,
+                BookingOrderId = booking?.OrderId,
+                DepositAmount = depositApplied,
             };
 
             _context.TrxOrders.Add(order);
@@ -577,15 +594,21 @@ var dbContext = _context as DbContext;
             }
 
             // 11. Cập nhật dư nợ khách hàng
-            if (outstanding > 0 && isCompleted)
+            if (isCompleted)
             {
-                // Khách trả thiếu -> Ghi nợ phát sinh
-                customer.CurrentDebt = (customer.CurrentDebt ?? 0) + outstanding;
-            }
-            else if (isRecordDebtExcess && rawChangeAmount > 0 && isCompleted)
-            {
-                // Khách trả thừa và chọn "Tính vào công nợ" -> Ghi có giảm nợ cũ hoặc cọc đơn sau
-                customer.CurrentDebt = (customer.CurrentDebt ?? 0) - rawChangeAmount;
+                // Tiền trả trước của đơn đặt đã giảm nợ lúc thu → nay trừ vào hóa đơn thì cộng lại phần đó
+                decimal debtDelta = depositApplied;
+                if (outstanding > 0)
+                {
+                    // Khách trả thiếu -> Ghi nợ phát sinh
+                    debtDelta += outstanding;
+                }
+                else if (isRecordDebtExcess && rawChangeAmount > 0)
+                {
+                    // Khách trả thừa và chọn "Tính vào công nợ" -> Ghi có giảm nợ cũ hoặc cọc đơn sau
+                    debtDelta -= rawChangeAmount;
+                }
+                if (debtDelta != 0) customer.CurrentDebt = (customer.CurrentDebt ?? 0) + debtDelta;
             }
 
             // 12. Ghi nhận giao dịch tài chính (Phiếu thu)
@@ -611,6 +634,13 @@ CreatedBy = currentUserId,
 
             await _context.SaveChangesAsync(cancellationToken);
 
+            // Đơn đặt hàng: cập nhật SL đã giao → Đang giao hàng / Hoàn thành
+            if (booking != null && isCompleted)
+            {
+                await SalesBookingOps.RecomputeStatusAsync(_context, booking.OrderId, currentUserId, cancellationToken);
+                await _context.SaveChangesAsync(cancellationToken);
+            }
+
             if (transaction != null)
             {
                 await transaction.CommitAsync(cancellationToken);
@@ -632,7 +662,8 @@ CreatedBy = currentUserId,
                 DiscountValue = orderDiscountValue,
                 DiscountAmount = orderDiscountAmount,
                 TotalAmount = finalTotal,
-                PaidAmount = actualReceived,
+                PaidAmount = totalPaid,
+                DepositAmount = depositApplied,
                 ChangeAmount = changeAmount,
                 OutstandingAmount = outstanding,
                 PaymentStatus = paymentStatus,

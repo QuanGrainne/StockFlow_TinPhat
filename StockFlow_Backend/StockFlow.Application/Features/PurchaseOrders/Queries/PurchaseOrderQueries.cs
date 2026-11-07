@@ -17,7 +17,8 @@ public record GetPurchaseOrdersQuery(
     string? Search = null
 ) : IRequest<Result<List<PurchaseOrderListDto>>>;
 
-public record GetPurchaseOrderByIdQuery(int PoId) : IRequest<Result<PurchaseOrderDetailDto>>;
+/// <summary>Chi tiết phiếu theo id, hoặc theo mã PDN khi PoId = 0 (link từ phiếu nhập / phiếu gộp chỉ có mã)</summary>
+public record GetPurchaseOrderByIdQuery(int PoId, string? PoCode = null) : IRequest<Result<PurchaseOrderDetailDto>>;
 
 public class PurchaseOrderQueryHandler :
     IRequestHandler<GetPurchaseOrdersQuery, Result<List<PurchaseOrderListDto>>>,
@@ -107,7 +108,7 @@ public class PurchaseOrderQueryHandler :
             .Include(p => p.MergedIntoPo)
             .Include(p => p.MergedFromPos)
             .Include(p => p.DtlPurchaseOrderItems).ThenInclude(i => i.Product).ThenInclude(p => p.BaseUnit)
-            .FirstOrDefaultAsync(p => p.PoId == request.PoId, ct);
+            .FirstOrDefaultAsync(p => request.PoId > 0 ? p.PoId == request.PoId : p.PoCode == request.PoCode, ct);
         if (po == null) return Result.Failure<PurchaseOrderDetailDto>("Không tìm thấy phiếu đặt hàng nhập.");
         if (!await _currentUser.HasWarehouseAccessAsync(po.WarehouseId, ct))
             return Result.Failure<PurchaseOrderDetailDto>("Bạn không có quyền xem phiếu của kho này.");

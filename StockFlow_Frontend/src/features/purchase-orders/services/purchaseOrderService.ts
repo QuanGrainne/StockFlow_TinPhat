@@ -26,6 +26,11 @@ export const purchaseOrderService = {
     return apiClient.get<PurchaseOrderDetail>(`/api/purchase-orders/${id}`);
   },
 
+  /** Tra phiếu theo mã PDN (link chỉ có mã, VD phiếu gộp, PO trên phiếu nhập) */
+  getPurchaseOrderByCode(code: string): Promise<PurchaseOrderDetail> {
+    return apiClient.get<PurchaseOrderDetail>(`/api/purchase-orders/by-code/${encodeURIComponent(code)}`);
+  },
+
   createPurchaseOrder(payload: SavePurchaseOrderPayload): Promise<{ poId: number }> {
     return apiClient.post<{ poId: number }>('/api/purchase-orders', payload);
   },

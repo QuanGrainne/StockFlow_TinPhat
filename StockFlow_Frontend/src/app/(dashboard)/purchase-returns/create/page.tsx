@@ -2,6 +2,7 @@
 
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
+import { FeatureGuard } from '@/features/roles/components/common/FeatureGuard';
 
 const CreatePurchaseReturnClient = dynamic(() => import('./CreatePurchaseReturnClient'), {
   ssr: false,
@@ -12,8 +13,14 @@ const CreatePurchaseReturnClient = dynamic(() => import('./CreatePurchaseReturnC
   ),
 });
 
+const RETURN_FEATURES = ['feat-purchase-returns'];
+
 export default function CreatePurchaseReturnPage() {
   // cacheComponents giữ state trang khi rời đi (Activity) → key theo bfcacheId để mỗi lần vào là form mới
   const { bfcacheId } = useRouter();
-  return <CreatePurchaseReturnClient key={bfcacheId} />;
+  return (
+    <FeatureGuard anyOf={RETURN_FEATURES}>
+      <CreatePurchaseReturnClient key={bfcacheId} />
+    </FeatureGuard>
+  );
 }

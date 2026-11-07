@@ -33,6 +33,8 @@ export interface PosSaleRequest {
   clientRequestId: string;
   /** Thời gian bán (ISO); bỏ trống = giờ hiện tại. Không được ở tương lai. */
   orderDate?: string;
+  /** Hóa đơn giao hàng tạo từ đơn đặt hàng: server trừ tiền khách đã trả trước của đơn */
+  bookingOrderId?: number;
   items: {
     productId: number;
     quantity: number;
@@ -55,6 +57,8 @@ export interface PosSaleResult {
   paidAmount: number;
   changeAmount: number;
   outstandingAmount: number;
+  /** Tiền trả trước của đơn đặt hàng đã trừ vào hóa đơn */
+  depositAmount?: number;
   message?: string;
 }
 

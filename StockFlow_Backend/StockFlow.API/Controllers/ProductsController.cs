@@ -70,6 +70,7 @@ public class ProductsController : ControllerBase
     [ProducesResponseType(typeof(List<StockCardEntryDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [RequirePermission("GOODS_READ")]
+    [RequireFeature("feat-goods")]
     public async Task<IActionResult> GetStockCard(int id, [FromQuery] int warehouseId)
     {
         var result = await _mediator.Send(new GetProductStockCardQuery(id, warehouseId));
@@ -88,6 +89,7 @@ public class ProductsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [RequirePermission("GOODS_CREATE")]
+    [RequireFeature("feat-goods", "feat-purchase", "feat-purchase-orders")]
     public async Task<IActionResult> CreateProduct([FromBody] CreateProductRequest request)
     {
         var result = await _mediator.Send(new CreateProductCommand(request));
@@ -109,6 +111,7 @@ public class ProductsController : ControllerBase
     [ProducesResponseType(typeof(ImportProductsResultDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [RequirePermission("GOODS_CREATE")]
+    [RequireFeature("feat-goods")]
     public async Task<IActionResult> ImportProducts([FromBody] ImportProductsRequest request)
     {
         var result = await _mediator.Send(new ImportProductsCommand(request));
@@ -126,6 +129,7 @@ public class ProductsController : ControllerBase
     [ProducesResponseType(typeof(ProductDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [RequirePermission("GOODS_UPDATE")]
+    [RequireFeature("feat-goods")]
     public async Task<IActionResult> UpdateProduct(int id, [FromBody] UpdateProductRequest request)
     {
         var result = await _mediator.Send(new UpdateProductCommand(id, request));
@@ -143,6 +147,7 @@ public class ProductsController : ControllerBase
     [ProducesResponseType(typeof(ProductStockAdjustmentDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [RequirePermission("STOCK_UPDATE")]
+    [RequireFeature("feat-goods")]
     public async Task<IActionResult> AdjustStock(int id, [FromBody] AdjustProductStockRequest request)
     {
         var result = await _mediator.Send(new AdjustProductStockCommand(id, request));
@@ -160,6 +165,7 @@ public class ProductsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [RequirePermission("GOODS_UPDATE")]
+    [RequireFeature("feat-goods")]
     public async Task<IActionResult> ToggleProductStatus(int id)
     {
         var result = await _mediator.Send(new ToggleProductStatusCommand(id));
@@ -177,6 +183,7 @@ public class ProductsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [RequirePermission("GOODS_DELETE")]
+    [RequireFeature("feat-goods")]
     public async Task<IActionResult> DeleteProduct(int id)
     {
         var result = await _mediator.Send(new DeleteProductCommand(id));
@@ -206,6 +213,7 @@ public class ProductsController : ControllerBase
     [ProducesResponseType(typeof(ProductCategoryDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [RequirePermission("GOODS_CREATE")]
+    [RequireFeature("feat-goods", "feat-purchase", "feat-purchase-orders")]
     public async Task<IActionResult> CreateProductCategory([FromBody] CreateCategoryRequest request)
     {
         var result = await _mediator.Send(new CreateProductCategoryCommand(request));

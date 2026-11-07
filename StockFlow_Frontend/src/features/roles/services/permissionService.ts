@@ -2,6 +2,8 @@
 // Service chuyên biệt xử lý Vai trò & Phân quyền Kho (Roles & Warehouse Permissions - Người 2 phụ trách)
 
 import { apiClient } from '@/lib/api/client';
+import { ADMIN_LOCKED_FEATURES, NAV_ITEMS_FLAT } from '../config/navbar';
+import { ROLE_SWITCHER_ENABLED } from '@/lib/auth/flags';
 import {
   StaffAccount,
   WarehouseFacility,
@@ -443,302 +445,184 @@ export const permissionService = {
   },
 
   // ─── 3. Navbar Feature Matrix (Phân quyền theo chức năng Navbar) ───────────
+  // Ma trận lưu trên server (mã quyền FEAT_* của từng vai trò). Backend chặn API ghi dữ liệu theo đúng ma trận này.
   async getFeatureMatrix(): Promise<Record<string, string[]>> {
-    let matrix: Record<string, string[]> = {};
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('stockflow_feature_matrix');
-      if (saved) {
-        try {
-          matrix = JSON.parse(saved);
-          // One-time initialization: đảm bảo tính năng khách hàng được bật mặc định cho ADMIN, MANAGER, SALES
-          if (!localStorage.getItem('stockflow_customers_feat_initialized_v1')) {
-            const defaultRolesWithCustomers = ['ROLE_ADMIN', 'ROLE_MANAGER', 'ROLE_SALES'];
-            for (const r of defaultRolesWithCustomers) {
-              if (Array.isArray(matrix[r]) && !matrix[r].includes('feat-customers')) {
-                matrix[r].push('feat-customers');
-              }
-            }
-            localStorage.setItem('stockflow_feature_matrix', JSON.stringify(matrix));
-            localStorage.setItem('stockflow_customers_feat_initialized_v1', 'true');
-          }
-          // One-time: bật tính năng Kiểm kho mặc định cho ADMIN, MANAGER, WAREHOUSE (ma trận đã lưu từ trước chưa có)
-          if (!localStorage.getItem('stockflow_stocktake_feat_initialized_v1')) {
-            for (const r of ['ROLE_ADMIN', 'ROLE_MANAGER', 'ROLE_WAREHOUSE']) {
-              if (Array.isArray(matrix[r]) && !matrix[r].includes('feat-stocktake')) {
-                matrix[r].push('feat-stocktake');
-              }
-            }
-            localStorage.setItem('stockflow_feature_matrix', JSON.stringify(matrix));
-            localStorage.setItem('stockflow_stocktake_feat_initialized_v1', 'true');
-          }
-          // One-time (v2): ma trận lưu sau lần v1 có thể đã mất "Khách hàng" → menu Khách hàng bị ẩn, vào /customers bị đá về Tổng quan.
-          // Bật lại mặc định cho ADMIN, MANAGER, SALES (sau đó Admin vẫn tắt được cho Quản lý / Kinh doanh trong ma trận).
-          if (!localStorage.getItem('stockflow_customers_feat_initialized_v2')) {
-            for (const r of ['ROLE_ADMIN', 'ROLE_MANAGER', 'ROLE_SALES']) {
-              if (Array.isArray(matrix[r]) && !matrix[r].includes('feat-customers')) {
-                matrix[r].push('feat-customers');
-              }
-            }
-            localStorage.setItem('stockflow_feature_matrix', JSON.stringify(matrix));
-            localStorage.setItem('stockflow_customers_feat_initialized_v2', 'true');
-          }
-          if (!localStorage.getItem('stockflow_suppliers_feat_initialized_v2')) {
-            const defaultRolesWithSuppliers = ['ROLE_ADMIN', 'ROLE_MANAGER', 'ROLE_WAREHOUSE'];
-            for (const r of defaultRolesWithSuppliers) {
-              if (Array.isArray(matrix[r]) && !matrix[r].includes('feat-suppliers')) {
-                matrix[r].push('feat-suppliers');
-              }
-            }
-            if (Array.isArray(matrix['ROLE_ADMIN']) && !matrix['ROLE_ADMIN'].includes('feat-purchase')) {
-              matrix['ROLE_ADMIN'].push('feat-purchase');
-            }
-            localStorage.setItem('stockflow_feature_matrix', JSON.stringify(matrix));
-            localStorage.setItem('stockflow_suppliers_feat_initialized_v2', 'true');
-          }
-        } catch {}
-      }
+    const rows = await apiClient.get<RoleFeaturesRow[]>('/api/Roles/feature-matrix', authToken());
+    const matrix: Record<string, string[]> = {};
+    for (const r of rows) matrix[r.roleCode] = r.features;
+
+    // One-time: đẩy ma trận cũ lưu trên trình duyệt lên server cho các vai trò server chưa cấu hình
+    const pushed = await pushLegacyLocalMatrix(rows);
+    if (pushed) {
+      for (const [role, feats] of Object.entries(pushed)) matrix[role] = feats;
     }
-    for (const [role, feats] of Object.entries(DEFAULT_ROLE_FEATURE_PERMS)) {
-      if (!matrix[role]) {
-        matrix[role] = [...feats];
-      }
-    }
+    matrixCache = { token: authToken() ?? '', at: Date.now(), matrix };
     return matrix;
   },
 
   async saveFeatureMatrix(matrix: Record<string, string[]>): Promise<boolean> {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('stockflow_feature_matrix', JSON.stringify(matrix));
-    }
-
-    // Đồng bộ sang từng Role cho Backend & localStorage
-    for (const [roleCode, featureIds] of Object.entries(matrix)) {
-      // Dùng mã phân hệ backend (backendModuleKey) nếu khác mã hiển thị, VD Chuyển hàng → STOCK
-      const permittedModuleKeys = new Set(
-        NAVBAR_FEATURES
-          .filter(f => featureIds.includes(f.id))
-          .map(f => f.backendModuleKey ?? f.moduleKey)
-      );
-
-      const modules: PermissionMatrixModule[] = INITIAL_PERMISSION_MODULES.map(m => {
-        const key = m.code.replace(/[\[\]]/g, '').toUpperCase();
-        const isPermitted = permittedModuleKeys.has(key);
-        return {
-          ...m,
-          read: isPermitted,
-          create: isPermitted,
-          update: isPermitted,
-          delete: isPermitted,
-          approve: isPermitted,
-        };
-      });
-
-      await this.savePermissionMatrix(roleCode, modules);
-    }
-
+    await apiClient.put('/api/Roles/feature-matrix', matrix, authToken());
+    clearFeatureCaches();
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('stockflow_permissions_updated'));
     }
     return true;
   },
 
+  /**
+   * Chức năng navbar được dùng. Bình thường lấy theo tài khoản đăng nhập (server tính từ vai trò thật);
+   * khi bật bộ chuyển vai trò (demo) thì lấy theo vai trò đang chọn trong ma trận.
+   */
   async getAllowedFeatures(roleCode: string): Promise<Set<string>> {
-    const matrix = await this.getFeatureMatrix();
-    // Admin luôn dùng được mọi chức năng (backend cũng luôn cho Admin qua) → không bị ẩn màn do ma trận cũ lưu trên trình duyệt
-    const feats =
-      roleCode === 'ROLE_ADMIN'
-        ? NAVBAR_FEATURES.map((f) => f.id)
-        : matrix[roleCode] || DEFAULT_ROLE_FEATURE_PERMS[roleCode] || [];
-    const allowed = new Set<string>();
-
-    for (const fid of feats) {
-      allowed.add(fid);
-      const featConfig = NAVBAR_FEATURES.find(f => f.id === fid);
-      if (featConfig) {
-        allowed.add(featConfig.moduleKey);
-        featConfig.tabIds.forEach(tid => allowed.add(tid));
+    const token = authToken() ?? '';
+    let feats: string[];
+    if (ROLE_SWITCHER_ENABLED) {
+      const cached = matrixCache && matrixCache.token === token && Date.now() - matrixCache.at < CACHE_MS ? matrixCache.matrix : null;
+      const matrix = cached ?? (await permissionService.getFeatureMatrix());
+      feats = [...(matrix[roleCode] ?? []), ...(roleCode === 'ROLE_ADMIN' ? ADMIN_LOCKED_FEATURES : [])];
+    } else {
+      if (myFeaturesCache && myFeaturesCache.token === token && Date.now() - myFeaturesCache.at < CACHE_MS) {
+        feats = myFeaturesCache.feats;
+      } else {
+        myFeaturesInflight ??= apiClient
+          .get<string[]>('/api/Roles/my-features', token || undefined)
+          .finally(() => {
+            myFeaturesInflight = null;
+          });
+        feats = await myFeaturesInflight;
+        myFeaturesCache = { token, at: Date.now(), feats };
       }
     }
-    return allowed;
+    lastAllowed = { token, role: roleCode, feats: new Set(feats) };
+    return new Set(feats);
+  },
+
+  /** Kết quả quyền gần nhất (đồng bộ) để navbar hiện ngay khi chuyển trang, không bị nháy trống */
+  peekAllowedFeatures(roleCode: string): Set<string> | null {
+    if (!lastAllowed || lastAllowed.role !== roleCode || lastAllowed.token !== (authToken() ?? '')) return null;
+    return new Set(lastAllowed.feats);
   },
 };
+
+interface RoleFeaturesRow {
+  roleCode: string;
+  roleName: string;
+  features: string[];
+  configured: boolean;
+}
+
+/** Không giữ tạm: mỗi lần mở / chuyển trang đều hỏi lại server, Admin bỏ tick là trang bị chặn ngay */
+const CACHE_MS = 0;
+let myFeaturesCache: { token: string; at: number; feats: string[] } | null = null;
+let myFeaturesInflight: Promise<string[]> | null = null;
+let matrixCache: { token: string; at: number; matrix: Record<string, string[]> } | null = null;
+let lastAllowed: { token: string; role: string; feats: Set<string> } | null = null;
+
+function authToken(): string | undefined {
+  return typeof window !== 'undefined' ? localStorage.getItem('stockflow_token') ?? undefined : undefined;
+}
+
+function clearFeatureCaches() {
+  myFeaturesCache = null;
+  matrixCache = null;
+  lastAllowed = null;
+}
+
+const LEGACY_MATRIX_KEY = 'stockflow_feature_matrix';
+const LEGACY_SYNCED_KEY = 'stockflow_feature_matrix_synced_server_v1';
+
+/**
+ * Trước đây ma trận chỉ lưu trong localStorage của trình duyệt Admin. Lần đầu mở sau khi chuyển lên server:
+ * vai trò nào server chưa cấu hình mà trình duyệt có ma trận cũ thì đẩy lên (chỉ Admin lưu được).
+ */
+async function pushLegacyLocalMatrix(rows: RoleFeaturesRow[]): Promise<Record<string, string[]> | null> {
+  if (typeof window === 'undefined' || localStorage.getItem(LEGACY_SYNCED_KEY)) return null;
+  const raw = localStorage.getItem(LEGACY_MATRIX_KEY);
+  if (!raw) {
+    localStorage.setItem(LEGACY_SYNCED_KEY, 'true');
+    return null;
+  }
+  try {
+    const local = JSON.parse(raw) as Record<string, unknown>;
+    const payload: Record<string, string[]> = {};
+    for (const row of rows) {
+      const feats = local[row.roleCode];
+      if (!row.configured && Array.isArray(feats)) {
+        payload[row.roleCode] = migrateFeatureList(row.roleCode, feats.map(String));
+      }
+    }
+    if (Object.keys(payload).length > 0) {
+      await apiClient.put('/api/Roles/feature-matrix', payload, authToken());
+    }
+    localStorage.setItem(LEGACY_SYNCED_KEY, 'true');
+    localStorage.removeItem(LEGACY_MATRIX_KEY);
+    return Object.keys(payload).length > 0 ? payload : null;
+  } catch (e) {
+    const status = (e as { status?: number }).status;
+    // Không phải Admin (403): bỏ qua, không thử lại
+    if (status === 403) localStorage.setItem(LEGACY_SYNCED_KEY, 'true');
+    return null;
+  }
+}
 
 export interface NavFeatureConfig {
   id: string;
   name: string;
   desc: string;
+  /** Nhóm trên navbar (VD Mua hàng) — ma trận phân quyền hiển thị theo nhóm */
+  group: string;
+  /** Phân hệ quyền backend (PermissionConstants) được cấp khi tick chức năng */
   moduleKey: string;
-  /**
-   * Mã phân hệ trong ma trận quyền backend (PermissionConstants: AUTH, BOM, PARTNER, PURCHASE,
-   * SALES, STOCK, PROD, FIN, GOODS). Chỉ khai báo khi moduleKey hiển thị không trùng mã backend.
-   */
   backendModuleKey?: string;
+  /** Các mã màn hình mở chức năng này */
   tabIds: string[];
 }
 
-export const NAVBAR_FEATURES: NavFeatureConfig[] = [
-  {
-    id: 'feat-staff',
-    name: 'Tài khoản nhân viên',
-    desc: 'Hồ sơ nhân viên, phân công phòng ban và tài khoản',
-    moduleKey: 'AUTH',
-    tabIds: ['admin-staff', 'admin-staff-active'],
-  },
-  {
-    id: 'feat-roles',
-    name: 'Danh mục vai trò & Phân quyền',
-    desc: 'Thiết lập danh mục vai trò và quyền hạn chức năng hệ thống',
-    moduleKey: 'AUTH',
-    tabIds: ['admin-roles', 'admin-matrix'],
-  },
-  {
-    id: 'feat-warehouse-perms',
-    name: 'Phân quyền kho & Cơ sở kho',
-    desc: 'Phân quyền nhân sự vào các cơ sở kho và danh sách kho',
-    moduleKey: 'AUTH',
-    tabIds: ['admin-warehouse-perms', 'admin-warehouse-facilities'],
-  },
-  {
-    id: 'feat-goods',
-    name: 'Danh mục hàng hóa & Bảng giá',
-    desc: 'Quản trị danh mục sản phẩm, vật tư, đơn vị tính, thẻ kho và thiết lập bảng giá',
-    moduleKey: 'GOODS',
-    tabIds: ['admin-goods', 'admin-price-books', 'price-books', 'warehouse-goods', 'production-goods', 'goods-catalog'],
-  },
-  {
-    id: 'feat-customers',
-    name: 'Quản lý khách hàng',
-    desc: 'Hồ sơ khách hàng, phân nhóm đối tác, lịch sử mua hàng và công nợ phải thu',
-    moduleKey: 'PARTNER',
-    tabIds: ['customers', 'sales-customers', 'manager-customers', 'admin-customers'],
-  },
-  {
-    id: 'feat-transfers',
-    name: 'Chuyển hàng (Chuyển kho)',
-    desc: 'Tạo phiếu chuyển kho, theo dõi hàng đang chuyển và xác nhận nhập kho đích',
-    moduleKey: 'TRANSFER',
-    // API /api/Transfers yêu cầu quyền STOCK_* (UC-33 thuộc phân hệ Quản lý kho)
-    backendModuleKey: 'STOCK',
-    tabIds: ['transfers', 'admin-transfers', 'manager-transfers', 'sales-transfers', 'warehouse-transfers', 'warehouse-transfer'],
-  },
-  {
-    id: 'feat-stocktake',
-    name: 'Kiểm kho',
-    desc: 'Lập phiếu kiểm kê, gộp phiếu và cân bằng tồn kho thực tế tại kho',
-    moduleKey: 'STOCKTAKE',
-    // API /api/Stocktakes yêu cầu quyền STOCK_* (thuộc phân hệ Quản lý kho)
-    backendModuleKey: 'STOCK',
-    tabIds: ['stocktakes'],
-  },
-  {
-    id: 'feat-sales',
-    name: 'Quản lý bán hàng',
-    desc: 'Đơn hàng chờ xử lý, gộp đơn B2B và quản lý hàng trả',
-    moduleKey: 'SALES',
-    tabIds: ['sales-orders', 'sales-dashboard', 'sales-consolidate', 'sales-returns', 'warehouse-outbound'],
-  },
-  {
-    id: 'feat-purchase',
-    name: 'Quản lý mua hàng & Nhập kho',
-    desc: 'Lập phiếu nhập hàng, quản lý đơn mua PO, thanh toán và chi phí mua hàng',
-    moduleKey: 'PURCHASE',
-    tabIds: ['purchases', 'admin-purchases', 'manager-purchases', 'warehouse-purchases', 'warehouse-inbound', 'manager-landed-cost'],
-  },
-  {
-    id: 'feat-suppliers',
-    name: 'Quản lý Nhà cung cấp',
-    desc: 'Hồ sơ nhà cung cấp, công nợ phải trả và lịch sử nhập hàng',
-    moduleKey: 'PARTNER',
-    tabIds: ['suppliers', 'admin-suppliers', 'manager-suppliers'],
-  },
-  {
-    id: 'feat-stock',
-    name: 'Quản trị kho & Tồn kho',
-    desc: 'Tổng quan tồn kho thực tế, xuất kho, điều chuyển và kiểm kê',
-    moduleKey: 'STOCK',
-    tabIds: ['warehouse-overview', 'warehouse-transfer', 'warehouse-audit', 'warehouse-returns'],
-  },
-  {
-    id: 'feat-prod',
-    name: 'Quản trị sản xuất',
-    desc: 'Theo dõi lệnh sản xuất, nhận kế hoạch gia công và nhật ký',
-    moduleKey: 'PROD',
-    tabIds: ['production-orders', 'production-import', 'production-logs'],
-  },
-  {
-    id: 'feat-bom',
-    name: 'Định mức nguyên liệu (BOM)',
-    desc: 'Quản lý định mức BOM vật tư và công thức phối liệu',
-    moduleKey: 'BOM',
-    tabIds: ['manager-bom'],
-  },
-  {
-    id: 'feat-partner',
-    name: 'Đối tác & Hạn mức công nợ',
-    desc: 'Quản lý khách hàng B2B, hồ sơ khách hàng và xét duyệt ngoại lệ công nợ',
-    moduleKey: 'PARTNER',
-    tabIds: ['customers', 'manager-partners', 'sales-credit-limits'],
-  },
-  {
-    id: 'feat-fin',
-    name: 'Tài chính & Báo cáo',
-    desc: 'Quản lý phiếu thu, chi dòng tiền và báo cáo quản trị tổng hợp',
-    moduleKey: 'FIN',
-    tabIds: ['manager-cashflow', 'manager-reports'],
-  },
-];
+/** Chức năng phân quyền = đúng các mục trên navbar (xem config/navbar.ts) */
+export const NAVBAR_FEATURES: NavFeatureConfig[] = NAV_ITEMS_FLAT.map((i) => ({
+  id: i.featureId,
+  name: i.title,
+  desc: i.desc,
+  group: i.groupLabel,
+  moduleKey: i.backendModule,
+  tabIds: [i.screen, ...(i.aliases ?? [])],
+}));
+
+const GOODS_FEATS = ['feat-goods', 'feat-price-books'];
+const STOCK_FEATS = ['feat-transfers', 'feat-stocktake'];
+const SALES_FEATS = ['feat-pos', 'feat-sales-booking', 'feat-invoices', 'feat-sales-returns'];
+const PURCHASE_FEATS = ['feat-purchase-orders', 'feat-purchase', 'feat-purchase-returns', 'feat-suppliers'];
+const PROD_FEATS = ['feat-prod', 'feat-prod-import', 'feat-prod-logs'];
 
 export const DEFAULT_ROLE_FEATURE_PERMS: Record<string, string[]> = {
-  ROLE_ADMIN: [
-    'feat-staff',
-    'feat-customers',
-    'feat-roles',
-    'feat-warehouse-perms',
-    'feat-goods',
-    'feat-transfers',
-    'feat-stocktake',
-    'feat-sales',
-    'feat-purchase',
-    'feat-suppliers',
-    'feat-stock',
-    'feat-prod',
-    'feat-bom',
-    'feat-partner',
-    'feat-fin',
-  ],
-  ROLE_MANAGER: [
-    'feat-goods',
-    'feat-customers',
-    'feat-transfers',
-    'feat-stocktake',
-    'feat-sales',
-    'feat-purchase',
-    'feat-suppliers',
-    'feat-stock',
-    'feat-prod',
-    'feat-bom',
-    'feat-partner',
-    'feat-fin',
-  ],
-  ROLE_SALES: [
-    'feat-goods',
-    'feat-customers',
-    'feat-sales',
-    'feat-partner',
-  ],
-  ROLE_WAREHOUSE: [
-    'feat-goods',
-    'feat-transfers', // UC-33: nhân viên kho lập phiếu chuyển và xác nhận nhận hàng
-    'feat-stocktake',
-    'feat-purchase',
-    'feat-suppliers',
-    'feat-stock',
-    'feat-bom',
-  ],
-  ROLE_PRODUCTION: [
-    'feat-goods',
-    'feat-stock',
-    'feat-prod',
-    'feat-bom',
-  ],
+  ROLE_ADMIN: NAVBAR_FEATURES.map((f) => f.id),
+  ROLE_MANAGER: [...GOODS_FEATS, ...STOCK_FEATS, 'feat-customers', ...SALES_FEATS, ...PURCHASE_FEATS, ...PROD_FEATS, 'feat-bom'],
+  ROLE_SALES: ['feat-goods', 'feat-customers', ...SALES_FEATS],
+  // UC-33: nhân viên kho lập phiếu chuyển và xác nhận nhận hàng
+  ROLE_WAREHOUSE: ['feat-goods', ...STOCK_FEATS, ...PURCHASE_FEATS, 'feat-bom'],
+  ROLE_PRODUCTION: ['feat-goods', ...PROD_FEATS, 'feat-bom'],
 };
+
+/**
+ * Chuyển ma trận đã lưu (bộ chức năng cũ) sang bộ chức năng mới theo navbar:
+ * tách chức năng gộp thành từng mục, bỏ các nhóm đã gỡ khỏi navbar (Quản trị kho, Đối tác & Công nợ, Tài chính & Báo cáo).
+ */
+function migrateFeatureList(role: string, feats: string[]): string[] {
+  const out = new Set(feats);
+  const addIf = (has: string, add: string[]) => {
+    if (out.has(has)) add.forEach((a) => out.add(a));
+  };
+  addIf('feat-goods', ['feat-price-books']);
+  addIf('feat-sales', SALES_FEATS);
+  addIf('feat-purchase', ['feat-purchase-orders', 'feat-purchase-returns']);
+  addIf('feat-partner', ['feat-customers']);
+  // Nhân viên: gộp "Tất cả nhân sự" + "Đang hoạt động" thành 1 mục
+  addIf('feat-staff-active', ['feat-staff']);
+  addIf('feat-roles', ['feat-role-matrix']);
+  // Phân quyền kho: gộp "Danh sách quyền kho" + "Cơ sở kho" thành 1 mục
+  addIf('feat-warehouse-facilities', ['feat-warehouse-perms']);
+  addIf('feat-prod', ['feat-prod-import', 'feat-prod-logs']);
+  if (role === 'ROLE_ADMIN') out.add('feat-dashboard');
+  const valid = new Set(NAVBAR_FEATURES.map((f) => f.id));
+  return [...out].filter((id) => valid.has(id));
+}

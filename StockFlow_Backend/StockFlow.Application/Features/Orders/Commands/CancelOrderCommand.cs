@@ -2,6 +2,7 @@ using MediatR;
 using Microsoft.EntityFrameworkCore;
 using StockFlow.Application.Common;
 using StockFlow.Application.Common.Interfaces;
+using StockFlow.Application.Features.SalesBookings.Common;
 using StockFlow.Application.Features.Transfers.Helpers;
 
 namespace StockFlow.Application.Features.Orders.Commands;
@@ -42,6 +43,8 @@ public class CancelOrderCommandHandler : IRequestHandler<CancelOrderCommand, Res
             .FirstOrDefaultAsync(o => o.OrderId == request.OrderId, ct);
         if (order == null)
             return Result.Failure<bool>("Không tìm thấy hóa đơn.");
+        if (order.OrderType == SalesBookingOps.OrderType)
+            return Result.Failure<bool>("Đây là đơn đặt hàng — hủy ở màn Đặt hàng.");
         if (string.Equals(order.Status, "CANCELLED", StringComparison.OrdinalIgnoreCase))
             return Result.Failure<bool>($"Hóa đơn {order.OrderCode} đã hủy trước đó.");
 
@@ -73,7 +76,8 @@ public class CancelOrderCommandHandler : IRequestHandler<CancelOrderCommand, Res
         // 2. Công nợ khách: bỏ phần còn nợ của hóa đơn; hủy phiếu thu của hóa đơn
         if (string.Equals(order.Status, "COMPLETED", StringComparison.OrdinalIgnoreCase) && order.Partner != null)
         {
-            order.Partner.CurrentDebt = (order.Partner.CurrentDebt ?? 0) - (order.OutstandingAmount ?? 0);
+            // Tiền trả trước của đơn đặt đã trừ vào hóa đơn trả lại cho đơn đặt (khách vẫn đang trả trước)
+            order.Partner.CurrentDebt = (order.Partner.CurrentDebt ?? 0) - (order.OutstandingAmount ?? 0) - order.DepositAmount;
         }
         var receipts = await _context.TrxFinancialTransactions
             .Where(t => t.ReferenceType == "SALES_ORDER" && t.ReferenceId == order.OrderId && t.Status != "CANCELLED")
@@ -86,6 +90,13 @@ public class CancelOrderCommandHandler : IRequestHandler<CancelOrderCommand, Res
         order.UpdatedBy = userId;
 
         await _context.SaveChangesAsync(ct);
+
+        // Hóa đơn giao của đơn đặt hàng: SL đã giao giảm → mở lại đơn (Đang giao / Đã xác nhận)
+        if (order.BookingOrderId.HasValue)
+        {
+            await SalesBookingOps.RecomputeStatusAsync(_context, order.BookingOrderId.Value, userId, ct);
+            await _context.SaveChangesAsync(ct);
+        }
         return Result.Success(true);
     }
 }
