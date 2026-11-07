@@ -25,6 +25,7 @@ public class StaffController : ControllerBase
     [HttpGet]
     [ProducesResponseType(typeof(List<StaffDto>), StatusCodes.Status200OK)]
     [RequirePermission("AUTH_READ")]
+    [RequireFeature("feat-staff", "feat-dashboard", "feat-price-books", "feat-warehouse-perms")]
     public async Task<IActionResult> GetStaffList([FromQuery] string? search, [FromQuery] string? status, [FromQuery] string? department)
     {
         var result = await _mediator.Send(new GetStaffListQuery(search, status, department));

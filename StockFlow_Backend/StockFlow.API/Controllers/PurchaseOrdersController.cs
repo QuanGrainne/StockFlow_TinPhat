@@ -22,6 +22,7 @@ public class PurchaseOrdersController : ControllerBase
 
     [HttpGet]
     [RequirePermission("PURCHASE_READ")]
+    [RequireFeature("feat-purchase-orders")]
     public async Task<IActionResult> GetPurchaseOrders(
         [FromQuery] string? warehouseIds,
         [FromQuery] string? status,
@@ -41,24 +42,37 @@ public class PurchaseOrdersController : ControllerBase
 
     [HttpGet("{id:int}")]
     [RequirePermission("PURCHASE_READ")]
+    [RequireFeature("feat-purchase-orders", "feat-purchase")]
     public async Task<IActionResult> GetPurchaseOrder(int id)
     {
         var result = await _mediator.Send(new GetPurchaseOrderByIdQuery(id));
         return result.IsSuccess ? Ok(result.Value) : NotFound(new { message = result.Error });
     }
 
+    [HttpGet("by-code/{code}")]
+    [RequirePermission("PURCHASE_READ")]
+    [RequireFeature("feat-purchase-orders", "feat-purchase")]
+    public async Task<IActionResult> GetPurchaseOrderByCode(string code)
+    {
+        var result = await _mediator.Send(new GetPurchaseOrderByIdQuery(0, code.Trim()));
+        return result.IsSuccess ? Ok(result.Value) : NotFound(new { message = result.Error });
+    }
+
     [HttpPost]
     [RequirePermission("PURCHASE_CREATE")]
+    [RequireFeature("feat-purchase-orders")]
     public async Task<IActionResult> CreatePurchaseOrder([FromBody] CreatePurchaseOrderRequest request) =>
         ToResponse(await _mediator.Send(new CreatePurchaseOrderCommand(request)));
 
     [HttpPut("{id:int}")]
     [RequirePermission("PURCHASE_UPDATE")]
+    [RequireFeature("feat-purchase-orders")]
     public async Task<IActionResult> UpdatePurchaseOrder(int id, [FromBody] UpdatePurchaseOrderRequest request) =>
         ToResponse(await _mediator.Send(new UpdatePurchaseOrderCommand(id, request)));
 
     [HttpPost("{id:int}/cancel")]
     [RequirePermission("PURCHASE_UPDATE")]
+    [RequireFeature("feat-purchase-orders")]
     public async Task<IActionResult> CancelPurchaseOrder(int id)
     {
         var result = await _mediator.Send(new CancelPurchaseOrderCommand(id));
@@ -67,6 +81,7 @@ public class PurchaseOrdersController : ControllerBase
 
     [HttpPost("{id:int}/finish")]
     [RequirePermission("PURCHASE_UPDATE")]
+    [RequireFeature("feat-purchase-orders")]
     public async Task<IActionResult> FinishPurchaseOrder(int id)
     {
         var result = await _mediator.Send(new FinishPurchaseOrderCommand(id));
@@ -75,6 +90,7 @@ public class PurchaseOrdersController : ControllerBase
 
     [HttpPatch("{id:int}/notes")]
     [RequirePermission("PURCHASE_UPDATE")]
+    [RequireFeature("feat-purchase-orders")]
     public async Task<IActionResult> UpdateNotes(int id, [FromBody] UpdatePurchaseOrderNotesRequest request)
     {
         var result = await _mediator.Send(new UpdatePurchaseOrderNotesCommand(id, request.Notes));
@@ -84,6 +100,7 @@ public class PurchaseOrdersController : ControllerBase
     /// <summary>Gộp các phiếu cùng NCC, cùng kho thành 1 phiếu mới; phiếu gốc chuyển Đã hủy.</summary>
     [HttpPost("merge")]
     [RequirePermission("PURCHASE_UPDATE")]
+    [RequireFeature("feat-purchase-orders")]
     public async Task<IActionResult> MergePurchaseOrders([FromBody] MergePurchaseOrdersRequest request) =>
         ToResponse(await _mediator.Send(new MergePurchaseOrdersCommand(request.PoIds)));
 

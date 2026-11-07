@@ -56,7 +56,12 @@ public class GetCustomerByIdQueryHandler : IRequestHandler<GetCustomerByIdQuery,
             })
             .ToListAsync(cancellationToken);
 
+        var bookingIds = await _context.TrxOrders.AsNoTracking()
+            .Where(o => o.PartnerId == partner.PartnerId && o.OrderType == "BOOKING")
+            .Select(o => o.OrderId).ToListAsync(cancellationToken);
+        // Lịch sử bán hàng chỉ gồm hóa đơn (đơn đặt hàng chưa bán)
         var recentOrders = orders
+            .Where(o => !bookingIds.Contains(o.OrderId))
             .Select(o => new CustomerRecentOrderDto(
                 o.OrderId, o.OrderCode ?? $"HD{o.OrderId:D6}", o.OrderDate, o.Total, o.Status, o.Seller, o.Warehouse, o.Paid, o.Outstanding))
             .ToList();

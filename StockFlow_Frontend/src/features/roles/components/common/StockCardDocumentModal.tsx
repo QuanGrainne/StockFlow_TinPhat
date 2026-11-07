@@ -12,6 +12,8 @@ import { purchaseReturnService } from '@/features/purchase-returns/services/purc
 import { transferService } from '@/features/transfers/services/transferService';
 import { stocktakeService } from '@/features/stocktakes/services/stocktakeService';
 import { orderService } from '@/features/orders/services/orderService';
+import { purchaseOrderService } from '@/features/purchase-orders/services/purchaseOrderService';
+import { PO_STATUS } from '@/features/purchase-orders/utils/purchaseOrderUtils';
 import { documentLinkHref, toLinkDate } from '@/lib/navigation/documentLink';
 import { ProductCodeLink } from '@/components/links/EntityLinks';
 
@@ -300,6 +302,62 @@ async function loadDocument(ref: StockCardDocumentRef): Promise<DocView> {
     };
   }
 
+  if (type === 'PURCHASE_ORDER') {
+    const d = ref.documentId > 0
+      ? await purchaseOrderService.getPurchaseOrder(ref.documentId)
+      : await purchaseOrderService.getPurchaseOrderByCode(ref.documentCode);
+    const status = PO_STATUS[d.status];
+    const tone: Record<string, DocView['statusTone']> = {
+      DRAFT: 'amber', ORDERED: 'blue', PARTIAL: 'blue', COMPLETED: 'green', CANCELLED: 'red',
+    };
+    return {
+      title: 'Phiếu đặt hàng nhập',
+      code: d.poCode,
+      statusLabel: status?.label ?? d.status,
+      statusTone: tone[d.status] ?? 'slate',
+      branch: d.warehouseName,
+      info: [
+        { label: 'Người tạo', value: d.createdByName },
+        { label: 'Ngày đặt', value: dateTime(d.orderDate) },
+        {
+          label: 'Tên NCC',
+          value: d.partnerCode ? `${d.partnerName} (${d.partnerCode})` : d.partnerName,
+          highlight: true,
+          href: d.partnerCode ? documentLinkHref('/suppliers', { code: d.partnerCode, id: d.partnerId }) : undefined,
+        },
+        ...(d.receipts.length
+          ? [{ label: 'Phiếu nhập', value: d.receipts.map((r) => r.grCode).join(', ') }]
+          : []),
+        ...(d.mergedIntoCode ? [{ label: 'Đã gộp vào', value: d.mergedIntoCode, highlight: true }] : []),
+      ],
+      columns: [
+        ITEM_COLS.code, ITEM_COLS.name,
+        { key: 'qty', label: 'SL đặt', align: 'right' },
+        { key: 'received', label: 'Đã nhập', align: 'right' },
+        { key: 'unitPrice', label: 'Đơn giá', align: 'right' },
+        { key: 'discount', label: 'Giảm giá', align: 'right' },
+        { key: 'total', label: 'Thành tiền', align: 'right' },
+      ],
+      rows: d.items.map((i) => {
+        const disc = i.unitPrice * ((i.discountPercent || 0) / 100);
+        return {
+          code: i.productCode, productId: i.productId, name: i.productName, qty: qtyFmt(i.orderedQty),
+          received: qtyFmt(i.receivedQty), unitPrice: money(i.unitPrice), discount: disc > 0 ? money(disc) : '',
+          total: money(i.lineTotal),
+        };
+      }),
+      totals: [
+        { label: 'Số lượng mặt hàng', value: String(d.items.length) },
+        { label: `Tổng tiền hàng (${qtyFmt(d.items.reduce((s, i) => s + i.orderedQty, 0))})`, value: money(d.totalGoodsAmount) },
+        { label: 'Giảm giá', value: money(d.discountAmount) },
+        { label: 'Tổng cộng', value: money(d.totalAmount), strong: true },
+        { label: 'Đã trả NCC', value: money(d.paidAmount) },
+      ],
+      notes: d.notes,
+      openHref: documentLinkHref('/purchase-orders', { code: d.poCode, id: d.poId }),
+    };
+  }
+
   throw new Error('Chứng từ này không có màn hình xem chi tiết.');
 }
 
@@ -312,7 +370,7 @@ export function StockCardDocumentModal({ doc, onClose }: Props) {
   const [view, setView] = useState<{ key: string; data: DocView | null; error: string | null } | null>(null);
   const [codeFilter, setCodeFilter] = useState('');
   const [nameFilter, setNameFilter] = useState('');
-  const docKey = `${doc.referenceType}#${doc.documentId}`;
+  const docKey = `${doc.referenceType}#${doc.documentId}#${doc.documentCode}`;
   const loading = view?.key !== docKey;
   const data = view?.key === docKey ? view.data : null;
   const error = view?.key === docKey ? view.error : null;

@@ -55,15 +55,8 @@ export default function LoginPage() {
 
       localStorage.setItem('stockflow_current_role', targetRole);
 
-      const defaultScreens: Record<string, string> = {
-        ADMIN: 'admin-dashboard',
-        MANAGER: 'manager-dashboard',
-        WAREHOUSE: 'warehouse-overview',
-        PRODUCTION: 'production-orders',
-        SALES: 'sales-dashboard',
-      };
-      localStorage.setItem('stockflow_active_screen', defaultScreens[targetRole] || 'sales-dashboard');
-
+      // Vào Tổng quan; vai trò không được phân quyền Tổng quan sẽ tự chuyển sang trang đầu tiên được phép
+      localStorage.removeItem('stockflow_active_screen');
       router.push('/dashboard');
     } catch {
       setError('Không thể kết nối đến máy chủ. Vui lòng thử lại.');

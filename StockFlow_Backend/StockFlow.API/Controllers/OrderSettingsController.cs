@@ -45,6 +45,7 @@ public class OrderSettingsController : ControllerBase
     [ProducesResponseType(typeof(OrderSettingDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [RequirePermission("SALES_APPROVE")]
+    [RequireFeature("feat-invoices", "feat-pos")]
     public async Task<IActionResult> UpdateSettings([FromBody] UpdateOrderSettingDto request)
     {
         var result = await _mediator.Send(new UpdateOrderSettingsCommand(request));

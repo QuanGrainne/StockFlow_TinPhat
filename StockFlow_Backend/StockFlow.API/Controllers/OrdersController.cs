@@ -30,6 +30,7 @@ public class OrdersController : ControllerBase
     [HttpGet]
     [ProducesResponseType(typeof(PaginatedResult<PosOrderSummaryDto>), StatusCodes.Status200OK)]
     [RequirePermission("SALES_READ")]
+    [RequireFeature("feat-invoices", "feat-pos")]
     public async Task<IActionResult> GetOrders(
         [FromQuery] string? search,
         [FromQuery] string? status,
@@ -68,6 +69,7 @@ public class OrdersController : ControllerBase
     [ProducesResponseType(typeof(OrderDetailDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [RequirePermission("SALES_READ")]
+    [RequireFeature("feat-invoices", "feat-pos", "feat-customers", "feat-goods")]
     public async Task<IActionResult> GetOrderDetail(string id)
     {
         int? orderId = int.TryParse(id, out var parsedId) ? parsedId : null;
@@ -88,6 +90,7 @@ public class OrdersController : ControllerBase
     [ProducesResponseType(typeof(PosOrderResultDto), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [RequirePermission("SALES_CREATE")]
+    [RequireFeature("feat-pos")]
     public async Task<IActionResult> CreatePosOrder([FromBody] CreatePosOrderRequest request)
     {
         var result = await _mediator.Send(new CreatePosOrderCommand(request));
@@ -105,6 +108,7 @@ public class OrdersController : ControllerBase
     [ProducesResponseType(typeof(OrderDetailDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [RequirePermission("SALES_UPDATE")]
+    [RequireFeature("feat-invoices")]
     public async Task<IActionResult> UpdateOrder(string id, [FromBody] UpdateOrderDto request)
     {
         var result = await _mediator.Send(new UpdateOrderCommand(id, request));
@@ -122,6 +126,7 @@ public class OrdersController : ControllerBase
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [RequirePermission("SALES_UPDATE")]
+    [RequireFeature("feat-invoices")]
     public async Task<IActionResult> CancelOrder(int id)
     {
         var result = await _mediator.Send(new CancelOrderCommand(id));

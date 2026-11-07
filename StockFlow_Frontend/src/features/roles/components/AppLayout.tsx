@@ -3,6 +3,7 @@ import { useRouter } from 'next/navigation';
 import { UserRole } from '../types';
 import { Header } from './common/Header';
 import { Sidebar } from './common/Sidebar';
+import { NoAccess } from './common/FeatureGuard';
 import { GoodsCatalogScreen } from './common/GoodsCatalogScreen';
 import SuppliersClient from '@/app/(dashboard)/suppliers/SuppliersClient';
 import CustomersClient from '@/app/(dashboard)/customers/CustomersClient';
@@ -13,110 +14,14 @@ import PriceBooksClient from '@/features/price-books/screens/PriceBooksClient';
 import TransfersClient from '@/app/(dashboard)/transfers/TransfersClient';
 import StocktakesClient from '@/app/(dashboard)/stocktakes/StocktakesClient';
 import OrdersClient from '@/app/(dashboard)/orders/OrdersClient';
+import SalesBookingsClient from '@/app/(dashboard)/sales-booking/SalesBookingsClient';
 import { OrderSettingsScreen } from '@/features/settings/screens/OrderSettingsScreen';
 import { permissionService } from '../services/permissionService';
+import { SCREEN_PATH_MAP, canOpenScreen, firstAllowedPath } from '../config/navbar';
+import { getStoredRole } from '../config/currentRole';
 
-interface AppLayoutProps {
-  initialScreen?: string;
-  children?: React.ReactNode;
-}
-
-const SCREEN_MODULE_MAP: Record<string, string> = {
-  'admin-staff': 'AUTH',
-  'admin-staff-active': 'AUTH',
-  'admin-roles': 'AUTH',
-  'admin-matrix': 'AUTH',
-  'admin-order-settings': 'SALES',
-  'admin-warehouse-perms': 'AUTH',
-  'admin-warehouse-facilities': 'AUTH',
-  'admin-goods': 'GOODS',
-  'admin-price-books': 'GOODS',
-  'price-books': 'GOODS',
-  'manager-bom': 'BOM',
-  'manager-partners': 'PARTNER',
-  'manager-cashflow': 'FIN',
-  'manager-landed-cost': 'PURCHASE',
-  'manager-reports': 'FIN',
-  'manager-production': 'PROD',
-  'sales-orders': 'SALES',
-  'orders': 'SALES',
-  'sales-orders-management': 'SALES',
-  'sales-consolidate': 'SALES',
-  'sales-credit-limits': 'PARTNER',
-  'sales-returns': 'SALES',
-  'warehouse-inbound': 'PURCHASE',
-  'warehouse-outbound': 'SALES',
-  'warehouse-transfer': 'STOCK',
-  'warehouse-audit': 'STOCK',
-  'warehouse-returns': 'STOCK',
-  'production-import': 'PROD',
-  'production-logs': 'PROD',
-  'goods-catalog': 'GOODS',
-  'purchases': 'PURCHASE',
-  'admin-purchases': 'PURCHASE',
-  'manager-purchases': 'PURCHASE',
-  'warehouse-purchases': 'PURCHASE',
-  'purchase-returns': 'PURCHASE',
-  'purchase-orders': 'PURCHASE',
-  'suppliers': 'PARTNER',
-  'admin-suppliers': 'PARTNER',
-  'manager-suppliers': 'PARTNER',
-  'transfers': 'STOCK',
-  'admin-transfers': 'STOCK',
-  'manager-transfers': 'STOCK',
-  'stocktakes': 'STOCK',
-  'customers': 'PARTNER',
-  'sales-customers': 'SALES',
-  'manager-customers': 'PARTNER',
-  'admin-customers': 'PARTNER',
-};
-
-const SCREEN_FEATURE_MAP: Record<string, string> = {
-  'suppliers': 'feat-suppliers',
-  'admin-suppliers': 'feat-suppliers',
-  'manager-suppliers': 'feat-suppliers',
-  'purchases': 'feat-purchase',
-  'admin-purchases': 'feat-purchase',
-  'manager-purchases': 'feat-purchase',
-  'warehouse-purchases': 'feat-purchase',
-  'purchase-returns': 'feat-purchase',
-  'purchase-orders': 'feat-purchase',
-  'warehouse-inbound': 'feat-purchase',
-  'manager-landed-cost': 'feat-purchase',
-  'transfers': 'feat-transfers',
-  'admin-transfers': 'feat-transfers',
-  'manager-transfers': 'feat-transfers',
-  'stocktakes': 'feat-stocktake',
-  'customers': 'feat-partner',
-  'manager-partners': 'feat-partner',
-  'sales-credit-limits': 'feat-partner',
-};
-
-// Sales Screens
-import { SalesDashboard } from './sales/screens/SalesDashboard';
-import { PendingOrdersScreen } from './sales/screens/PendingOrdersScreen';
-import { ConsolidateOrdersScreen } from './sales/screens/ConsolidateOrdersScreen';
-import { CreditLimitExceptionsScreen } from './sales/screens/CreditLimitExceptionsScreen';
-import { ReturnClaimsScreen } from './sales/screens/ReturnClaimsScreen';
-
-// Manager Screens
-import { ManagerDashboard } from './manager/screens/ManagerDashboard';
-import { ApprovalInboxScreen } from './manager/screens/ApprovalInboxScreen';
+// Màn hình theo chức năng (navbar dùng chung, xem config/navbar.ts)
 import { BomManagementScreen } from './manager/screens/BomManagementScreen';
-import { PartnerCreditLimitScreen } from './manager/screens/PartnerCreditLimitScreen';
-import { CashFlowScreen } from './manager/screens/CashFlowScreen';
-import { ProductionOrdersScreen } from './manager/screens/ProductionOrdersScreen';
-import { LandedCostScreen } from './manager/screens/LandedCostScreen';
-import { ReportsScreen } from './manager/screens/ReportsScreen';
-
-
-// Warehouse Screens
-import { WarehouseOverviewScreen } from './warehouse/screens/WarehouseOverviewScreen';
-import { WarehouseInboundScreen } from './warehouse/screens/WarehouseInboundScreen';
-import { WarehouseOutboundScreen } from './warehouse/screens/WarehouseOutboundScreen';
-import { WarehouseTransferScreen } from './warehouse/screens/WarehouseTransferScreen';
-import { WarehouseAuditScreen } from './warehouse/screens/WarehouseAuditScreen';
-import { WarehouseReturnsScreen } from './warehouse/screens/WarehouseReturnsScreen';
 
 // Production Screens
 import { ProductionTrackingScreen } from './production/screens/ProductionTrackingScreen';
@@ -129,182 +34,88 @@ import { StaffAccountsScreen } from './admin/screens/StaffAccountsScreen';
 import { RoleCatalogScreen } from './admin/screens/RoleCatalogScreen';
 import { WarehousePermissionsScreen } from './admin/screens/WarehousePermissionsScreen';
 import { PermissionMatrixScreen } from './admin/screens/PermissionMatrixScreen';
-import { UserManagementScreen } from './admin/screens/UserManagementScreen';
 import { ROLE_SWITCHER_ENABLED } from '@/lib/auth/flags';
 
-const getStoredRole = (): UserRole => {
-  if (typeof window === 'undefined') return 'SALES';
-  const savedRole = localStorage.getItem('stockflow_current_role') as UserRole | null;
-  // Khi tắt bộ chuyển vai trò, bỏ qua giá trị đã lưu và lấy vai trò thật từ stockflow_user (kết quả login).
-  if (ROLE_SWITCHER_ENABLED && savedRole && ['ADMIN', 'MANAGER', 'SALES', 'WAREHOUSE', 'PRODUCTION'].includes(savedRole)) {
-    return savedRole;
-  }
-  const userStr = localStorage.getItem('stockflow_user');
-  if (userStr) {
-    try {
-      const u = JSON.parse(userStr);
-      const primaryRoleStr = Array.isArray(u.roles) && u.roles.length > 0 ? u.roles[0] : (u.role || '');
-      const upper = String(primaryRoleStr).toUpperCase();
-      if (upper.includes('ADMIN')) return 'ADMIN';
-      if (upper.includes('MGR') || upper.includes('MANAGER')) return 'MANAGER';
-      if (upper.includes('WAREHOUSE')) return 'WAREHOUSE';
-      if (upper.includes('PROD')) return 'PRODUCTION';
-      if (upper.includes('SALES')) return 'SALES';
-    } catch { }
-  }
-  return 'SALES';
-};
+interface AppLayoutProps {
+  /** Màn hình của trang (mỗi chức năng navbar có 1 đường dẫn riêng, VD /transfers → 'transfers') */
+  initialScreen: string;
+  children?: React.ReactNode;
+}
 
-const getDefaultScreenForRole = (role: UserRole): string => {
-  switch (role) {
-    case 'ADMIN': return 'admin-dashboard';
-    case 'MANAGER': return 'manager-dashboard';
-    case 'WAREHOUSE': return 'warehouse-overview';
-    case 'PRODUCTION': return 'production-orders';
-    default: return 'sales-dashboard';
-  }
-};
-
-const getStoredScreen = (role: UserRole): string => {
-  if (typeof window === 'undefined') return getDefaultScreenForRole(role);
-  const savedScreen = localStorage.getItem('stockflow_active_screen');
-  if (savedScreen) return savedScreen;
-  return getDefaultScreenForRole(role);
+/** Màn hình ban đầu: một số trang nhận thêm tham số trên URL */
+const resolveInitialScreen = (initialScreen: string): string => {
+  if (typeof window === 'undefined') return initialScreen;
+  const params = new URLSearchParams(window.location.search);
+  // /production?report=1: mở sẵn form Nhập báo cáo giấy
+  if (initialScreen === 'production-orders' && params.get('report') === '1') return 'production-open-report-modal';
+  return initialScreen;
 };
 
 export const AppLayout: React.FC<AppLayoutProps> = ({ initialScreen, children }) => {
   const router = useRouter();
   // Đọc vai trò thật ngay khi khởi tạo (AppLayout luôn được load với ssr:false nên có localStorage).
-  // Trước đây khởi tạo 'SALES' rồi mới cập nhật trong effect, khiến lần kiểm tra quyền đầu tiên chạy
-  // với vai trò SALES và đẩy màn hình (VD: Chuyển hàng) về trang mặc định.
   const [currentRole, setCurrentRole] = useState<UserRole>(() => getStoredRole());
   const [purchaseOrdersKey, setPurchaseOrdersKey] = useState(0);
-  const [activeScreen, setActiveScreen] = useState<string>(
-    () => initialScreen || getStoredScreen(getStoredRole())
+  const [activeScreen, setActiveScreen] = useState<string>(() => resolveInitialScreen(initialScreen));
+  // /roles/permissions?role=ROLE_SALES: mở sẵn cột vai trò được chọn từ Danh mục vai trò
+  const [selectedMatrixRole] = useState<string>(() =>
+    typeof window === 'undefined' ? 'ROLE_ADMIN' : new URLSearchParams(window.location.search).get('role') || 'ROLE_ADMIN'
   );
-  const [selectedMatrixRole, setSelectedMatrixRole] = useState<string>('ROLE_ADMIN');
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [hasImportedProductionPlan, setHasImportedProductionPlan] = useState(false);
+  // Chức năng được phép (lấy lần gần nhất để không nháy trống khi chuyển trang)
+  const [allowedFeatures, setAllowedFeatures] = useState<Set<string> | null>(() =>
+    permissionService.peekAllowedFeatures(`ROLE_${getStoredRole()}`)
+  );
 
-  // Khôi phục role và screen từ localStorage khi reload trang, đồng thời xác thực quyền truy cập
+  // Tải quyền của vai trò; tải lại khi Admin lưu ma trận phân quyền
   React.useEffect(() => {
-    const checkInitialAccess = async () => {
-      const role = getStoredRole();
-      const screen = initialScreen || getStoredScreen(role);
-      setCurrentRole(role);
-
-      const roleCode = `ROLE_${role}`;
-      const allowed = await permissionService.getAllowedModuleKeys(roleCode);
-      const allowedFeatures = await permissionService.getAllowedFeatures(roleCode);
-      const reqMod = SCREEN_MODULE_MAP[screen];
-
-      const isFeatureForbidden =
-        (screen === 'customers' || screen.includes('customers')) &&
-        !allowedFeatures.has('feat-customers');
-
-      if ((reqMod && !allowed.has(reqMod)) || isFeatureForbidden) {
-        const fallback = getDefaultScreenForRole(role);
-        setActiveScreen(fallback);
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('stockflow_active_screen', fallback);
-        }
-      } else {
-        setActiveScreen(screen);
-      }
-    };
-
-    checkInitialAccess();
-  }, [initialScreen]);
-
-  // Lắng nghe cập nhật quyền từ Ma trận phân quyền để tự động chuyển trang nếu màn hình hiện tại bị bỏ quyền
-  React.useEffect(() => {
-    // Bỏ qua kết quả của lần kiểm tra cũ (role/screen đã đổi trong lúc chờ API)
     let stale = false;
-    const checkScreenAccess = async () => {
-      const roleCode = `ROLE_${currentRole}`;
-      const allowed = await permissionService.getAllowedModuleKeys(roleCode);
-
-      const allowedFeats = await permissionService.getAllowedFeatures(roleCode);
-      if (stale) return;
-      const reqMod = SCREEN_MODULE_MAP[activeScreen];
-      const reqFeat = SCREEN_FEATURE_MAP[activeScreen];
-
-      // Màn hình gắn với một tính năng navbar thì chỉ xét tính năng đó (giống cách Sidebar hiện menu).
-      // Trước đây vẫn xét thêm phân hệ backend, nên màn Chuyển hàng (phân hệ 'TRANSFER' không tồn tại
-      // trong ma trận backend) luôn bị đẩy về trang mặc định dù đã tick quyền.
-      let isPermitted = true;
-      if (reqFeat) {
-        isPermitted = allowedFeats.has(reqFeat);
-      } else if (reqMod) {
-        isPermitted = allowed.has(reqMod);
-      }
-
-      if (!isPermitted) {
-        const fallback = getDefaultScreenForRole(currentRole);
-        setActiveScreen(fallback);
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('stockflow_active_screen', fallback);
-        }
-      }
+    const load = () => {
+      permissionService
+        .getAllowedFeatures(`ROLE_${currentRole}`)
+        .then((feats) => {
+          if (!stale) setAllowedFeatures(feats);
+        })
+        .catch(() => {
+          // Hết phiên: client tự chuyển về trang đăng nhập
+        });
     };
-
-    checkScreenAccess();
-
-    window.addEventListener('stockflow_permissions_updated', checkScreenAccess);
+    load();
+    window.addEventListener('stockflow_permissions_updated', load);
     return () => {
       stale = true;
-      window.removeEventListener('stockflow_permissions_updated', checkScreenAccess);
+      window.removeEventListener('stockflow_permissions_updated', load);
     };
-  }, [currentRole, activeScreen]);
+  }, [currentRole]);
 
+  const isPermitted = allowedFeatures ? canOpenScreen(activeScreen, allowedFeatures) : false;
+  const homePath = allowedFeatures ? firstAllowedPath(allowedFeatures) : null;
+
+  // Trang Tổng quan là trang vào sau đăng nhập: vai trò không có Tổng quan thì chuyển sang trang đầu tiên được phép
+  React.useEffect(() => {
+    if (allowedFeatures && !isPermitted && activeScreen === 'admin-dashboard' && homePath && homePath !== '/dashboard') {
+      router.replace(homePath);
+    }
+  }, [allowedFeatures, isPermitted, activeScreen, homePath, router]);
+
+  /** Mỗi chức năng là 1 đường dẫn riêng: bấm menu → chuyển trang (VD /transfers), không dùng chung /dashboard */
   const handleNavigate = (newScreen: string) => {
+    const screen = newScreen.replace(/^\//, '');
+    const path = SCREEN_PATH_MAP[screen] ?? (newScreen.startsWith('/') ? newScreen : undefined);
     // Bấm lại menu Đặt hàng nhập: về danh sách mặc định (xóa từ khóa / bộ lọc đang giữ)
-    if (newScreen === 'purchase-orders') setPurchaseOrdersKey((k) => k + 1);
-    if (newScreen === 'pos' || newScreen === '/pos') { router.push('/pos'); return; }
-    if (newScreen === 'orders' || newScreen === '/orders' || newScreen === 'sales-orders-management') {
-      setActiveScreen('orders');
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('stockflow_active_screen', 'orders');
-        if (!window.location.pathname.includes('/orders')) {
-          window.history.pushState(null, '', '/orders');
-        }
-      }
+    if (screen === 'purchase-orders') setPurchaseOrdersKey((k) => k + 1);
+    if (!path) {
+      setActiveScreen(screen);
       return;
     }
-    if (newScreen === 'admin-order-settings' || newScreen === 'settings/orders' || newScreen === '/settings/orders') {
-      setActiveScreen('admin-order-settings');
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('stockflow_active_screen', 'admin-order-settings');
-        if (!window.location.pathname.includes('/settings/orders')) {
-          window.history.pushState(null, '', '/settings/orders');
-        }
-      }
+    const [pathname] = path.split('?');
+    if (typeof window !== 'undefined' && window.location.pathname === pathname) {
+      // Cùng trang: chỉ đổi màn hình (VD mở form Nhập báo cáo giấy), bỏ tham số cũ trên URL
+      setActiveScreen(screen);
+      if (window.location.search) router.replace(pathname);
       return;
     }
-    setActiveScreen(newScreen);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('stockflow_active_screen', newScreen);
-      if (newScreen === 'customers' || newScreen === '/customers') {
-        window.history.pushState(null, '', '/customers');
-      } else if (newScreen === 'suppliers' || newScreen === '/suppliers') {
-        window.history.pushState(null, '', '/suppliers');
-      } else if (newScreen === 'purchases' || newScreen === '/purchases') {
-        window.history.pushState(null, '', '/purchases');
-      } else if (newScreen === 'purchase-orders' || newScreen === '/purchase-orders') {
-        window.history.pushState(null, '', '/purchase-orders');
-      } else if (newScreen === 'purchase-returns' || newScreen === '/purchase-returns') {
-        window.history.pushState(null, '', '/purchase-returns');
-      } else if (newScreen === 'goods-catalog' || newScreen === 'products' || newScreen === '/products') {
-        window.history.pushState(null, '', '/products');
-      } else if (newScreen === 'transfers' || newScreen === '/transfers' || newScreen === 'admin-transfers' || newScreen === 'manager-transfers') {
-        window.history.pushState(null, '', '/transfers');
-
-      } else if (newScreen === 'stocktakes' || newScreen === '/stocktakes') {
-        window.history.pushState(null, '', '/stocktakes');
-      } else if (window.location.pathname.includes('/stocktakes') || window.location.pathname.includes('/suppliers') || window.location.pathname.includes('/purchases') || window.location.pathname.includes('/purchase-returns') || window.location.pathname.includes('/purchase-orders') || window.location.pathname.includes('/products') || window.location.pathname.includes('/transfers') || window.location.pathname.includes('/customers')) {
-        window.history.pushState(null, '', '/dashboard');
-      }
-    }
+    router.push(path);
   };
 
   // Xử lý chuyển đổi vai trò (RBAC Switcher)
@@ -312,11 +123,8 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ initialScreen, children })
   const handleRoleChange = (newRole: UserRole) => {
     if (!ROLE_SWITCHER_ENABLED) return;
     setCurrentRole(newRole);
-    const defaultScreen = getDefaultScreenForRole(newRole);
-    setActiveScreen(defaultScreen);
     if (typeof window !== 'undefined') {
       localStorage.setItem('stockflow_current_role', newRole);
-      localStorage.setItem('stockflow_active_screen', defaultScreen);
       const userStr = localStorage.getItem('stockflow_user');
       if (userStr) {
         try {
@@ -326,59 +134,30 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ initialScreen, children })
         } catch { }
       }
     }
+    router.push('/dashboard');
   };
 
   const renderActiveScreen = () => {
+    // Chưa tải xong quyền: chưa hiện gì; không có quyền (bỏ tick hoặc gõ thẳng đường dẫn): chặn hẳn màn hình
+    if (!allowedFeatures) return null;
+    if (!isPermitted) {
+      // Đang chuyển từ Tổng quan sang trang đầu tiên được phép
+      if (activeScreen === 'admin-dashboard' && homePath && homePath !== '/dashboard') return null;
+      return <NoAccess feature={activeScreen} homePath={homePath} />;
+    }
+
     switch (activeScreen) {
-      // ─── Sales Screens ───
-      case 'sales-dashboard':
-        return <SalesDashboard onNavigate={handleNavigate} />;
+      // ─── Bán hàng ───
       case 'orders':
       case 'sales-orders-management':
         return <OrdersClient onNavigate={handleNavigate} />;
-      case 'sales-orders':
-        return <PendingOrdersScreen onNavigate={handleNavigate} />;
-      case 'sales-consolidate':
-        return <ConsolidateOrdersScreen onNavigate={handleNavigate} />;
-      case 'sales-credit-limits':
-        return <CreditLimitExceptionsScreen onNavigate={handleNavigate} />;
-      case 'sales-returns':
-        return <ReturnClaimsScreen />;
 
-      // ─── Manager Screens ───
-      case 'manager-dashboard':
-        return <ManagerDashboard onNavigate={handleNavigate} />;
-      case 'manager-approvals':
-      case 'manager-inbox':
-        return <ApprovalInboxScreen />;
+      case 'sales-booking':
+        return <SalesBookingsClient />;
+
+      // ─── Định mức BOM ───
       case 'manager-bom':
         return <BomManagementScreen />;
-      case 'manager-partners':
-        return <PartnerCreditLimitScreen onNavigate={handleNavigate} />;
-      case 'manager-cashflow':
-        return <CashFlowScreen />;
-      case 'manager-production':
-        return <ProductionOrdersScreen onNavigate={handleNavigate} />;
-      case 'manager-landed-cost':
-      case 'manager-purchases':
-        return <LandedCostScreen />;
-      case 'manager-reports':
-        return <ReportsScreen onNavigate={handleNavigate} />;
-
-
-      // ─── Warehouse Screens (Đã bỏ Vị trí ô kệ) ───
-      case 'warehouse-overview':
-        return <WarehouseOverviewScreen onNavigate={handleNavigate} />;
-      case 'warehouse-inbound':
-        return <WarehouseInboundScreen />;
-      case 'warehouse-outbound':
-        return <WarehouseOutboundScreen />;
-      case 'warehouse-transfer':
-        return <WarehouseTransferScreen />;
-      case 'warehouse-audit':
-        return <WarehouseAuditScreen />;
-      case 'warehouse-returns':
-        return <WarehouseReturnsScreen />;
 
       // ─── Production Screens ───
       case 'production-orders':
@@ -420,7 +199,10 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ initialScreen, children })
         return (
           <RoleCatalogScreen
             onNavigate={(screen, roleCode) => {
-              if (roleCode) setSelectedMatrixRole(roleCode);
+              if (screen === 'admin-matrix' && roleCode) {
+                router.push(`/roles/permissions?role=${encodeURIComponent(roleCode)}`);
+                return;
+              }
               handleNavigate(screen);
             }}
           />
@@ -484,22 +266,11 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ initialScreen, children })
       case 'transfers':
       case 'admin-transfers':
       case 'manager-transfers':
-      case 'warehouse-transfer':
         return <TransfersClient />;
 
       default:
-        if (currentRole === 'SALES') return <SalesDashboard onNavigate={handleNavigate} />;
-        if (currentRole === 'MANAGER') return <ManagerDashboard onNavigate={handleNavigate} />;
-        if (currentRole === 'WAREHOUSE') return <WarehouseOverviewScreen onNavigate={handleNavigate} />;
-        if (currentRole === 'PRODUCTION')
-          return (
-            <ProductionTrackingScreen
-              onNavigate={handleNavigate}
-              isImportedPlan={hasImportedProductionPlan}
-            />
-          );
-        if (currentRole === 'ADMIN') return <AdminDashboard onNavigate={handleNavigate} />;
-        return <SalesDashboard onNavigate={handleNavigate} />;
+        // Đang tải quyền để chọn màn hình được phép
+        return null;
     }
   };
 
@@ -525,10 +296,10 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ initialScreen, children })
           {children}
         </main>
       ) : activeScreen === 'transfers' || activeScreen.includes('transfers') ||
-        activeScreen === 'warehouse-transfer' ||
         activeScreen === 'purchases' || activeScreen.includes('purchases') ||
         activeScreen === 'purchase-returns' ||
         activeScreen === 'purchase-orders' ||
+        activeScreen === 'sales-booking' ||
         activeScreen === 'suppliers' || activeScreen.includes('suppliers') ||
         activeScreen === 'customers' || activeScreen.includes('customers') ||
         activeScreen === 'goods-catalog' || activeScreen === 'products' ||

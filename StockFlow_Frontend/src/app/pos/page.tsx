@@ -3,6 +3,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
+import { FeatureGuard } from '@/features/roles/components/common/FeatureGuard';
 
 const PosScreen = dynamic(() => import('@/features/pos/screens/PosScreen'), {
   ssr: false,
@@ -11,6 +12,18 @@ const PosScreen = dynamic(() => import('@/features/pos/screens/PosScreen'), {
   ),
 });
 
+// Tạo / sửa đơn đặt hàng chỉ cần quyền Đặt hàng; tạo hóa đơn (kể cả từ đơn đặt) cần quyền Bán hàng
+const posFeatures = (params: URLSearchParams): string[] =>
+  params.has('booking') || params.has('newBooking')
+    ? ['feat-sales-booking']
+    : params.has('bookingInvoice')
+      ? ['feat-pos']
+      : ['feat-pos', 'feat-sales-booking'];
+
 export default function PosPage() {
-  return <PosScreen />;
+  return (
+    <FeatureGuard anyOf={posFeatures}>
+      <PosScreen />
+    </FeatureGuard>
+  );
 }

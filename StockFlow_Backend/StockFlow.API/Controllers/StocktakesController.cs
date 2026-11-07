@@ -32,6 +32,7 @@ public class StocktakesController : ControllerBase
     /// <summary>Danh sách phiếu kiểm kho (lọc theo kho, trạng thái, ngày tạo, mã phiếu).</summary>
     [HttpGet]
     [RequirePermission("STOCK_READ")]
+    [RequireFeature("feat-stocktake")]
     public async Task<IActionResult> GetList(
         [FromQuery] string? warehouseIds,
         [FromQuery] string? statuses,
@@ -48,6 +49,7 @@ public class StocktakesController : ControllerBase
 
     [HttpGet("{id:int}")]
     [RequirePermission("STOCK_READ")]
+    [RequireFeature("feat-stocktake", "feat-goods")]
     public async Task<IActionResult> GetById(int id)
     {
         var result = await _mediator.Send(new GetStocktakeByIdQuery(id));
@@ -57,6 +59,7 @@ public class StocktakesController : ControllerBase
     /// <summary>Tạo phiếu kiểm: Status DRAFT = Lưu tạm, BALANCED = Hoàn thành (cân bằng kho).</summary>
     [HttpPost]
     [RequirePermission("STOCK_CREATE")]
+    [RequireFeature("feat-stocktake")]
     public async Task<IActionResult> Create([FromBody] SaveStocktakeRequest request)
     {
         var result = await _mediator.Send(new CreateStocktakeCommand(request));
@@ -66,6 +69,7 @@ public class StocktakesController : ControllerBase
     /// <summary>Sửa phiếu tạm (có thể Hoàn thành luôn).</summary>
     [HttpPut("{id:int}")]
     [RequirePermission("STOCK_UPDATE")]
+    [RequireFeature("feat-stocktake")]
     public async Task<IActionResult> Update(int id, [FromBody] SaveStocktakeRequest request)
     {
         var result = await _mediator.Send(new UpdateStocktakeCommand(id, request));
@@ -75,6 +79,7 @@ public class StocktakesController : ControllerBase
     /// <summary>Hủy phiếu (phiếu đã cân bằng sẽ được đảo lại tồn kho).</summary>
     [HttpPost("{id:int}/cancel")]
     [RequirePermission("STOCK_UPDATE")]
+    [RequireFeature("feat-stocktake")]
     public async Task<IActionResult> Cancel(int id)
     {
         var result = await _mediator.Send(new CancelStocktakeCommand(id));
@@ -84,6 +89,7 @@ public class StocktakesController : ControllerBase
     /// <summary>Gộp các phiếu tạm cùng kho thành 1 phiếu tạm mới; phiếu cũ chuyển sang Đã hủy.</summary>
     [HttpPost("merge")]
     [RequirePermission("STOCK_CREATE")]
+    [RequireFeature("feat-stocktake")]
     public async Task<IActionResult> Merge([FromBody] MergeStocktakesRequest request)
     {
         var result = await _mediator.Send(new MergeStocktakesCommand(request));

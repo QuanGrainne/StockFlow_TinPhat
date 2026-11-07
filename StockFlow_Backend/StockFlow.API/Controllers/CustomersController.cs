@@ -26,6 +26,7 @@ public class CustomersController : ControllerBase
     [HttpGet]
     [ProducesResponseType(typeof(List<CustomerDto>), StatusCodes.Status200OK)]
     [RequirePermission("PARTNER_READ")]
+    [RequireFeature("feat-customers", "feat-pos", "feat-invoices")]
     public async Task<IActionResult> GetCustomers(
         [FromQuery] string? search,
         [FromQuery] string? debtStatus,
@@ -57,6 +58,7 @@ public class CustomersController : ControllerBase
     [HttpGet("stats")]
     [ProducesResponseType(typeof(CustomerStatsDto), StatusCodes.Status200OK)]
     [RequirePermission("PARTNER_READ")]
+    [RequireFeature("feat-customers")]
     public async Task<IActionResult> GetCustomerStats()
     {
         var result = await _mediator.Send(new GetCustomerStatsQuery());
@@ -74,6 +76,7 @@ public class CustomersController : ControllerBase
     [ProducesResponseType(typeof(CustomerDetailDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [RequirePermission("PARTNER_READ")]
+    [RequireFeature("feat-customers", "feat-invoices")]
     public async Task<IActionResult> GetCustomerById(int id)
     {
         var result = await _mediator.Send(new GetCustomerByIdQuery(id));
@@ -91,6 +94,7 @@ public class CustomersController : ControllerBase
     [ProducesResponseType(typeof(CustomerReceiptDetailDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [RequirePermission("PARTNER_READ")]
+    [RequireFeature("feat-customers")]
     public async Task<IActionResult> GetCustomerReceipt(int id, string code)
     {
         var result = await _mediator.Send(new GetCustomerReceiptQuery(id, code));
@@ -108,6 +112,7 @@ public class CustomersController : ControllerBase
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [RequirePermission("FIN_UPDATE")]
+    [RequireFeature("feat-customers")]
     public async Task<IActionResult> UpdateCustomerReceipt(int id, string code, [FromBody] UpdateCustomerReceiptRequest request)
     {
         var result = await _mediator.Send(new UpdateCustomerReceiptCommand(id, code, request));
@@ -125,6 +130,7 @@ public class CustomersController : ControllerBase
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [RequirePermission("FIN_UPDATE")]
+    [RequireFeature("feat-customers")]
     public async Task<IActionResult> CancelCustomerReceipt(int id, string code)
     {
         var result = await _mediator.Send(new CancelCustomerReceiptCommand(id, code));
@@ -143,6 +149,7 @@ public class CustomersController : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     [RequirePermission("PARTNER_CREATE")]
+    [RequireFeature("feat-customers", "feat-pos")]
     public async Task<IActionResult> CreateCustomer([FromBody] CreateCustomerRequest request)
     {
         var result = await _mediator.Send(new CreateCustomerCommand(request));
@@ -176,6 +183,7 @@ public class CustomersController : ControllerBase
     [ProducesResponseType(typeof(CustomerPaymentResultDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [RequirePermission("FIN_CREATE")]
+    [RequireFeature("feat-customers")]
     public async Task<IActionResult> CreateCustomerPayment(int id, [FromBody] CreateCustomerPaymentRequest request)
     {
         var result = await _mediator.Send(new CreateCustomerPaymentCommand(id, request));
@@ -193,6 +201,7 @@ public class CustomersController : ControllerBase
     [ProducesResponseType(typeof(CustomerDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [RequirePermission("PARTNER_UPDATE")]
+    [RequireFeature("feat-customers")]
     public async Task<IActionResult> UpdateCustomer(int id, [FromBody] UpdateCustomerRequest request)
     {
         var result = await _mediator.Send(new UpdateCustomerCommand(id, request));
@@ -208,6 +217,7 @@ public class CustomersController : ControllerBase
     /// </summary>
     [HttpPatch("{id}/toggle-status")]
     [RequirePermission("PARTNER_UPDATE")]
+    [RequireFeature("feat-customers")]
     public async Task<IActionResult> ToggleCustomerStatus(int id)
     {
         var result = await _mediator.Send(new ToggleCustomerStatusCommand(id));
@@ -223,6 +233,7 @@ public class CustomersController : ControllerBase
     /// </summary>
     [HttpPatch("batch-status")]
     [RequirePermission("PARTNER_UPDATE")]
+    [RequireFeature("feat-customers")]
     public async Task<IActionResult> BatchUpdateCustomerStatus([FromBody] BatchCustomerStatusRequest request)
     {
         var result = await _mediator.Send(new BatchCustomerStatusCommand(request));
@@ -238,6 +249,7 @@ public class CustomersController : ControllerBase
     /// </summary>
     [HttpDelete("{id}")]
     [RequirePermission("PARTNER_DELETE")]
+    [RequireFeature("feat-customers")]
     public async Task<IActionResult> DeleteCustomer(int id)
     {
         var result = await _mediator.Send(new DeleteCustomerCommand(id));

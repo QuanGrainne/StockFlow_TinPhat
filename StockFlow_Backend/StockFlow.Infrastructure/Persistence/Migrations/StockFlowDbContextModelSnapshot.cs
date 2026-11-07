@@ -2134,6 +2134,10 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("OrderId"));
 
+                    b.Property<int?>("BookingOrderId")
+                        .HasColumnType("integer")
+                        .HasColumnName("booking_order_id");
+
                     b.Property<int?>("ConsolidatedIntoOrderId")
                         .HasColumnType("integer")
                         .HasColumnName("consolidated_into_order_id");
@@ -2141,6 +2145,17 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                     b.Property<int>("CreatedBy")
                         .HasColumnType("integer")
                         .HasColumnName("created_by");
+
+                    b.Property<DateTime?>("DeliveryDate")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("delivery_date");
+
+                    b.Property<decimal>("DepositAmount")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasDefaultValue(0m)
+                        .HasColumnName("deposit_amount");
 
                     b.Property<decimal>("DiscountAmount")
                         .HasPrecision(18, 2)
@@ -2222,8 +2237,14 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("updated_by");
 
+                    b.Property<int?>("WarehouseId")
+                        .HasColumnType("integer")
+                        .HasColumnName("warehouse_id");
+
                     b.HasKey("OrderId")
                         .HasName("trx_orders_pkey");
+
+                    b.HasIndex("BookingOrderId");
 
                     b.HasIndex("ConsolidatedIntoOrderId");
 
@@ -2232,6 +2253,8 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                     b.HasIndex("PartnerId");
 
                     b.HasIndex("UpdatedBy");
+
+                    b.HasIndex("WarehouseId");
 
                     b.HasIndex(new[] { "OrderCode" }, "uq_trx_orders_1")
                         .IsUnique();
@@ -3663,6 +3686,11 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("StockFlow.Domain.Entities.TrxOrder", b =>
                 {
+                    b.HasOne("StockFlow.Domain.Entities.TrxOrder", "BookingOrder")
+                        .WithMany("BookingInvoices")
+                        .HasForeignKey("BookingOrderId")
+                        .HasConstraintName("fk_trx_orders_booking_order_id");
+
                     b.HasOne("StockFlow.Domain.Entities.TrxOrder", "ConsolidatedIntoOrder")
                         .WithMany("InverseConsolidatedIntoOrder")
                         .HasForeignKey("ConsolidatedIntoOrderId")
@@ -3685,6 +3713,13 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                         .HasForeignKey("UpdatedBy")
                         .HasConstraintName("fk_trx_orders_updated_by");
 
+                    b.HasOne("StockFlow.Domain.Entities.MstWarehouse", "Warehouse")
+                        .WithMany()
+                        .HasForeignKey("WarehouseId")
+                        .HasConstraintName("fk_trx_orders_warehouse_id");
+
+                    b.Navigation("BookingOrder");
+
                     b.Navigation("ConsolidatedIntoOrder");
 
                     b.Navigation("CreatedByNavigation");
@@ -3692,6 +3727,8 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                     b.Navigation("Partner");
 
                     b.Navigation("UpdatedByNavigation");
+
+                    b.Navigation("Warehouse");
                 });
 
             modelBuilder.Entity("StockFlow.Domain.Entities.TrxProductionMaterialRequirement", b =>
@@ -4216,6 +4253,8 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("StockFlow.Domain.Entities.TrxOrder", b =>
                 {
+                    b.Navigation("BookingInvoices");
+
                     b.Navigation("DtlOrderItems");
 
                     b.Navigation("InverseConsolidatedIntoOrder");

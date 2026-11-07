@@ -1,5 +1,5 @@
 // src/features/pos/utils/posTabs.ts
-// Kiểu dữ liệu tab hóa đơn của màn POS + hàm mở sẵn 1 tab (VD "Sao chép" từ màn Hóa đơn).
+// Kiểu dữ liệu tab của màn POS (Hóa đơn / Đặt hàng) + hàm mở sẵn 1 tab (VD "Sao chép" từ màn Hóa đơn).
 // Các tab được lưu ở localStorage để tải lại trang không mất giỏ hàng.
 
 import type { PosCustomer } from '../types';
@@ -7,6 +7,8 @@ import type { PosCustomer } from '../types';
 export type DiscountMode = 'VND' | 'PERCENT';
 /** Phương thức thanh toán tại quầy: Tiền mặt / Chuyển khoản */
 export type PayMethod = 'CASH' | 'VIETQR';
+/** Loại tab: Hóa đơn (bán, trừ kho ngay) hoặc Đặt hàng (đơn đặt của khách, không trừ kho) */
+export type PosTabKind = 'INVOICE' | 'BOOKING';
 
 export interface PosLine {
   key: string;
@@ -34,13 +36,35 @@ export interface PosTab {
   priceBookId: number | null;
   discountMode: DiscountMode;
   discountValue: number;
-  /** null = tự bằng Khách cần trả */
+  /** null = mặc định (hóa đơn: bằng Khách cần trả; đặt hàng: 0) */
   paid: number | null;
   payMethod: PayMethod;
   notes: string;
+  /** Mặc định INVOICE (tab cũ đã lưu không có trường này) */
+  kind?: PosTabKind;
+  /** BOOKING: đơn đặt đang sửa; INVOICE: hóa đơn giao hàng tạo từ đơn đặt này */
+  bookingId?: number | null;
+  bookingCode?: string | null;
+  /** BOOKING (sửa): tiền khách đã trả trước; INVOICE từ đơn: tiền trả trước còn lại được trừ vào hóa đơn */
+  bookingPaid?: number;
+  /** Chi nhánh xử lý của đơn đặt (hóa đơn từ đơn / sửa đơn phải ở đúng chi nhánh này) */
+  warehouseId?: number | null;
+  /** Thời gian giao hàng (YYYY-MM-DDTHH:mm) */
+  deliveryDate?: string | null;
 }
 
 export const POS_TABS_KEY = 'stockflow_pos_tabs_v2';
+
+export const tabPrefix = (kind: PosTabKind) => (kind === 'BOOKING' ? 'Đặt hàng' : 'Hóa đơn');
+
+/** Số thứ tự nhỏ nhất chưa dùng cho tab cùng loại (Hóa đơn 1, 2... / Đặt hàng 1, 2...) */
+export function nextTabNumber(tabs: PosTab[], kind: PosTabKind): number {
+  const prefix = `${tabPrefix(kind)} `;
+  const used = new Set(tabs.filter((t) => t.name.startsWith(prefix)).map((t) => Number(t.name.slice(prefix.length)) || 0));
+  let n = 1;
+  while (used.has(n)) n++;
+  return n;
+}
 
 export const newPosId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 
@@ -55,13 +79,11 @@ export function readPosTabs(): PosTab[] {
   }
 }
 
-/** Thêm 1 tab hóa đơn mới lên đầu danh sách tab của POS (lần mở POS tiếp theo sẽ mở tab này) */
+/** Thêm 1 tab mới lên đầu danh sách tab của POS (lần mở POS tiếp theo sẽ mở tab này) */
 export function queuePosTab(tab: Omit<PosTab, 'id' | 'name'>) {
   const tabs = readPosTabs();
-  const used = new Set(tabs.map((t) => Number(t.name.replace(/\D/g, '')) || 0));
-  let n = 1;
-  while (used.has(n)) n++;
-  const next: PosTab = { ...tab, id: newPosId(), name: `Hóa đơn ${n}` };
+  const kind = tab.kind ?? 'INVOICE';
+  const next: PosTab = { ...tab, id: newPosId(), name: `${tabPrefix(kind)} ${nextTabNumber(tabs, kind)}` };
   try {
     localStorage.setItem(POS_TABS_KEY, JSON.stringify([next, ...tabs]));
   } catch {

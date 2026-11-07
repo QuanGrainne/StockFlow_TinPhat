@@ -107,6 +107,9 @@ public class CancelCustomerReceiptCommandHandler : IRequestHandler<CancelCustome
         var orders = await _context.TrxOrders.Where(o => orderIds.Contains(o.OrderId)).ToListAsync(cancellationToken);
         if (orders.Any(o => string.Equals(o.Status, "CANCELLED", StringComparison.OrdinalIgnoreCase)))
             return Result.Failure<bool>("Hóa đơn của phiếu thu này đã hủy.");
+        var bookingIdsOfReceipt = orders.Where(o => o.OrderType == "BOOKING").Select(o => o.OrderId).ToList();
+        if (bookingIdsOfReceipt.Count > 0 && await _context.TrxOrders.AnyAsync(o => o.BookingOrderId.HasValue && bookingIdsOfReceipt.Contains(o.BookingOrderId.Value) && o.Status == "COMPLETED", cancellationToken))
+            return Result.Failure<bool>("Tiền trả trước của đơn đặt hàng đã được trừ vào hóa đơn giao hàng, không hủy phiếu thu được.");
 
         var dbContext = _context as DbContext;
         using var transaction = dbContext != null ? await dbContext.Database.BeginTransactionAsync(cancellationToken) : null;
@@ -122,7 +125,9 @@ public class CancelCustomerReceiptCommandHandler : IRequestHandler<CancelCustome
                 var order = t.ReferenceType == "SALES_ORDER" ? orders.FirstOrDefault(o => o.OrderId == t.ReferenceId) : null;
                 if (order == null) continue;
                 order.PaidAmount = Math.Max(0, (order.PaidAmount ?? 0) - amount);
-                order.OutstandingAmount = (order.OutstandingAmount ?? 0) + amount;
+                // Đơn đặt hàng: tiền trả trước không phải công nợ của đơn
+                if (order.OrderType != "BOOKING")
+                    order.OutstandingAmount = (order.OutstandingAmount ?? 0) + amount;
                 order.PaymentStatus = (order.PaidAmount ?? 0) > 0 ? "PARTIAL" : "DEBT";
                 order.UpdatedAt = VietnamTime.Now;
                 order.UpdatedBy = userId;

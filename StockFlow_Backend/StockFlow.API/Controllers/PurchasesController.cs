@@ -31,6 +31,7 @@ public class PurchasesController : ControllerBase
     [ProducesResponseType(typeof(List<PurchaseListDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [RequirePermission("PURCHASE_READ")]
+    [RequireFeature("feat-purchase")]
     public async Task<IActionResult> GetPurchases(
         [FromQuery] int? warehouseId,
         [FromQuery] string? warehouseIds,
@@ -75,6 +76,7 @@ public class PurchasesController : ControllerBase
     [ProducesResponseType(typeof(PurchaseDetailDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [RequirePermission("PURCHASE_READ")]
+    [RequireFeature("feat-purchase", "feat-purchase-orders", "feat-purchase-returns", "feat-suppliers", "feat-goods")]
     public async Task<IActionResult> GetPurchaseById(int id)
     {
         var result = await _mediator.Send(new GetPurchaseByIdQuery(id));
@@ -93,6 +95,7 @@ public class PurchasesController : ControllerBase
     [ProducesResponseType(typeof(PurchaseDetailDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [RequirePermission("PURCHASE_CREATE")]
+    [RequireFeature("feat-purchase", "feat-purchase-orders")]
     public async Task<IActionResult> CreatePurchase([FromBody] CreatePurchaseRequest request)
     {
         var result = await _mediator.Send(new CreatePurchaseCommand(request));
@@ -110,6 +113,7 @@ public class PurchasesController : ControllerBase
     [ProducesResponseType(typeof(PurchaseDetailDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [RequirePermission("PURCHASE_UPDATE")]
+    [RequireFeature("feat-purchase", "feat-purchase-orders")]
     public async Task<IActionResult> UpdatePurchase(int id, [FromBody] UpdatePurchaseRequest request)
     {
         var result = await _mediator.Send(new UpdatePurchaseCommand(id, request));
@@ -128,6 +132,7 @@ public class PurchasesController : ControllerBase
     [ProducesResponseType(typeof(PurchaseDetailDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [RequirePermission("PURCHASE_CREATE")]
+    [RequireFeature("feat-purchase", "feat-purchase-orders")]
     public async Task<IActionResult> CompletePurchase(int id, [FromBody] CompletePurchaseRequest? request)
     {
         var result = await _mediator.Send(new CompletePurchaseCommand(id, request ?? new CompletePurchaseRequest()));
@@ -145,6 +150,7 @@ public class PurchasesController : ControllerBase
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [RequirePermission("PURCHASE_UPDATE")]
+    [RequireFeature("feat-purchase")]
     public async Task<IActionResult> CancelPurchase(int id, [FromBody] CancelPurchaseRequest? request)
     {
         var result = await _mediator.Send(new CancelPurchaseCommand(id, request));
