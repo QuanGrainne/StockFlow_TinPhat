@@ -10,7 +10,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { message } from 'antd';
-import { Copy, FileDown, Loader2, Printer, Save, Trash2, X } from 'lucide-react';
+import { Copy, FileDown, Loader2, Printer, Save, Trash2, Undo2, X } from 'lucide-react';
 import { PartnerLink, ProductCodeLink } from '@/components/links/EntityLinks';
 
 import type { OrderDetail } from '../types';
@@ -442,6 +442,17 @@ export const KiotVietOrderDetail: React.FC<KiotVietOrderDetailProps> = ({
               >
                 {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Lưu
               </button>
+              {/* Khách trả hàng theo hóa đơn này: mở tab Trả hàng ở màn Bán hàng (tab mới) */}
+              {order.status === 'COMPLETED' && (
+                <button
+                  type="button"
+                  onClick={() => window.open(`/pos?returnInvoice=${order.orderId}`, '_blank', 'noopener,noreferrer')}
+                  className={outlineBtnCls}
+                  title="Khách trả lại hàng của hóa đơn này"
+                >
+                  <Undo2 size={14} /> Trả hàng
+                </button>
+              )}
               <button type="button" onClick={handlePrint} className={outlineBtnCls}>
                 <Printer size={14} /> In
               </button>

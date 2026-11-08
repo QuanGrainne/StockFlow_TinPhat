@@ -18,6 +18,7 @@ export const salesBookingService = {
     if (filter.fromDate) qs.set('fromDate', filter.fromDate);
     if (filter.toDate) qs.set('toDate', filter.toDate);
     if (filter.search?.trim()) qs.set('search', filter.search.trim());
+    if (filter.productSearch?.trim()) qs.set('productSearch', filter.productSearch.trim());
     const data = await apiClient.get<SalesBookingListItem[]>(`/api/sales-bookings?${qs.toString()}`);
     return Array.isArray(data) ? data : [];
   },
@@ -46,6 +47,11 @@ export const salesBookingService = {
 
   updateBooking(id: number, payload: SaveSalesBookingPayload): Promise<SalesBookingSaveResult> {
     return apiClient.put<SalesBookingSaveResult>(`/api/sales-bookings/${id}`, payload);
+  },
+
+  /** Lưu ghi chú / thời gian giao dự kiến */
+  async updateInfo(id: number, info: { notes: string | null; deliveryDate: string | null }): Promise<void> {
+    await apiClient.patch(`/api/sales-bookings/${id}/info`, info);
   },
 
   async confirmBooking(id: number): Promise<void> {

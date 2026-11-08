@@ -174,24 +174,32 @@ export const posService = {
   },
 
   /**
-   * Lấy ma trận giá bán của các sản phẩm theo từng bảng giá (ProductId -> { PriceBookId: Price })
+   * Ma trận giá bán: productId → { priceBookId: giá } của mọi bảng giá đang chọn (mặc định: mọi bảng giá đang hoạt động).
+   * allProducts=true: lấy cả hàng chưa thêm vào bảng giá tự tạo; tải đủ các trang (API tối đa 100 hàng/trang).
    */
   async getPriceMatrix(priceBookIds?: number[]): Promise<Record<number, Record<number, number>>> {
+    type MatrixPage = { items?: { productId: number; prices?: Record<string, number | null> }[]; totalCount?: number };
     try {
-      const qs = priceBookIds && priceBookIds.length > 0 ? `?priceBookIds=${priceBookIds.join(',')}&pageSize=100` : '?pageSize=100';
-      const data = await apiClient.get<any>(`/api/price-books/matrix${qs}`);
-      const priceMap: Record<number, Record<number, number>> = {};
+      const ids = priceBookIds && priceBookIds.length > 0
+        ? priceBookIds
+        : (await this.getPriceBooks()).filter((b) => b.isActive).map((b) => b.priceBookId);
+      const pageSize = 100;
+      const fetchPage = (page: number) => {
+        const qs = new URLSearchParams({ pageSize: String(pageSize), page: String(page), allProducts: 'true' });
+        if (ids.length > 0) qs.set('priceBookIds', ids.join(','));
+        return apiClient.get<MatrixPage>(`/api/price-books/matrix?${qs.toString()}`);
+      };
+      const first = await fetchPage(1);
+      const pages = Math.ceil((first.totalCount ?? 0) / pageSize);
+      const rest = pages > 1 ? await Promise.all(Array.from({ length: pages - 1 }, (_, i) => fetchPage(i + 2))) : [];
 
-      if (data?.items && Array.isArray(data.items)) {
-        for (const item of data.items) {
+      const priceMap: Record<number, Record<number, number>> = {};
+      for (const data of [first, ...rest]) {
+        for (const item of data.items ?? []) {
           const pId = Number(item.productId);
-          priceMap[pId] = {};
-          if (item.prices) {
-            for (const [pbIdStr, priceVal] of Object.entries(item.prices)) {
-              if (priceVal !== null && priceVal !== undefined) {
-                priceMap[pId][Number(pbIdStr)] = Number(priceVal);
-              }
-            }
+          priceMap[pId] = priceMap[pId] ?? {};
+          for (const [pbIdStr, priceVal] of Object.entries(item.prices ?? {})) {
+            if (priceVal !== null && priceVal !== undefined) priceMap[pId][Number(pbIdStr)] = Number(priceVal);
           }
         }
       }

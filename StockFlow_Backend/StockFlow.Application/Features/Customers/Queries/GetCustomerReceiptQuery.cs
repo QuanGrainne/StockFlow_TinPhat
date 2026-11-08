@@ -39,7 +39,7 @@ public class GetCustomerReceiptQueryHandler : IRequestHandler<GetCustomerReceipt
             .Select(t => t.ReferenceId!.Value).Distinct().ToList();
         var orders = await _context.TrxOrders.AsNoTracking()
             .Where(o => orderIds.Contains(o.OrderId))
-            .Select(o => new { o.OrderId, o.OrderCode, o.OrderDate, Total = o.TotalAmount ?? 0, o.PaymentStatus })
+            .Select(o => new { o.OrderId, o.OrderCode, o.OrderDate, Total = o.TotalAmount ?? 0, o.PaymentStatus, o.OrderType })
             .ToDictionaryAsync(o => o.OrderId, cancellationToken);
 
         string DisplayCode(StockFlow.Domain.Entities.TrxFinancialTransaction t) =>
@@ -65,7 +65,7 @@ public class GetCustomerReceiptQueryHandler : IRequestHandler<GetCustomerReceipt
                                  ((x.TransactionDate ?? DateTime.MinValue) == (t.TransactionDate ?? DateTime.MinValue) && x.TxId < t.TxId)))
                     .Sum(x => x.Amount ?? 0);
                 return new CustomerReceiptAllocationDto(o.OrderId, o.OrderCode ?? $"HD{o.OrderId:D6}", o.OrderDate, o.Total,
-                    paidBefore, t.Amount ?? 0, o.PaymentStatus);
+                    paidBefore, t.Amount ?? 0, o.PaymentStatus, o.OrderType ?? "INVOICE");
             })
             .ToList();
 

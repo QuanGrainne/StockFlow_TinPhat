@@ -52,16 +52,20 @@ public class GetCustomerByIdQueryHandler : IRequestHandler<GetCustomerByIdQuery,
                 Outstanding = o.OutstandingAmount ?? 0,
                 o.Status,
                 Seller = o.CreatedByNavigation.FullName ?? o.CreatedByNavigation.Username,
-                Warehouse = o.TrxStockIssues.Select(si => si.Warehouse.WarehouseName).FirstOrDefault(),
+                Warehouse = o.TrxStockIssues.Select(si => si.Warehouse.WarehouseName).FirstOrDefault()
+                            ?? (o.Warehouse != null ? o.Warehouse.WarehouseName : null),
+                IsBooking = o.OrderType == "BOOKING",
             })
             .ToListAsync(cancellationToken);
 
-        var bookingIds = await _context.TrxOrders.AsNoTracking()
-            .Where(o => o.PartnerId == partner.PartnerId && o.OrderType == "BOOKING")
-            .Select(o => o.OrderId).ToListAsync(cancellationToken);
-        // Lịch sử bán hàng chỉ gồm hóa đơn (đơn đặt hàng chưa bán)
+        // Lịch sử bán hàng chỉ gồm hóa đơn; đơn đặt hàng (chưa bán) ở Lịch sử đặt hàng
+        var recentBookings = orders
+            .Where(o => o.IsBooking)
+            .Select(o => new CustomerRecentOrderDto(
+                o.OrderId, o.OrderCode ?? "", o.OrderDate, o.Total, o.Status, o.Seller, o.Warehouse, o.Paid, 0))
+            .ToList();
         var recentOrders = orders
-            .Where(o => !bookingIds.Contains(o.OrderId))
+            .Where(o => !o.IsBooking)
             .Select(o => new CustomerRecentOrderDto(
                 o.OrderId, o.OrderCode ?? $"HD{o.OrderId:D6}", o.OrderDate, o.Total, o.Status, o.Seller, o.Warehouse, o.Paid, o.Outstanding))
             .ToList();
@@ -71,6 +75,16 @@ public class GetCustomerByIdQueryHandler : IRequestHandler<GetCustomerByIdQuery,
         var receipts = await _context.TrxFinancialTransactions.AsNoTracking()
             .Where(t => t.PartnerId == partner.PartnerId && t.TxType == "RECEIPT" && (t.Status == null || t.Status != "CANCELLED"))
             .Select(t => new { t.TxId, t.TxCode, t.ReferenceType, t.ReferenceId, t.TransactionDate, Amount = t.Amount ?? 0 })
+            .ToListAsync(cancellationToken);
+
+        // Trả hàng: khách được trả lại "Cần trả khách" (−); tiền trả khách ngay (+)
+        var returnRows = await _context.TrxReturnRequests.AsNoTracking()
+            .Where(r => r.PartnerId == partner.PartnerId && r.Status == "COMPLETED")
+            .Select(r => new { r.ReturnRequestId, r.ReturnCode, r.RequestDate, r.TotalAmount })
+            .ToListAsync(cancellationToken);
+        var refundRows = await _context.TrxFinancialTransactions.AsNoTracking()
+            .Where(t => t.PartnerId == partner.PartnerId && t.TxType == "CUSTOMER_REFUND" && t.Status != "CANCELLED")
+            .Select(t => new { t.TxId, t.TxCode, t.ReferenceId, t.TransactionDate, Amount = t.Amount ?? 0 })
             .ToListAsync(cancellationToken);
 
         var movements = orders
@@ -84,6 +98,10 @@ public class GetCustomerByIdQueryHandler : IRequestHandler<GetCustomerByIdQuery,
                 return (Code: code, Date: t.TransactionDate, Type: "PAYMENT", Label: "Thanh toán",
                         Ref: forOrder ? t.ReferenceId : null, Amount: -t.Amount, Order: 1);
             }))
+            .Concat(returnRows.Select(r => (Code: r.ReturnCode ?? $"TH{r.ReturnRequestId:D6}", Date: r.RequestDate, Type: "RETURN",
+                                            Label: "Trả hàng", Ref: (int?)r.ReturnRequestId, Amount: -r.TotalAmount, Order: 2)))
+            .Concat(refundRows.Select(t => (Code: t.TxCode ?? $"PC{t.TxId:D6}", Date: t.TransactionDate, Type: "REFUND",
+                                            Label: "Trả tiền khách", Ref: t.ReferenceId, Amount: t.Amount, Order: 3)))
             .OrderBy(m => m.Date ?? DateTime.MinValue)
             .ThenBy(m => m.Order)
             .ToList();
@@ -123,7 +141,8 @@ public class GetCustomerByIdQueryHandler : IRequestHandler<GetCustomerByIdQuery,
             CreatedWarehouseName: dto.CreatedWarehouseName,
             TotalSales: dto.TotalSales,
             TotalSalesNetReturns: dto.TotalSalesNetReturns,
-            DebtLedger: ledger);
+            DebtLedger: ledger,
+            RecentBookings: recentBookings);
 
         return Result<CustomerDetailDto>.Success(detail);
     }

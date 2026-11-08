@@ -47,6 +47,11 @@ public class CancelOrderCommandHandler : IRequestHandler<CancelOrderCommand, Res
             return Result.Failure<bool>("Đây là đơn đặt hàng — hủy ở màn Đặt hàng.");
         if (string.Equals(order.Status, "CANCELLED", StringComparison.OrdinalIgnoreCase))
             return Result.Failure<bool>($"Hóa đơn {order.OrderCode} đã hủy trước đó.");
+        var activeReturn = await _context.TrxReturnRequests.AsNoTracking()
+            .Where(r => r.SalesOrderId == order.OrderId && r.Status != "CANCELLED")
+            .Select(r => r.ReturnCode).FirstOrDefaultAsync(ct);
+        if (activeReturn != null)
+            return Result.Failure<bool>($"Hóa đơn {order.OrderCode} đã có phiếu trả hàng {activeReturn} — hủy phiếu trả hàng trước.");
 
         foreach (var issue in order.TrxStockIssues)
         {

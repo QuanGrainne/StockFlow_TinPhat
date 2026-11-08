@@ -485,9 +485,23 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                         .HasColumnType("numeric(18,2)")
                         .HasColumnName("quantity");
 
+                    b.Property<decimal>("ReturnPrice")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasDefaultValue(0m)
+                        .HasColumnName("return_price");
+
                     b.Property<int>("ReturnRequestId")
                         .HasColumnType("integer")
                         .HasColumnName("return_request_id");
+
+                    b.Property<decimal>("SalePrice")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasDefaultValue(0m)
+                        .HasColumnName("sale_price");
 
                     b.HasKey("ReturnItemId")
                         .HasName("dtl_return_request_items_pkey");
@@ -2675,14 +2689,33 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("created_by");
 
+                    b.Property<decimal>("DiscountAmount")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasDefaultValue(0m)
+                        .HasColumnName("discount_amount");
+
                     b.Property<int>("PartnerId")
                         .HasColumnType("integer")
                         .HasColumnName("partner_id");
+
+                    b.Property<string>("PaymentMethod")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("payment_method");
 
                     b.Property<string>("Reason")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)")
                         .HasColumnName("reason");
+
+                    b.Property<decimal>("RefundAmount")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasDefaultValue(0m)
+                        .HasColumnName("refund_amount");
 
                     b.Property<DateTime?>("RequestDate")
                         .HasColumnType("timestamp without time zone")
@@ -2693,6 +2726,13 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(30)")
                         .HasColumnName("return_code");
 
+                    b.Property<decimal>("ReturnFee")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasDefaultValue(0m)
+                        .HasColumnName("return_fee");
+
                     b.Property<int>("SalesOrderId")
                         .HasColumnType("integer")
                         .HasColumnName("sales_order_id");
@@ -2702,6 +2742,28 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(20)")
                         .HasColumnName("status");
 
+                    b.Property<decimal>("TotalAmount")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasDefaultValue(0m)
+                        .HasColumnName("total_amount");
+
+                    b.Property<decimal>("TotalGoodsAmount")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasDefaultValue(0m)
+                        .HasColumnName("total_goods_amount");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<int?>("WarehouseId")
+                        .HasColumnType("integer")
+                        .HasColumnName("warehouse_id");
+
                     b.HasKey("ReturnRequestId")
                         .HasName("trx_return_requests_pkey");
 
@@ -2710,6 +2772,8 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                     b.HasIndex("PartnerId");
 
                     b.HasIndex("SalesOrderId");
+
+                    b.HasIndex("WarehouseId");
 
                     b.HasIndex(new[] { "ReturnCode" }, "uq_trx_return_requests_1")
                         .IsUnique();
@@ -3925,11 +3989,18 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasConstraintName("fk_trx_return_requests_sales_order_id");
 
+                    b.HasOne("StockFlow.Domain.Entities.MstWarehouse", "Warehouse")
+                        .WithMany()
+                        .HasForeignKey("WarehouseId")
+                        .HasConstraintName("fk_trx_return_requests_warehouse_id");
+
                     b.Navigation("CreatedByNavigation");
 
                     b.Navigation("Partner");
 
                     b.Navigation("SalesOrder");
+
+                    b.Navigation("Warehouse");
                 });
 
             modelBuilder.Entity("StockFlow.Domain.Entities.TrxStockIssue", b =>

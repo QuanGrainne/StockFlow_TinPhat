@@ -68,6 +68,25 @@ export function exportCustomerOrdersToXLSX(customer: Customer, orders: CustomerR
   XLSX.writeFile(wb, `LichSuBanHang_${customer.code}_${stamp()}.xlsx`);
 }
 
+/** Lịch sử đặt hàng của khách (statusLabel: nhãn trạng thái đơn đặt) */
+export function exportCustomerBookingsToXLSX(customer: Customer, bookings: CustomerRecentOrder[], statusLabel: (s?: string | null) => string) {
+  if (bookings.length === 0) return;
+  const data = bookings.map((o) => ({
+    'Mã đặt hàng': o.orderCode,
+    'Thời gian': fmtDateTime(o.orderDate),
+    'Người bán': o.sellerName || '',
+    'Chi nhánh xử lý': o.warehouseName || '',
+    'Tổng cộng': o.totalAmount,
+    'Khách đã trả': o.paidAmount,
+    'Trạng thái': statusLabel(o.status),
+  }));
+  const ws = XLSX.utils.json_to_sheet(data);
+  ws['!cols'] = [16, 18, 22, 22, 14, 14, 16].map((wch) => ({ wch }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Lịch sử đặt hàng');
+  XLSX.writeFile(wb, `LichSuDatHang_${customer.code}_${stamp()}.xlsx`);
+}
+
 export function exportCustomerLedgerToXLSX(customer: Customer, ledger: CustomerDebtLedgerEntry[]) {
   if (ledger.length === 0) return;
   const data = ledger.map((l) => ({

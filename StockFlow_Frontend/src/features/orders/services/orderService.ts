@@ -19,6 +19,7 @@ export const orderService = {
     add('returnStatus', filter.returnStatus);
     add('paymentMethod', filter.paymentMethod);
     add('priceBookName', filter.priceBookName);
+    add('productSearch', filter.productSearch?.trim());
     const pageSize = 100;
     const fetchPage = (page: number) => {
       const qs = new URLSearchParams(sp);

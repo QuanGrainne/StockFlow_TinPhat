@@ -120,7 +120,9 @@ public record CustomerDetailDto(
     string? CreatedWarehouseName = null,
     decimal TotalSales = 0,
     decimal TotalSalesNetReturns = 0,
-    List<CustomerDebtLedgerEntryDto>? DebtLedger = null
+    List<CustomerDebtLedgerEntryDto>? DebtLedger = null,
+    // Lịch sử đặt hàng (đơn đặt của khách, order_type = BOOKING)
+    List<CustomerRecentOrderDto>? RecentBookings = null
 );
 
 /// <summary>Request tạo mới khách hàng.</summary>
@@ -174,7 +176,9 @@ public record CustomerReceiptAllocationDto(
     decimal OrderTotal,
     decimal PaidBefore,
     decimal Amount,
-    string? PaymentStatus
+    string? PaymentStatus,
+    // INVOICE (hóa đơn) hoặc BOOKING (đơn đặt hàng — tiền khách trả trước)
+    string OrderType = "INVOICE"
 );
 
 /// <summary>Chi tiết 1 phiếu thu của khách (TTHD... / PT...).</summary>

@@ -8,7 +8,7 @@ export type DiscountMode = 'VND' | 'PERCENT';
 /** Phương thức thanh toán tại quầy: Tiền mặt / Chuyển khoản */
 export type PayMethod = 'CASH' | 'VIETQR';
 /** Loại tab: Hóa đơn (bán, trừ kho ngay) hoặc Đặt hàng (đơn đặt của khách, không trừ kho) */
-export type PosTabKind = 'INVOICE' | 'BOOKING';
+export type PosTabKind = 'INVOICE' | 'BOOKING' | 'RETURN';
 
 export interface PosLine {
   key: string;
@@ -26,6 +26,10 @@ export interface PosLine {
   discountValue: number;
   quantity: number;
   note: string;
+  /** Trả hàng: dòng hóa đơn gốc, SL còn được trả, tình trạng hàng */
+  orderItemId?: number;
+  maxQty?: number;
+  condition?: 'GOOD' | 'DEFECTIVE';
 }
 
 export interface PosTab {
@@ -51,11 +55,19 @@ export interface PosTab {
   warehouseId?: number | null;
   /** Thời gian giao hàng (YYYY-MM-DDTHH:mm) */
   deliveryDate?: string | null;
+  /** Sửa đơn đặt hàng: thời gian đặt của đơn (YYYY-MM-DDTHH:mm), chỉ hiển thị */
+  orderDate?: string | null;
+  /** Trả hàng: hóa đơn gốc, người bán, phí trả hàng, khách lẻ (phải trả đủ tiền) */
+  returnInvoiceId?: number | null;
+  returnInvoiceCode?: string | null;
+  returnSellerName?: string | null;
+  returnFee?: number;
+  returnWalkIn?: boolean;
 }
 
 export const POS_TABS_KEY = 'stockflow_pos_tabs_v2';
 
-export const tabPrefix = (kind: PosTabKind) => (kind === 'BOOKING' ? 'Đặt hàng' : 'Hóa đơn');
+export const tabPrefix = (kind: PosTabKind) => (kind === 'BOOKING' ? 'Đặt hàng' : kind === 'RETURN' ? 'Trả hàng' : 'Hóa đơn');
 
 /** Số thứ tự nhỏ nhất chưa dùng cho tab cùng loại (Hóa đơn 1, 2... / Đặt hàng 1, 2...) */
 export function nextTabNumber(tabs: PosTab[], kind: PosTabKind): number {

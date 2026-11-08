@@ -144,11 +144,11 @@ public class PurchaseOrderQueryHandler :
                 p?.BaseUnit?.UnitName ?? "Cái", 0, received[g.Key], 0, 0, 0);
         }));
 
-        // Tiền đã trả NCC của phiếu đặt = số trả ngay lúc nhập hàng (giao dịch không có mã phiếu chi).
-        // Phiếu chi PC... trả sau ở Nhà cung cấp không làm đổi phiếu đặt; công nợ hiện tại xem ở màn Nhập hàng.
+        // Tiền đã trả NCC của phiếu đặt = tổng đã trả cho các phiếu nhập theo phiếu đặt (khớp Lịch sử thanh toán
+        // của phiếu nhập): trả lúc nhập hàng + phần phiếu chi PC... trả thêm sau ở Nhà cung cấp phân bổ vào các phiếu nhập đó.
         var completedIds = receipts.Where(r => r.Status == "COMPLETED").Select(r => r.GrId).ToList();
         var paidAmount = await _context.TrxFinancialTransactions.AsNoTracking()
-            .Where(t => t.TxType == "SUPPLIER_PAYMENT" && t.Status != "CANCELLED" && t.TxCode == null &&
+            .Where(t => t.TxType == "SUPPLIER_PAYMENT" && t.Status != "CANCELLED" &&
                         t.ReferenceType == "GOODS_RECEIPT" && t.ReferenceId != null && completedIds.Contains(t.ReferenceId.Value))
             .SumAsync(t => t.Amount ?? 0, ct);
 

@@ -88,5 +88,7 @@ public class PosOrderSummaryDto
     public string PaymentMethod { get; set; } = string.Empty;
     public bool HasReturn { get; set; }
     public string? ReturnCode { get; set; }
+    /// <summary>Nhân viên tạo hóa đơn</summary>
+    public string CreatedByName { get; set; } = string.Empty;
     public string? Notes { get; set; }
 }

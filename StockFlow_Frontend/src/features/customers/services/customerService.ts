@@ -56,7 +56,33 @@ interface BackendStatsDto {
   creditUsagePercent: number;
 }
 
+type BackendRecentOrder = {
+  orderId: number;
+  orderCode: string;
+  orderDate?: string | null;
+  totalAmount: number;
+  status?: string | null;
+  sellerName?: string | null;
+  warehouseName?: string | null;
+  paidAmount?: number | null;
+  outstandingAmount?: number | null;
+};
+
+const mapRecentOrder = (o: BackendRecentOrder) => ({
+  orderId: o.orderId,
+  orderCode: o.orderCode,
+  orderDate: o.orderDate ?? undefined,
+  totalAmount: Number(o.totalAmount) || 0,
+  status: o.status ?? undefined,
+  sellerName: o.sellerName ?? null,
+  warehouseName: o.warehouseName ?? null,
+  paidAmount: Number(o.paidAmount) || 0,
+  outstandingAmount: Number(o.outstandingAmount) || 0,
+});
+
 interface BackendCustomerDetailDto extends BackendCustomerDto {
+  /** Lịch sử đặt hàng (đơn đặt của khách) */
+  recentBookings?: BackendRecentOrder[] | null;
   recentOrders?: Array<{
     orderId: number;
     orderCode: string;
@@ -205,17 +231,8 @@ export const customerService = {
     const dto = await apiClient.get<BackendCustomerDetailDto>(`/api/customers/${id}`);
     return {
       ...mapDtoToCustomer(dto),
-      recentOrders: (dto.recentOrders ?? []).map((o) => ({
-        orderId: o.orderId,
-        orderCode: o.orderCode,
-        orderDate: o.orderDate ?? undefined,
-        totalAmount: Number(o.totalAmount) || 0,
-        status: o.status ?? undefined,
-        sellerName: o.sellerName ?? null,
-        warehouseName: o.warehouseName ?? null,
-        paidAmount: Number(o.paidAmount) || 0,
-        outstandingAmount: Number(o.outstandingAmount) || 0,
-      })),
+      recentOrders: (dto.recentOrders ?? []).map(mapRecentOrder),
+      recentBookings: (dto.recentBookings ?? []).map(mapRecentOrder),
       debtLedger: (dto.debtLedger ?? []).map((l) => ({
         code: l.code,
         date: l.date ?? null,

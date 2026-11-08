@@ -31,6 +31,8 @@ public interface IStockFlowDbContext
 
     DbSet<MstOrderSetting> MstOrderSettings { get; }
     DbSet<TrxOrder> TrxOrders { get; }
+    DbSet<TrxReturnRequest> TrxReturnRequests { get; }
+    DbSet<DtlReturnRequestItem> DtlReturnRequestItems { get; }
     DbSet<DtlOrderItem> DtlOrderItems { get; }
     DbSet<TrxStockTransfer> TrxStockTransfers { get; }
     DbSet<DtlStockTransferItem> DtlStockTransferItems { get; }

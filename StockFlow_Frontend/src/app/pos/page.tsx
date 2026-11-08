@@ -14,7 +14,9 @@ const PosScreen = dynamic(() => import('@/features/pos/screens/PosScreen'), {
 
 // Tạo / sửa đơn đặt hàng chỉ cần quyền Đặt hàng; tạo hóa đơn (kể cả từ đơn đặt) cần quyền Bán hàng
 const posFeatures = (params: URLSearchParams): string[] =>
-  params.has('booking') || params.has('newBooking')
+  params.has('returnInvoice')
+    ? ['feat-sales-returns']
+    : params.has('booking') || params.has('newBooking') || params.has('copyBooking')
     ? ['feat-sales-booking']
     : params.has('bookingInvoice')
       ? ['feat-pos']

@@ -134,7 +134,8 @@ public class PriceBooksController : ControllerBase
         [FromQuery] string? stockCondition,
         [FromQuery] string? priceBookIds,
         [FromQuery] int page = 1,
-        [FromQuery] int pageSize = 20)
+        [FromQuery] int pageSize = 20,
+        [FromQuery] bool allProducts = false)
     {
         List<int>? ids = null;
         if (!string.IsNullOrWhiteSpace(priceBookIds))
@@ -153,7 +154,8 @@ public class PriceBooksController : ControllerBase
             stockCondition,
             ids,
             page,
-            pageSize
+            pageSize,
+            allProducts
         ));
 
         if (!result.IsSuccess)

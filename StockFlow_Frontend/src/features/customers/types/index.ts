@@ -125,6 +125,8 @@ export interface CustomerDebtLedgerEntry {
 export interface CustomerDetail extends Customer {
   recentOrders?: CustomerRecentOrder[];
   debtLedger?: CustomerDebtLedgerEntry[];
+  /** Lịch sử đặt hàng (đơn đặt của khách) */
+  recentBookings?: CustomerRecentOrder[];
 }
 
 /** Kết quả tạo phiếu thu nợ khách hàng */
@@ -152,6 +154,8 @@ export interface CustomerReceiptAllocation {
   paidBefore: number;
   amount: number;
   paymentStatus?: string | null;
+  /** INVOICE (hóa đơn) | BOOKING (đơn đặt hàng — tiền khách trả trước) */
+  orderType?: string | null;
 }
 
 /** Chi tiết 1 phiếu thu của khách (TTHD... / PT...) */

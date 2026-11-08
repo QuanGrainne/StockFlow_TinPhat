@@ -93,5 +93,5 @@ public record PurchaseOrderDetailDto(
     int? MergedIntoPoId = null,
     string? MergedIntoCode = null,
     List<string>? MergedFromCodes = null,
-    decimal PaidAmount = 0  // Đã trả NCC lúc nhập hàng theo phiếu đặt (không tính phiếu chi trả sau)
+    decimal PaidAmount = 0  // Đã trả NCC cho các phiếu nhập theo phiếu đặt (kể cả phiếu chi trả thêm sau)
 );

@@ -78,6 +78,13 @@ export default function SalesBookingsClient() {
     return scrollToWhenReady(`[data-doc-row="${rowId}"]`);
   }, [docLink, openId]);
 
+  // Quay lại từ tab Bán hàng (đặt / giao hàng ở tab khác) → tải lại danh sách
+  useEffect(() => {
+    const onFocus = () => setReloadTick((t) => t + 1);
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, []);
+
   useEffect(() => {
     const t = setTimeout(() => setSearch(searchInput.trim()), 300);
     return () => clearTimeout(t);
@@ -124,7 +131,7 @@ export default function SalesBookingsClient() {
   const safePage = Math.min(page, pageCount);
   const paged = rows.slice((safePage - 1) * pageSize, safePage * pageSize);
   const totals = useMemo(
-    () => rows.reduce((acc, r) => ({ amount: acc.amount + r.totalAmount, paid: acc.paid + r.paidAmount }), { amount: 0, paid: 0 }),
+    () => rows.reduce((acc, r) => ({ amount: acc.amount + r.totalAmount, paid: acc.paid + r.customerPaidAmount }), { amount: 0, paid: 0 }),
     [rows]
   );
 
@@ -204,8 +211,11 @@ export default function SalesBookingsClient() {
             <Merge size={14} className="text-[#677484]" />
             <span>Gộp đơn{selectedRows.length >= 2 ? ` (${selectedRows.length})` : ''}</span>
           </button>
+          {/* Mở màn Bán hàng ở tab mới, giữ nguyên danh sách đặt hàng */}
           <Link
             href="/pos?newBooking=1"
+            target="_blank"
+            rel="noopener noreferrer"
             className="inline-flex items-center gap-1.5 px-3.5 h-8 rounded-[8px] bg-[#0070f4] hover:bg-[#005ac3] text-white font-semibold text-[13px] shadow-xs transition cursor-pointer"
           >
             <Plus size={15} className="stroke-[2.5]" />
@@ -339,7 +349,14 @@ export default function SalesBookingsClient() {
                             </PartnerLink>
                           </td>
                           <td className="py-2.5 px-3 text-right font-mono">{money.format(r.totalAmount)}</td>
-                          <td className="py-2.5 px-3 text-right font-mono">{money.format(r.paidAmount)}</td>
+                          <td
+                            className={`py-2.5 px-3 text-right font-mono ${
+                              r.status !== 'CANCELLED' && r.customerPaidAmount < r.totalAmount ? 'text-[#fb2c36]' : ''
+                            }`}
+                            title={r.customerPaidAmount < r.totalAmount ? 'Khách chưa trả đủ' : undefined}
+                          >
+                            {money.format(r.customerPaidAmount)}
+                          </td>
                           <td className="py-2.5 px-3">
                             <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold border whitespace-nowrap ${st.cls}`}>{st.label}</span>
                           </td>

@@ -19,10 +19,17 @@ import { priceBookService } from '@/features/price-books/services/priceBookServi
 import { getTimeRangeForPreset } from '@/components/filters/TimeRangeFilter';
 import { PartnerLink } from '@/components/links/EntityLinks';
 import { useActiveWarehouse } from '@/lib/warehouse/useActiveWarehouse';
-import { readDocumentLink, scrollToWhenReady } from '@/lib/navigation/documentLink';
+import { documentLinkHref, readDocumentLink, scrollToWhenReady } from '@/lib/navigation/documentLink';
 
 const money = new Intl.NumberFormat('vi-VN');
-const COLUMN_COUNT = 10;
+const COLUMN_COUNT = 11;
+
+/** Trạng thái hóa đơn (cột Trạng thái) */
+const INVOICE_STATUS: Record<string, { label: string; cls: string }> = {
+  COMPLETED: { label: 'Hoàn thành', cls: 'bg-[#e6f8ec] text-[#16a34a] border-[#bbf7d0]' },
+  CANCELLED: { label: 'Đã hủy', cls: 'bg-[#fef2f2] text-[#fb2c36] border-[#fecaca]' },
+  DRAFT: { label: 'Phiếu tạm', cls: 'bg-[#fffbeb] text-[#d97706] border-[#fde68a]' },
+};
 const STAR_KEY = 'stockflow_invoice_stars';
 const WALK_IN_CODE = 'KH00000';
 const thCls = 'sticky top-0 z-20 bg-[#f7f8f9] py-2.5 px-3 border-b border-slate-200 whitespace-nowrap';
@@ -316,6 +323,7 @@ export default function OrdersClient({}: OrdersClientProps = {}) {
                   <th className={`${thCls} text-right`}>Tổng tiền hàng</th>
                   <th className={`${thCls} text-right`}>Giảm giá</th>
                   <th className={`${thCls} text-right`}>Khách đã trả</th>
+                  <th className={thCls}>Trạng thái</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -326,6 +334,7 @@ export default function OrdersClient({}: OrdersClientProps = {}) {
                     <td className="py-2.5 px-3 text-right font-mono">{money.format(totals.subTotal)}</td>
                     <td className="py-2.5 px-3 text-right font-mono">{money.format(totals.discount)}</td>
                     <td className="py-2.5 px-3 text-right font-mono">{money.format(totals.paid)}</td>
+                    <td></td>
                   </tr>
                 )}
 
@@ -408,14 +417,23 @@ export default function OrdersClient({}: OrdersClientProps = {}) {
                           </td>
                           <td className="py-2.5 px-3 font-mono font-bold text-[#0070f4] whitespace-nowrap">
                             {r.orderCode}
-                            {cancelled && (
-                              <span className="ml-2 px-1.5 py-0.5 rounded-[4px] text-[10px] font-semibold font-sans bg-[#fef2f2] text-[#fb2c36] border border-[#fecaca]">
-                                Đã hủy
-                              </span>
-                            )}
                           </td>
                           <td className="py-2.5 px-3 whitespace-nowrap">{formatDateTime(r.orderDate)}</td>
-                          <td className="py-2.5 px-3 font-mono text-[12px] text-[#677484] whitespace-nowrap">{r.returnCode || ''}</td>
+                          <td className="py-2.5 px-3 font-mono text-[12px] whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                            {r.returnCode ? (
+                              <a
+                                href={documentLinkHref('/sales-returns', { code: r.returnCode })}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-[#0070f4] hover:underline"
+                                title={`Mở phiếu trả hàng ${r.returnCode}`}
+                              >
+                                {r.returnCode}
+                              </a>
+                            ) : (
+                              ''
+                            )}
+                          </td>
                           <td className="py-2.5 px-3 font-mono text-[12px] whitespace-nowrap">
                             {walkIn ? (
                               ''
@@ -426,7 +444,28 @@ export default function OrdersClient({}: OrdersClientProps = {}) {
                           <td className="py-2.5 px-3">{walkIn ? 'Khách lẻ' : r.partnerName}</td>
                           <td className="py-2.5 px-3 text-right font-mono">{money.format(r.subTotal || 0)}</td>
                           <td className="py-2.5 px-3 text-right font-mono">{money.format(r.discountAmount || 0)}</td>
-                          <td className="py-2.5 px-3 text-right font-mono">{money.format(r.paidAmount || 0)}</td>
+                          {/* Khách trả chưa đủ (còn nợ) → đỏ */}
+                          <td
+                            className={`py-2.5 px-3 text-right font-mono ${
+                              !cancelled && (r.paidAmount || 0) < (r.totalAmount || 0) ? 'text-[#fb2c36]' : ''
+                            }`}
+                            title={!cancelled && (r.paidAmount || 0) < (r.totalAmount || 0) ? 'Khách chưa trả đủ' : undefined}
+                          >
+                            {money.format(r.paidAmount || 0)}
+                          </td>
+                          <td className="py-2.5 px-3">
+                            {(() => {
+                              const st = INVOICE_STATUS[(r.status || '').toUpperCase()] ?? {
+                                label: r.status || '—',
+                                cls: 'bg-slate-50 text-slate-600 border-slate-200',
+                              };
+                              return (
+                                <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold border whitespace-nowrap ${st.cls}`}>
+                                  {st.label}
+                                </span>
+                              );
+                            })()}
+                          </td>
                         </tr>
                         {isExpanded && (
                           <tr>
