@@ -24,20 +24,21 @@ public class SalesBookingsController : ControllerBase
 
     [HttpGet]
     [RequirePermission("SALES_READ")]
-    [RequireFeature("feat-sales-booking")]
+    [RequireFeature("feat-sales-booking", "feat-pos")]
     public async Task<IActionResult> GetBookings(
         [FromQuery] string? warehouseIds,
         [FromQuery] string? status,
         [FromQuery] DateTime? fromDate,
         [FromQuery] DateTime? toDate,
         [FromQuery] int? partnerId,
-        [FromQuery] string? search)
+        [FromQuery] string? search,
+        [FromQuery] string? productSearch)
     {
         var ids = (warehouseIds ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .Select(s => int.TryParse(s, out var n) ? n : 0).Where(n => n > 0).ToList();
         var statuses = (status ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .Select(s => s.ToUpperInvariant()).ToList();
-        var result = await _mediator.Send(new GetSalesBookingsQuery(ids, statuses, fromDate, toDate, partnerId, search));
+        var result = await _mediator.Send(new GetSalesBookingsQuery(ids, statuses, fromDate, toDate, partnerId, search, productSearch));
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { message = result.Error });
     }
 
@@ -78,6 +79,16 @@ public class SalesBookingsController : ControllerBase
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { message = result.Error });
     }
 
+    /// <summary>Lưu ghi chú / thời gian giao dự kiến (không đổi hàng hóa, tiền)</summary>
+    [HttpPatch("{id:int}/info")]
+    [RequirePermission("SALES_UPDATE")]
+    [RequireFeature("feat-sales-booking")]
+    public async Task<IActionResult> UpdateInfo(int id, [FromBody] UpdateSalesBookingInfoRequest request)
+    {
+        var result = await _mediator.Send(new UpdateSalesBookingInfoCommand(id, request.Notes, request.DeliveryDate));
+        return result.IsSuccess ? Ok(new { success = true }) : BadRequest(new { message = result.Error });
+    }
+
     [HttpPost("{id:int}/confirm")]
     [RequirePermission("SALES_UPDATE")]
     [RequireFeature("feat-sales-booking")]
@@ -116,3 +127,5 @@ public class SalesBookingsController : ControllerBase
 }
 
 public record MergeSalesBookingsRequest(List<int> OrderIds);
+
+public record UpdateSalesBookingInfoRequest(string? Notes, DateTime? DeliveryDate);

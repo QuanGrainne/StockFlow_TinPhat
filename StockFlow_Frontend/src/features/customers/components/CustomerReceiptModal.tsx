@@ -11,6 +11,15 @@ import { customerService } from '../services/customerService';
 import type { CustomerReceiptDetail } from '../types';
 import { PartnerLink } from '@/components/links/EntityLinks';
 import { invoiceLinkHref } from '@/features/orders/components/InvoicePreviewModal';
+import { documentLinkHref, toLinkDate } from '@/lib/navigation/documentLink';
+import type { CustomerReceiptAllocation } from '../types';
+
+const isBookingAlloc = (a: CustomerReceiptAllocation) => (a.orderType || '').toUpperCase() === 'BOOKING';
+/** Mã phiếu được phân bổ: hóa đơn → trang hóa đơn; đơn đặt hàng → màn Đặt hàng (mở sẵn đơn) */
+const allocHref = (a: CustomerReceiptAllocation) =>
+  isBookingAlloc(a)
+    ? documentLinkHref('/sales-booking', { code: a.orderCode, id: a.orderId, date: toLinkDate(a.orderDate) })
+    : invoiceLinkHref(a);
 import { formatDateTimeVN, toLocalDatetimeInputString } from '@/features/transfers/utils/dateUtils';
 
 type PayMethod = 'CASH' | 'VIETQR';
@@ -41,7 +50,7 @@ table{width:100%;border-collapse:collapse;margin-top:12px}td,th{border:1px solid
 <div class="row"><b>Phương thức:</b><span>${esc(METHOD_LABEL[method] ?? method)}</span></div>
 <div class="row"><b>Người thu:</b><span>${esc(r.createdByName || '')}</span></div>
 ${notes ? `<div class="row"><b>Ghi chú:</b><span>${esc(notes)}</span></div>` : ''}
-${rows ? `<table><thead><tr><th>Hóa đơn</th><th class="r">Giá trị hóa đơn</th><th class="r">Tiền thu</th></tr></thead><tbody>${rows}</tbody></table>` : ''}
+${rows ? `<table><thead><tr><th>Mã phiếu</th><th class="r">Giá trị phiếu</th><th class="r">Tiền thu</th></tr></thead><tbody>${rows}</tbody></table>` : ''}
 <div class="sign"><div>Người nộp tiền<br><br><br>&nbsp;</div><div>Người thu tiền<br><br><br>${esc(r.createdByName || '')}</div></div>
 <script>window.onload=function(){window.print()}</script></body></html>`);
   w.document.close();
@@ -252,15 +261,24 @@ export default function CustomerReceiptModal({ partnerId, code, onClose, onChang
               </div>
 
               {r.allocations.length > 0 && (
+                <div className="text-[13px] text-[#15171a] -mb-2">
+                  {r.allocations.every(isBookingAlloc)
+                    ? 'Phân bổ vào đơn đặt hàng'
+                    : r.allocations.some(isBookingAlloc)
+                      ? 'Phân bổ vào hóa đơn / đơn đặt hàng'
+                      : 'Phân bổ vào hóa đơn'}
+                </div>
+              )}
+              {r.allocations.length > 0 && (
                 <div className="rounded-[8px] border border-slate-200 overflow-hidden">
                   <table className="w-full text-left border-collapse">
                     <thead className="bg-[#f7f8f9] border-b border-slate-200 text-[12px] font-semibold text-[#15171a]">
                       <tr>
-                        <th className="py-2 px-3">Mã hóa đơn</th>
+                        <th className="py-2 px-3">Mã phiếu</th>
                         <th className="py-2 px-3">Thời gian</th>
-                        <th className="py-2 px-3 text-right">Giá trị hóa đơn</th>
+                        <th className="py-2 px-3 text-right">Giá trị phiếu</th>
                         <th className="py-2 px-3 text-right">Đã thu trước</th>
-                        <th className="py-2 px-3 text-right">Tiền thu</th>
+                        <th className="py-2 px-3 text-right">Tiền thu/chi</th>
                         <th className="py-2 px-3 text-right">Trạng thái</th>
                       </tr>
                     </thead>
@@ -271,16 +289,16 @@ export default function CustomerReceiptModal({ partnerId, code, onClose, onChang
                         <td />
                       </tr>
                       {r.allocations.map((a) => {
-                        const paidFull = a.paidBefore + a.amount >= a.orderTotal;
+                        // Trạng thái của phiếu thu (như KiotViet): đã thu xong là "Đã thanh toán", kể cả khi hóa đơn còn nợ
                         return (
                           <tr key={a.orderId}>
                             <td className="py-2 px-3">
                               <a
-                                href={invoiceLinkHref(a)}
+                                href={allocHref(a)}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="text-[#0070f4] hover:underline"
-                                title={`Mở hóa đơn ${a.orderCode}`}
+                                title={isBookingAlloc(a) ? `Mở đơn đặt hàng ${a.orderCode}` : `Mở hóa đơn ${a.orderCode}`}
                               >
                                 {a.orderCode}
                               </a>
@@ -292,12 +310,12 @@ export default function CustomerReceiptModal({ partnerId, code, onClose, onChang
                             <td className="py-2 px-3 text-right">
                               <span
                                 className={`px-2 py-0.5 rounded-full text-[11px] font-semibold border ${
-                                  paidFull
-                                    ? 'bg-[#e6f8ec] text-[#16a34a] border-[#bbf7d0]'
-                                    : 'bg-[#fffbeb] text-[#d97706] border-[#fde68a]'
+                                  cancelled
+                                    ? 'bg-[#fef2f2] text-[#fb2c36] border-[#fecaca]'
+                                    : 'bg-[#e6f8ec] text-[#16a34a] border-[#bbf7d0]'
                                 }`}
                               >
-                                {paidFull ? 'Đã thanh toán' : 'Thanh toán một phần'}
+                                {cancelled ? 'Đã hủy' : 'Đã thanh toán'}
                               </span>
                             </td>
                           </tr>

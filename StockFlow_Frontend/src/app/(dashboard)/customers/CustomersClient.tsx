@@ -334,7 +334,7 @@ export default function CustomersClient({ }: CustomersClientProps = {}) {
                 {!showLoading && paged.length > 0 && (
                   <tr className="bg-white border-b border-slate-200 font-bold text-[13px]">
                     <td colSpan={4}></td>
-                    <td className={`py-2.5 px-3 text-right font-mono ${totals.debt > 0 ? 'text-[#fb2c36]' : ''}`}>
+                    <td className={`py-2.5 px-3 text-right font-mono ${totals.debt !== 0 ? 'text-[#fb2c36]' : ''}`}>
                       {money.format(totals.debt)}
                     </td>
                     <td className="py-2.5 px-3 text-right font-mono">{money.format(totals.sales)}</td>
@@ -408,7 +408,17 @@ export default function CustomersClient({ }: CustomersClientProps = {}) {
                             )}
                           </td>
                           <td className="py-2.5 px-3 font-mono text-[12px] text-[#677484] whitespace-nowrap">{c.phone || '—'}</td>
-                          <td className={`py-2.5 px-3 text-right font-mono ${c.currentDebt > 0 ? 'text-[#fb2c36] font-semibold' : ''}`}>
+                          {/* Nợ chưa về 0 (khách còn nợ, hoặc cửa hàng còn nợ khách — số âm) → đỏ */}
+                          <td
+                            className={`py-2.5 px-3 text-right font-mono ${(c.currentDebt || 0) !== 0 ? 'text-[#fb2c36] font-semibold' : ''}`}
+                            title={
+                              (c.currentDebt || 0) > 0
+                                ? 'Khách còn nợ cửa hàng'
+                                : (c.currentDebt || 0) < 0
+                                  ? 'Cửa hàng còn nợ khách (khách trả trước / chưa trả tiền hàng trả)'
+                                  : undefined
+                            }
+                          >
                             {money.format(c.currentDebt || 0)}
                           </td>
                           <td className="py-2.5 px-3 text-right font-mono">{money.format(c.totalSales || 0)}</td>

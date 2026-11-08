@@ -13,6 +13,7 @@ import { transferService } from '@/features/transfers/services/transferService';
 import { stocktakeService } from '@/features/stocktakes/services/stocktakeService';
 import { orderService } from '@/features/orders/services/orderService';
 import { purchaseOrderService } from '@/features/purchase-orders/services/purchaseOrderService';
+import { salesReturnService } from '@/features/sales-returns/services/salesReturnService';
 import { PO_STATUS } from '@/features/purchase-orders/utils/purchaseOrderUtils';
 import { documentLinkHref, toLinkDate } from '@/lib/navigation/documentLink';
 import { ProductCodeLink } from '@/components/links/EntityLinks';
@@ -297,8 +298,57 @@ async function loadDocument(ref: StockCardDocumentRef): Promise<DocView> {
         { label: 'Khách đã trả', value: money(d.paidAmount) },
       ],
       notes: d.notes,
-      openHref: `/orders/${d.orderId}`,
+      // Mở màn danh sách Hóa đơn, tự lọc + mở sẵn hóa đơn (như các chứng từ khác)
+      openHref: documentLinkHref('/orders', { code: d.orderCode, id: d.orderId, date: toLinkDate(d.orderDate) }),
       openLabel: 'Xem hóa đơn',
+    };
+  }
+
+  if (type === 'SALES_RETURN') {
+    const d = await salesReturnService.getReturn(ref.documentId);
+    const status = { COMPLETED: ['Đã trả', 'green'], CANCELLED: ['Đã hủy', 'red'] }[d.status] ?? [d.status, 'slate'];
+    return {
+      title: 'Phiếu trả hàng',
+      code: d.returnCode,
+      statusLabel: status[0],
+      statusTone: status[1] as DocView['statusTone'],
+      branch: d.warehouseName,
+      info: [
+        { label: 'Người tạo', value: d.createdByName },
+        { label: 'Ngày trả', value: dateTime(d.returnDate) },
+        {
+          label: 'Khách hàng',
+          value: `${d.partnerName} (${d.partnerCode})`,
+          highlight: true,
+          href: documentLinkHref('/customers', { code: d.partnerCode, id: d.partnerId }),
+        },
+        {
+          label: 'Hóa đơn',
+          value: d.invoiceCode,
+          highlight: true,
+          href: documentLinkHref('/orders', { code: d.invoiceCode, id: d.invoiceId, date: toLinkDate(d.invoiceDate) }),
+        },
+      ],
+      columns: [
+        ITEM_COLS.code, ITEM_COLS.name,
+        { key: 'qty', label: 'SL trả', align: 'right' },
+        { key: 'salePrice', label: 'Giá bán', align: 'right' },
+        { key: 'returnPrice', label: 'Giá nhập lại', align: 'right' },
+        { key: 'total', label: 'Thành tiền', align: 'right' },
+      ],
+      rows: d.items.map((i) => ({
+        code: i.productCode, productId: i.productId, name: i.productName, qty: qtyFmt(i.quantity),
+        salePrice: money(i.salePrice), returnPrice: money(i.returnPrice), total: money(i.lineTotal),
+      })),
+      totals: [
+        { label: 'Tổng tiền hàng trả', value: money(d.totalGoodsAmount) },
+        { label: 'Giảm giá', value: money(d.discountAmount) },
+        { label: 'Phí trả hàng', value: money(d.returnFee) },
+        { label: 'Cần trả khách', value: money(d.totalAmount), strong: true },
+        { label: 'Đã trả khách', value: money(d.refundAmount) },
+      ],
+      notes: d.notes,
+      openHref: documentLinkHref('/sales-returns', { code: d.returnCode, id: d.returnId, date: toLinkDate(d.returnDate) }),
     };
   }
 

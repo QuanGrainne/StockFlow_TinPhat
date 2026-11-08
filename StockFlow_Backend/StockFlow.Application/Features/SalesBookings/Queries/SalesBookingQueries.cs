@@ -13,7 +13,9 @@ public record GetSalesBookingsQuery(
     DateTime? FromDate,
     DateTime? ToDate,
     int? PartnerId,
-    string? Search) : IRequest<Result<List<SalesBookingListDto>>>;
+    string? Search,
+    // Tìm theo mã hàng / tên hàng trong đơn (popup Xử lý đặt hàng ở màn Bán hàng)
+    string? ProductSearch = null) : IRequest<Result<List<SalesBookingListDto>>>;
 
 public record GetSalesBookingByIdQuery(int OrderId) : IRequest<Result<SalesBookingDetailDto>>;
 
@@ -56,7 +58,15 @@ public class SalesBookingQueryHandler :
             query = query.Where(o => (o.OrderCode != null && o.OrderCode.ToLower().Contains(s))
                                      || (o.Partner.PartnerName != null && o.Partner.PartnerName.ToLower().Contains(s))
                                      || (o.Partner.PartnerCode != null && o.Partner.PartnerCode.ToLower().Contains(s))
-                                     || (o.Partner.Phone != null && o.Partner.Phone.Contains(s)));
+                                     || (o.Partner.Phone != null && o.Partner.Phone.Contains(s))
+                                     || (o.Notes != null && o.Notes.ToLower().Contains(s)));
+        }
+        if (!string.IsNullOrWhiteSpace(request.ProductSearch))
+        {
+            var ps = request.ProductSearch.Trim().ToLower();
+            query = query.Where(o => o.DtlOrderItems.Any(i =>
+                (i.Product.ProductCode != null && i.Product.ProductCode.ToLower().Contains(ps)) ||
+                (i.Product.ProductName != null && i.Product.ProductName.ToLower().Contains(ps))));
         }
 
         var rows = await query
@@ -83,10 +93,12 @@ public class SalesBookingQueryHandler :
             .ToListAsync(ct);
 
         var delivered = await SalesBookingOps.LoadDeliveredAsync(_context, rows.Select(r => r.OrderId).ToList(), ct);
+        var invoicePaid = await InvoicePaidAsync(rows.Select(r => r.OrderId).ToList(), ct);
         return Result.Success(rows.Select(r => new SalesBookingListDto(
             r.OrderId, r.OrderCode ?? "", r.OrderDate, r.DeliveryDate, r.WarehouseId, r.WarehouseName ?? "",
             r.PartnerId, r.PartnerCode ?? "", r.PartnerName ?? "", r.Phone, r.Status ?? SalesBookingOps.Draft,
-            r.CreatedBy ?? "", r.Qty, delivered.GetValueOrDefault(r.OrderId)?.Values.Sum() ?? 0, r.Total, r.Paid, r.Notes)).ToList());
+            r.CreatedBy ?? "", r.Qty, delivered.GetValueOrDefault(r.OrderId)?.Values.Sum() ?? 0, r.Total, r.Paid, r.Notes,
+            r.Paid + invoicePaid.GetValueOrDefault(r.OrderId))).ToList());
     }
 
     public async Task<Result<SalesBookingDetailDto>> Handle(GetSalesBookingByIdQuery request, CancellationToken ct)
@@ -126,12 +138,15 @@ public class SalesBookingQueryHandler :
                 x.TotalAmount ?? 0, x.DepositAmount, x.Status ?? ""))
             .ToListAsync(ct);
 
+        // Lịch sử thanh toán: phiếu thu trả trước của đơn + phiếu thu của các hóa đơn tạo từ đơn (kể cả đã hủy)
+        var paymentRefIds = invoices.Select(i => i.OrderId).Append(o.OrderId).ToList();
         var payments = await _context.TrxFinancialTransactions.AsNoTracking()
-            .Where(t => t.ReferenceType == "SALES_ORDER" && t.ReferenceId == o.OrderId && t.TxType == "RECEIPT" && t.Status != "CANCELLED")
-            .OrderBy(t => t.TransactionDate).ThenBy(t => t.TxId)
+            .Where(t => t.ReferenceType == "SALES_ORDER" && t.ReferenceId.HasValue && paymentRefIds.Contains(t.ReferenceId.Value) && t.TxType == "RECEIPT")
+            .OrderByDescending(t => t.TransactionDate).ThenByDescending(t => t.TxId)
             .Select(t => new SalesBookingPaymentDto(
                 t.TxCode ?? "", t.TransactionDate, t.PaymentMethod, t.Amount ?? 0,
-                t.CreatedByNavigation.FullName ?? t.CreatedByNavigation.Username ?? ""))
+                t.CreatedByNavigation.FullName ?? t.CreatedByNavigation.Username ?? "",
+                t.Status ?? "COMPLETED"))
             .ToListAsync(ct);
 
         var mergedFrom = await _context.TrxOrders.AsNoTracking()
@@ -150,7 +165,20 @@ public class SalesBookingQueryHandler :
             o.SubTotal, o.DiscountType, o.DiscountValue, o.DiscountAmount, o.TotalAmount ?? 0,
             o.PaidAmount ?? 0, Math.Max(0, (o.PaidAmount ?? 0) - usedDeposit), o.Notes,
             o.ConsolidatedIntoOrderId, o.ConsolidatedIntoOrder?.OrderCode, mergedFrom,
-            items, invoices, payments));
+            items, invoices, payments,
+            (o.PaidAmount ?? 0) + (await InvoicePaidAsync(new[] { o.OrderId }, ct)).GetValueOrDefault(o.OrderId)));
+    }
+
+    /// <summary>Tiền khách trả thêm lúc giao (hóa đơn của đơn, không tính phần trừ tiền trả trước): bookingId → tiền</summary>
+    private async Task<Dictionary<int, decimal>> InvoicePaidAsync(IReadOnlyCollection<int> bookingIds, CancellationToken ct)
+    {
+        if (bookingIds.Count == 0) return new();
+        var rows = await _context.TrxOrders.AsNoTracking()
+            .Where(o => o.BookingOrderId.HasValue && bookingIds.Contains(o.BookingOrderId.Value) && o.Status == "COMPLETED")
+            .GroupBy(o => o.BookingOrderId!.Value)
+            .Select(g => new { g.Key, Paid = g.Sum(o => (o.PaidAmount ?? 0) - o.DepositAmount) })
+            .ToListAsync(ct);
+        return rows.ToDictionary(r => r.Key, r => Math.Max(0, r.Paid));
     }
 
     public async Task<Result<Dictionary<int, decimal>>> Handle(GetReservedQuantitiesQuery request, CancellationToken ct)

@@ -19,6 +19,9 @@ public record SaveSalesBookingCommand(int? OrderId, SaveSalesBookingRequest Requ
 /// </summary>
 public record SalesBookingActionCommand(int OrderId, string Action, bool KeepDeposit = false) : IRequest<Result<bool>>;
 
+/// <summary>Sửa nhanh ở màn Đặt hàng (không đổi hàng hóa / tiền): ghi chú, thời gian giao dự kiến</summary>
+public record UpdateSalesBookingInfoCommand(int OrderId, string? Notes, DateTime? DeliveryDate) : IRequest<Result<bool>>;
+
 /// <summary>Gộp nhiều đơn đặt hàng cùng khách, cùng chi nhánh, chưa giao (BR-09)</summary>
 public record MergeSalesBookingsCommand(List<int> OrderIds) : IRequest<Result<SalesBookingSaveResultDto>>;
 
@@ -47,6 +50,7 @@ public class SaveSalesBookingCommandValidator : AbstractValidator<SaveSalesBooki
 public class SalesBookingCommandHandler :
     IRequestHandler<SaveSalesBookingCommand, Result<SalesBookingSaveResultDto>>,
     IRequestHandler<SalesBookingActionCommand, Result<bool>>,
+    IRequestHandler<UpdateSalesBookingInfoCommand, Result<bool>>,
     IRequestHandler<MergeSalesBookingsCommand, Result<SalesBookingSaveResultDto>>
 {
     private readonly IStockFlowDbContext _context;
@@ -302,6 +306,25 @@ public class SalesBookingCommandHandler :
 
         booking.UpdatedAt = VietnamTime.Now;
         booking.UpdatedBy = userId;
+        await _context.SaveChangesAsync(ct);
+        return Result.Success(true);
+    }
+
+    // ───────────────────────── Sửa ghi chú / ngày giao ─────────────────────────
+    public async Task<Result<bool>> Handle(UpdateSalesBookingInfoCommand command, CancellationToken ct)
+    {
+        if (!_currentUser.UserId.HasValue) return Result.Failure<bool>("Không xác định được người dùng đăng nhập.");
+        var booking = await _context.TrxOrders
+            .FirstOrDefaultAsync(o => o.OrderId == command.OrderId && o.OrderType == SalesBookingOps.OrderType, ct);
+        if (booking == null) return Result.Failure<bool>("Không tìm thấy đơn đặt hàng.");
+        if (booking.Status == SalesBookingOps.Cancelled) return Result.Failure<bool>($"Đơn {booking.OrderCode} đã hủy.");
+        if (booking.WarehouseId.HasValue && !await _currentUser.HasWarehouseAccessAsync(booking.WarehouseId.Value, ct))
+            return Result.Failure<bool>("Bạn không có quyền sửa đơn đặt hàng của chi nhánh này.");
+
+        booking.Notes = string.IsNullOrWhiteSpace(command.Notes) ? null : command.Notes.Trim();
+        booking.DeliveryDate = command.DeliveryDate.HasValue ? VietnamTime.From(command.DeliveryDate) : null;
+        booking.UpdatedAt = VietnamTime.Now;
+        booking.UpdatedBy = _currentUser.UserId.Value;
         await _context.SaveChangesAsync(ct);
         return Result.Success(true);
     }

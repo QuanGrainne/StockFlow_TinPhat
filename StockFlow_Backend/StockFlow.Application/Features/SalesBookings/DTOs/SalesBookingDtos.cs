@@ -17,7 +17,9 @@ public record SalesBookingListDto(
     decimal DeliveredQuantity,
     decimal TotalAmount,
     decimal PaidAmount,
-    string? Notes);
+    string? Notes,
+    // Khách đã trả: tiền trả trước + tiền khách trả ở các hóa đơn giao hàng của đơn
+    decimal CustomerPaidAmount = 0);
 
 public record SalesBookingItemDto(
     int OrderItemId,
@@ -44,13 +46,14 @@ public record SalesBookingInvoiceDto(
     decimal DepositAmount,
     string Status);
 
-/// <summary>Phiếu thu tiền khách trả trước</summary>
+/// <summary>Phiếu thu của đơn: tiền khách trả trước + tiền thu ở các hóa đơn tạo từ đơn</summary>
 public record SalesBookingPaymentDto(
     string Code,
     DateTime? Date,
     string? PaymentMethod,
     decimal Amount,
-    string CreatedByName);
+    string CreatedByName,
+    string Status = "COMPLETED");
 
 public record SalesBookingDetailDto(
     int OrderId,
@@ -83,7 +86,9 @@ public record SalesBookingDetailDto(
     List<string> MergedFromCodes,
     List<SalesBookingItemDto> Items,
     List<SalesBookingInvoiceDto> Invoices,
-    List<SalesBookingPaymentDto> Payments);
+    List<SalesBookingPaymentDto> Payments,
+    // Khách đã trả: tiền trả trước + tiền khách trả ở các hóa đơn giao hàng của đơn
+    decimal CustomerPaidAmount = 0);
 
 public class SalesBookingLineRequest
 {

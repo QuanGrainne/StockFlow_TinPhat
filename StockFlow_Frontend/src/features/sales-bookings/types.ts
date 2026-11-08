@@ -21,6 +21,8 @@ export interface SalesBookingListItem {
   totalAmount: number;
   paidAmount: number;
   notes?: string | null;
+  /** Khách đã trả: trả trước + trả thêm ở các hóa đơn giao hàng */
+  customerPaidAmount: number;
 }
 
 export interface SalesBookingItem {
@@ -55,6 +57,8 @@ export interface SalesBookingPayment {
   paymentMethod?: string | null;
   amount: number;
   createdByName: string;
+  /** COMPLETED | CANCELLED */
+  status: string;
 }
 
 export interface SalesBookingDetail {
@@ -89,6 +93,8 @@ export interface SalesBookingDetail {
   items: SalesBookingItem[];
   invoices: SalesBookingInvoice[];
   payments: SalesBookingPayment[];
+  /** Khách đã trả: trả trước + trả thêm ở các hóa đơn giao hàng */
+  customerPaidAmount: number;
 }
 
 export interface SalesBookingLinePayload {
@@ -128,4 +134,6 @@ export interface SalesBookingListFilter {
   fromDate?: string;
   toDate?: string;
   search?: string;
+  /** Tìm theo mã hàng / tên hàng trong đơn */
+  productSearch?: string;
 }

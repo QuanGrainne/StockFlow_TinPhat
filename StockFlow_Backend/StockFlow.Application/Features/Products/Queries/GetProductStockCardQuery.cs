@@ -34,6 +34,8 @@ public class GetProductStockCardQueryHandler : IRequestHandler<GetProductStockCa
         ["PURCHASE_RETURN_CANCEL"] = "Hủy phiếu trả hàng nhập",
         ["ISSUE_SALE"] = "Bán hàng",
         ["ISSUE_SALE_CANCEL"] = "Hủy hóa đơn",
+        ["RETURN_SALE"] = "Khách trả hàng",
+        ["RETURN_SALE_CANCEL"] = "Hủy phiếu trả hàng",
         ["TRANSFER_OUT"] = "Chuyển hàng",
         ["TRANSFER_IN"] = "Nhận hàng chuyển",
         ["TRANSFER_CANCEL_IN"] = "Hủy phiếu chuyển hàng",
@@ -130,6 +132,16 @@ public class GetProductStockCardQueryHandler : IRequestHandler<GetProductStockCa
             .Select(i => new { i.OrderId, i.UnitPrice })
             .ToListAsync(ct);
 
+        var srIds = IdsOf("SALES_RETURN");
+        var salesReturns = await _context.TrxReturnRequests.AsNoTracking()
+            .Where(r => srIds.Contains(r.ReturnRequestId))
+            .Select(r => new { r.ReturnRequestId, r.ReturnCode, PartnerName = r.Partner.PartnerName })
+            .ToDictionaryAsync(r => r.ReturnRequestId, ct);
+        var salesReturnPrices = await _context.DtlReturnRequestItems.AsNoTracking()
+            .Where(i => srIds.Contains(i.ReturnRequestId) && i.ProductId == request.ProductId)
+            .Select(i => new { i.ReturnRequestId, i.ReturnPrice })
+            .ToListAsync(ct);
+
         // ── Tồn cuối: dòng mới đã lưu sẵn BalanceAfter; dòng cũ tính lùi từ tồn hiện tại của kho ──
         var running = await _context.TrxInventoryBalances.AsNoTracking()
             .Where(b => b.ProductId == request.ProductId && b.WarehouseId == request.WarehouseId)
@@ -192,6 +204,15 @@ public class GetProductStockCardQueryHandler : IRequestHandler<GetProductStockCa
                         // Giá GD = đơn giá bán thực tế trên hóa đơn (sau giảm giá dòng)
                         price = salePrices.FirstOrDefault(p => p.OrderId == iss.SalesOrderId)?.UnitPrice ?? price;
                     }
+                    break;
+                case "SALES_RETURN" when refId.HasValue:
+                    if (salesReturns.TryGetValue(refId.Value, out var sr))
+                    {
+                        code = sr.ReturnCode ?? $"TH{refId:D6}";
+                        partner = sr.PartnerName;
+                    }
+                    // Giá GD = giá nhập lại trên phiếu trả hàng
+                    price = salesReturnPrices.FirstOrDefault(p => p.ReturnRequestId == refId)?.ReturnPrice ?? price;
                     break;
                 case "COST_UPDATE" when refId.HasValue:
                     code = $"CB{refId:D6}";

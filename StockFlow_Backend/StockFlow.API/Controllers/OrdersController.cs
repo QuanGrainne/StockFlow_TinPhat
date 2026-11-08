@@ -30,7 +30,7 @@ public class OrdersController : ControllerBase
     [HttpGet]
     [ProducesResponseType(typeof(PaginatedResult<PosOrderSummaryDto>), StatusCodes.Status200OK)]
     [RequirePermission("SALES_READ")]
-    [RequireFeature("feat-invoices", "feat-pos")]
+    [RequireFeature("feat-invoices", "feat-pos", "feat-sales-returns")]
     public async Task<IActionResult> GetOrders(
         [FromQuery] string? search,
         [FromQuery] string? status,
@@ -41,7 +41,8 @@ public class OrdersController : ControllerBase
         [FromQuery] string? paymentMethod,
         [FromQuery] string? priceBookName,
         [FromQuery] int page = 1,
-        [FromQuery] int pageSize = 10)
+        [FromQuery] int pageSize = 10,
+        [FromQuery] string? productSearch = null)
     {
         var result = await _mediator.Send(new GetPosOrdersQuery(
             search,
@@ -53,7 +54,8 @@ public class OrdersController : ControllerBase
             paymentMethod,
             priceBookName,
             page,
-            pageSize
+            pageSize,
+            productSearch
         ));
         if (!result.IsSuccess)
         {

@@ -162,6 +162,8 @@ export interface OrderListItem {
   hasReturn: boolean;
   /** Mã phiếu trả hàng gần nhất của hóa đơn (nếu có) */
   returnCode?: string | null;
+  /** Nhân viên tạo hóa đơn */
+  createdByName?: string;
   notes?: string | null;
 }
 
@@ -178,4 +180,6 @@ export interface OrderListFilter {
   /** ALL | CASH | VIETQR */
   paymentMethod?: string;
   priceBookName?: string;
+  /** Tìm theo mã hàng / tên hàng trong hóa đơn */
+  productSearch?: string;
 }

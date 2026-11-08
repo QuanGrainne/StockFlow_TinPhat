@@ -39,7 +39,7 @@ export function exportBookingsToXLSX(rows: SalesBookingListItem[]) {
     'SL đặt': r.totalQuantity,
     'SL đã giao': r.deliveredQuantity,
     'Khách cần trả': r.totalAmount,
-    'Khách đã trả': r.paidAmount,
+    'Khách đã trả': r.customerPaidAmount,
     'Trạng thái': BOOKING_STATUS[r.status]?.label ?? r.status,
     'Người tạo': r.createdByName,
     'Ghi chú': r.notes || '',

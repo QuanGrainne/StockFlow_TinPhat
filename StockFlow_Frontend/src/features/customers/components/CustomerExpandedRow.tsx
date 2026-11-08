@@ -9,7 +9,13 @@ import CustomerPaymentModal from './CustomerPaymentModal';
 import CustomerReceiptModal from './CustomerReceiptModal';
 import InvoicePreviewModal from '@/features/orders/components/InvoicePreviewModal';
 import { Customer, CustomerDebtLedgerEntry, CustomerDetail } from '../types';
-import { exportCustomerLedgerToXLSX, exportCustomerOrdersToXLSX, GENDER_LABEL } from '../utils/exportExcel';
+import { exportCustomerBookingsToXLSX, exportCustomerLedgerToXLSX, exportCustomerOrdersToXLSX, GENDER_LABEL } from '../utils/exportExcel';
+import { BOOKING_STATUS } from '@/features/sales-bookings/utils/salesBookingUtils';
+import type { SalesBookingStatus } from '@/features/sales-bookings/types';
+import { documentLinkHref, toLinkDate } from '@/lib/navigation/documentLink';
+
+const bookingStatusOf = (s?: string | null) =>
+  BOOKING_STATUS[(s || '').toUpperCase() as SalesBookingStatus] ?? { label: s || '—', cls: 'bg-slate-50 text-slate-600 border-slate-200' };
 
 interface CustomerExpandedRowProps {
   customer: Customer;
@@ -25,7 +31,7 @@ interface CustomerExpandedRowProps {
   onDataChanged?: (customerId: number) => void;
 }
 
-type TabKey = 'info' | 'orders' | 'debts';
+type TabKey = 'info' | 'orders' | 'bookings' | 'debts';
 type LedgerFilter = 'ALL' | 'SALE' | 'PAYMENT';
 
 const LEDGER_FILTER_OPTIONS: { value: LedgerFilter; label: string }[] = [
@@ -110,9 +116,12 @@ export default function CustomerExpandedRow({
     [orders]
   );
 
+  const bookings = useMemo(() => detail?.recentBookings ?? [], [detail]);
+  // Như KiotViet: khách có đơn đặt → có tab Lịch sử đặt hàng; tab bán hàng hiện khi có hóa đơn (hoặc chưa có giao dịch nào)
   const tabs: { key: TabKey; label: string }[] = [
     { key: 'info', label: 'Thông tin' },
-    { key: 'orders', label: 'Lịch sử bán/trả hàng' },
+    ...(orders.length > 0 || bookings.length === 0 ? [{ key: 'orders' as const, label: 'Lịch sử bán/trả hàng' }] : []),
+    ...(bookings.length > 0 ? [{ key: 'bookings' as const, label: 'Lịch sử đặt hàng' }] : []),
     { key: 'debts', label: 'Nợ cần thu từ khách' },
   ];
 
@@ -288,6 +297,67 @@ export default function CustomerExpandedRow({
                 </>
               )}
 
+              {/* ── TAB: LỊCH SỬ ĐẶT HÀNG ── */}
+              {activeTab === 'bookings' && (
+                <>
+                  <div className="px-5 py-4">
+                    <div className={tableWrapCls}>
+                      <table className="w-full text-left border-collapse">
+                        <thead className={theadCls}>
+                          <tr>
+                            <th className="py-2 px-3 w-40">Mã đặt hàng</th>
+                            <th className="py-2 px-3 w-40">Thời gian</th>
+                            <th className="py-2 px-3">Người bán</th>
+                            <th className="py-2 px-3">Chi nhánh xử lý</th>
+                            <th className="py-2 px-3 w-36 text-right">Tổng cộng</th>
+                            <th className="py-2 px-3 w-36">Trạng thái</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 text-[13px]">
+                          {bookings.map((o) => {
+                            const st = bookingStatusOf(o.status);
+                            return (
+                              <tr key={o.orderId} className="hover:bg-[#f7f8f9]">
+                                <td className="py-2.5 px-3 font-medium">
+                                  <a
+                                    href={documentLinkHref('/sales-booking', { code: o.orderCode, id: o.orderId, date: toLinkDate(o.orderDate) })}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-[#0070f4] hover:underline"
+                                    title={`Mở đơn đặt hàng ${o.orderCode}`}
+                                  >
+                                    {o.orderCode}
+                                  </a>
+                                </td>
+                                <td className="py-2.5 px-3 whitespace-nowrap">{fmtDateTime(o.orderDate)}</td>
+                                <td className="py-2.5 px-3">{o.sellerName || '—'}</td>
+                                <td className="py-2.5 px-3">{o.warehouseName || '—'}</td>
+                                <td className="py-2.5 px-3 text-right">{money.format(o.totalAmount)}</td>
+                                <td className="py-2.5 px-3">
+                                  <span className={`inline-block px-2 py-0.5 rounded-[4px] text-[11px] font-semibold border ${st.cls}`}>
+                                    {st.label}
+                                  </span>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                  <div className="px-5 py-3 border-t border-slate-200 flex items-center">
+                    <button
+                      type="button"
+                      onClick={() => exportCustomerBookingsToXLSX(customer, bookings, (s) => bookingStatusOf(s).label)}
+                      className={textBtnCls}
+                    >
+                      <FileUp size={15} />
+                      <span>Xuất file</span>
+                    </button>
+                  </div>
+                </>
+              )}
+
               {/* ── TAB 3: NỢ CẦN THU TỪ KHÁCH ── */}
               {activeTab === 'debts' && (
                 <>
@@ -336,10 +406,26 @@ export default function CustomerExpandedRow({
                                     onClick={() =>
                                       l.type === 'SALE' && l.referenceId
                                         ? setPreviewOrderId(l.referenceId)
-                                        : setReceiptCode(l.code)
+                                        : l.type === 'RETURN' || l.type === 'REFUND'
+                                          ? // Trả hàng / trả tiền khách: mở phiếu trả hàng (mã TTTH... → TH...)
+                                            window.open(
+                                              documentLinkHref('/sales-returns', {
+                                                code: l.type === 'REFUND' ? l.code.replace(/^TT/, '') : l.code,
+                                                id: l.referenceId ?? null,
+                                              }),
+                                              '_blank',
+                                              'noopener,noreferrer'
+                                            )
+                                          : setReceiptCode(l.code)
                                     }
                                     className="text-[#0070f4] hover:underline cursor-pointer"
-                                    title={l.type === 'SALE' ? `Xem hóa đơn ${l.code}` : `Xem phiếu thu ${l.code}`}
+                                    title={
+                                      l.type === 'SALE'
+                                        ? `Xem hóa đơn ${l.code}`
+                                        : l.type === 'RETURN' || l.type === 'REFUND'
+                                          ? `Xem phiếu trả hàng`
+                                          : `Xem phiếu thu ${l.code}`
+                                    }
                                   >
                                     {l.code}
                                   </button>
@@ -347,7 +433,7 @@ export default function CustomerExpandedRow({
                                 <td className="py-2.5 px-3 whitespace-nowrap">{fmtDateTime(l.date)}</td>
                                 <td className="py-2.5 px-3">{l.typeLabel}</td>
                                 <td className="py-2.5 px-3 text-right">{money.format(l.amount)}</td>
-                                <td className="py-2.5 px-3 text-right">{money.format(l.balanceAfter)}</td>
+                                <td className={`py-2.5 px-3 text-right ${l.balanceAfter !== 0 ? 'text-[#fb2c36] font-semibold' : ''}`}>{money.format(l.balanceAfter)}</td>
                               </tr>
                             ))
                           )}

@@ -11,6 +11,8 @@ public sealed class CustomerLookups
     public Dictionary<int, string> UserNames { get; init; } = new();
     public Dictionary<int, string> WarehouseNames { get; init; } = new();
     public Dictionary<int, (decimal Total, DateTime? Last)> Sales { get; init; } = new();
+    /// <summary>Tổng giá trị hàng khách trả (phiếu trả hoàn thành)</summary>
+    public Dictionary<int, decimal> Returns { get; init; } = new();
 }
 
 public static class CustomerProfileHelper
@@ -83,7 +85,16 @@ public static class CustomerProfileHelper
                 .ToDictionaryAsync(w => w.WarehouseId, w => w.WarehouseName ?? $"Kho #{w.WarehouseId}", ct);
         var sales = await SalesTotalsAsync(context, partners.Select(p => p.PartnerId).ToList(), salesFrom, salesTo, ct);
 
-        return new CustomerLookups { UserNames = userNames, WarehouseNames = whNames, Sales = sales };
+        var partnerIds = partners.Select(p => p.PartnerId).ToList();
+        var returnQuery = context.TrxReturnRequests.AsNoTracking()
+            .Where(r => partnerIds.Contains(r.PartnerId) && r.Status == CompletedStatus);
+        if (salesFrom.HasValue) returnQuery = returnQuery.Where(r => r.RequestDate >= salesFrom.Value.Date);
+        if (salesTo.HasValue) returnQuery = returnQuery.Where(r => r.RequestDate < salesTo.Value.Date.AddDays(1));
+        var returns = await returnQuery.GroupBy(r => r.PartnerId)
+            .Select(g => new { g.Key, Total = g.Sum(r => r.TotalAmount) })
+            .ToDictionaryAsync(x => x.Key, x => x.Total, ct);
+
+        return new CustomerLookups { UserNames = userNames, WarehouseNames = whNames, Sales = sales, Returns = returns };
     }
 
     public static CustomerDto ToDto(MstBusinessPartner p, CustomerLookups lookups)
@@ -115,7 +126,7 @@ public static class CustomerProfileHelper
             CreatedWarehouseId: p.CreatedWarehouseId,
             CreatedWarehouseName: p.CreatedWarehouseId.HasValue ? lookups.WarehouseNames.GetValueOrDefault(p.CreatedWarehouseId.Value) : null,
             TotalSales: sales.Total,
-            TotalSalesNetReturns: sales.Total,
+            TotalSalesNetReturns: sales.Total - lookups.Returns.GetValueOrDefault(p.PartnerId),
             LastTransactionDate: sales.Last);
     }
 }

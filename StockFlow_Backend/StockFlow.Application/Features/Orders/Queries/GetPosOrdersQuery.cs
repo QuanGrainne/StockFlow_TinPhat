@@ -21,7 +21,9 @@ public record GetPosOrdersQuery(
     string? PaymentMethod = null,
     string? PriceBookName = null,
     int Page = 1,
-    int PageSize = 10
+    int PageSize = 10,
+    // Tìm theo mã hàng / tên hàng trong hóa đơn (popup chọn hóa đơn trả hàng)
+    string? ProductSearch = null
 ) : IRequest<Result<PaginatedResult<PosOrderSummaryDto>>>;
 
 public class GetPosOrdersQueryHandler : IRequestHandler<GetPosOrdersQuery, Result<PaginatedResult<PosOrderSummaryDto>>>
@@ -70,6 +72,14 @@ public class GetPosOrdersQueryHandler : IRequestHandler<GetPosOrdersQuery, Resul
                 (o.Partner != null && o.Partner.Phone != null && o.Partner.Phone.Contains(s)));
         }
 
+        if (!string.IsNullOrWhiteSpace(request.ProductSearch))
+        {
+            var ps = request.ProductSearch.Trim().ToLower();
+            query = query.Where(o => o.DtlOrderItems.Any(i =>
+                (i.Product.ProductCode != null && i.Product.ProductCode.ToLower().Contains(ps)) ||
+                (i.Product.ProductName != null && i.Product.ProductName.ToLower().Contains(ps))));
+        }
+
         // 4. Lọc theo trạng thái đơn hàng (Hỗ trợ đa chọn qua dấu phẩy: COMPLETED,CANCELLED)
         if (!string.IsNullOrWhiteSpace(request.Status) && request.Status != "ALL")
         {
@@ -102,11 +112,11 @@ public class GetPosOrdersQueryHandler : IRequestHandler<GetPosOrdersQuery, Resul
         {
             if (string.Equals(request.ReturnStatus, "NO_RETURN", StringComparison.OrdinalIgnoreCase))
             {
-                query = query.Where(o => !o.TrxReturnRequests.Any());
+                query = query.Where(o => !o.TrxReturnRequests.Any(r => r.Status != "CANCELLED"));
             }
             else if (string.Equals(request.ReturnStatus, "HAS_RETURN", StringComparison.OrdinalIgnoreCase))
             {
-                query = query.Where(o => o.TrxReturnRequests.Any());
+                query = query.Where(o => o.TrxReturnRequests.Any(r => r.Status != "CANCELLED"));
             }
         }
 
@@ -151,6 +161,7 @@ public class GetPosOrdersQueryHandler : IRequestHandler<GetPosOrdersQuery, Resul
             {
                 OrderId = o.OrderId,
                 OrderCode = o.OrderCode ?? $"HD{o.OrderId:D5}",
+                CreatedByName = o.CreatedByNavigation.FullName ?? o.CreatedByNavigation.Username ?? "",
                 PartnerName = o.Partner != null && o.Partner.PartnerName != null ? o.Partner.PartnerName : "Khách lẻ tại quầy",
                 PartnerPhone = o.Partner != null ? (o.Partner.Phone ?? "") : "",
                 PartnerCode = o.Partner != null ? (o.Partner.PartnerCode ?? "") : "",
@@ -169,8 +180,8 @@ public class GetPosOrdersQueryHandler : IRequestHandler<GetPosOrdersQuery, Resul
                     .Where(ft => ft.ReferenceType == "SALES_ORDER" && ft.ReferenceId == o.OrderId)
                     .Select(ft => ft.PaymentMethod)
                     .FirstOrDefault() ?? (o.OutstandingAmount > 0 && o.PaidAmount == 0 ? "DEBT" : "CASH"),
-                HasReturn = o.TrxReturnRequests.Any(),
-                ReturnCode = o.TrxReturnRequests.OrderByDescending(r => r.ReturnRequestId).Select(r => r.ReturnCode).FirstOrDefault(),
+                HasReturn = o.TrxReturnRequests.Any(r => r.Status != "CANCELLED"),
+                ReturnCode = o.TrxReturnRequests.Where(r => r.Status != "CANCELLED").OrderByDescending(r => r.ReturnRequestId).Select(r => r.ReturnCode).FirstOrDefault(),
                 Notes = o.Notes
             })
             .ToListAsync(cancellationToken);

@@ -332,6 +332,8 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
                 .HasPrecision(18, 2)
                 .HasColumnName("quantity");
             entity.Property(e => e.ReturnRequestId).HasColumnName("return_request_id");
+            entity.Property(e => e.SalePrice).HasPrecision(18, 2).HasDefaultValue(0m).HasColumnName("sale_price");
+            entity.Property(e => e.ReturnPrice).HasPrecision(18, 2).HasDefaultValue(0m).HasColumnName("return_price");
 
             entity.HasOne(d => d.OrderItem).WithMany(p => p.DtlReturnRequestItems)
                 .HasForeignKey(d => d.OrderItemId)
@@ -1701,6 +1703,17 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
             entity.Property(e => e.Status)
                 .HasMaxLength(20)
                 .HasColumnName("status");
+            entity.Property(e => e.WarehouseId).HasColumnName("warehouse_id");
+            entity.Property(e => e.TotalGoodsAmount).HasPrecision(18, 2).HasDefaultValue(0m).HasColumnName("total_goods_amount");
+            entity.Property(e => e.DiscountAmount).HasPrecision(18, 2).HasDefaultValue(0m).HasColumnName("discount_amount");
+            entity.Property(e => e.ReturnFee).HasPrecision(18, 2).HasDefaultValue(0m).HasColumnName("return_fee");
+            entity.Property(e => e.TotalAmount).HasPrecision(18, 2).HasDefaultValue(0m).HasColumnName("total_amount");
+            entity.Property(e => e.RefundAmount).HasPrecision(18, 2).HasDefaultValue(0m).HasColumnName("refund_amount");
+            entity.Property(e => e.PaymentMethod).HasMaxLength(20).HasColumnName("payment_method");
+            entity.Property(e => e.UpdatedAt).HasColumnType("timestamp without time zone").HasColumnName("updated_at");
+            entity.HasOne(d => d.Warehouse).WithMany()
+                .HasForeignKey(d => d.WarehouseId)
+                .HasConstraintName("fk_trx_return_requests_warehouse_id");
 
             entity.HasOne(d => d.CreatedByNavigation).WithMany(p => p.TrxReturnRequests)
                 .HasForeignKey(d => d.CreatedBy)

@@ -66,7 +66,7 @@ export interface PurchaseOrderDetail {
   mergedIntoCode?: string | null;
   /** Phiếu này được gộp từ các phiếu nào */
   mergedFromCodes?: string[] | null;
-  /** Đã trả NCC lúc nhập hàng theo phiếu đặt (không đổi khi trả thêm ở Nhà cung cấp) */
+  /** Đã trả NCC cho các phiếu nhập theo phiếu đặt (cập nhật khi trả thêm NCC — khớp lịch sử thanh toán phiếu nhập) */
   paidAmount: number;
 }
 
