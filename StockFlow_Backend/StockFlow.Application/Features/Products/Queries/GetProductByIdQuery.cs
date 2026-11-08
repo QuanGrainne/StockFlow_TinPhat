@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using StockFlow.Application.Common;
 using StockFlow.Application.Common.Interfaces;
 using StockFlow.Application.Features.Products.DTOs;
+using StockFlow.Application.Features.SalesBookings.Common;
 using StockFlow.Application.Features.Products.Helpers;
 
 namespace StockFlow.Application.Features.Products.Queries;
@@ -40,6 +41,7 @@ public class GetProductByIdQueryHandler : IRequestHandler<GetProductByIdQuery, R
         var costPrice = product.MovingAverageCost ?? 0;
         var standardPrice = product.StandardPrice ?? (costPrice > 0 ? Math.Round(costPrice * 1.35m, 0) : 0);
 
+        var reservedMap = await SalesBookingOps.ReservedByWarehouseAsync(_context, new[] { product.ProductId }, cancellationToken);
         var warehouses = product.TrxInventoryBalances
             .GroupBy(b => b.WarehouseId)
             .Select(g =>
@@ -50,7 +52,8 @@ public class GetProductByIdQueryHandler : IRequestHandler<GetProductByIdQuery, R
                     WarehouseCode: first.Warehouse?.WarehouseCode ?? $"WH-{g.Key}",
                     WarehouseName: first.Warehouse?.WarehouseName ?? $"Kho #{g.Key}",
                     Quantity: g.Sum(x => x.Quantity ?? 0),
-                    UnitCost: g.Average(x => x.UnitCost ?? costPrice)
+                    UnitCost: g.Average(x => x.UnitCost ?? costPrice),
+                    ReservedQuantity: reservedMap.GetValueOrDefault((g.Key, product.ProductId))
                 );
             }).ToList();
 

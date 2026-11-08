@@ -83,6 +83,29 @@ public static class SalesBookingOps
         }
     }
 
+    /// <summary>Hàng khách đặt theo (kho, hàng) — cột "Khách đặt" ở màn Hàng hóa</summary>
+    public static async Task<Dictionary<(int WarehouseId, int ProductId), decimal>> ReservedByWarehouseAsync(
+        IStockFlowDbContext context, IReadOnlyCollection<int> productIds, CancellationToken ct)
+    {
+        var lines = await context.DtlOrderItems.AsNoTracking()
+            .Where(i => i.Order.OrderType == OrderType && i.Order.Status != null && OpenStatuses.Contains(i.Order.Status)
+                        && i.Order.WarehouseId.HasValue && productIds.Contains(i.ProductId))
+            .Select(i => new { i.OrderId, WarehouseId = i.Order.WarehouseId!.Value, i.ProductId, Qty = i.Quantity ?? 0 })
+            .ToListAsync(ct);
+        if (lines.Count == 0) return new();
+
+        var delivered = await LoadDeliveredAsync(context, lines.Select(l => l.OrderId).Distinct().ToList(), ct);
+        return lines.GroupBy(l => new { l.OrderId, l.WarehouseId, l.ProductId })
+            .Select(g => new
+            {
+                g.Key.WarehouseId,
+                g.Key.ProductId,
+                Remaining = Math.Max(0, g.Sum(x => x.Qty) - (delivered.GetValueOrDefault(g.Key.OrderId)?.GetValueOrDefault(g.Key.ProductId) ?? 0)),
+            })
+            .GroupBy(x => (x.WarehouseId, x.ProductId))
+            .ToDictionary(g => g.Key, g => g.Sum(x => x.Remaining));
+    }
+
     /// <summary>
     /// Hàng khách đặt (đang giữ) tại kho: SL đặt − SL đã giao của các đơn đặt còn mở. productIds rỗng = mọi hàng.
     /// </summary>

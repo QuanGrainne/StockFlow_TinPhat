@@ -231,7 +231,6 @@ export const NAV_GROUPS: NavGroup[] = [
         desc: 'Khách trả lại hàng đã mua',
         icon: RotateCcw,
         backendModule: 'SALES',
-        comingSoon: true,
       },
     ],
   },

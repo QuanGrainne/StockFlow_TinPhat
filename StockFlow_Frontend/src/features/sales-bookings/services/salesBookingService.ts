@@ -52,8 +52,9 @@ export const salesBookingService = {
     await apiClient.post(`/api/sales-bookings/${id}/confirm`, {});
   },
 
-  async cancelBooking(id: number): Promise<void> {
-    await apiClient.post(`/api/sales-bookings/${id}/cancel`, {});
+  /** keepDeposit: giữ tiền khách trả trước làm khoản trả trước chung thay vì hoàn tiền */
+  async cancelBooking(id: number, keepDeposit = false): Promise<void> {
+    await apiClient.post(`/api/sales-bookings/${id}/cancel?keepDeposit=${keepDeposit}`, {});
   },
 
   async finishBooking(id: number): Promise<void> {

@@ -15,6 +15,7 @@ import TransfersClient from '@/app/(dashboard)/transfers/TransfersClient';
 import StocktakesClient from '@/app/(dashboard)/stocktakes/StocktakesClient';
 import OrdersClient from '@/app/(dashboard)/orders/OrdersClient';
 import SalesBookingsClient from '@/app/(dashboard)/sales-booking/SalesBookingsClient';
+import SalesReturnsClient from '@/app/(dashboard)/sales-returns/SalesReturnsClient';
 import { OrderSettingsScreen } from '@/features/settings/screens/OrderSettingsScreen';
 import { permissionService } from '../services/permissionService';
 import { SCREEN_PATH_MAP, canOpenScreen, firstAllowedPath } from '../config/navbar';
@@ -154,6 +155,9 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ initialScreen, children })
 
       case 'sales-booking':
         return <SalesBookingsClient />;
+
+      case 'sales-returns':
+        return <SalesReturnsClient />;
 
       // ─── Định mức BOM ───
       case 'manager-bom':
@@ -300,6 +304,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ initialScreen, children })
         activeScreen === 'purchase-returns' ||
         activeScreen === 'purchase-orders' ||
         activeScreen === 'sales-booking' ||
+        activeScreen === 'sales-returns' ||
         activeScreen === 'suppliers' || activeScreen.includes('suppliers') ||
         activeScreen === 'customers' || activeScreen.includes('customers') ||
         activeScreen === 'goods-catalog' || activeScreen === 'products' ||

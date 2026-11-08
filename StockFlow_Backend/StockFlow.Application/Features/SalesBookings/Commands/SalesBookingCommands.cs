@@ -12,8 +12,12 @@ namespace StockFlow.Application.Features.SalesBookings.Commands;
 /// <summary>Tạo (OrderId = null) hoặc sửa đơn đặt hàng. Không trừ tồn kho (BR-08).</summary>
 public record SaveSalesBookingCommand(int? OrderId, SaveSalesBookingRequest Request) : IRequest<Result<SalesBookingSaveResultDto>>;
 
-/// <summary>Thao tác trạng thái: CONFIRM (xác nhận), CANCEL (hủy), FINISH (kết thúc, không giao phần còn lại)</summary>
-public record SalesBookingActionCommand(int OrderId, string Action) : IRequest<Result<bool>>;
+/// <summary>
+/// Thao tác trạng thái: CONFIRM (xác nhận), CANCEL (hủy), FINISH (kết thúc, không giao phần còn lại).
+/// Hủy đơn có tiền trả trước: KeepDeposit = false → hủy phiếu thu (hoàn tiền cho khách);
+/// true → giữ phiếu thu thành khoản khách trả trước chung (không gắn đơn), công nợ khách giữ nguyên.
+/// </summary>
+public record SalesBookingActionCommand(int OrderId, string Action, bool KeepDeposit = false) : IRequest<Result<bool>>;
 
 /// <summary>Gộp nhiều đơn đặt hàng cùng khách, cùng chi nhánh, chưa giao (BR-09)</summary>
 public record MergeSalesBookingsCommand(List<int> OrderIds) : IRequest<Result<SalesBookingSaveResultDto>>;
@@ -258,12 +262,28 @@ public class SalesBookingCommandHandler :
                 if (!SalesBookingOps.IsOpen(booking.Status)) return Result.Failure<bool>($"Đơn {booking.OrderCode} đã hoàn thành hoặc đã hủy.");
                 if (hasInvoice)
                     return Result.Failure<bool>($"Đơn {booking.OrderCode} đã tạo hóa đơn giao hàng. Dùng \"Kết thúc\" để dừng giao phần còn lại.");
-                // Trả lại tiền khách đã trả trước: hủy phiếu thu, công nợ tăng lại
                 var deposits = await _context.TrxFinancialTransactions
                     .Where(t => t.ReferenceType == "SALES_ORDER" && t.ReferenceId == booking.OrderId && t.Status != "CANCELLED")
                     .ToListAsync(ct);
-                foreach (var d in deposits) d.Status = "CANCELLED";
-                if (booking.Partner != null) booking.Partner.CurrentDebt = (booking.Partner.CurrentDebt ?? 0) + deposits.Sum(d => d.Amount ?? 0);
+                if (command.KeepDeposit)
+                {
+                    // Giữ tiền: phiếu thu thành khoản khách trả trước chung (giống phiếu thu không gắn hóa đơn),
+                    // công nợ khách giữ nguyên (đang âm = khách trả trước), trừ dần vào hóa đơn sau
+                    foreach (var d in deposits)
+                    {
+                        d.ReferenceType = null;
+                        d.ReferenceId = null;
+                        d.Description = string.IsNullOrWhiteSpace(d.Description)
+                            ? $"Tiền trả trước của đơn {booking.OrderCode} (đơn đã hủy)"
+                            : d.Description;
+                    }
+                }
+                else
+                {
+                    // Hoàn tiền cho khách: hủy phiếu thu, công nợ tăng lại
+                    foreach (var d in deposits) d.Status = "CANCELLED";
+                    if (booking.Partner != null) booking.Partner.CurrentDebt = (booking.Partner.CurrentDebt ?? 0) + deposits.Sum(d => d.Amount ?? 0);
+                }
                 booking.PaidAmount = 0;
                 booking.PaymentStatus = "UNPAID";
                 booking.Status = SalesBookingOps.Cancelled;
