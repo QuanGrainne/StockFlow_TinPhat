@@ -1388,11 +1388,12 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
             // Tồn kho theo từng kho lấy từ DB (ProductDto.warehouses = Σ trx_inventory_balances theo kho).
             // Trước đây gán số cố định theo mã hàng hoặc dồn toàn bộ tổng tồn vào "Kho Tổng Gia Lâm" → hiển thị sai.
             stockByWarehouse: (Array.isArray(p.warehouses) ? p.warehouses : []).map(
-              (w: { warehouseCode?: string; warehouseName?: string; quantity?: number; unitCost?: number }) => ({
+              (w: { warehouseCode?: string; warehouseName?: string; quantity?: number; unitCost?: number; reservedQuantity?: number }) => ({
                 warehouseName: w.warehouseName || '',
                 warehouseCode: w.warehouseCode || undefined,
                 actualStock: Number(w.quantity) || 0,
-                availableStock: Number(w.quantity) || 0,
+                // Có thể bán = tồn thực tế − khách đặt (đơn đặt hàng còn mở chưa giao)
+                availableStock: (Number(w.quantity) || 0) - (Number(w.reservedQuantity) || 0),
                 costPrice: w.unitCost !== undefined && w.unitCost !== null ? Number(w.unitCost) || 0 : undefined,
               })
             ),

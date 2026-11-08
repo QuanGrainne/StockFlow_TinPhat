@@ -48,6 +48,8 @@ export default function SalesBookingExpandedRow({ orderId, colSpan, onClose, onC
   const [result, setResult] = useState<{ key: string; data: SalesBookingDetail | null }>({ key: '', data: null });
   const [confirm, setConfirm] = useState<ConfirmKind | null>(null);
   const [busy, setBusy] = useState(false);
+  /** Hủy đơn có tiền trả trước: giữ tiền làm khoản khách trả trước (true) hay hoàn tiền (false) */
+  const [keepDeposit, setKeepDeposit] = useState(false);
   const loading = result.key !== key;
 
   useEffect(() => {
@@ -71,7 +73,7 @@ export default function SalesBookingExpandedRow({ orderId, colSpan, onClose, onC
     if (!b || !confirm) return;
     setBusy(true);
     try {
-      if (confirm === 'cancel') await salesBookingService.cancelBooking(b.orderId);
+      if (confirm === 'cancel') await salesBookingService.cancelBooking(b.orderId, b.paidAmount > 0 && keepDeposit);
       else if (confirm === 'finish') await salesBookingService.finishBooking(b.orderId);
       else await salesBookingService.confirmBooking(b.orderId);
       message.success(
@@ -127,8 +129,38 @@ export default function SalesBookingExpandedRow({ orderId, colSpan, onClose, onC
         <>
           Bạn có chắc muốn hủy đơn <strong>{b.orderCode}</strong>?
           {b.paidAmount > 0 && (
-            <div className="mt-2 text-[#d97706]">
-              Phiếu thu tiền khách trả trước ({fmt(b.paidAmount)}) sẽ bị hủy — coi như đã hoàn tiền cho khách.
+            <div className="mt-3 space-y-2">
+              <div>
+                Khách đã trả trước <strong>{fmt(b.paidAmount)}</strong> cho đơn này. Xử lý khoản tiền này:
+              </div>
+              <label className="flex items-start gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="booking-deposit"
+                  checked={!keepDeposit}
+                  onChange={() => setKeepDeposit(false)}
+                  className="mt-0.5 h-4 w-4 accent-[#0070f4] cursor-pointer"
+                />
+                <span>
+                  <strong>Hoàn tiền cho khách</strong>
+                  <span className="block text-[12px] text-[#677484]">Hủy phiếu thu tiền trả trước, công nợ khách tăng lại.</span>
+                </span>
+              </label>
+              <label className="flex items-start gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="booking-deposit"
+                  checked={keepDeposit}
+                  onChange={() => setKeepDeposit(true)}
+                  className="mt-0.5 h-4 w-4 accent-[#0070f4] cursor-pointer"
+                />
+                <span>
+                  <strong>Giữ làm tiền khách trả trước</strong>
+                  <span className="block text-[12px] text-[#677484]">
+                    Giữ phiếu thu trong công nợ của khách (khách đang trả trước), trừ vào các hóa đơn sau.
+                  </span>
+                </span>
+              </label>
             </div>
           )}
         </>
@@ -291,7 +323,10 @@ export default function SalesBookingExpandedRow({ orderId, colSpan, onClose, onC
 
           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 px-5 py-2.5">
             <div className="flex items-center gap-1">
-              <button type="button" disabled={!canCancel} onClick={() => setConfirm('cancel')} className={`${textBtnCls} !text-[#fb2c36]`}>
+              <button type="button" disabled={!canCancel} onClick={() => {
+                  setKeepDeposit(false);
+                  setConfirm('cancel');
+                }} className={`${textBtnCls} !text-[#fb2c36]`}>
                 <Trash2 size={14} /> Hủy
               </button>
               <button type="button" onClick={() => exportBookingDetailToXLSX(b)} className={textBtnCls}>

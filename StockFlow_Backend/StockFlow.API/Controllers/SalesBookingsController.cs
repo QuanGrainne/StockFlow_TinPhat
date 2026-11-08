@@ -83,11 +83,14 @@ public class SalesBookingsController : ControllerBase
     [RequireFeature("feat-sales-booking")]
     public Task<IActionResult> Confirm(int id) => RunAction(id, "CONFIRM");
 
-    /// <summary>Hủy đơn chưa giao; tiền khách trả trước được hoàn (phiếu thu hủy, công nợ tăng lại)</summary>
+    /// <summary>
+    /// Hủy đơn chưa giao. keepDeposit=false: hoàn tiền trả trước (phiếu thu hủy, công nợ tăng lại);
+    /// keepDeposit=true: giữ tiền làm khoản khách trả trước.
+    /// </summary>
     [HttpPost("{id:int}/cancel")]
     [RequirePermission("SALES_DELETE")]
     [RequireFeature("feat-sales-booking")]
-    public Task<IActionResult> Cancel(int id) => RunAction(id, "CANCEL");
+    public Task<IActionResult> Cancel(int id, [FromQuery] bool keepDeposit = false) => RunAction(id, "CANCEL", keepDeposit);
 
     /// <summary>Kết thúc đơn đang giao 1 phần: không giao phần còn lại</summary>
     [HttpPost("{id:int}/finish")]
@@ -105,9 +108,9 @@ public class SalesBookingsController : ControllerBase
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { message = result.Error });
     }
 
-    private async Task<IActionResult> RunAction(int id, string action)
+    private async Task<IActionResult> RunAction(int id, string action, bool keepDeposit = false)
     {
-        var result = await _mediator.Send(new SalesBookingActionCommand(id, action));
+        var result = await _mediator.Send(new SalesBookingActionCommand(id, action, keepDeposit));
         return result.IsSuccess ? Ok(new { success = true }) : BadRequest(new { message = result.Error });
     }
 }

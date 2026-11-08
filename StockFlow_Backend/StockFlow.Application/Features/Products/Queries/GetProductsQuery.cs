@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using StockFlow.Application.Common;
 using StockFlow.Application.Common.Interfaces;
 using StockFlow.Application.Features.Products.DTOs;
+using StockFlow.Application.Features.SalesBookings.Common;
 using StockFlow.Application.Features.Products.Helpers;
 
 namespace StockFlow.Application.Features.Products.Queries;
@@ -90,6 +91,9 @@ public class GetProductsQueryHandler : IRequestHandler<GetProductsQuery, Result<
         var supplierMap = await ProductSupplierLookup.GetSupplierNamesAsync(
             _context, products.Select(p => p.ProductId).ToList(), cancellationToken);
 
+        // Khách đặt theo kho (đơn đặt hàng còn mở, chưa giao)
+        var reservedMap = await SalesBookingOps.ReservedByWarehouseAsync(_context, products.Select(p => p.ProductId).ToList(), cancellationToken);
+
         var result = products.Select(p =>
         {
             decimal stockQty;
@@ -127,7 +131,8 @@ public class GetProductsQueryHandler : IRequestHandler<GetProductsQuery, Result<
                         WarehouseCode: first.Warehouse?.WarehouseCode ?? $"WH-{g.Key}",
                         WarehouseName: first.Warehouse?.WarehouseName ?? $"Kho #{g.Key}",
                         Quantity: g.Sum(x => x.Quantity ?? 0),
-                        UnitCost: g.Average(x => x.UnitCost ?? costPrice)
+                        UnitCost: g.Average(x => x.UnitCost ?? costPrice),
+                        ReservedQuantity: reservedMap.GetValueOrDefault((g.Key, p.ProductId))
                     );
                 }).ToList();
 
