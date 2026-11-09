@@ -1,10 +1,8 @@
 // src/features/sales-returns/types.ts
-// Kiểu dữ liệu Trả hàng (khách trả lại hàng đã mua theo hóa đơn — BR-18/19/20).
+// Kiểu dữ liệu Trả hàng (khách trả lại hàng đã mua theo hóa đơn — BR-18/19).
 
 export type SalesReturnStatus = 'COMPLETED' | 'CANCELLED';
 
-/** Tình trạng hàng khách trả (BR-20): hàng tốt nhập lại kho bán tiếp, hàng lỗi không nhập kho bán */
-export type ReturnCondition = 'GOOD' | 'DEFECTIVE';
 
 export interface SalesReturnListItem {
   returnId: number;
@@ -41,7 +39,6 @@ export interface SalesReturnItem {
   /** Giá nhập lại */
   returnPrice: number;
   lineTotal: number;
-  condition: ReturnCondition;
 }
 
 export interface SalesReturnDetail {
@@ -112,14 +109,19 @@ export interface SalesReturnSource {
 }
 
 export interface CreateSalesReturnPayload {
+  /** 0 = Trả nhanh (không có hóa đơn gốc) */
   invoiceId: number;
+  /** Trả nhanh: khách hàng (0 = Khách lẻ) */
+  partnerId?: number;
+  /** Trả nhanh: chi nhánh nhận hàng trả */
+  warehouseId?: number;
   returnDate?: string;
   discountAmount: number;
   returnFee: number;
   refundAmount: number;
   paymentMethod: 'CASH' | 'VIETQR';
   notes?: string | null;
-  items: { orderItemId: number; quantity: number; returnPrice: number; condition: ReturnCondition }[];
+  items: { orderItemId: number; productId: number; quantity: number; returnPrice: number }[];
 }
 
 export interface SalesReturnResult {

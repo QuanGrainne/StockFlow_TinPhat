@@ -1,7 +1,7 @@
 // src/features/pos/components/PosPickerDialogs.tsx
 // Hai popup trên thanh màn Bán hàng (như KiotViet):
-// - "Chọn hóa đơn trả hàng" (nút ↩): tìm hóa đơn đã hoàn thành ở chi nhánh → mở tab Trả hàng.
-//   Không có "Trả nhanh": phiếu trả phải gắn hóa đơn gốc (BR-18).
+// - "Chọn hóa đơn trả hàng" (nút ↩): tìm hóa đơn đã hoàn thành ở chi nhánh → mở tab Trả hàng;
+//   "Trả nhanh": khách quên hóa đơn → mở tab trả hàng không theo hóa đơn.
 // - "Xử lý đặt hàng" (nút 🛍): tìm đơn đặt hàng còn mở ở chi nhánh → mở tab hóa đơn giao hàng từ đơn.
 // Bên trái: ô tìm kiếm + khoảng thời gian; bên phải: bảng kết quả, nút "Chọn".
 
@@ -168,10 +168,13 @@ export function PickInvoiceDialog({
   warehouseId,
   onClose,
   onSelect,
+  onQuickReturn,
 }: {
   warehouseId: number;
   onClose: () => void;
   onSelect: (orderId: number) => void;
+  /** Khách quên hóa đơn: trả hàng không theo hóa đơn */
+  onQuickReturn: () => void;
 }) {
   const [f, setF] = useState({ code: '', customer: '', productCode: '', productName: '', from: daysAgo(30), to: '' });
   const q = useDebounced(f);
@@ -268,6 +271,16 @@ export function PickInvoiceDialog({
         </table>
       </div>
       <Pager page={pg.page} pageCount={pg.pageCount} total={pg.total} setPage={pg.setPage} unit="hóa đơn" />
+      <div className="mt-4 flex justify-end">
+        <button
+          type="button"
+          onClick={onQuickReturn}
+          title="Khách quên hóa đơn: tự chọn hàng và khách để trả"
+          className="h-10 px-6 rounded-[8px] bg-[#0070f4] hover:bg-[#005ac3] text-white font-semibold cursor-pointer"
+        >
+          Trả nhanh
+        </button>
+      </div>
     </PickerShell>
   );
 }

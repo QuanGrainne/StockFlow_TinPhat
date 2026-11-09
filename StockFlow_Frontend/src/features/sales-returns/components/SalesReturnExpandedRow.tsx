@@ -19,7 +19,6 @@ import {
   formatVnd,
   PAY_METHOD_LABEL,
   printSalesReturn,
-  RETURN_CONDITION,
   RETURN_STATUS,
 } from '../utils/salesReturnUtils';
 
@@ -256,14 +255,18 @@ export default function SalesReturnExpandedRow({ returnId, colSpan, onClose, onC
           </div>
           <div className="flex items-center gap-3 min-h-8">
             <span className={labelCls}>Mã hóa đơn:</span>
-            <Link
-              href={invoiceLinkHref({ orderId: r.invoiceId, orderCode: r.invoiceCode, orderDate: r.invoiceDate })}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-[#0070f4] hover:underline"
-            >
-              {r.invoiceCode}
-            </Link>
+            {r.invoiceId > 0 ? (
+              <Link
+                href={invoiceLinkHref({ orderId: r.invoiceId, orderCode: r.invoiceCode, orderDate: r.invoiceDate })}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[#0070f4] hover:underline"
+              >
+                {r.invoiceCode}
+              </Link>
+            ) : (
+              <span className="text-[#677484]">Trả nhanh (không có hóa đơn)</span>
+            )}
           </div>
         </div>
 
@@ -290,15 +293,6 @@ export default function SalesReturnExpandedRow({ returnId, colSpan, onClose, onC
                   <td className="py-2.5 px-3">
                     {it.productName}
                     <span className="text-[#677484]"> ({it.unit})</span>
-                    {/* BR-20: hàng lỗi không nhập lại kho bán */}
-                    {it.condition === 'DEFECTIVE' && (
-                      <span
-                        className="ml-2 px-1.5 py-0.5 rounded-[4px] text-[10px] font-semibold bg-[#fffbeb] text-[#d97706] border border-[#fde68a]"
-                        title={RETURN_CONDITION.DEFECTIVE.hint}
-                      >
-                        {RETURN_CONDITION.DEFECTIVE.label}
-                      </span>
-                    )}
                   </td>
                   <td className="py-2.5 px-3 text-right font-mono">{qty(it.quantity)}</td>
                   <td className="py-2.5 px-3 text-right font-mono">{formatVnd(it.salePrice)}</td>
@@ -470,7 +464,7 @@ export default function SalesReturnExpandedRow({ returnId, colSpan, onClose, onC
                 Bạn có chắc muốn hủy phiếu <strong>{r.returnCode}</strong>?
               </div>
               <div className="text-[#677484] text-[12px]">
-                Hàng tốt đã nhập lại kho sẽ bị xuất ra; công nợ khách tăng lại {formatVnd(r.totalAmount - r.refundAmount)}
+                Hàng đã nhập lại kho sẽ bị xuất ra; công nợ khách tăng lại {formatVnd(r.totalAmount - r.refundAmount)}
                 {r.refundAmount > 0 ? `, phiếu chi trả khách ${formatVnd(r.refundAmount)} bị hủy` : ''}.
               </div>
             </div>

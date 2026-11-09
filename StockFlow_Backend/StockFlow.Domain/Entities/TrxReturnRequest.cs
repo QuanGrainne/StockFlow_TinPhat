@@ -11,7 +11,8 @@ public partial class TrxReturnRequest
 
     public int PartnerId { get; set; }
 
-    public int SalesOrderId { get; set; }
+    /// <summary>Hóa đơn gốc; null = Trả nhanh (khách không có hóa đơn)</summary>
+    public int? SalesOrderId { get; set; }
 
     public int CreatedBy { get; set; }
 
@@ -51,6 +52,6 @@ public partial class TrxReturnRequest
 
     public virtual MstBusinessPartner Partner { get; set; } = null!;
 
-    public virtual TrxOrder SalesOrder { get; set; } = null!;
+    public virtual TrxOrder? SalesOrder { get; set; }
 }
 

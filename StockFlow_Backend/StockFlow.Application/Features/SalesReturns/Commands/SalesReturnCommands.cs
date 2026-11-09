@@ -12,9 +12,9 @@ using StockFlow.Domain.Entities;
 namespace StockFlow.Application.Features.SalesReturns.Commands;
 
 /// <summary>
-/// Khách trả hàng theo hóa đơn (UC-23, BR-18/19/20):
+/// Khách trả hàng theo hóa đơn (UC-23, BR-18/19):
 /// - Phiếu trả gắn với hóa đơn gốc đã hoàn thành; SL trả ≤ SL đã mua − SL đã trả ở phiếu khác.
-/// - Hàng tốt nhập lại kho chi nhánh bán (ghi thẻ kho "Khách trả hàng"); hàng lỗi không nhập kho bán.
+/// - Hàng trả nhập lại kho chi nhánh bán (ghi thẻ kho "Khách trả hàng"): nhân viên đã kiểm tra chất lượng trước khi nhận lại.
 /// - Công nợ khách giảm theo "Cần trả khách"; tiền trả khách ngay làm công nợ tăng lại (phiếu chi trả khách).
 /// </summary>
 public record CreateSalesReturnCommand(CreateSalesReturnRequest Request) : IRequest<Result<SalesReturnResultDto>>;
@@ -32,7 +32,12 @@ public class CreateSalesReturnCommandValidator : AbstractValidator<CreateSalesRe
 {
     public CreateSalesReturnCommandValidator()
     {
-        RuleFor(x => x.Request.InvoiceId).GreaterThan(0).WithMessage("Vui lòng chọn hóa đơn trả hàng.");
+        RuleFor(x => x.Request.InvoiceId).GreaterThanOrEqualTo(0).WithMessage("Hóa đơn trả hàng không hợp lệ.");
+        // Trả nhanh (InvoiceId = 0): cần chi nhánh và mã hàng của từng dòng
+        RuleFor(x => x.Request.WarehouseId).GreaterThan(0).When(x => x.Request.InvoiceId == 0)
+            .WithMessage("Vui lòng chọn chi nhánh nhận hàng trả.");
+        RuleFor(x => x.Request.Items).Must(items => items.All(i => i.ProductId > 0)).When(x => x.Request.InvoiceId == 0)
+            .WithMessage("Hàng hóa trả không hợp lệ.");
         RuleFor(x => x.Request.DiscountAmount).GreaterThanOrEqualTo(0).WithMessage("Giảm giá không được âm.");
         RuleFor(x => x.Request.ReturnFee).GreaterThanOrEqualTo(0).WithMessage("Phí trả hàng không được âm.");
         RuleFor(x => x.Request.RefundAmount).GreaterThanOrEqualTo(0).WithMessage("Tiền trả khách không được âm.");
@@ -42,7 +47,6 @@ public class CreateSalesReturnCommandValidator : AbstractValidator<CreateSalesRe
         {
             i.RuleFor(l => l.Quantity).GreaterThanOrEqualTo(0).WithMessage("Số lượng trả không được âm.");
             i.RuleFor(l => l.ReturnPrice).GreaterThanOrEqualTo(0).WithMessage("Giá nhập lại không được âm.");
-            i.RuleFor(l => l.Condition).Must(c => c is "GOOD" or "DEFECTIVE").WithMessage("Tình trạng hàng trả không hợp lệ.");
         });
     }
 }
@@ -70,36 +74,68 @@ public class SalesReturnCommandHandler :
         var userId = _currentUser.UserId.Value;
         var req = command.Request;
 
-        var invoice = await _context.TrxOrders
-            .Include(o => o.Partner)
-            .Include(o => o.TrxStockIssues)
-            .Include(o => o.DtlOrderItems)
-            .FirstOrDefaultAsync(o => o.OrderId == req.InvoiceId, ct);
-        if (invoice == null || invoice.OrderType == "BOOKING") return Fail("Không tìm thấy hóa đơn gốc (BR-18).");
-        if (!string.Equals(invoice.Status, "COMPLETED", StringComparison.OrdinalIgnoreCase))
-            return Fail($"Hóa đơn {invoice.OrderCode} chưa hoàn thành hoặc đã hủy, không trả hàng được.");
-        var warehouseId = invoice.WarehouseId ?? invoice.TrxStockIssues.Select(si => (int?)si.WarehouseId).FirstOrDefault();
-        if (!warehouseId.HasValue) return Fail("Không xác định được chi nhánh bán của hóa đơn.");
-        if (!await _currentUser.HasWarehouseAccessAsync(warehouseId.Value, ct))
-            return Fail("Bạn không có quyền trả hàng của chi nhánh này.");
-
         var lines = req.Items.Where(i => i.Quantity > 0).ToList();
         if (lines.Count == 0) return Fail("Chọn ít nhất 1 hàng hóa với số lượng trả lớn hơn 0.");
 
-        // BR-19: không trả vượt SL còn được trả của từng dòng hóa đơn
-        var returned = await SalesReturnOps.ReturnedByOrderItemAsync(_context, invoice.OrderId, null, ct);
-        var orderItems = invoice.DtlOrderItems.ToDictionary(i => i.OrderItemId);
-        var productIds = invoice.DtlOrderItems.Select(i => i.ProductId).Distinct().ToList();
-        var products = await _context.MstProducts.Where(p => productIds.Contains(p.ProductId)).ToDictionaryAsync(p => p.ProductId, ct);
-        foreach (var g in lines.GroupBy(l => l.OrderItemId))
+        var isQuick = req.InvoiceId == 0;
+        TrxOrder? invoice = null;
+        MstBusinessPartner? partner;
+        int warehouseId;
+        // (ProductId, OrderItemId, giá bán) của từng dòng trả
+        var resolved = new List<(SalesReturnLineRequest Line, int ProductId, int? OrderItemId, decimal SalePrice)>();
+        Dictionary<int, MstProduct> products;
+
+        if (isQuick)
         {
-            if (!orderItems.TryGetValue(g.Key, out var oi)) return Fail("Hàng trả không thuộc hóa đơn gốc (BR-18).");
-            var remaining = (oi.Quantity ?? 0) - returned.GetValueOrDefault(g.Key);
-            if (g.Sum(x => x.Quantity) > remaining)
+            // Trả nhanh: khách quên hóa đơn → không có hóa đơn gốc, không giới hạn theo SL đã mua
+            var warehouse = await _context.MstWarehouses.AsNoTracking().FirstOrDefaultAsync(w => w.WarehouseId == req.WarehouseId, ct);
+            if (warehouse == null || warehouse.IsActive == false) return Fail("Chi nhánh nhận hàng trả không tồn tại hoặc đã ngừng hoạt động.");
+            if (!await _currentUser.HasWarehouseAccessAsync(req.WarehouseId, ct)) return Fail("Bạn không có quyền trả hàng của chi nhánh này.");
+            warehouseId = req.WarehouseId;
+
+            partner = req.PartnerId > 0
+                ? await _context.MstBusinessPartners.FirstOrDefaultAsync(p => p.PartnerId == req.PartnerId, ct)
+                : await GetOrCreateWalkInAsync(ct);
+            if (partner == null || !(partner.PartnerType?.ToUpper() is "CUSTOMER" or "BOTH")) return Fail("Không tìm thấy khách hàng.");
+
+            var ids = lines.Select(l => l.ProductId).Distinct().ToList();
+            products = await _context.MstProducts.Where(p => ids.Contains(p.ProductId)).ToDictionaryAsync(p => p.ProductId, ct);
+            if (lines.Any(l => !products.ContainsKey(l.ProductId))) return Fail("Có hàng hóa trả không tồn tại.");
+            resolved.AddRange(lines.Select(l => (l, l.ProductId, (int?)null, l.ReturnPrice)));
+        }
+        else
+        {
+            invoice = await _context.TrxOrders
+                .Include(o => o.Partner)
+                .Include(o => o.TrxStockIssues)
+                .Include(o => o.DtlOrderItems)
+                .FirstOrDefaultAsync(o => o.OrderId == req.InvoiceId, ct);
+            if (invoice == null || invoice.OrderType == "BOOKING") return Fail("Không tìm thấy hóa đơn gốc (BR-18).");
+            if (!string.Equals(invoice.Status, "COMPLETED", StringComparison.OrdinalIgnoreCase))
+                return Fail($"Hóa đơn {invoice.OrderCode} chưa hoàn thành hoặc đã hủy, không trả hàng được.");
+            var invoiceWarehouse = invoice.WarehouseId ?? invoice.TrxStockIssues.Select(si => (int?)si.WarehouseId).FirstOrDefault();
+            if (!invoiceWarehouse.HasValue) return Fail("Không xác định được chi nhánh bán của hóa đơn.");
+            if (!await _currentUser.HasWarehouseAccessAsync(invoiceWarehouse.Value, ct))
+                return Fail("Bạn không có quyền trả hàng của chi nhánh này.");
+            warehouseId = invoiceWarehouse.Value;
+            partner = invoice.Partner;
+
+            // BR-19: không trả vượt SL còn được trả của từng dòng hóa đơn
+            var returned = await SalesReturnOps.ReturnedByOrderItemAsync(_context, invoice.OrderId, null, ct);
+            var orderItems = invoice.DtlOrderItems.ToDictionary(i => i.OrderItemId);
+            var productIds = invoice.DtlOrderItems.Select(i => i.ProductId).Distinct().ToList();
+            products = await _context.MstProducts.Where(p => productIds.Contains(p.ProductId)).ToDictionaryAsync(p => p.ProductId, ct);
+            foreach (var g in lines.GroupBy(l => l.OrderItemId))
             {
-                var name = products.GetValueOrDefault(oi.ProductId)?.ProductName ?? $"SP{oi.ProductId}";
-                return Fail($"\"{name}\" chỉ còn được trả {remaining:N0} (đã mua {oi.Quantity:N0}, đã trả {returned.GetValueOrDefault(g.Key):N0}) (BR-19).");
+                if (!orderItems.TryGetValue(g.Key, out var oi)) return Fail("Hàng trả không thuộc hóa đơn gốc (BR-18).");
+                var remaining = (oi.Quantity ?? 0) - returned.GetValueOrDefault(g.Key);
+                if (g.Sum(x => x.Quantity) > remaining)
+                {
+                    var name = products.GetValueOrDefault(oi.ProductId)?.ProductName ?? $"SP{oi.ProductId}";
+                    return Fail($"\"{name}\" chỉ còn được trả {remaining:N0} (đã mua {oi.Quantity:N0}, đã trả {returned.GetValueOrDefault(g.Key):N0}) (BR-19).");
+                }
             }
+            resolved.AddRange(lines.Select(l => (l, orderItems[l.OrderItemId].ProductId, (int?)l.OrderItemId, orderItems[l.OrderItemId].UnitPrice ?? 0)));
         }
 
         var totalGoods = lines.Sum(l => Math.Round(l.Quantity * l.ReturnPrice, 2));
@@ -107,7 +143,7 @@ public class SalesReturnCommandHandler :
         var fee = Math.Min(totalGoods - discount, req.ReturnFee);
         var total = totalGoods - discount - fee;
         if (req.RefundAmount > total) return Fail($"Tiền trả khách ({req.RefundAmount:N0}) vượt quá số cần trả khách ({total:N0}).");
-        var isWalkIn = invoice.Partner?.PartnerCode == CreatePosOrderCommandHandler.WalkInCustomerCode;
+        var isWalkIn = partner?.PartnerCode == CreatePosOrderCommandHandler.WalkInCustomerCode;
         if (isWalkIn && req.RefundAmount < total)
             return Fail("Khách lẻ không có công nợ — phải trả đủ tiền cho khách.");
 
@@ -118,7 +154,7 @@ public class SalesReturnCommandHandler :
         {
             returnDate = VietnamTime.From(req.ReturnDate);
             if (returnDate > now.AddMinutes(1)) return Fail("Thời gian trả hàng không được ở tương lai.");
-            if (invoice.OrderDate.HasValue && returnDate < invoice.OrderDate.Value)
+            if (invoice?.OrderDate != null && returnDate < invoice.OrderDate.Value)
                 return Fail("Thời gian trả hàng không được trước thời gian bán.");
         }
 
@@ -129,9 +165,9 @@ public class SalesReturnCommandHandler :
             var ret = new TrxReturnRequest
             {
                 ReturnCode = await _codeGenerator.GenerateCodeAsync("RETURN", settings, ct),
-                PartnerId = invoice.PartnerId,
-                SalesOrderId = invoice.OrderId,
-                WarehouseId = warehouseId.Value,
+                PartnerId = partner!.PartnerId,
+                SalesOrderId = invoice?.OrderId,
+                WarehouseId = warehouseId,
                 CreatedBy = userId,
                 RequestDate = returnDate,
                 Reason = string.IsNullOrWhiteSpace(req.Notes) ? null : req.Notes.Trim(),
@@ -143,39 +179,37 @@ public class SalesReturnCommandHandler :
                 RefundAmount = req.RefundAmount,
                 PaymentMethod = req.RefundAmount > 0 ? req.PaymentMethod : null,
             };
-            foreach (var l in lines)
+            foreach (var r in resolved)
             {
-                var oi = orderItems[l.OrderItemId];
                 ret.DtlReturnRequestItems.Add(new DtlReturnRequestItem
                 {
-                    ProductId = oi.ProductId,
-                    OrderItemId = oi.OrderItemId,
-                    Quantity = l.Quantity,
-                    Condition = l.Condition,
-                    SalePrice = oi.UnitPrice ?? 0,
-                    ReturnPrice = l.ReturnPrice,
+                    ProductId = r.ProductId,
+                    OrderItemId = r.OrderItemId,
+                    Quantity = r.Line.Quantity,
+                    Condition = "GOOD",
+                    SalePrice = r.SalePrice,
+                    ReturnPrice = r.Line.ReturnPrice,
                 });
             }
             _context.TrxReturnRequests.Add(ret);
             await _context.SaveChangesAsync(ct);
 
-            // Hàng tốt nhập lại kho (giá vốn hiện tại của kho); hàng lỗi để riêng, không nhập kho bán (BR-20)
-            foreach (var g in lines.Where(l => l.Condition == "GOOD").GroupBy(l => orderItems[l.OrderItemId].ProductId))
+            // Hàng trả nhập lại kho theo giá vốn hiện tại của kho
+            foreach (var g in resolved.GroupBy(r => r.ProductId))
             {
                 var product = products[g.Key];
-                var (_, cost) = await TransferStockOps.WarehouseStockAsync(_context, warehouseId.Value, product, ct);
-                await TransferStockOps.InboundAsync(_context, warehouseId.Value, product, g.Sum(x => x.Quantity), cost,
+                var (_, cost) = await TransferStockOps.WarehouseStockAsync(_context, warehouseId, product, ct);
+                await TransferStockOps.InboundAsync(_context, warehouseId, product, g.Sum(x => x.Line.Quantity), cost,
                     SalesReturnOps.StockInType, ret.ReturnRequestId, userId, ct, SalesReturnOps.ReferenceType);
             }
 
             // Công nợ: khách được trả lại "Cần trả khách"; phần đã trả tiền ngay làm nợ tăng lại
-            if (invoice.Partner != null)
-                invoice.Partner.CurrentDebt = (invoice.Partner.CurrentDebt ?? 0) - total + req.RefundAmount;
+            partner.CurrentDebt = (partner.CurrentDebt ?? 0) - total + req.RefundAmount;
             if (req.RefundAmount > 0)
             {
                 _context.TrxFinancialTransactions.Add(new TrxFinancialTransaction
                 {
-                    PartnerId = invoice.PartnerId,
+                    PartnerId = partner.PartnerId,
                     TxType = SalesReturnOps.RefundTxType,
                     TxCode = $"TT{ret.ReturnCode}",
                     Amount = req.RefundAmount,
@@ -216,7 +250,7 @@ public class SalesReturnCommandHandler :
         using var tx = dbContext != null ? await dbContext.Database.BeginTransactionAsync(ct) : null;
         try
         {
-            // Xuất lại kho phần hàng tốt đã nhập
+            // Xuất lại kho phần hàng đã nhập (dòng DEFECTIVE cũ nếu có thì chưa từng nhập kho)
             var goodByProduct = ret.DtlReturnRequestItems.Where(i => i.Condition != "DEFECTIVE")
                 .GroupBy(i => i.ProductId).ToDictionary(g => g.Key, g => g.Sum(x => x.Quantity ?? 0));
             var products = await _context.MstProducts.Where(p => goodByProduct.Keys.Contains(p.ProductId)).ToDictionaryAsync(p => p.ProductId, ct);
@@ -304,6 +338,29 @@ public class SalesReturnCommandHandler :
         if (ret.Partner != null) ret.Partner.CurrentDebt = (ret.Partner.CurrentDebt ?? 0) + req.Amount;
         await _context.SaveChangesAsync(ct);
         return Result.Success(new SalesReturnResultDto(ret.ReturnRequestId, ret.ReturnCode ?? "", ret.TotalAmount, ret.RefundAmount));
+    }
+
+    /// <summary>Hồ sơ "Khách lẻ" (KH00000) cho phiếu Trả nhanh không chọn khách</summary>
+    private async Task<MstBusinessPartner> GetOrCreateWalkInAsync(CancellationToken ct)
+    {
+        var walkIn = await _context.MstBusinessPartners
+            .FirstOrDefaultAsync(p => p.PartnerCode == CreatePosOrderCommandHandler.WalkInCustomerCode, ct);
+        if (walkIn != null) return walkIn;
+        walkIn = new MstBusinessPartner
+        {
+            PartnerCode = CreatePosOrderCommandHandler.WalkInCustomerCode,
+            PartnerName = "Khách lẻ",
+            PartnerType = "CUSTOMER",
+            CreditLimit = 0,
+            CurrentDebt = 0,
+            CurrentPayable = 0,
+            IsActive = true,
+            CreatedAt = VietnamTime.Now,
+            CreatedBy = _currentUser.UserId,
+        };
+        _context.MstBusinessPartners.Add(walkIn);
+        await _context.SaveChangesAsync(ct);
+        return walkIn;
     }
 
     private static Result<SalesReturnResultDto> Fail(string message) => Result.Failure<SalesReturnResultDto>(message);

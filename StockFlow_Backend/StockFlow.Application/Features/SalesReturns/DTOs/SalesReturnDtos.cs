@@ -29,8 +29,7 @@ public record SalesReturnItemDto(
     decimal Quantity,
     decimal SalePrice,
     decimal ReturnPrice,
-    decimal LineTotal,
-    string Condition);
+    decimal LineTotal);
 
 public record SalesReturnDetailDto(
     int ReturnId,
@@ -98,16 +97,21 @@ public record SalesReturnSourceDto(
 public class SalesReturnLineRequest
 {
     public int OrderItemId { get; set; }
+    /// <summary>Trả nhanh (không có hóa đơn): hàng hóa được trả</summary>
+    public int ProductId { get; set; }
     public decimal Quantity { get; set; }
     /// <summary>Giá nhập lại (tiền trả khách / 1 đơn vị)</summary>
     public decimal ReturnPrice { get; set; }
-    /// <summary>GOOD (nhập lại kho bán tiếp) | DEFECTIVE (hàng lỗi, không nhập kho bán — BR-20)</summary>
-    public string Condition { get; set; } = "GOOD";
 }
 
 public class CreateSalesReturnRequest
 {
+    /// <summary>Hóa đơn gốc; 0 = Trả nhanh (dùng PartnerId, WarehouseId, ProductId của từng dòng)</summary>
     public int InvoiceId { get; set; }
+    /// <summary>Trả nhanh: khách hàng (0 = Khách lẻ)</summary>
+    public int PartnerId { get; set; }
+    /// <summary>Trả nhanh: chi nhánh nhận hàng trả</summary>
+    public int WarehouseId { get; set; }
     public DateTime? ReturnDate { get; set; }
     public decimal DiscountAmount { get; set; }
     public decimal ReturnFee { get; set; }

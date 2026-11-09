@@ -1,10 +1,10 @@
 // src/features/sales-returns/utils/salesReturnUtils.ts
-// Nhãn trạng thái / tình trạng hàng + xuất Excel / in phiếu Trả hàng
+// Nhãn trạng thái + xuất Excel / in phiếu Trả hàng
 
 import * as XLSX from 'xlsx';
 import { formatDateTimeVN } from '@/features/transfers/utils/dateUtils';
 import { escapeHtml, printDateTime, printHtml, printMoney, printQty } from '@/lib/print/printHtml';
-import type { ReturnCondition, SalesReturnDetail, SalesReturnListItem, SalesReturnStatus } from '../types';
+import type { SalesReturnDetail, SalesReturnListItem, SalesReturnStatus } from '../types';
 
 export const RETURN_STATUS: Record<SalesReturnStatus, { label: string; cls: string }> = {
   COMPLETED: { label: 'Đã trả', cls: 'bg-[#e6f8ec] text-[#16a34a] border-[#bbf7d0]' },
@@ -14,11 +14,6 @@ export const RETURN_STATUS: Record<SalesReturnStatus, { label: string; cls: stri
 export const RETURN_STATUS_OPTIONS: SalesReturnStatus[] = ['COMPLETED', 'CANCELLED'];
 /** Mặc định như KiotViet: ẩn phiếu đã hủy */
 export const RETURN_DEFAULT_STATUSES: SalesReturnStatus[] = ['COMPLETED'];
-
-export const RETURN_CONDITION: Record<ReturnCondition, { label: string; hint: string }> = {
-  GOOD: { label: 'Hàng tốt', hint: 'Nhập lại kho để bán tiếp' },
-  DEFECTIVE: { label: 'Hàng lỗi', hint: 'Không nhập kho bán, chờ xử lý' },
-};
 
 export const PAY_METHOD_LABEL: Record<string, string> = { CASH: 'Tiền mặt', VIETQR: 'Chuyển khoản' };
 
@@ -31,7 +26,7 @@ export function exportReturnsToXLSX(rows: SalesReturnListItem[]) {
   const data = rows.map((r, i) => ({
     STT: i + 1,
     'Mã trả hàng': r.returnCode,
-    'Mã hóa đơn': r.invoiceCode,
+    'Mã hóa đơn': r.invoiceCode || 'Trả nhanh',
     'Thời gian': formatDateTimeVN(r.returnDate),
     'Người tạo': r.createdByName,
     'Mã KH': r.partnerCode,
@@ -59,7 +54,6 @@ export function exportReturnDetailToXLSX(r: SalesReturnDetail) {
     'Giá bán': it.salePrice,
     'Giá nhập lại': it.returnPrice,
     'Thành tiền': it.lineTotal,
-    'Tình trạng': RETURN_CONDITION[it.condition]?.label ?? it.condition,
   }));
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(data), r.returnCode);
@@ -103,7 +97,7 @@ export function printSalesReturn(r: SalesReturnDetail, notes: string) {
     Chi nhánh: ${escapeHtml(r.warehouseName)}<br />
     Người tạo: ${escapeHtml(r.createdByName)}<br />
     Khách hàng: ${escapeHtml(r.partnerName)} (${escapeHtml(r.partnerCode)})<br />
-    Hóa đơn: ${escapeHtml(r.invoiceCode)}
+    Hóa đơn: ${escapeHtml(r.invoiceCode || 'Trả nhanh (không có hóa đơn)')}
   </div>
   <table class="items"><thead><tr>
     <th style="width:36px">STT</th><th style="width:90px">Mã hàng</th><th>Tên hàng</th>

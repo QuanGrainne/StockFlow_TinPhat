@@ -2733,7 +2733,7 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                         .HasDefaultValue(0m)
                         .HasColumnName("return_fee");
 
-                    b.Property<int>("SalesOrderId")
+                    b.Property<int?>("SalesOrderId")
                         .HasColumnType("integer")
                         .HasColumnName("sales_order_id");
 
@@ -3986,7 +3986,6 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                     b.HasOne("StockFlow.Domain.Entities.TrxOrder", "SalesOrder")
                         .WithMany("TrxReturnRequests")
                         .HasForeignKey("SalesOrderId")
-                        .IsRequired()
                         .HasConstraintName("fk_trx_return_requests_sales_order_id");
 
                     b.HasOne("StockFlow.Domain.Entities.MstWarehouse", "Warehouse")

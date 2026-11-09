@@ -322,12 +322,14 @@ async function loadDocument(ref: StockCardDocumentRef): Promise<DocView> {
           highlight: true,
           href: documentLinkHref('/customers', { code: d.partnerCode, id: d.partnerId }),
         },
-        {
-          label: 'Hóa đơn',
-          value: d.invoiceCode,
-          highlight: true,
-          href: documentLinkHref('/orders', { code: d.invoiceCode, id: d.invoiceId, date: toLinkDate(d.invoiceDate) }),
-        },
+        d.invoiceId > 0
+          ? {
+              label: 'Hóa đơn',
+              value: d.invoiceCode,
+              highlight: true,
+              href: documentLinkHref('/orders', { code: d.invoiceCode, id: d.invoiceId, date: toLinkDate(d.invoiceDate) }),
+            }
+          : { label: 'Hóa đơn', value: 'Trả nhanh' },
       ],
       columns: [
         ITEM_COLS.code, ITEM_COLS.name,

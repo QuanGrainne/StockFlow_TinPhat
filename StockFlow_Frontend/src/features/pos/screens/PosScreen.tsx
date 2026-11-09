@@ -94,6 +94,11 @@ function emptyTab(index: number, priceBookId: number | null, kind: PosTabKind = 
   };
 }
 
+/** Tab Trả nhanh: khách quên hóa đơn — chưa có hàng, chưa có khách */
+function quickReturnTab(index: number): PosTab {
+  return { ...emptyTab(index, null, 'RETURN'), returnQuick: true, returnFee: 0 };
+}
+
 /**
  * Sau khi đổi hàng / giảm giá / bảng giá: hóa đơn trả về mặc định "trả đủ" (theo Khách cần trả mới);
  * đơn đặt hàng giữ nguyên tiền khách trả trước người dùng đã nhập.
@@ -279,6 +284,10 @@ export default function PosScreen() {
   const [initialTabs] = useState(() => {
     const saved = readPosTabs();
     const base = saved.length > 0 ? saved : [emptyTab(1, null)];
+    if (new URLSearchParams(window.location.search).has('quickReturn')) {
+      const t = quickReturnTab(nextTabNumber(base, 'RETURN'));
+      return { tabs: [...base, t], activeId: t.id };
+    }
     if (new URLSearchParams(window.location.search).has('newBooking')) {
       const t = emptyTab(nextTabNumber(base, 'BOOKING'), null, 'BOOKING');
       return { tabs: [...base, t], activeId: t.id };
@@ -412,7 +421,6 @@ export default function PosScreen() {
             note: '',
             orderItemId: it.orderItemId,
             maxQty: it.remainingQuantity,
-            condition: 'GOOD',
           }));
         if (lines.length === 0) {
           message.warning(`Hóa đơn ${src.invoiceCode} đã được trả hết hàng.`);
@@ -448,7 +456,7 @@ export default function PosScreen() {
           returnFee: 0,
           returnWalkIn: src.isWalkIn,
         };
-        setTabs((prev) => [...prev.filter((x) => x.lines.length > 0 || x.bookingId || x.returnInvoiceId), t]);
+        setTabs((prev) => [...prev.filter((x) => x.lines.length > 0 || x.bookingId || x.returnInvoiceId || x.returnQuick), t]);
         setActiveTabId(t.id);
         setReloadTick((n) => n + 1);
       })
@@ -532,7 +540,7 @@ export default function PosScreen() {
           // Đã mở đơn này ở 1 tab cùng loại → thay bằng dữ liệu mới nhất
           const rest = copyId ? prev : prev.filter((t) => !(t.bookingId === b.orderId && (t.kind ?? 'INVOICE') === kind));
           // Bỏ tab hóa đơn trống mặc định cho gọn
-          const cleaned = rest.filter((t) => t.lines.length > 0 || t.bookingId);
+          const cleaned = rest.filter((t) => t.lines.length > 0 || t.bookingId || t.returnQuick);
           return [...cleaned, tabData];
         });
         setActiveTabId(tabData.id);
@@ -549,7 +557,7 @@ export default function PosScreen() {
     const editId = Number(params.get('booking')) || 0;
     const invoiceId = Number(params.get('bookingInvoice')) || 0;
     const copyId = Number(params.get('copyBooking')) || 0;
-    const isNew = params.has('newBooking');
+    const isNew = params.has('newBooking') || params.has('quickReturn');
     if (!returnInvoiceId && !editId && !invoiceId && !copyId && !isNew) return;
     window.history.replaceState(null, '', window.location.pathname);
     if (returnInvoiceId) openReturnTab(returnInvoiceId);
@@ -648,12 +656,33 @@ export default function PosScreen() {
 
   const addProduct = (p: PosProduct, asNewLine = false) => {
     if (tab.kind === 'RETURN') {
-      updateTab((t) => ({
-        lines: t.lines.map((l) =>
-          l.productId === p.productId ? { ...l, quantity: Math.min(l.maxQty ?? 0, l.quantity + 1) } : l
-        ),
-        paid: null,
-      }));
+      updateTab((t) => {
+        // Trả nhanh: hàng chưa có trong phiếu thì thêm dòng mới, giá theo bảng giá
+        if (t.returnQuick && !t.lines.some((l) => l.productId === p.productId)) {
+          const line: PosLine = {
+            key: newId(),
+            productId: p.productId,
+            code: p.code,
+            name: p.name,
+            imageUrl: p.imageUrl,
+            uom: p.uom,
+            unitId: p.baseUnitId,
+            stock: p.stockQuantity,
+            unitPrice: priceOf(p.productId, p.standardPrice),
+            discountMode: 'VND',
+            discountValue: 0,
+            quantity: 1,
+            note: '',
+          };
+          return { lines: [...t.lines, line], paid: null };
+        }
+        return {
+          lines: t.lines.map((l) =>
+            l.productId === p.productId ? { ...l, quantity: Math.min(l.maxQty ?? Infinity, l.quantity + 1) } : l
+          ),
+          paid: null,
+        };
+      });
       setProductQuery('');
       setProductDropdown(false);
       return;
@@ -702,12 +731,12 @@ export default function PosScreen() {
   const productMatches = useMemo(() => {
     const q = productQuery.trim().toLowerCase();
     if (!q) return [];
-    const returnIds = tab.kind === 'RETURN' ? new Set(tab.lines.map((l) => l.productId)) : null;
+    const returnIds = tab.kind === 'RETURN' && !tab.returnQuick ? new Set(tab.lines.map((l) => l.productId)) : null;
     return products
       .filter((p) => !returnIds || returnIds.has(p.productId))
       .filter((p) => p.code.toLowerCase().includes(q) || p.name.toLowerCase().includes(q) || (p.barcode || '').toLowerCase() === q)
       .slice(0, 30);
-  }, [products, productQuery, tab.kind, tab.lines]);
+  }, [products, productQuery, tab.kind, tab.lines, tab.returnQuick]);
 
   // ── Tab hóa đơn / đặt hàng ──
   const defaultKind: PosTabKind = canInvoice || !canBooking ? 'INVOICE' : 'BOOKING';
@@ -1160,6 +1189,7 @@ export default function PosScreen() {
           tab={tab}
           userName={userName}
           canReturn={canReturn}
+          warehouseId={warehouseId}
           onChange={updateTab}
           onDone={() => {
             closeTab(tab.id);
@@ -1560,6 +1590,12 @@ export default function PosScreen() {
           onSelect={(id) => {
             setPicker(null);
             openReturnTab(id);
+          }}
+          onQuickReturn={() => {
+            const t = quickReturnTab(nextTabNumber(tabs, 'RETURN'));
+            setTabs((prev) => [...prev, t]);
+            setActiveTabId(t.id);
+            setPicker(null);
           }}
         />
       )}
