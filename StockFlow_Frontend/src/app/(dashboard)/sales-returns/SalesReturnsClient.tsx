@@ -388,6 +388,10 @@ export default function SalesReturnsClient() {
         open={pickerOpen}
         warehouseId={activeWarehouse.warehouseId}
         onClose={() => setPickerOpen(false)}
+        onQuickReturn={() => {
+          setPickerOpen(false);
+          window.open('/pos?quickReturn=1', '_blank', 'noopener,noreferrer');
+        }}
         onSelect={(orderId) => {
           setPickerOpen(false);
           // Trả hàng ở màn Bán hàng (tab mới), như KiotViet

@@ -1,20 +1,20 @@
 // src/features/pos/components/ReturnTabView.tsx
 // Nội dung tab "Trả hàng" của màn Bán hàng (như KiotViet, bỏ phần "Tìm hàng đổi"):
-// - Trái: hàng của hóa đơn gốc, nhập SL trả (≤ SL còn được trả — BR-19), giá nhập lại, tình trạng hàng (BR-20).
+// - Trái: hàng của hóa đơn gốc, nhập SL trả (≤ SL còn được trả — BR-19), giá nhập lại.
 // - Phải: khách hàng (theo hóa đơn), "Trả hàng / HD... - người bán", tổng tiền hàng trả, giảm giá, phí trả hàng,
 //   cần trả khách, tiền trả khách + phương thức, phần trừ vào công nợ, nút TRẢ HÀNG.
 
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { message } from 'antd';
-import { CircleUserRound, Minus, Pencil, Plus, RefreshCw, Trash2 } from 'lucide-react';
+import { CircleUserRound, Minus, Pencil, Plus, RefreshCw, Search, Trash2, X } from 'lucide-react';
 import { ProductThumb } from '@/components/ProductThumb';
 import { invoiceLinkHref } from '@/features/orders/components/InvoicePreviewModal';
 import { salesReturnService } from '@/features/sales-returns/services/salesReturnService';
-import type { ReturnCondition } from '@/features/sales-returns/types';
-import { RETURN_CONDITION } from '@/features/sales-returns/utils/salesReturnUtils';
+import { posService } from '../services/posService';
+import type { PosCustomer } from '../types';
 import type { PayMethod, PosLine, PosTab } from '../utils/posTabs';
 
 const fmt = (n: number) => Math.round(n || 0).toLocaleString('vi-VN');
@@ -43,14 +43,32 @@ interface Props {
   /** Trả hàng xong: đóng tab, tải lại tồn kho */
   onDone: () => void;
   canReturn: boolean;
+  /** Chi nhánh đang làm việc (Trả nhanh nhận hàng về đây) */
+  warehouseId: number;
 }
 
-export function ReturnTabView({ tab, userName, onChange, onDone, canReturn }: Props) {
+export function ReturnTabView({ tab, userName, onChange, onDone, canReturn, warehouseId }: Props) {
   const [submitting, setSubmitting] = useState(false);
+  const isQuick = !!tab.returnQuick;
+  /** Khách lẻ không có công nợ: phải trả đủ tiền */
+  const walkIn = isQuick ? !tab.customer : !!tab.returnWalkIn;
+
+  // Trả nhanh: tìm khách hàng
+  const [customerQuery, setCustomerQuery] = useState('');
+  const [customerResults, setCustomerResults] = useState<{ q: string; items: PosCustomer[] }>({ q: '', items: [] });
+  useEffect(() => {
+    const q = customerQuery.trim();
+    if (!q) return;
+    const timer = window.setTimeout(() => {
+      posService.getCustomers(q).then((items) => setCustomerResults({ q, items }));
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [customerQuery]);
+  const customerItems = customerResults.q === customerQuery.trim() ? customerResults.items : [];
 
   const updateLine = (key: string, patch: Partial<PosLine>) =>
     onChange((t) => ({ lines: t.lines.map((l) => (l.key === key ? { ...l, ...patch } : l)), paid: null }));
-  const setQty = (l: PosLine, q: number) => updateLine(l.key, { quantity: Math.max(0, Math.min(l.maxQty ?? 0, q)) });
+  const setQty = (l: PosLine, q: number) => updateLine(l.key, { quantity: Math.max(0, Math.min(l.maxQty ?? Infinity, q)) });
 
   const active = tab.lines.filter((l) => l.quantity > 0);
   const totalQty = active.reduce((s, l) => s + l.quantity, 0);
@@ -62,14 +80,16 @@ export function ReturnTabView({ tab, userName, onChange, onDone, canReturn }: Pr
   const toDebt = mustRefund - refund;
 
   const handleSubmit = async () => {
-    if (submitting || !tab.returnInvoiceId) return;
+    if (submitting || (!tab.returnInvoiceId && !isQuick)) return;
     if (!canReturn) return message.error('Vai trò của bạn chưa được phân quyền chức năng Trả hàng.');
     if (active.length === 0) return message.warning('Nhập số lượng trả cho ít nhất 1 hàng hóa.');
-    if (tab.returnWalkIn && refund < mustRefund) return message.error('Khách lẻ không có công nợ — phải trả đủ tiền cho khách.');
+    if (walkIn && refund < mustRefund) return message.error('Khách lẻ không có công nợ — phải trả đủ tiền cho khách.');
     setSubmitting(true);
     try {
       const res = await salesReturnService.createReturn({
-        invoiceId: tab.returnInvoiceId,
+        invoiceId: tab.returnInvoiceId ?? 0,
+        partnerId: isQuick ? tab.customer?.id ?? 0 : undefined,
+        warehouseId: isQuick ? warehouseId : undefined,
         discountAmount: discount,
         returnFee: fee,
         refundAmount: refund,
@@ -77,9 +97,9 @@ export function ReturnTabView({ tab, userName, onChange, onDone, canReturn }: Pr
         notes: tab.notes.trim() || null,
         items: active.map((l) => ({
           orderItemId: l.orderItemId ?? 0,
+          productId: l.productId,
           quantity: l.quantity,
           returnPrice: l.unitPrice,
-          condition: l.condition ?? 'GOOD',
         })),
       });
       message.success(
@@ -101,10 +121,11 @@ export function ReturnTabView({ tab, userName, onChange, onDone, canReturn }: Pr
       <div className="flex-1 min-w-0 flex flex-col gap-2">
         <div className="flex-1 min-h-0 overflow-y-auto space-y-2 pr-1">
           {tab.lines.length === 0 ? (
-            <div className="h-full flex items-center justify-center text-[#94a3b8]">Hóa đơn không còn hàng để trả</div>
+            <div className="h-full flex items-center justify-center text-[#94a3b8]">
+              {isQuick ? 'Tìm hàng trả (F3) để thêm vào phiếu trả' : 'Hóa đơn không còn hàng để trả'}
+            </div>
           ) : (
             tab.lines.map((l, idx) => {
-              const max = l.maxQty ?? 0;
               return (
                 <div key={l.key} className={`bg-white rounded-xl border px-4 py-3 ${l.quantity > 0 ? 'border-[#0070f4]/50' : 'border-transparent'}`}>
                   <div className="flex items-center gap-3">
@@ -151,30 +172,17 @@ export function ReturnTabView({ tab, userName, onChange, onDone, canReturn }: Pr
                           <Plus size={15} />
                         </button>
                       </div>
-                      <span className="text-[12px] text-[#677484] mt-0.5" title="SL còn được trả">
-                        / {fmt(max)}
-                      </span>
+                      {l.maxQty !== undefined && (
+                        <span className="text-[12px] text-[#677484] mt-0.5" title="SL còn được trả">
+                          / {fmt(l.maxQty)}
+                        </span>
+                      )}
                     </div>
 
                     {/* Giá nhập lại */}
                     <div className="w-28 shrink-0" title="Giá nhập lại (tiền trả khách / 1 đơn vị)">
                       <MoneyInput value={l.unitPrice} onChange={(v) => updateLine(l.key, { unitPrice: v })} />
                     </div>
-
-                    <select
-                      value={l.condition ?? 'GOOD'}
-                      onChange={(e) => updateLine(l.key, { condition: e.target.value as ReturnCondition })}
-                      title={RETURN_CONDITION[l.condition ?? 'GOOD'].hint}
-                      className={`shrink-0 h-8 px-2 rounded-lg border bg-white text-[13px] outline-none cursor-pointer ${
-                        l.condition === 'DEFECTIVE' ? 'border-[#fde68a] text-[#d97706]' : 'border-slate-300'
-                      }`}
-                    >
-                      {(Object.keys(RETURN_CONDITION) as ReturnCondition[]).map((c) => (
-                        <option key={c} value={c}>
-                          {RETURN_CONDITION[c].label}
-                        </option>
-                      ))}
-                    </select>
 
                     <span className="w-24 shrink-0 text-right font-bold">{fmt(l.quantity * l.unitPrice)}</span>
                   </div>
@@ -205,6 +213,43 @@ export function ReturnTabView({ tab, userName, onChange, onDone, canReturn }: Pr
           <span className="text-[13px] text-[#677484]">{new Date().toLocaleDateString('vi-VN')}</span>
         </div>
 
+        {/* Trả nhanh: tự chọn khách (bỏ trống = Khách lẻ) */}
+        {isQuick && !tab.customer && (
+          <div className="relative mt-3">
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#677484]" />
+            <input
+              value={customerQuery}
+              onChange={(e) => setCustomerQuery(e.target.value)}
+              placeholder="Tìm khách hàng (bỏ trống = Khách lẻ)"
+              className="w-full h-9 pl-9 pr-3 rounded-lg bg-[#f1f3f6] outline-none focus:bg-white focus:ring-1 focus:ring-[#0070f4]"
+            />
+            {customerQuery.trim() && (
+              <div className="absolute left-0 right-0 top-full mt-1 z-50 bg-white rounded-xl shadow-[0_10px_30px_rgba(15,23,42,0.2)] border border-slate-200 max-h-72 overflow-y-auto divide-y divide-slate-100">
+                {customerItems.length === 0 ? (
+                  <div className="p-3 text-center text-[13px] text-[#677484]">Không tìm thấy khách hàng</div>
+                ) : (
+                  customerItems.map((c) => (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => {
+                        onChange({ customer: c });
+                        setCustomerQuery('');
+                      }}
+                      className="w-full text-left px-3 py-2 hover:bg-[#eff6ff] cursor-pointer"
+                    >
+                      <div className="font-semibold">{c.name}</div>
+                      <div className="text-[12px] text-[#677484]">
+                        {c.code} • {c.phone || '—'}
+                      </div>
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
         {tab.customer && (
           <div className="mt-3 h-9 px-3 rounded-lg bg-[#e6f1fe] flex items-center gap-2">
             <span className="text-[#0070f4] font-semibold truncate">{tab.customer.name}</span>
@@ -214,12 +259,23 @@ export function ReturnTabView({ tab, userName, onChange, onDone, canReturn }: Pr
                 Nợ: {fmt(tab.customer.currentDebt)}
               </span>
             )}
+            {isQuick && (
+              <button
+                type="button"
+                onClick={() => onChange({ customer: null, paid: null })}
+                className={`p-0.5 rounded hover:bg-black/5 cursor-pointer ${tab.customer.currentDebt !== 0 ? '' : 'ml-auto'}`}
+                aria-label="Bỏ chọn khách hàng"
+              >
+                <X size={15} />
+              </button>
+            )}
           </div>
         )}
 
         <div className="mt-4 text-[15px]">
           <span className="font-bold text-[#16a34a]">Trả hàng</span>
-          <span className="text-[#677484]"> / </span>
+          {isQuick && <span className="text-[#677484]"> / Trả nhanh (không có hóa đơn)</span>}
+          {!isQuick && <span className="text-[#677484]"> / </span>}
           {tab.returnInvoiceId && tab.returnInvoiceCode ? (
             <Link
               href={invoiceLinkHref({ orderId: tab.returnInvoiceId, orderCode: tab.returnInvoiceCode })}
@@ -278,8 +334,8 @@ export function ReturnTabView({ tab, userName, onChange, onDone, canReturn }: Pr
           </div>
           {toDebt > 0 && (
             <div className="flex items-center justify-between">
-              <span>{tab.returnWalkIn ? 'Còn thiếu' : 'Trừ vào công nợ khách'}</span>
-              <span className={`font-semibold ${tab.returnWalkIn ? 'text-[#fb2c36]' : ''}`}>{fmt(toDebt)}</span>
+              <span>{walkIn ? 'Còn thiếu' : 'Trừ vào công nợ khách'}</span>
+              <span className={`font-semibold ${walkIn ? 'text-[#fb2c36]' : ''}`}>{fmt(toDebt)}</span>
             </div>
           )}
         </div>

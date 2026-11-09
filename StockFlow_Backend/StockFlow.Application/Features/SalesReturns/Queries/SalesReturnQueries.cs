@@ -75,7 +75,7 @@ public class SalesReturnQueryHandler :
         {
             var s = request.Search.Trim().ToLower();
             query = query.Where(r => (r.ReturnCode != null && r.ReturnCode.ToLower().Contains(s))
-                                     || (r.SalesOrder.OrderCode != null && r.SalesOrder.OrderCode.ToLower().Contains(s))
+                                     || (r.SalesOrder != null && r.SalesOrder.OrderCode != null && r.SalesOrder.OrderCode.ToLower().Contains(s))
                                      || (r.Partner.PartnerName != null && r.Partner.PartnerName.ToLower().Contains(s))
                                      || (r.Partner.PartnerCode != null && r.Partner.PartnerCode.ToLower().Contains(s)));
         }
@@ -86,8 +86,8 @@ public class SalesReturnQueryHandler :
                 r.ReturnRequestId,
                 r.ReturnCode ?? "",
                 r.RequestDate,
-                r.SalesOrderId,
-                r.SalesOrder.OrderCode ?? "",
+                r.SalesOrderId ?? 0,
+                r.SalesOrder != null ? r.SalesOrder.OrderCode ?? "" : "",
                 r.WarehouseId!.Value,
                 r.Warehouse != null ? r.Warehouse.WarehouseName ?? "" : "",
                 r.PartnerId,
@@ -122,8 +122,7 @@ public class SalesReturnQueryHandler :
             i.ReturnItemId, i.OrderItemId ?? 0, i.ProductId,
             i.Product?.ProductCode ?? $"SP{i.ProductId}", i.Product?.ProductName ?? "Sản phẩm",
             i.OrderItem?.Unit?.UnitName ?? i.Product?.BaseUnit?.UnitName ?? "Cái",
-            i.Quantity ?? 0, i.SalePrice, i.ReturnPrice, Math.Round((i.Quantity ?? 0) * i.ReturnPrice, 2),
-            i.Condition ?? "GOOD")).ToList();
+            i.Quantity ?? 0, i.SalePrice, i.ReturnPrice, Math.Round((i.Quantity ?? 0) * i.ReturnPrice, 2))).ToList();
 
         var refunds = await _context.TrxFinancialTransactions.AsNoTracking()
             .Where(t => t.ReferenceType == SalesReturnOps.ReferenceType && t.ReferenceId == r.ReturnRequestId && t.TxType == SalesReturnOps.RefundTxType)
@@ -134,7 +133,7 @@ public class SalesReturnQueryHandler :
 
         return Result.Success(new SalesReturnDetailDto(
             r.ReturnRequestId, r.ReturnCode ?? "", r.RequestDate,
-            r.SalesOrderId, r.SalesOrder?.OrderCode ?? "", r.SalesOrder?.OrderDate,
+            r.SalesOrderId ?? 0, r.SalesOrder?.OrderCode ?? "", r.SalesOrder?.OrderDate,
             r.WarehouseId.Value, r.Warehouse?.WarehouseName ?? "",
             r.PartnerId, r.Partner?.PartnerCode ?? "", r.Partner?.PartnerName ?? "",
             r.CreatedByNavigation?.FullName ?? r.CreatedByNavigation?.Username ?? "",

@@ -26,10 +26,9 @@ export interface PosLine {
   discountValue: number;
   quantity: number;
   note: string;
-  /** Trả hàng: dòng hóa đơn gốc, SL còn được trả, tình trạng hàng */
+  /** Trả hàng: dòng hóa đơn gốc, SL còn được trả */
   orderItemId?: number;
   maxQty?: number;
-  condition?: 'GOOD' | 'DEFECTIVE';
 }
 
 export interface PosTab {
@@ -63,6 +62,8 @@ export interface PosTab {
   returnSellerName?: string | null;
   returnFee?: number;
   returnWalkIn?: boolean;
+  /** Trả nhanh: khách quên hóa đơn — tự tìm hàng, tự chọn khách, không giới hạn theo hóa đơn */
+  returnQuick?: boolean;
 }
 
 export const POS_TABS_KEY = 'stockflow_pos_tabs_v2';

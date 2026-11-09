@@ -17,9 +17,11 @@ interface Props {
   warehouseId: number;
   onClose: () => void;
   onSelect: (orderId: number) => void;
+  /** Khách quên hóa đơn: trả hàng không theo hóa đơn */
+  onQuickReturn: () => void;
 }
 
-export default function SelectInvoiceModal({ open, warehouseId, onClose, onSelect }: Props) {
+export default function SelectInvoiceModal({ open, warehouseId, onClose, onSelect, onQuickReturn }: Props) {
   const [keyword, setKeyword] = useState('');
   const [query, setQuery] = useState('');
   const [result, setResult] = useState<{ key: string; items: OrderListItem[] }>({ key: '', items: [] });
@@ -128,6 +130,16 @@ export default function SelectInvoiceModal({ open, warehouseId, onClose, onSelec
                 )}
               </tbody>
             </table>
+          </div>
+          <div className="mt-4 flex justify-end">
+            <button
+              type="button"
+              onClick={onQuickReturn}
+              title="Khách quên hóa đơn: tự chọn hàng và khách để trả"
+              className="h-9 px-5 rounded-[8px] bg-[#0070f4] hover:bg-[#005ac3] text-white font-semibold cursor-pointer"
+            >
+              Trả nhanh
+            </button>
           </div>
         </div>
       </div>
