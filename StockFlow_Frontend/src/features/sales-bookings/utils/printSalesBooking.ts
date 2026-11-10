@@ -1,96 +1,112 @@
-// In phiếu đặt hàng (mẫu A4 cùng kiểu Phiếu đặt hàng nhập, dữ liệu StockFlow).
+// In đơn đặt hàng khổ A4 theo mẫu giấy "ĐƠN ĐẶT HÀNG" của Tín Phát:
+// khung viền, đầu phiếu (công ty + chi nhánh), Kính gửi khách, bảng hàng, Tổng cộng / Chiết khấu /
+// Thành tiền sau chiết khấu, số tiền bằng chữ, ngày lập.
 import { escapeHtml, printDateTime, printHtml, printMoney, printQty } from '@/lib/print/printHtml';
+import { readVietnameseMoney } from '@/lib/print/vietnameseCurrency';
 import type { SalesBookingDetail } from '../types';
-import { BOOKING_STATUS } from './salesBookingUtils';
+
+const pad = (n: number) => String(n).padStart(2, '0');
 
 export function buildSalesBookingHtml(b: SalesBookingDetail, notes: string): string {
-  const totalQty = b.items.reduce((s, it) => s + it.quantity, 0);
+  const goodsTotal = b.items.reduce((s, it) => s + (it.lineTotal || 0), 0);
+  const deposit = b.customerPaidAmount || b.paidAmount || 0;
+  const remaining = Math.max(0, b.totalAmount - deposit);
+
+  const d = b.orderDate ? new Date(b.orderDate) : new Date();
+  const dateText = `Ngày ${pad(d.getDate())} tháng ${pad(d.getMonth() + 1)} năm ${d.getFullYear()}`;
+  const discountLabel =
+    b.discountType === 'PERCENT' && b.discountValue > 0 ? `Chiết khấu (${printQty(b.discountValue)}%)` : 'Chiết khấu';
+
   const rows = b.items
     .map(
       (it, idx) => `<tr>
         <td class="c">${idx + 1}</td>
-        <td>${escapeHtml(it.productCode)}</td>
-        <td>${escapeHtml(it.unit ? `${it.productName} (${it.unit})` : it.productName)}</td>
+        <td>${escapeHtml(it.productName)}<span class="code"> (${escapeHtml(it.productCode)})</span></td>
+        <td class="c">${escapeHtml(it.unit)}</td>
         <td class="r">${printQty(it.quantity)}</td>
-        <td class="r">${printMoney(it.originalPrice)}</td>
-        <td class="r">${printMoney(Math.max(0, it.originalPrice - it.unitPrice))}</td>
+        <td class="r">${printMoney(it.unitPrice)}</td>
         <td class="r">${printMoney(it.lineTotal)}</td>
       </tr>`
     )
     .join('');
 
+  const sumRow = (label: string, value: number, bold = false) =>
+    `<tr class="sum${bold ? ' b' : ''}"><td colspan="5" class="c">${label}</td><td class="r">${printMoney(value)}</td></tr>`;
+
+  const info: string[] = [];
+  if (b.partnerPhone) info.push(`Điện thoại: ${escapeHtml(b.partnerPhone)}`);
+  if (b.partnerAddress) info.push(`Địa chỉ: ${escapeHtml(b.partnerAddress)}`);
+  if (b.deliveryDate) info.push(`Dự kiến giao: ${escapeHtml(printDateTime(b.deliveryDate))}`);
+
   return `<!doctype html>
 <html lang="vi">
 <head>
 <meta charset="utf-8" />
-<title>StockFlow - Bán hàng - Đặt hàng</title>
+<title>${escapeHtml(b.orderCode)}</title>
 <style>
-  @page { size: A4 portrait; margin: 12mm 10mm; }
+  @page { size: A4 portrait; margin: 12mm; }
   * { box-sizing: border-box; }
-  body { font-family: Arial, Helvetica, sans-serif; font-size: 13px; color: #000; margin: 0; }
-  h1 { text-align: center; font-size: 18px; margin: 4px 0 4px; }
-  .sub { text-align: center; font-size: 11px; line-height: 1.5; }
-  .info { margin: 18px 0 8px; line-height: 1.55; }
+  body { font-family: 'Times New Roman', Times, serif; font-size: 15px; color: #000; margin: 0; }
+  .frame { border: 1.5px solid #000; padding: 10px 16px 18px; }
+  .company { text-align: center; font-size: 19px; font-weight: bold; }
+  .addr { text-align: center; font-size: 13px; margin-top: 2px; }
+  .codeno { text-align: right; font-size: 13px; margin-top: 4px; }
+  h1 { text-align: center; font-size: 24px; margin: 14px 0 12px; }
+  .to { margin-bottom: 4px; }
+  .to u { font-weight: bold; font-style: italic; margin-right: 18px; }
+  .to b { font-weight: bold; }
+  .extra { font-size: 13.5px; margin: 0 0 8px 88px; line-height: 1.5; }
   table.items { width: 100%; border-collapse: collapse; }
-  table.items th, table.items td { border: 1px solid #000; padding: 2px 4px; }
+  table.items th, table.items td { border: 1px solid #000; padding: 3px 6px; }
   table.items th { font-weight: bold; text-align: center; }
-  .c { text-align: center; }
-  .r { text-align: right; }
-  table.sum { margin: 6px 0 0 auto; width: 60%; border-collapse: collapse; }
-  table.sum td { padding: 2px 4px; }
-  .note { margin-top: 8px; }
-  .sign { display: flex; justify-content: space-around; margin-top: 24px; font-weight: bold; text-align: center; }
-  .sign small { display: block; font-weight: normal; font-style: italic; font-size: 11px; margin-top: 2px; }
+  table.items tr.sum td { font-weight: bold; }
+  .code { font-size: 12px; color: #333; }
+  .c { text-align: center; } .r { text-align: right; }
+  .words { margin-top: 12px; }
+  .words b { margin-right: 22px; }
+  .words i { font-weight: bold; }
+  .note { margin-top: 8px; font-size: 13.5px; }
+  .date { text-align: right; margin-top: 12px; padding-right: 20px; }
 </style>
 </head>
 <body>
-  <h1>PHIẾU ĐẶT HÀNG</h1>
-  <div class="sub"><b>Mã phiếu: ${escapeHtml(b.orderCode)}</b><br /><i>Ngày đặt: ${printDateTime(b.orderDate)}</i></div>
+  <div class="frame">
+    <div class="company">CÔNG TY TNHH TÍN PHÁT</div>
+    <div class="addr">${escapeHtml(b.warehouseName)}</div>
+    <div class="codeno">Số: <b>${escapeHtml(b.orderCode)}</b></div>
+    <h1>ĐƠN ĐẶT HÀNG</h1>
+    <div class="to"><u>Kính gửi:</u> <b>${escapeHtml(b.partnerName)}</b></div>
+    ${info.length ? `<div class="extra">${info.join('<br />')}</div>` : ''}
 
-  <div class="info">
-    Chi nhánh xử lý: ${escapeHtml(b.warehouseName)}<br />
-    Người tạo: ${escapeHtml(b.createdByName)}<br />
-    Khách hàng: ${escapeHtml(b.partnerName)} (${escapeHtml(b.partnerCode)})${b.partnerPhone ? ` - ĐT: ${escapeHtml(b.partnerPhone)}` : ''}<br />
-    Địa chỉ: ${escapeHtml(b.partnerAddress)}<br />
-    Dự kiến giao: ${b.deliveryDate ? printDateTime(b.deliveryDate) : ''}<br />
-    Trạng thái: ${escapeHtml(BOOKING_STATUS[b.status]?.label ?? b.status)}
-  </div>
+    <table class="items">
+      <thead>
+        <tr>
+          <th style="width:46px">STT</th>
+          <th>Tên, quy cách, chủng loại hàng hóa, dịch vụ</th>
+          <th style="width:70px">Đơn vị tính</th>
+          <th style="width:80px">Số lượng</th>
+          <th style="width:95px">Đơn giá</th>
+          <th style="width:115px">Thành tiền</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rows}
+        ${sumRow('Tổng cộng', goodsTotal, true)}
+        ${sumRow(discountLabel, b.discountAmount || 0, true)}
+        ${sumRow('Thành tiền sau chiết khấu', b.totalAmount, true)}
+        ${deposit > 0 ? sumRow('Khách đã đặt cọc', deposit) + sumRow('Còn phải thanh toán', remaining, true) : ''}
+      </tbody>
+    </table>
 
-  <table class="items">
-    <thead>
-      <tr>
-        <th style="width:36px">STT</th>
-        <th style="width:90px">Mã hàng</th>
-        <th>Tên hàng</th>
-        <th style="width:60px">SL đặt</th>
-        <th style="width:80px">Đơn giá</th>
-        <th style="width:72px">Giảm giá</th>
-        <th style="width:90px">Thành tiền</th>
-      </tr>
-    </thead>
-    <tbody>${rows}</tbody>
-  </table>
-
-  <table class="sum">
-    <tr><td>Tổng số lượng:</td><td class="r">${printQty(totalQty)}</td></tr>
-    <tr><td>Tổng tiền hàng:</td><td class="r">${printMoney(b.subTotal)}</td></tr>
-    <tr><td>Giảm giá phiếu đặt:</td><td class="r">${printMoney(b.discountAmount)}</td></tr>
-    <tr><td><b>Tổng cộng:</b></td><td class="r"><b>${printMoney(b.totalAmount)}</b></td></tr>
-    <tr><td>Khách đã trả:</td><td class="r">${printMoney(b.paidAmount)}</td></tr>
-    <tr><td><b>Còn phải trả:</b></td><td class="r"><b>${printMoney(Math.max(0, b.totalAmount - b.paidAmount))}</b></td></tr>
-  </table>
-
-  <div class="note">Ghi chú: ${escapeHtml(notes)}</div>
-
-  <div class="sign">
-    <div>Khách hàng<small>(Ký, họ tên)</small></div>
-    <div>Người lập<small>(Ký, họ tên)</small></div>
+    <div class="words"><b>Số tiền bằng chữ:</b> <i>${escapeHtml(readVietnameseMoney(b.totalAmount).replace(/\.$/, ''))} ./.</i></div>
+    ${notes ? `<div class="note">Ghi chú: ${escapeHtml(notes)}</div>` : ''}
+    <div class="date">${dateText}</div>
   </div>
 </body>
 </html>`;
 }
 
-/** Mở hộp thoại in của trình duyệt với phiếu đặt hàng. */
+/** Mở hộp thoại in của trình duyệt với đơn đặt hàng. */
 export function printSalesBooking(b: SalesBookingDetail, notes: string): void {
   printHtml(buildSalesBookingHtml(b, notes));
 }

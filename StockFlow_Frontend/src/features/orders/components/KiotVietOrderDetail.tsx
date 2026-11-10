@@ -223,7 +223,7 @@ export const KiotVietOrderDetail: React.FC<KiotVietOrderDetailProps> = ({
   };
 
   const handlePrint = () => {
-    if (order && !printInvoice(order)) message.warning('Trình duyệt đã chặn cửa sổ in. Vui lòng cho phép cửa sổ bật lên.');
+    if (order) void printInvoice(order);
   };
 
   const wrap = (body: React.ReactNode) => (
