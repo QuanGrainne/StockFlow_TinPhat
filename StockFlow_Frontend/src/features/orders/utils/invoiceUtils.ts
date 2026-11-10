@@ -3,6 +3,9 @@
 
 import * as XLSX from 'xlsx';
 import type { OrderDetail, OrderListItem } from '../types';
+import { customerService } from '@/features/customers/services/customerService';
+import { escapeHtml, printHtml, printMoney, printQty } from '@/lib/print/printHtml';
+import { readVietnameseMoney } from '@/lib/print/vietnameseCurrency';
 
 /** Phương thức thanh toán được hỗ trợ tại quầy (đã bỏ Thẻ / Ví) */
 export const PAYMENT_METHOD_OPTIONS: { value: string; label: string }[] = [
@@ -72,42 +75,135 @@ export function exportInvoicesToXLSX(rows: OrderListItem[]) {
   XLSX.writeFile(wb, `DanhSachHoaDon_${stamp()}.xlsx`);
 }
 
-const escapeHtml = (s: string) =>
-  s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+const isWalkIn = (order: OrderDetail) =>
+  !order.customer?.partnerId || (order.customer.partnerCode || '').toUpperCase() === 'KH00000';
 
-/** In hóa đơn khổ K80 trong cửa sổ riêng (không in cả trang quản lý) */
-export function printInvoice(order: OrderDetail): boolean {
-  const win = window.open('', '_blank', 'width=420,height=640');
-  if (!win) return false;
-  const m = (n: number) => new Intl.NumberFormat('vi-VN').format(n || 0);
-  const rows = order.items
-    .map(
-      (it) => `<tr><td colspan="3">${escapeHtml(it.productName)}</td></tr>
-        <tr><td>${m(it.quantity)} x ${m(it.unitPrice)}</td><td></td><td class="r">${m(it.lineTotal)}</td></tr>`
-    )
-    .join('');
-  win.document.write(`<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>${escapeHtml(order.orderCode)}</title>
-    <style>body{font-family:Arial,sans-serif;font-size:12px;width:72mm;margin:0 auto;padding:8px}
-    h1{font-size:15px;text-align:center;margin:4px 0}p{margin:2px 0}.c{text-align:center}.r{text-align:right}
-    table{width:100%;border-collapse:collapse;margin:6px 0}td{padding:2px 0}hr{border:0;border-top:1px dashed #000}
-    .t td{font-weight:bold}</style></head><body>
-    <p class="c"><strong>CÔNG TY TNHH TÍN PHÁT</strong></p>
-    <p class="c">${escapeHtml(order.warehouseName || '')}</p>
-    <h1>HÓA ĐƠN BÁN HÀNG</h1>
-    <p class="c">${escapeHtml(order.orderCode)} - ${escapeHtml(formatDateTime(order.orderDate))}</p>
-    <p>Khách hàng: ${escapeHtml(order.customer?.partnerName || 'Khách lẻ')}</p>
-    <p>Người bán: ${escapeHtml(order.salesRepName || order.createdByName || '')}</p>
-    <hr><table>${rows}</table><hr>
-    <table>
-      <tr><td>Tổng tiền hàng</td><td class="r">${m(order.itemsTotalAmount || order.subTotal)}</td></tr>
-      <tr><td>Giảm giá hóa đơn</td><td class="r">${m(order.orderDiscountAmount)}</td></tr>
-      <tr class="t"><td>Khách cần trả</td><td class="r">${m(order.totalAmount)}</td></tr>
-      <tr><td>Khách đã trả</td><td class="r">${m(order.paidAmount)}</td></tr>
-    </table>
-    <p class="c">Cảm ơn quý khách!</p>
-    <script>window.onload=function(){window.print();}</script></body></html>`);
-  win.document.close();
-  return true;
+/**
+ * Nợ cũ của khách ngay trước hóa đơn này: lấy từ sổ công nợ (dòng SALE của hóa đơn → dư nợ trước = dư nợ sau − phát sinh).
+ * Không tìm thấy thì ước lượng = công nợ hiện tại − phần còn nợ của hóa đơn.
+ */
+async function loadOldDebt(order: OrderDetail): Promise<number> {
+  const fallback = (order.customer?.currentDebt || 0) - (order.outstandingAmount || 0);
+  try {
+    const detail = await customerService.getCustomerById(order.customer.partnerId);
+    const sale = (detail.debtLedger ?? []).find((l) => l.type === 'SALE' && Number(l.referenceId) === order.orderId);
+    return sale ? sale.balanceAfter - sale.amount : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+/** In hóa đơn theo mẫu "PHIẾU XUẤT KHO" khổ A4 của Tín Phát (iframe ẩn, chỉ in đúng phiếu) */
+export async function printInvoice(order: OrderDetail): Promise<void> {
+  const walkIn = isWalkIn(order);
+  const oldDebt = walkIn ? 0 : await loadOldDebt(order);
+  const goodsTotal = order.items.reduce((s, it) => s + (it.lineTotal || 0), 0);
+  const outstanding = order.outstandingAmount || 0;
+  const totalDebt = oldDebt + outstanding;
+
+  const d = order.orderDate ? new Date(order.orderDate) : new Date();
+  const day = pad(d.getDate());
+  const month = pad(d.getMonth() + 1);
+  const year = d.getFullYear();
+
+  const discountText = (it: OrderDetail['items'][number]) => {
+    const perUnit = (it.originalPrice || 0) - (it.unitPrice || 0);
+    if (perUnit <= 0) return '';
+    return it.discountType === 'PERCENT' && it.discountValue > 0 ? `${printQty(it.discountValue)}%` : printMoney(perUnit);
+  };
+
+  const itemRows = order.items.map(
+    (it, i) => `<tr>
+      <td class="c">${i + 1}</td>
+      <td>${escapeHtml(it.productCode)}</td>
+      <td>${escapeHtml(it.productName)}</td>
+      <td class="c">${escapeHtml(it.unitName)}</td>
+      <td class="r">${printQty(it.quantity)}</td>
+      <td class="r">${printMoney(it.originalPrice || it.unitPrice)}</td>
+      <td class="r">${discountText(it)}</td>
+      <td class="r">${printMoney(it.lineTotal)}</td>
+    </tr>`
+  );
+
+  const sumRow = (label: string, value: number, bold = false) =>
+    `<tr class="sum${bold ? ' b' : ''}"><td colspan="7" class="r">${label}</td><td class="r">${printMoney(value)}</td></tr>`;
+
+  const summary = [
+    sumRow('Tổng cộng tiền hàng', goodsTotal, true),
+    order.orderDiscountAmount > 0 ? sumRow('Chiết khấu hóa đơn', order.orderDiscountAmount) : '',
+    order.paidAmount > 0 ? sumRow('Khách đã trả', order.paidAmount) : '',
+    walkIn ? sumRow('Còn phải thanh toán', outstanding, true) : sumRow('Nợ cũ', oldDebt),
+    walkIn ? '' : sumRow('Tổng nợ', totalDebt, true),
+    `<tr class="sum"><td colspan="8"><i>Tổng số tiền (Viết bằng chữ):</i> <b>${escapeHtml(
+      readVietnameseMoney(walkIn ? outstanding : totalDebt)
+    )}</b></td></tr>`,
+  ].join('');
+
+  const customer = order.customer;
+  const customerName = walkIn ? 'Khách lẻ' : customer?.partnerName || '';
+  const seller = order.salesRepName || order.createdByName || '';
+
+  printHtml(`<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>${escapeHtml(order.orderCode)}</title>
+<style>
+  @page { size: A4; margin: 12mm 12mm 14mm; }
+  * { box-sizing: border-box; }
+  body { font-family: 'Times New Roman', Times, serif; font-size: 13.5px; color: #000; margin: 0; }
+  .head { display: flex; justify-content: space-between; align-items: flex-start; }
+  .company b { font-size: 14px; }
+  .code { text-align: right; font-size: 12.5px; }
+  h1 { text-align: center; font-size: 22px; margin: 14px 0 2px; letter-spacing: .5px; }
+  .date { text-align: center; font-style: italic; margin-bottom: 12px; }
+  .info { width: 100%; margin-bottom: 8px; }
+  .info td { padding: 2px 0; vertical-align: top; }
+  .info .lbl { white-space: nowrap; width: 1%; padding-right: 6px; }
+  .dots { border-bottom: 1px dotted #000; }
+  table.items { width: 100%; border-collapse: collapse; }
+  table.items th, table.items td { border: 1px solid #000; padding: 4px 5px; }
+  table.items th { font-weight: bold; text-align: center; }
+  table.items tr.sum.b td { font-weight: bold; }
+  .c { text-align: center; } .r { text-align: right; }
+  .lines p { margin: 6px 0; }
+  .note { font-style: italic; margin-top: 6px; }
+  .sign { display: flex; justify-content: space-between; margin-top: 18px; text-align: center; }
+  .sign div { flex: 1; } .sign b { display: block; } .sign i { font-size: 12.5px; }
+  .sign { min-height: 110px; }
+</style></head><body>
+  <div class="head">
+    <div class="company">
+      <b>CÔNG TY TNHH TÍN PHÁT</b><br/>
+      Địa chỉ: ${escapeHtml(order.warehouseName || '')}
+    </div>
+    <div class="code">Số: <b>${escapeHtml(order.orderCode)}</b></div>
+  </div>
+  <h1>PHIẾU XUẤT KHO</h1>
+  <div class="date">Ngày ${day} Tháng ${month} Năm ${year}</div>
+  <table class="info">
+    <tr>
+      <td class="lbl">Tên khách hàng:</td><td class="dots"><b>${escapeHtml(customerName)}</b></td>
+      <td class="lbl" style="padding-left:16px">SĐT:</td><td class="dots" style="width:28%">${escapeHtml(customer?.phone || '')}</td>
+    </tr>
+    <tr><td class="lbl">Địa chỉ:</td><td class="dots" colspan="3">${escapeHtml(customer?.address || '')}</td></tr>
+    <tr><td class="lbl">Nhân viên BH:</td><td class="dots" colspan="3">${escapeHtml(seller)}</td></tr>
+  </table>
+  <table class="items">
+    <thead><tr>
+      <th style="width:5%">STT</th><th style="width:12%">Mã hàng</th><th>Tên hàng hoá</th><th style="width:7%">ĐVT</th>
+      <th style="width:7%">SL</th><th style="width:12%">Đơn giá</th><th style="width:8%">CK</th><th style="width:14%">Thành tiền</th>
+    </tr></thead>
+    <tbody>${itemRows.join('')}${summary}</tbody>
+  </table>
+  <div class="lines">
+    <p>Số tiền phải thanh toán (viết bằng chữ): ......................................................................................................................</p>
+    <p>Số chứng từ gốc kèm theo: ....................................................................................................................................</p>
+  </div>
+  <div class="note">(Lưu ý: Công ty chỉ giải quyết khiếu nại hàng thừa, thiếu trong vòng 05 ngày tính từ thời điểm khách nhận hàng)</div>
+  <div class="sign">
+    <div><b>Nhân viên bán hàng</b><i>(Ký, họ tên)</i></div>
+    <div><b>Nhân viên kho</b><i>(Ký, họ tên)</i></div>
+    <div><b>Nhân viên vận chuyển</b><i>(Ký, họ tên)</i></div>
+    <div><b>Khách hàng</b><i>(Ký, họ tên)</i></div>
+  </div>
+</body></html>`);
 }
 
 /** Xuất chi tiết 1 hóa đơn (dòng hàng + tổng kết) ra file Excel */
