@@ -22,12 +22,12 @@ import { SCREEN_PATH_MAP, canOpenScreen, firstAllowedPath } from '@/lib/navigati
 import { getStoredRole } from '@/lib/navigation/currentRole';
 
 // Màn hình theo chức năng (navbar dùng chung, xem config/navbar.ts)
-import { BomManagementScreen } from '@/features/roles/components/manager/screens/BomManagementScreen';
+import { BomManagementScreen } from '@/features/bom/screens/BomManagementScreen';
 
 // Production Screens
-import { ProductionTrackingScreen } from '@/features/roles/components/production/screens/ProductionTrackingScreen';
-import { ProductionPlanImportScreen } from '@/features/roles/components/production/screens/ProductionPlanImportScreen';
-import { ProductionReferenceLogsScreen } from '@/features/roles/components/production/screens/ProductionReferenceLogsScreen';
+import { ProductionTrackingScreen } from '@/features/production/screens/ProductionTrackingScreen';
+import { ProductionPlanImportScreen } from '@/features/production/screens/ProductionPlanImportScreen';
+import { ProductionReferenceLogsScreen } from '@/features/production/screens/ProductionReferenceLogsScreen';
 
 // Admin Screens
 import { AdminDashboard } from '@/features/admin/screens/AdminDashboard';

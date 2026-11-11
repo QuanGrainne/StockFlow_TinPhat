@@ -1,4 +1,4 @@
-// src/features/roles/components/manager/screens/BomManagementScreen.tsx
+// src/features/bom/screens/BomManagementScreen.tsx
 // Màn hình 3.2.2.8: Quản lý định mức vật tư (BOM) theo thiết kế chuẩn AI Studio Ảnh 4 & Ảnh 5
 
 import React, { useState } from 'react';

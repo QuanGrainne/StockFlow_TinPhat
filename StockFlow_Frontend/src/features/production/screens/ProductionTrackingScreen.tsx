@@ -1,4 +1,4 @@
-// src/features/roles/components/production/screens/ProductionTrackingScreen.tsx
+// src/features/production/screens/ProductionTrackingScreen.tsx
 // Màn hình 3.2.3.2: Theo dõi Tiến độ Lệnh Sản xuất (Data Grid) + Chi tiết Nhập liệu Chứng từ Giấy (Khớp Ảnh 1, 2, 3)
 
 import React, { useState, useEffect } from 'react';
@@ -21,7 +21,7 @@ import {
   Calendar,
   Layers,
 } from 'lucide-react';
-import { EditReferenceSlipModal, ReferenceSlipData } from './EditReferenceSlipModal';
+import { EditReferenceSlipModal, ReferenceSlipData } from '../components/EditReferenceSlipModal';
 
 export interface ProductionTrackingOrder {
   id: string;

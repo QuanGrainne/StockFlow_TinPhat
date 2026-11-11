@@ -1,4 +1,4 @@
-// src/features/roles/components/production/screens/ProductionReferenceLogsScreen.tsx
+// src/features/production/screens/ProductionReferenceLogsScreen.tsx
 // Màn hình 3.2.3.3: Sổ Nhật ký Phiếu tham chiếu (Reference Slip Logs)
 
 import React, { useState } from 'react';
@@ -17,7 +17,7 @@ import {
   Layers,
   ChevronDown,
 } from 'lucide-react';
-import { EditReferenceSlipModal } from './EditReferenceSlipModal';
+import { EditReferenceSlipModal } from '../components/EditReferenceSlipModal';
 
 interface ReferenceSlip {
   id: string;
