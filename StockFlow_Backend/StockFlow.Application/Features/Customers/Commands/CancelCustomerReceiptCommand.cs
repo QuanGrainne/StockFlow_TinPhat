@@ -7,67 +7,6 @@ using StockFlow.Domain.Entities;
 
 namespace StockFlow.Application.Features.Customers.Commands;
 
-internal static class CustomerReceiptLookup
-{
-    /// <summary>Các dòng giao dịch RECEIPT của khách mang mã phiếu thu này (1 phiếu có thể gồm nhiều dòng).</summary>
-    public static Task<List<TrxFinancialTransaction>> LoadAsync(
-        IStockFlowDbContext context, int partnerId, string code, CancellationToken ct)
-    {
-        var c = (code ?? "").Trim().ToUpper();
-        return context.TrxFinancialTransactions
-            .Where(t => t.PartnerId == partnerId && t.TxType == "RECEIPT" && t.TxCode != null && t.TxCode.ToUpper() == c)
-            .ToListAsync(ct);
-    }
-}
-
-/// <summary>Sửa phiếu thu: thời gian, phương thức thanh toán, ghi chú. Phiếu đã hủy không sửa được.</summary>
-public record UpdateCustomerReceiptCommand(int PartnerId, string Code, UpdateCustomerReceiptRequest Request)
-    : IRequest<Result<bool>>;
-
-public class UpdateCustomerReceiptCommandHandler : IRequestHandler<UpdateCustomerReceiptCommand, Result<bool>>
-{
-    private readonly IStockFlowDbContext _context;
-    private readonly ICurrentUserService _currentUserService;
-
-    public UpdateCustomerReceiptCommandHandler(IStockFlowDbContext context, ICurrentUserService currentUserService)
-    {
-        _context = context;
-        _currentUserService = currentUserService;
-    }
-
-    public async Task<Result<bool>> Handle(UpdateCustomerReceiptCommand command, CancellationToken cancellationToken)
-    {
-        if (!_currentUserService.UserId.HasValue)
-            return Result.Failure<bool>("Không xác định được người dùng đăng nhập.");
-
-        var lines = await CustomerReceiptLookup.LoadAsync(_context, command.PartnerId, command.Code, cancellationToken);
-        if (lines.Count == 0)
-            return Result.Failure<bool>($"Không tìm thấy phiếu thu {command.Code}.");
-        if (lines.All(t => t.Status == "CANCELLED"))
-            return Result.Failure<bool>($"Phiếu thu {command.Code} đã hủy, không thể sửa.");
-
-        var req = command.Request;
-        if (req.TransactionDate.HasValue)
-        {
-            var date = VietnamTime.From(req.TransactionDate);
-            if (date > VietnamTime.Now.AddMinutes(1))
-                return Result.Failure<bool>("Thời gian phiếu thu không được ở tương lai.");
-            foreach (var t in lines) t.TransactionDate = date;
-        }
-
-        var method = string.IsNullOrWhiteSpace(req.PaymentMethod) ? null : req.PaymentMethod.Trim().ToUpperInvariant();
-        var notes = string.IsNullOrWhiteSpace(req.Notes) ? null : req.Notes.Trim();
-        foreach (var t in lines)
-        {
-            if (method != null) t.PaymentMethod = method;
-            t.Description = notes;
-        }
-
-        await _context.SaveChangesAsync(cancellationToken);
-        return Result.Success(true);
-    }
-}
-
 /// <summary>
 /// Hủy phiếu thu: các dòng chuyển CANCELLED, hoàn lại số đã trả / còn nợ của hóa đơn được phân bổ
 /// và cộng lại tổng tiền phiếu vào nợ của khách.
