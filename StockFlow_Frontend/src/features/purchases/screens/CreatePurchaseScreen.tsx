@@ -27,7 +27,7 @@ import {
   Image as ImageIcon,
 } from 'lucide-react';
 import { useActiveWarehouse } from '@/lib/warehouse/useActiveWarehouse';
-import { adminService } from '@/features/roles/services/adminService';
+import { adminService } from '@/features/admin/services/adminService';
 import { productService, BackendProduct } from '@/features/products/services/productService';
 import { supplierService } from '@/features/suppliers/services/supplierService';
 import { Supplier } from '@/features/suppliers/types';

@@ -12,7 +12,7 @@ import { documentLinkHref } from '@/lib/navigation/documentLink';
 
 // Tải popup khi cần (tránh vòng import với StockCardDocumentModal, vốn dùng ProductCodeLink)
 const DocumentPreviewModal = dynamic(
-  () => import('@/features/roles/components/common/StockCardDocumentModal').then((m) => m.StockCardDocumentModal),
+  () => import('@/features/products/components/StockCardDocumentModal').then((m) => m.StockCardDocumentModal),
   { ssr: false }
 );
 

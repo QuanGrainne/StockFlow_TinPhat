@@ -6,7 +6,7 @@
 import React, { useEffect, useState } from 'react';
 import { Check, ChevronDown, Warehouse } from 'lucide-react';
 import { useActiveWarehouse, type WarehouseItem } from '@/lib/warehouse/useActiveWarehouse';
-import { adminService } from '@/features/roles/services/adminService';
+import { adminService } from '@/features/admin/services/adminService';
 
 interface Props {
   /** Gọi sau khi người dùng đổi kho làm việc */

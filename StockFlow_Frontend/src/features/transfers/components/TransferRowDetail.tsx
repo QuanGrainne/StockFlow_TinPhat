@@ -13,7 +13,7 @@ import type { TransferDetail, TransferStatus } from '../types';
 import { transferService } from '../services/transferService';
 import { formatDateTimeVN } from '../utils/dateUtils';
 import { exportTransferToExcel, printTransferSlip } from '../utils/transferExportUtils';
-import type { WarehouseFacility } from '@/features/roles/types';
+import type { WarehouseFacility } from '@/features/admin/types';
 import { useActiveWarehouse } from '@/lib/warehouse/useActiveWarehouse';
 import { ProductCodeLink } from '@/components/links/EntityLinks';
 

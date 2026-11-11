@@ -2,7 +2,7 @@
 
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
-import { FeatureGuard } from '@/features/roles/components/common/FeatureGuard';
+import { FeatureGuard } from '@/components/layout/FeatureGuard';
 
 const CreatePurchaseReturnScreen = dynamic(() => import('@/features/purchase-returns/screens/CreatePurchaseReturnScreen'), {
   ssr: false,

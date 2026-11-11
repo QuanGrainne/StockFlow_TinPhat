@@ -2,7 +2,7 @@
 
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
-import { FeatureGuard } from '@/features/roles/components/common/FeatureGuard';
+import { FeatureGuard } from '@/components/layout/FeatureGuard';
 
 // Dùng chung form với Nhập hàng (mode="order"): tìm hàng, bảng hàng hóa, NCC, giảm giá
 const CreatePurchaseScreen = dynamic(() => import('@/features/purchases/screens/CreatePurchaseScreen'), {

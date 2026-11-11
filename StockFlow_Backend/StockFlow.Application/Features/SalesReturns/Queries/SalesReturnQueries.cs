@@ -19,31 +19,6 @@ public record GetSalesReturnByIdQuery(int ReturnId) : IRequest<Result<SalesRetur
 /// <summary>Hàng của hóa đơn gốc kèm SL còn được trả (mở tab Trả hàng ở màn Bán hàng)</summary>
 public record GetSalesReturnSourceQuery(int InvoiceId) : IRequest<Result<SalesReturnSourceDto>>;
 
-public static class SalesReturnOps
-{
-    public const string Completed = "COMPLETED";
-    public const string Cancelled = "CANCELLED";
-    public const string ReferenceType = "SALES_RETURN";
-    public const string StockInType = "RETURN_SALE";
-    public const string StockCancelType = "RETURN_SALE_CANCEL";
-    /// <summary>Giao dịch trả tiền cho khách khi khách trả hàng (làm tăng lại công nợ khách)</summary>
-    public const string RefundTxType = "CUSTOMER_REFUND";
-
-    /// <summary>SL đã trả theo từng dòng hóa đơn (phiếu trả chưa hủy), trừ phiếu excludeReturnId</summary>
-    public static async Task<Dictionary<int, decimal>> ReturnedByOrderItemAsync(
-        IStockFlowDbContext context, int invoiceId, int? excludeReturnId, CancellationToken ct)
-    {
-        var rows = await context.DtlReturnRequestItems.AsNoTracking()
-            .Where(i => i.ReturnRequest.SalesOrderId == invoiceId && i.ReturnRequest.Status != Cancelled
-                        && i.OrderItemId.HasValue
-                        && (!excludeReturnId.HasValue || i.ReturnRequestId != excludeReturnId.Value))
-            .GroupBy(i => i.OrderItemId!.Value)
-            .Select(g => new { g.Key, Qty = g.Sum(x => x.Quantity ?? 0) })
-            .ToListAsync(ct);
-        return rows.ToDictionary(r => r.Key, r => r.Qty);
-    }
-}
-
 public class SalesReturnQueryHandler :
     IRequestHandler<GetSalesReturnsQuery, Result<List<SalesReturnListDto>>>,
     IRequestHandler<GetSalesReturnByIdQuery, Result<SalesReturnDetailDto>>,

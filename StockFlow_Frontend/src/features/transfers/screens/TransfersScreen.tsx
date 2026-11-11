@@ -30,9 +30,9 @@ import {
   TransferFilterState,
   TransferStatus,
 } from '@/features/transfers/types';
-import { WarehouseFacility } from '@/features/roles/types';
+import { WarehouseFacility } from '@/features/admin/types';
 import { exportTransfersListToExcel } from '@/features/transfers/utils/transferExportUtils';
-import { adminService } from '@/features/roles/services/adminService';
+import { adminService } from '@/features/admin/services/adminService';
 import { formatDateTimeVN, getDateRangeForPreset } from '@/features/transfers/utils/dateUtils';
 
 const statusBadgeConfig: Record<
