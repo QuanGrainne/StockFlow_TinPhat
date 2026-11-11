@@ -4,7 +4,7 @@ import { UserRole } from '@/features/admin/types';
 import { Header } from '@/components/layout/Header';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { NoAccess } from '@/components/layout/FeatureGuard';
-import { GoodsCatalogScreen } from '@/features/roles/components/common/GoodsCatalogScreen';
+import { GoodsCatalogScreen } from '@/features/products/screens/GoodsCatalogScreen';
 import SuppliersScreen from '@/features/suppliers/screens/SuppliersScreen';
 import CustomersScreen from '@/features/customers/screens/CustomersScreen';
 import PurchasesScreen from '@/features/purchases/screens/PurchasesScreen';

@@ -1,10 +1,10 @@
-// src/features/roles/components/common/GoodsExportModal.tsx
+// src/features/products/components/GoodsExportModal.tsx
 'use client';
 
 import React, { useState, useMemo } from 'react';
 import { X } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import { GoodsItem } from './GoodsCatalogScreen';
+import { GoodsItem } from '../screens/GoodsCatalogScreen';
 
 export interface ColumnDefinition {
   id: string;

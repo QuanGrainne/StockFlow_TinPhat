@@ -1,4 +1,4 @@
-// src/features/roles/components/common/SkuAnalyticsModal.tsx
+// src/features/products/components/SkuAnalyticsModal.tsx
 // Modal phân tích chuyên sâu về chỉ số tiêu thụ, doanh thu, luồng nhập-xuất và dự báo tồn kho cho từng SKU
 // Thiết kế giao diện hiện đại, trực quan với SVG biểu đồ tương tác, KPI cards và bảng nhật ký luồng hàng
 
@@ -21,7 +21,7 @@ import {
   RefreshCw,
   Clock,
 } from 'lucide-react';
-import { GoodsItem } from './GoodsCatalogScreen';
+import { GoodsItem } from '../screens/GoodsCatalogScreen';
 
 interface SkuAnalyticsModalProps {
   item: GoodsItem | null;

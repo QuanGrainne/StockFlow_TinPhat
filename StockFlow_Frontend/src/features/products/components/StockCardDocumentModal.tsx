@@ -1,4 +1,4 @@
-// src/features/roles/components/common/StockCardDocumentModal.tsx
+// src/features/products/components/StockCardDocumentModal.tsx
 // Xem nhanh chứng từ từ Thẻ kho (bấm mã PN / THN / CK / KK / HD): thông tin phiếu + danh sách hàng + tổng tiền.
 // Chỉ xem; nút "Mở phiếu" dẫn tới màn hình của chứng từ đó (sửa phiếu / chi tiết hóa đơn).
 

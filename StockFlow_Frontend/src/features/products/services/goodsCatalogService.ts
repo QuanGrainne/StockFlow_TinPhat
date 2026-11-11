@@ -1,4 +1,4 @@
-// src/features/roles/services/productService.ts
+// src/features/products/services/goodsCatalogService.ts
 // Service kết nối API Danh mục Hàng hóa (Products) với backend ASP.NET Core & MediatR
 
 import { apiClient } from '@/lib/api/client';

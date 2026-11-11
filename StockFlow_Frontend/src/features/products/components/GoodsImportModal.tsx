@@ -1,11 +1,11 @@
-// src/features/roles/components/common/GoodsImportModal.tsx
+// src/features/products/components/GoodsImportModal.tsx
 'use client';
 
 import React, { useState, useRef } from 'react';
 import { X, Info, Lightbulb, ChevronDown, Check, Loader2 } from 'lucide-react';
-import { productService, ImportProductItemPayload } from '../../services/productService';
+import { productService, ImportProductItemPayload } from '../services/goodsCatalogService';
 import * as XLSX from 'xlsx';
-import { GoodsItem } from './GoodsCatalogScreen';
+import { GoodsItem } from '../screens/GoodsCatalogScreen';
 
 interface GoodsImportModalProps {
   isOpen: boolean;

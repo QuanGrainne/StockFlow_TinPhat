@@ -1,4 +1,4 @@
-// src/features/roles/components/common/GoodsCatalogScreen.tsx
+// src/features/products/screens/GoodsCatalogScreen.tsx
 // ─── Hàm Tính Toán Thời Gian Dự Kiến Hết Hàng (Days Until Out Of Stock) ──────────
 export interface DaysUntilOutOfStockResult {
   days: number | null;
@@ -108,18 +108,18 @@ import {
   ChevronsLeft,
   ChevronsRight,
 } from 'lucide-react';
-import { productService } from '../../services/productService';
+import { productService } from '../services/goodsCatalogService';
 import { adminService } from '@/features/admin/services/adminService';
 import { WarehouseFacility } from '@/features/admin/types';
-import { SkuAnalyticsModal } from './SkuAnalyticsModal';
+import { SkuAnalyticsModal } from '../components/SkuAnalyticsModal';
 import { getActiveWarehouse } from '@/lib/warehouse/useActiveWarehouse';
-import ViewPriceBooksModal from './ViewPriceBooksModal';
-import GoodsExportModal from './GoodsExportModal';
-import GoodsExportDownloadDock from './GoodsExportDownloadDock';
-import GoodsImportModal from './GoodsImportModal';
+import ViewPriceBooksModal from '../components/ViewPriceBooksModal';
+import GoodsExportModal from '../components/GoodsExportModal';
+import GoodsExportDownloadDock from '../components/GoodsExportDownloadDock';
+import GoodsImportModal from '../components/GoodsImportModal';
 import { ImageLightbox } from '@/components/ImageLightbox';
 import { ProductThumb } from '@/components/ProductThumb';
-import { StockCardTab, type StockCardWarehouseOption } from './StockCardTab';
+import { StockCardTab, type StockCardWarehouseOption } from '../components/StockCardTab';
 import ProductFilterSidebar, {
   FilterSidebarState,
   INITIAL_FILTER_STATE,

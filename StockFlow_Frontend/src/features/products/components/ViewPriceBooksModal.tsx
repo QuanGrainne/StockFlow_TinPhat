@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Tag, Info, SlidersHorizontal, CheckCircle2, Lock } from 'lucide-react';
 import { PriceBook } from '@/features/price-books/types';
 import { priceBookService } from '@/features/price-books/services/priceBookService';
-import { GoodsItem } from './GoodsCatalogScreen';
+import { GoodsItem } from '../screens/GoodsCatalogScreen';
 
 interface ViewPriceBooksModalProps {
   item: GoodsItem | null;

@@ -1,4 +1,4 @@
-// src/features/roles/components/common/StockCardTab.tsx
+// src/features/products/components/StockCardTab.tsx
 // Tab "Thẻ kho" trong chi tiết hàng hóa: lịch sử biến động SL & giá vốn tại 1 chi nhánh (mới nhất trước).
 // Chỉ xem và xuất file — các dòng do hệ thống tự ghi khi nhập / bán / trả hàng / chuyển / kiểm kho / sửa giá vốn.
 
@@ -7,7 +7,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import * as XLSX from 'xlsx';
 import { ChevronLeft, ChevronRight, FileOutput, Info, Loader2, Warehouse } from 'lucide-react';
-import { productService, type StockCardEntry } from '../../services/productService';
+import { productService, type StockCardEntry } from '../services/goodsCatalogService';
 import { StockCardDocumentModal, type StockCardDocumentRef } from './StockCardDocumentModal';
 
 export interface StockCardWarehouseOption {
