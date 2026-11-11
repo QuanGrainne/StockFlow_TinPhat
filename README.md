@@ -47,8 +47,8 @@ Frontend available at: http://localhost:3000
 Project_TinPhat/
 ├── StockFlow_Backend/    # ASP.NET Core Web API (Clean Architecture)
 ├── StockFlow_Frontend/   # Next.js App Router (TypeScript)
-├── docs/                 # Requirements & Architecture docs
-└── prompt.md             # Original scaffold instructions
+├── database/             # ERD SQL and ad-hoc seed scripts
+└── docs/                 # Requirements & Architecture docs (docs/archive/prompt.md: original scaffold instructions)
 ```
 
 See [`docs/architecture.md`](docs/architecture.md) for detailed architecture overview.

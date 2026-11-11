@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 StockFlow (OIMS) is an order and inventory management system for Công ty TNHH Tín Phát (capstone SEP490-G82). The backend is ASP.NET Core 9 and the frontend is Next.js. They talk only over HTTP. All UI text and most code comments are in Vietnamese.
 
-**Required reading before feature work:** [AI_CODING_RULES.md](AI_CODING_RULES.md) (mandatory architecture and UI rules; `.cursorrules` points to it) and the business specs in `docs/Report1.docx` (scope FE-01..FE-09) and `docs/Report3.docx` (SRS: use cases UC-xx, screen specs, business rules BR-01..BR-56). Python is not installed. To read a `.docx`, extract `word/document.xml` with PowerShell `System.IO.Compression.ZipFile` into the scratchpad.
+**Required reading before feature work:** [AI_CODING_RULES.md](AI_CODING_RULES.md) (mandatory architecture and UI rules; `.cursorrules` points to it) and the business specs in `docs/Report1.docx` (scope FE-01..FE-09) and Report 3 (SRS: use cases UC-xx, screen specs, business rules BR-xx). The current Report 3 is the team's Google Doc; the old `docs/Report3.docx` has been removed. Python is not installed. To read a `.docx`, extract `word/document.xml` with PowerShell `System.IO.Compression.ZipFile` into the scratchpad.
 
 ## Commands
 
@@ -87,7 +87,7 @@ Clean Architecture with four projects. Dependency direction: API → Application
 ## Database files
 
 - `database/stockflow.sql` is the full ERD as SQL and `database/@startuml StockFlow_Full_ERD.txt` is the PlantUML source. Use them for reference only. The live schema is owned by EF migrations; never hand-edit the schema.
-- `database/seed.sql`, `seed_pos_products.sql`, and `create_order_settings.sql` are ad-hoc data scripts.
+- `database/seed.sql` and `database/seed_pos_products.sql` are ad-hoc data scripts. Order settings (`mst_order_settings`) and `trx_orders.order_type` are created by EF migrations.
 - Roles: Admin, Manager, SalesStaff, WarehouseStaff, ProductionStaff.
 
 ## Domain notes
