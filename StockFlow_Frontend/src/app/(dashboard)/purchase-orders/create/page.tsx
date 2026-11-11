@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { FeatureGuard } from '@/features/roles/components/common/FeatureGuard';
 
 // Dùng chung form với Nhập hàng (mode="order"): tìm hàng, bảng hàng hóa, NCC, giảm giá
-const CreatePurchaseClient = dynamic(() => import('@/app/(dashboard)/purchases/create/CreatePurchaseClient'), {
+const CreatePurchaseScreen = dynamic(() => import('@/features/purchases/screens/CreatePurchaseScreen'), {
   ssr: false,
   loading: () => (
     <div className="flex min-h-[calc(100vh-56px)] items-center justify-center bg-[#f7f9fa] text-sm text-[#8c8c8c]">
@@ -21,7 +21,7 @@ export default function CreatePurchaseOrderPage() {
   const { bfcacheId } = useRouter();
   return (
     <FeatureGuard anyOf={PO_FEATURES}>
-      <CreatePurchaseClient key={bfcacheId} mode="order" />
+      <CreatePurchaseScreen key={bfcacheId} mode="order" />
     </FeatureGuard>
   );
 }

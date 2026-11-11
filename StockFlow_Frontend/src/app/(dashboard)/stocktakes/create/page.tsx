@@ -5,7 +5,7 @@ import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { FeatureGuard } from '@/features/roles/components/common/FeatureGuard';
 
-const CreateStocktakeClient = dynamic(() => import('./CreateStocktakeClient'), {
+const CreateStocktakeScreen = dynamic(() => import('@/features/stocktakes/screens/CreateStocktakeScreen'), {
   ssr: false,
   loading: () => (
     <div className="flex min-h-[calc(100vh-56px)] items-center justify-center bg-[#f7f9fa] text-sm text-[#8c8c8c]">
@@ -22,7 +22,7 @@ export default function CreateStocktakePage() {
   return (
     <Suspense fallback={null}>
       <FeatureGuard anyOf={STOCKTAKE_FEATURES}>
-        <CreateStocktakeClient key={bfcacheId} />
+        <CreateStocktakeScreen key={bfcacheId} />
       </FeatureGuard>
     </Suspense>
   );

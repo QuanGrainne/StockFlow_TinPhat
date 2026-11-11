@@ -64,8 +64,7 @@ public class SavePurchaseReturnHandler :
         if (!code.IsSuccess)
             return Result.Failure<PurchaseReturnDetailDto>(code.Error!);
 
-        var dbContext = _context as DbContext;
-        await using var transaction = dbContext != null ? await dbContext.Database.BeginTransactionAsync(ct) : null;
+        await using var transaction = await _context.BeginTransactionAsync(ct);
         try
         {
             if (ret == null)
@@ -144,8 +143,7 @@ public class CancelPurchaseReturnHandler : IRequestHandler<CancelPurchaseReturnC
         if (PurchaseReturnLogic.Is(ret.Status, PurchaseReturnLogic.Cancelled))
             return Result.Failure<bool>("Phiếu trả hàng nhập này đã bị hủy trước đó.");
 
-        var dbContext = _context as DbContext;
-        await using var transaction = dbContext != null ? await dbContext.Database.BeginTransactionAsync(ct) : null;
+        await using var transaction = await _context.BeginTransactionAsync(ct);
         try
         {
             if (PurchaseReturnLogic.Is(ret.Status, PurchaseReturnLogic.Completed))

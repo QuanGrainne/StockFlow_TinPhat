@@ -54,8 +54,7 @@ public class CreateSupplierRefundHandler : IRequestHandler<CreateSupplierRefundC
         if (partner == null)
             return Result.Failure<PurchaseReturnDetailDto>("Không tìm thấy nhà cung cấp của phiếu trả.");
 
-        var dbContext = _context as DbContext;
-        await using var transaction = dbContext != null ? await dbContext.Database.BeginTransactionAsync(ct) : null;
+        await using var transaction = await _context.BeginTransactionAsync(ct);
         try
         {
             var code = $"PT{await _context.GetNextSequenceValueAsync("stockflow.seq_supplier_refund", ct):D6}";

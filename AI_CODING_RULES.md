@@ -12,8 +12,8 @@
 | **Backend** | ASP.NET Core Web API | **.NET 9 (`net9.0`)**, C# 13 |
 | **ORM / Data** | Entity Framework Core | **EF Core 9.x**, Provider: **Npgsql 9.x** |
 | **Database** | PostgreSQL | Schema: `stockflow` (Cổng 5432) |
-| **Pattern BE** | Modular Monolith / Clean Architecture | **CQRS + MediatR**, FluentValidation, Result Pattern |
-| **Frontend** | Next.js (App Router) | **Next.js 15**, React 19, TypeScript |
+| **Pattern BE** | Clean Architecture (CQRS theo tính năng) | **CQRS + MediatR**, FluentValidation, Result Pattern |
+| **Frontend** | Next.js (App Router) | **Next.js 16**, React 19, TypeScript |
 | **Styling** | Tailwind CSS | Responsive, Clean Dashboard UI |
 | **Auth** | JWT Bearer Authentication | Token lưu `localStorage`, Header `Authorization: Bearer <token>` |
 
@@ -31,7 +31,7 @@ StockFlow.Infrastructure ──────────────────�
 ```
 
 ### 🔹 Layer 1: `StockFlow.Domain` (Trọng tâm nghiệp vụ)
-- **Chứa:** Entities, Enums, Value Objects, Domain Exceptions, Repository Interfaces (`IRepository<T>`, `IUnitOfWork`).
+- **Chứa:** Entities, Enums, Value Objects, Domain Exceptions.
 - **Nguyên tắc vàng:** 
   - KHÔNG tham chiếu tới bất kỳ dự án nào khác.
   - KHÔNG cài thêm NuGet package bên ngoài (trừ package ngôn ngữ C#).
@@ -151,7 +151,7 @@ StockFlow.Infrastructure ──────────────────�
 
 ### 5.3 🗂️ Left Filter Sidebar
 
-**File tham chiếu:** [`ProductFilterSidebar.tsx`](file:///f:/Ki_9/DO_AN/StockFlow_TinPhat/StockFlow_Frontend/src/components/ProductFilterSidebar.tsx)
+**File tham chiếu:** [`ProductFilterSidebar.tsx`](StockFlow_Frontend/src/features/products/components/ProductFilterSidebar.tsx)
 
 ```tsx
 // Wrapper chuẩn
@@ -241,7 +241,7 @@ StockFlow.Infrastructure ──────────────────�
 
 ### 5.6 📊 Ant Design Table
 
-**File tham chiếu:** [`ProductsClient.tsx`](file:///f:/Ki_9/DO_AN/StockFlow_TinPhat/StockFlow_Frontend/src/app/(dashboard)/products/ProductsClient.tsx) — dòng 978-1025
+**File tham chiếu:** [`GoodsCatalogScreen.tsx`](StockFlow_Frontend/src/features/roles/components/common/GoodsCatalogScreen.tsx)
 
 ```tsx
 // Wrapper Table
@@ -333,7 +333,7 @@ rowClassName={(record) =>
 
 ### 5.8 🪟 Modal / Dialog
 
-**File tham chiếu:** [`CreateProductModal.tsx`](file:///f:/Ki_9/DO_AN/StockFlow_TinPhat/StockFlow_Frontend/src/components/CreateProductModal.tsx)
+**File tham chiếu:** [`SupplierFormModal.tsx`](StockFlow_Frontend/src/features/suppliers/components/SupplierFormModal.tsx)
 
 ```tsx
 // Overlay backdrop
@@ -395,7 +395,7 @@ rowClassName={(record) =>
 
 ### 5.9 🧭 Navbar — Thêm menu item mới
 
-**File tham chiếu:** [`Navbar.tsx`](file:///f:/Ki_9/DO_AN/StockFlow_TinPhat/StockFlow_Frontend/src/components/Navbar.tsx)
+**File tham chiếu:** [`Navbar.tsx`](StockFlow_Frontend/src/components/Navbar.tsx)
 
 Khi thêm route mới, **chỉnh sửa mảng `NAV_ITEMS`**:
 ```tsx
@@ -503,7 +503,7 @@ const stockFormatter = new Intl.NumberFormat('vi-VN', {
 
 ---
 
-## 6. 📝 MẪU PROMPT CHUẨN DÀNH CHO TEAM KHI RA LỆNH CHO AI
+## 7. 📝 MẪU PROMPT CHUẨN DÀNH CHO TEAM KHI RA LỆNH CHO AI
 
 Khi bất kỳ ai trong team yêu cầu AI viết code cho một tính năng mới, hãy copy đoạn prompt mẫu này gửi kèm:
 
@@ -517,7 +517,7 @@ Tuân thủ nghiêm ngặt:
 1. Backend: 
    - Đặt Entity/Interface tại StockFlow.Domain.
    - Viết Command/Query/Handler/Validator (MediatR + FluentValidation) tại StockFlow.Application, trả về Result<T>.
-   - Cấu hình EF Core DbContext/Repository tại StockFlow.Infrastructure (schema stockflow).
+   - Cấu hình EF Core DbContext tại StockFlow.Infrastructure (schema stockflow).
    - Controller mỏng tại StockFlow.API.
    - Các gói NuGet phải ở phiên bản .NET 9.x.
 2. Frontend:

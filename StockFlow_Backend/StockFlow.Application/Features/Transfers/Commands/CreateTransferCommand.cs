@@ -96,8 +96,7 @@ public class CreateTransferCommandHandler : IRequestHandler<CreateTransferComman
 
         // 3. Luôn lưu phiếu ở trạng thái Phiếu tạm trước; nếu chọn Hoàn thành thì xuất chuyển bằng đúng logic
         //    của bước "Xuất hàng" (kiểm tra đủ tồn, trừ tồn theo giá vốn, ghi thẻ kho) trong cùng 1 giao dịch.
-        var dbContext = _context as DbContext;
-        await using var dbTransaction = dbContext != null ? await dbContext.Database.BeginTransactionAsync(cancellationToken) : null;
+        await using var dbTransaction = await _context.BeginTransactionAsync(cancellationToken);
 
         var transfer = new TrxStockTransfer
         {

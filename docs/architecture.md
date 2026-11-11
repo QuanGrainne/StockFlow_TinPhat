@@ -3,11 +3,11 @@
 ## System Overview
 
 StockFlow is an Order & Inventory Management System for Tin Phát Company.  
-It follows a **Modular Monolith** backend architecture with a **Next.js App Router** frontend.
+It follows a **Clean Architecture** backend architecture (organized by feature with MediatR CQRS) with a **Next.js App Router** frontend.
 
 ---
 
-## Backend Architecture (Clean Architecture / Modular Monolith)
+## Backend Architecture (Clean Architecture)
 
 ```
 ┌────────────────────────────────────────────────────────┐
@@ -17,12 +17,12 @@ It follows a **Modular Monolith** backend architecture with a **Next.js App Rout
              │                       │
              ▼                       ▼
 ┌────────────────────┐   ┌──────────────────────────────┐
-│ StockFlow.          │   │  StockFlow.Infrastructure     │
-│ Application         │   │  (EF Core, Npgsql, Repos,    │
-│ (MediatR CQRS,      │◄──│   UnitOfWork, Migrations)    │
-│  FluentValidation,  │   └──────────────────────────────┘
-│  DTOs, Behaviors)   │
-└────────────┬────────┘
+│ StockFlow.         │   │  StockFlow.Infrastructure     │
+│ Application        │   │  (EF Core DbContext, Npgsql,  │
+│ (MediatR CQRS,     │◄──│   Migrations)                 │
+│  FluentValidation, │   └──────────────────────────────┘
+│  DTOs, Behaviors)  │
+└────────────┬───────┘
              │
              ▼
 ┌─────────────────────────────────────┐

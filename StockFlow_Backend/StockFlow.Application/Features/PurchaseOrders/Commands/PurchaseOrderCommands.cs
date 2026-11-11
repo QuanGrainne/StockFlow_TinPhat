@@ -248,8 +248,7 @@ public class PurchaseOrderCommandHandler :
         var notes = userNotes.Count == 0 ? null : string.Join("; ", userNotes);
         if (notes is { Length: > 500 }) notes = notes[..500];
 
-        var dbContext = _context as DbContext;
-        using var transaction = dbContext != null ? await dbContext.Database.BeginTransactionAsync(ct) : null;
+        using var transaction = await _context.BeginTransactionAsync(ct);
         try
         {
             var merged = new TrxPurchaseOrder

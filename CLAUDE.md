@@ -31,7 +31,7 @@ There is no automated test project in either backend or frontend. Verify changes
 
 ## Version note
 
-Docs say "Next.js 15", but `package.json` actually pins **Next.js 16**, React 19.3, **antd 6**, and Tailwind 4 (via `@tailwindcss/turbopack`, with `cacheComponents` enabled in `next.config.ts`). Per `StockFlow_Frontend/AGENTS.md`, this Next.js has breaking changes. Read the guides in `node_modules/next/dist/docs/` before using Next APIs. Backend NuGet packages must stay on 9.x (the machine may have a .NET 10 SDK that pulls 10.x packages). Do not upgrade dependencies without team approval.
+The project uses **Next.js 16**, React 19.3, **antd 6**, and Tailwind 4 (via `@tailwindcss/turbopack`, with `cacheComponents` enabled in `next.config.ts`). Per `StockFlow_Frontend/AGENTS.md`, this Next.js has breaking changes. Read the guides in `node_modules/next/dist/docs/` before using Next APIs. Backend NuGet packages must stay on 9.x (the machine may have a .NET 10 SDK that pulls 10.x packages). Do not upgrade dependencies without team approval.
 
 ## Backend architecture
 
@@ -46,7 +46,7 @@ Clean Architecture with four projects. Dependency direction: API → Application
 - **Application/Features/<Module>/** holds `Commands/`, `Queries/`, `DTOs/`, and sometimes `Helpers/`. A command or query `record` and its `IRequestHandler` live in the same file.
   - Handlers return `Result<T>` (`Application/Common/Result.cs`).
   - FluentValidation validators run automatically via `ValidationBehavior`.
-- **Data access pattern:** handlers inject `IStockFlowDbContext` (`Application/Common/Interfaces`) and use EF directly. The generic `IRepository<T>`/`IUnitOfWork` exist but are effectively unused.
+- **Data access pattern:** handlers inject `IStockFlowDbContext` (`Application/Common/Interfaces`) and use EF Core directly.
   - A new entity must be added in three places: as a `DbSet` on `IStockFlowDbContext`, on `StockFlowDbContext`, and in a migration.
 - **StockFlowDbContext** (Infrastructure/Persistence) is a large scaffold-style file. All tables are in schema `stockflow`. Column mapping is snake_case via explicit `HasColumnName` in `OnModelCreating`. Follow that pattern for new columns.
 - **Document codes** come from Postgres sequences (`GetNextSequenceValueAsync("stockflow.seq_...")`). They are formatted by `ITransactionCodeGenerator` or per-module helpers, using prefixes and rules (SEQUENTIAL/DATETIME/RANDOM) from the `MstOrderSetting` row with id 1.
@@ -67,9 +67,9 @@ Clean Architecture with four projects. Dependency direction: API → Application
 
 ## Frontend architecture
 
-- Each route is `src/app/(dashboard)/<module>/page.tsx`. It lazy-loads `<Module>Client.tsx` via `next/dynamic` with `ssr: false`.
-- Feature code lives in `src/features/<module>/{components,services,types,utils}`.
-- Shared sidebars and modals live in `src/components/`. Top navigation is the `NAV_ITEMS` array in `src/components/Navbar.tsx`.
+- Each route is `src/app/(dashboard)/<module>/page.tsx`. It lazy-loads `<Module>Screen.tsx` from `src/features/<module>/screens` via `next/dynamic` with `ssr: false`.
+- Feature code lives in `src/features/<module>/{components,screens,services,types,utils}`.
+- Feature-specific sidebars and modals live in `src/features/<module>/components/`. Shared components live in `src/components/`. Layout lives in `src/components/layout/AppLayout.tsx`. Top navigation is the `NAV_ITEMS` array in `src/components/Navbar.tsx`.
 - `src/lib/api/client.ts` is the only HTTP client. It reads the JWT from `localStorage` (`stockflow_token`).
   - Under `npm run dev` it **auto-logs in as `admin` / `TinPhat@2026`** only if this browser has never logged in. Disable with `NEXT_PUBLIC_DEV_AUTO_LOGIN=false`.
   - A 401 on an existing session clears the session and redirects to `/login`.
@@ -77,7 +77,7 @@ Clean Architecture with four projects. Dependency direction: API → Application
   - Default passwords differ by source: `TinPhat@2026` is used by the seeder and staff-creation code paths, and `database/seed.sql` uses `StockFlow@123`.
 - `src/lib/warehouse/useActiveWarehouse.ts` holds the globally selected warehouse, KiotViet "branch" style, stored in localStorage.
   - Active warehouses are hard-coded there as ids 3–6 (K001 Gia Lâm, K002 Đông Anh, K003 Hà Đông, K004 Hoàn Kiếm). They match `DatabaseSeeder`, where ids 1–2 are inactive.
-- UI must match the Products module (`products/ProductsClient.tsx`, `ProductFilterSidebar.tsx`, `CreateProductModal.tsx`). [AI_CODING_RULES.md](AI_CODING_RULES.md) §5 is the spec:
+- UI must match the Goods Catalog module (`GoodsCatalogScreen.tsx`, `ProductFilterSidebar.tsx`). [AI_CODING_RULES.md](AI_CODING_RULES.md) §5 is the spec:
   - Colors: brand `#0071BA`, table header `#e8f2ff`.
   - Use antd `Table`/`Button`/`Pagination`/`Tag`, plus a per-module `.stockflow-<module>-table` CSS block in `globals.css`.
   - Modals are custom-built; do not use antd `Modal`.

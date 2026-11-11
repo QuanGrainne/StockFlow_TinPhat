@@ -468,8 +468,7 @@ public class CreatePosOrderCommandHandler : IRequestHandler<CreatePosOrderComman
         string clientReqTag = !string.IsNullOrWhiteSpace(req.ClientRequestId) ? $" [REQ:{req.ClientRequestId}]" : "";
         string finalNotes = $"{req.Notes ?? ""}{clientReqTag}".Trim();
 
-var dbContext = _context as DbContext;
-        using var transaction = dbContext != null ? await dbContext.Database.BeginTransactionAsync(cancellationToken) : null;
+        using var transaction = await _context.BeginTransactionAsync(cancellationToken);
 
         try
         {

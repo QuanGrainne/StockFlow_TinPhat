@@ -4,7 +4,7 @@ import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { FeatureGuard } from '@/features/roles/components/common/FeatureGuard';
 
-const CreatePurchaseClient = dynamic(() => import('./CreatePurchaseClient'), {
+const CreatePurchaseScreen = dynamic(() => import('@/features/purchases/screens/CreatePurchaseScreen'), {
   ssr: false,
   loading: () => (
     <div className="flex min-h-[calc(100vh-56px)] items-center justify-center bg-[#f7f9fa] text-sm text-[#8c8c8c]">
@@ -22,7 +22,7 @@ export default function CreatePurchasePage() {
   const { bfcacheId } = useRouter();
   return (
     <FeatureGuard anyOf={purchaseFeatures}>
-      <CreatePurchaseClient key={bfcacheId} />
+      <CreatePurchaseScreen key={bfcacheId} />
     </FeatureGuard>
   );
 }
