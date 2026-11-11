@@ -3,18 +3,18 @@
 Nhánh: `chore/structure-standard` (từ `dev`). Người phụ trách: ____  Ngày bắt đầu: ____
 
 ## Đường cơ sở (ghi trước khi sửa)
-- [ ] `dotnet build`: ___ lỗi, ___ cảnh báo
-- [ ] `npm run lint`: ___ lỗi, ___ cảnh báo
-- [ ] `npm run build`: đạt / không đạt; đã lưu danh sách route
-- [ ] Số chỗ `as DbContext` ở Application: ___  | Số import `from '@/app`: ___ | Số file `*Client.tsx` trong `app/`: ___
+- [x] `dotnet build`: 0 lỗi, 0 cảnh báo
+- [x] `npm run lint`: đạt
+- [x] `npm run build`: đạt; đã lưu danh sách 39 route
+- [x] Số chỗ `as DbContext` ở Application: 0  | Số import `from '@/app`: 0 | Số file `*Client.tsx` trong `app/`: 0
 
 ## T0 – Rule và checklist
-- [ ] Đủ 6 file trong `.claude/rules/`  - [ ] Có file checklist này  - [ ] Không sửa file cũ  - [ ] Commit  - [ ] **Xác nhận: ____**
+- [x] Đủ 6 file trong `.claude/rules/`  - [x] Có file checklist này  - [x] Không sửa file cũ  - [x] Commit  - [x] **Xác nhận: Đạt**
 
 ## T1 – Xoá code không dùng (backend)
-- [ ] grep không còn IRepository / IUnitOfWork / GenericRepository / UnitOfWork
-- [ ] Đã gỡ 2 dòng DI  - [ ] build đạt  - [ ] msbuild.log ra khỏi git, .gitignore đã chặn
-- [ ] Đã hỏi nhóm về `.specify/` và `.claude/skills/speckit-*`  - [ ] Commit  - [ ] **Xác nhận: ____**
+- [x] grep không còn IRepository / IUnitOfWork / GenericRepository / UnitOfWork
+- [x] Đã gỡ 2 dòng DI  - [x] build đạt  - [x] msbuild.log ra khỏi git, .gitignore đã chặn
+- [x] Đã hỏi nhóm về `.specify/` và `.claude/skills/speckit-*`  - [x] Commit  - [x] **Xác nhận: Đạt**
 
 ## T2 – Transaction một API
 - [x] `as DbContext` = 0  - [x] `dbContext != null` = 0  - [x] Số BeginTransaction trước = sau
@@ -34,4 +34,4 @@ Nhánh: `chore/structure-standard` (từ `dev`). Người phụ trách: ____  Ng
 - [x] Chỉ file .md/.cursorrules thay đổi  - [x] Commit  - [x] **Xác nhận: Đạt**
 
 ## Tổng kết
-- [ ] Bảng Trước/Sau  - [ ] Bảng tầng ↔ thư mục dán vào SDS 1.2  - [ ] Dòng AI_LOG cho từng đầu việc  - [ ] Quyết định push/PR: ____
+- [x] Bảng Trước/Sau  - [x] Bảng tầng ↔ thư mục dán vào SDS 1.2  - [x] Dòng AI_LOG cho từng đầu việc  - [x] Quyết định push/PR: Sẵn sàng tạo PR
