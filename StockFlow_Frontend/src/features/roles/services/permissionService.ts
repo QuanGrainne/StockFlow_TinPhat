@@ -2,7 +2,7 @@
 // Service chuyên biệt xử lý Vai trò & Phân quyền Kho (Roles & Warehouse Permissions - Người 2 phụ trách)
 
 import { apiClient } from '@/lib/api/client';
-import { ADMIN_LOCKED_FEATURES, NAV_ITEMS_FLAT } from '../config/navbar';
+import { ADMIN_LOCKED_FEATURES, NAV_ITEMS_FLAT } from '@/lib/navigation/navbar';
 import { ROLE_SWITCHER_ENABLED } from '@/lib/auth/flags';
 import {
   StaffAccount,

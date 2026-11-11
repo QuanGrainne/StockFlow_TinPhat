@@ -3,7 +3,7 @@
 import { Suspense } from 'react';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
-import { FeatureGuard } from '@/features/roles/components/common/FeatureGuard';
+import { FeatureGuard } from '@/components/layout/FeatureGuard';
 
 const CreateStocktakeScreen = dynamic(() => import('@/features/stocktakes/screens/CreateStocktakeScreen'), {
   ssr: false,

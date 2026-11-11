@@ -1,7 +1,7 @@
-// src/features/roles/config/currentRole.ts
+// src/lib/navigation/currentRole.ts
 // Vai trò hiện tại của người dùng (đọc từ kết quả đăng nhập lưu trong localStorage).
 
-import type { UserRole } from '../types';
+import type { UserRole } from '@/features/roles/types';
 import { ROLE_SWITCHER_ENABLED } from '@/lib/auth/flags';
 
 const KNOWN_ROLES = ['ADMIN', 'MANAGER', 'SALES', 'WAREHOUSE', 'PRODUCTION'];

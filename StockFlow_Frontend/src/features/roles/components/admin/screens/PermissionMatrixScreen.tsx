@@ -6,7 +6,7 @@ import { Shield, Save, RotateCcw, CheckCircle2, Check, Search, Package } from 'l
 import { UserRole, RoleDefinition } from '../../../types';
 import { adminService, NAVBAR_FEATURES } from '../../../services/adminService';
 import { DEFAULT_ROLE_FEATURE_PERMS } from '../../../services/permissionService';
-import { ADMIN_LOCKED_FEATURES, NAV_ITEMS_FLAT } from '../../../config/navbar';
+import { ADMIN_LOCKED_FEATURES, NAV_ITEMS_FLAT } from '@/lib/navigation/navbar';
 
 interface RoleColumn {
   code: string;

@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { UserRole } from '@/features/roles/types';
-import { Header } from '@/features/roles/components/common/Header';
-import { Sidebar } from '@/features/roles/components/common/Sidebar';
-import { NoAccess } from '@/features/roles/components/common/FeatureGuard';
+import { Header } from '@/components/layout/Header';
+import { Sidebar } from '@/components/layout/Sidebar';
+import { NoAccess } from '@/components/layout/FeatureGuard';
 import { GoodsCatalogScreen } from '@/features/roles/components/common/GoodsCatalogScreen';
 import SuppliersScreen from '@/features/suppliers/screens/SuppliersScreen';
 import CustomersScreen from '@/features/customers/screens/CustomersScreen';
@@ -18,8 +18,8 @@ import SalesBookingsScreen from '@/features/sales-bookings/screens/SalesBookings
 import SalesReturnsScreen from '@/features/sales-returns/screens/SalesReturnsScreen';
 import { OrderSettingsScreen } from '@/features/settings/screens/OrderSettingsScreen';
 import { permissionService } from '@/features/roles/services/permissionService';
-import { SCREEN_PATH_MAP, canOpenScreen, firstAllowedPath } from '@/features/roles/config/navbar';
-import { getStoredRole } from '@/features/roles/config/currentRole';
+import { SCREEN_PATH_MAP, canOpenScreen, firstAllowedPath } from '@/lib/navigation/navbar';
+import { getStoredRole } from '@/lib/navigation/currentRole';
 
 // Màn hình theo chức năng (navbar dùng chung, xem config/navbar.ts)
 import { BomManagementScreen } from '@/features/roles/components/manager/screens/BomManagementScreen';

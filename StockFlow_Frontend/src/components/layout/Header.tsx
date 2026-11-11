@@ -1,8 +1,8 @@
-// src/features/roles/components/common/Header.tsx
+// src/components/layout/Header.tsx
 // Header giao diện: Topbar chuẩn theo thiết kế AI Studio (Logo SF, Badge Role, Search input, User profile avatar & Switch Role dropdown khớp Ảnh 4)
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { UserRole, StaffAccount, WarehouseFacility } from '../../types';
+import { UserRole, StaffAccount, WarehouseFacility } from '@/features/roles/types';
 import {
   Shield,
   ChevronDown,
@@ -20,7 +20,7 @@ import {
   Building2,
   AlertTriangle,
 } from 'lucide-react';
-import { adminService } from '../../services/adminService';
+import { adminService } from '@/features/roles/services/adminService';
 import { useRouter } from 'next/navigation';
 import { TIN_PHAT_WAREHOUSES, setActiveWarehouseGlobal } from '@/lib/warehouse/useActiveWarehouse';
 import { ROLE_SWITCHER_ENABLED } from '@/lib/auth/flags';

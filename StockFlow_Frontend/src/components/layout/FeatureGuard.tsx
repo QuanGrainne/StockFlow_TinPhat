@@ -1,4 +1,4 @@
-// src/features/roles/components/common/FeatureGuard.tsx
+// src/components/layout/FeatureGuard.tsx
 // Chặn trang theo ma trận Phân quyền chức năng: bỏ tick chức năng thì gõ thẳng đường dẫn
 // (VD /pos, /transfers/create) cũng không vào được. API ghi dữ liệu còn bị chặn thêm ở backend.
 'use client';
@@ -6,9 +6,9 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ShieldOff } from 'lucide-react';
-import { permissionService } from '../../services/permissionService';
-import { featureTitleOf, firstAllowedPath } from '../../config/navbar';
-import { getStoredRole } from '../../config/currentRole';
+import { permissionService } from '@/features/roles/services/permissionService';
+import { featureTitleOf, firstAllowedPath } from '@/lib/navigation/navbar';
+import { getStoredRole } from '@/lib/navigation/currentRole';
 
 interface NoAccessProps {
   /** Mã chức năng / màn hình bị chặn (để hiện tên chức năng) */

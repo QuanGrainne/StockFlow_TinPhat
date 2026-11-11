@@ -3,7 +3,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { FeatureGuard } from '@/features/roles/components/common/FeatureGuard';
+import { FeatureGuard } from '@/components/layout/FeatureGuard';
 
 const PosScreen = dynamic(() => import('@/features/pos/screens/PosScreen'), {
   ssr: false,

@@ -1,13 +1,13 @@
-// src/features/roles/components/common/Sidebar.tsx
+// src/components/layout/Sidebar.tsx
 // Thanh Navbar dùng chung cho mọi vai trò. Danh sách mục lấy từ config/navbar.ts;
 // vai trò chỉ thấy các mục được tick trong Phân quyền vai trò (ma trận chức năng).
 
 import React, { useState, useRef, useEffect } from 'react';
 import { message } from 'antd';
 import { ChevronDown, FileText } from 'lucide-react';
-import { UserRole } from '../../types';
-import { permissionService } from '../../services/permissionService';
-import { NAV_GROUPS, type NavGroup } from '../../config/navbar';
+import { UserRole } from '@/features/roles/types';
+import { permissionService } from '@/features/roles/services/permissionService';
+import { NAV_GROUPS, type NavGroup } from '@/lib/navigation/navbar';
 
 interface SidebarProps {
   currentRole: UserRole;

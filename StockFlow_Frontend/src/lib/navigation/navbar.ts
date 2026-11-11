@@ -1,4 +1,4 @@
-// src/features/roles/config/navbar.ts
+// src/lib/navigation/navbar.ts
 // Nguồn duy nhất cho thanh Navbar và ma trận Phân quyền vai trò:
 // mỗi mục trên navbar = 1 chức năng được phân quyền. Navbar chỉ hiện các mục vai trò được tick.
 

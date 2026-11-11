@@ -40,7 +40,7 @@ import { orderSettingsService } from '@/features/settings/services/orderSettings
 import { salesBookingService } from '@/features/sales-bookings/services/salesBookingService';
 import type { SaveSalesBookingPayload } from '@/features/sales-bookings/types';
 import { permissionService } from '@/features/roles/services/permissionService';
-import { getStoredRole } from '@/features/roles/config/currentRole';
+import { getStoredRole } from '@/lib/navigation/currentRole';
 import { getActiveWarehouse, TIN_PHAT_WAREHOUSES, useActiveWarehouse } from '@/lib/warehouse/useActiveWarehouse';
 import { posService, type PosSaleRequest } from '../services/posService';
 import { ReturnTabView } from '../components/ReturnTabView';
