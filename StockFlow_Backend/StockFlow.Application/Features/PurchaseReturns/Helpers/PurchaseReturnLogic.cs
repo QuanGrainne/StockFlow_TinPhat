@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using StockFlow.Application.Common;
 using StockFlow.Application.Common.Interfaces;
+using StockFlow.Application.Common.Inventory;
 using StockFlow.Application.Features.PurchaseReturns.DTOs;
 using StockFlow.Application.Features.Purchases.Helpers;
 using StockFlow.Domain.Entities;
@@ -175,7 +176,7 @@ public static class PurchaseReturnLogic
             {
                 // Trả hàng tự do: giá nhập = giá vốn hiện tại tại kho
                 var (_, cost) = await PurchaseStockOps.GetBalanceAsync(
-                    context, new PurchaseStockOps.StockKey(warehouseId, line.ProductId, null, null), ct);
+                    context, new StockKey(warehouseId, line.ProductId, null, null), ct);
                 var importPrice = cost > 0 ? cost : products[line.ProductId].MovingAverageCost ?? 0;
                 items.Add(new DtlPurchaseReturnItem
                 {
@@ -240,12 +241,12 @@ public static class PurchaseReturnLogic
         CancellationToken ct)
     {
         var factor = NetFactor(ret, items);
-        var reference = new PurchaseStockOps.StockRef("OUTBOUND_PURCHASE_RETURN", ReferenceType, ret.PurchaseReturnId, userId);
+        var reference = new StockRef("OUTBOUND_PURCHASE_RETURN", ReferenceType, ret.PurchaseReturnId, userId);
         foreach (var item in items)
         {
             await PurchaseStockOps.OutboundAsync(
                 context,
-                new PurchaseStockOps.StockKey(ret.WarehouseId, item.ProductId, item.LocationId, item.LotId),
+                new StockKey(ret.WarehouseId, item.ProductId, item.LocationId, item.LotId),
                 item.Quantity,
                 (item.ReturnPrice ?? 0) * factor,
                 products,
@@ -290,12 +291,12 @@ public static class PurchaseReturnLogic
             .ToDictionaryAsync(p => p.ProductId, ct);
 
         var factor = NetFactor(ret, items);
-        var reference = new PurchaseStockOps.StockRef("PURCHASE_RETURN_CANCEL", ReferenceType, ret.PurchaseReturnId, userId);
+        var reference = new StockRef("PURCHASE_RETURN_CANCEL", ReferenceType, ret.PurchaseReturnId, userId);
         foreach (var item in items)
         {
             await PurchaseStockOps.InboundAsync(
                 context,
-                new PurchaseStockOps.StockKey(ret.WarehouseId, item.ProductId, item.LocationId, item.LotId),
+                new StockKey(ret.WarehouseId, item.ProductId, item.LocationId, item.LotId),
                 item.Quantity,
                 (item.ReturnPrice ?? 0) * factor,
                 products,

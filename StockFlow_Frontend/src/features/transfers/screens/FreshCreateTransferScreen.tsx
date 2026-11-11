@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { FeatureGuard } from '@/features/roles/components/common/FeatureGuard';
+import { FeatureGuard } from '@/components/layout/FeatureGuard';
 import CreateTransferScreen from './CreateTransferScreen';
 
 /** cacheComponents giữ state trang khi rời đi (Activity) → key theo bfcacheId để mỗi lần vào là form mới */

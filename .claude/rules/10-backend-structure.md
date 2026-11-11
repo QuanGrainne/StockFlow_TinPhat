@@ -21,6 +21,8 @@ StockFlow.API/Controllers  Authorization  Middleware
 
 ## Quy ước
 1. Command/Query là `record`; handler cùng file với record của nó. Tên file trùng tên lớp (`CreateXxxCommand.cs`).
+   - Ngoại lệ: một lớp handler cài nhiều `IRequestHandler` và dùng chung hàm private (vd `PurchaseOrderCommandHandler`, `StocktakeCommandHandler`) thì giữ một file, tên file theo nhóm (`PurchaseOrderCommands.cs`, `StocktakeQueries.cs`). Code mới không viết theo kiểu này.
+   - Lớp phụ trợ dùng chung trong module (vd `SalesReturnOps`, `CustomerReceiptLookup`) đặt file riêng cùng tên lớp, hoặc trong `Helpers/`.
 2. Handler dùng `IStockFlowDbContext` và dịch vụ trong Application; không gọi trực tiếp lớp của Infrastructure.
 3. Transaction chỉ qua `IStockFlowDbContext.BeginTransactionAsync`; không ép kiểu về `DbContext`.
 4. Mọi biến động tồn kho: cập nhật `trx_inventory_balances` **và** thêm một dòng `trx_inventory_transactions` (loại, reference_type/reference_id, created_by).

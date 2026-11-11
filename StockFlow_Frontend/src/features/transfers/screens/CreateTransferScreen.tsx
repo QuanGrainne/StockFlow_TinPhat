@@ -23,8 +23,8 @@ import {
   CircleUserRound,
 } from 'lucide-react';
 import { useActiveWarehouse } from '@/lib/warehouse/useActiveWarehouse';
-import { adminService } from '@/features/roles/services/adminService';
-import { WarehouseFacility } from '@/features/roles/types';
+import { adminService } from '@/features/admin/services/adminService';
+import { WarehouseFacility } from '@/features/admin/types';
 import { transferService } from '@/features/transfers/services/transferService';
 import { ProductForTransfer, TransferItem } from '@/features/transfers/types';
 import { toLocalDatetimeInputString } from '@/features/transfers/utils/dateUtils';

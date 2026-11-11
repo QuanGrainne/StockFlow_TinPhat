@@ -4,20 +4,8 @@
 'use client';
 
 import React, { use, Suspense } from 'react';
-import dynamic from 'next/dynamic';
+import { LazyAppLayout } from '@/components/layout/LazyAppLayout';
 import OrderDetailScreen from '@/features/orders/screens/OrderDetailScreen';
-
-const AppLayout = dynamic(
-  () => import('@/components/layout/AppLayout').then((mod) => mod.AppLayout),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="flex h-screen items-center justify-center bg-[#f7f9fa] text-sm text-slate-400">
-        Đang tải Chi tiết đơn hàng...
-      </div>
-    ),
-  }
-);
 
 interface OrderDetailPageProps {
   params: Promise<{ id: string }> | { id: string };
@@ -27,9 +15,9 @@ function OrderDetailContent({ params }: OrderDetailPageProps) {
   const resolvedParams = 'then' in params ? use(params) : params;
 
   return (
-    <AppLayout initialScreen="orders">
+    <LazyAppLayout initialScreen="orders">
       <OrderDetailScreen id={resolvedParams.id} />
-    </AppLayout>
+    </LazyAppLayout>
   );
 }
 
