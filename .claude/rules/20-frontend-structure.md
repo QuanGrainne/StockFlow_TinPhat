@@ -5,16 +5,26 @@ Kiểu kiến trúc: **feature-based.** Thư mục `app/` chỉ định tuyến;
 ## Cây thư mục
 ```
 src/
-  app/(dashboard)/<route>/page.tsx   chỉ next/dynamic (ssr:false) + render màn hình
+  app/(dashboard)/<route>/page.tsx   chỉ import LazyAppLayout + render (xem "Cách nạp trang")
   features/<module>/
     screens/       <Module>Screen.tsx  (tên cũ *Client.tsx)
     components/    thành phần chỉ dùng trong module (bộ lọc, modal)
     services/      gọi API qua lib/api/client.ts
     types.ts       (chuyển thành thư mục types/ khi quá 300 dòng)
     utils/  hooks/
-  components/      CHỈ thành phần dùng chung (Navbar, layout, ô nhập, bộ chọn thời gian/kho)
+  components/      CHỈ thành phần dùng chung (layout/, ô nhập, bộ chọn thời gian/kho)
   lib/             api, auth, warehouse, navigation, print
 ```
+
+## Cách nạp trang (kiểu "Khung + bảng màn hình")
+```
+page.tsx → components/layout/LazyAppLayout (next/dynamic, ssr:false)
+         → components/layout/AppLayout (Header + Sidebar + kiểm quyền)
+         → switch (activeScreen) → features/<module>/screens/<Module>Screen
+```
+1. Trang danh sách: `'use client'` + `<LazyAppLayout initialScreen="<mã màn hình>" />`. Không tự viết lại `next/dynamic` cho AppLayout. Cần làm mới khi quay lại thì truyền `key` (vd `key={bfcacheId}` ở `purchase-orders`).
+2. Trang chi tiết `orders/[id]` cũng dùng `LazyAppLayout`, truyền `OrderDetailScreen` qua `children`. Trang tạo (`*/create`) và `pos` nạp màn hình riêng bằng `next/dynamic`, không qua AppLayout (`transfers/create` là server component có `metadata` nên không dùng `ssr:false`).
+3. Thêm màn hình mới: thêm `case` trong `AppLayout`, khai mục menu trong cấu hình navbar, rồi tạo `page.tsx` theo mục 1.
 
 ## Quy ước
 1. `app/` không chứa logic, không bị `features/` hay `components/` import.

@@ -67,9 +67,13 @@ Clean Architecture with four projects. Dependency direction: API → Application
 
 ## Frontend architecture
 
-- Each route is `src/app/(dashboard)/<module>/page.tsx`. It lazy-loads `<Module>Screen.tsx` from `src/features/<module>/screens` via `next/dynamic` with `ssr: false`.
+- Pages use a "shell + screen switch" pattern: `page.tsx` → `LazyAppLayout` → `AppLayout` → `src/features/<module>/screens/<Module>Screen.tsx`.
+  - A list page (`src/app/(dashboard)/<route>/page.tsx`) is `'use client'` and only renders `<LazyAppLayout initialScreen="..." />` (`src/components/layout/LazyAppLayout.tsx`, `next/dynamic` with `ssr: false`). Do not re-declare `next/dynamic` for AppLayout in a page.
+  - `AppLayout` renders Header + Sidebar, checks feature permissions, and picks the screen with `switch (activeScreen)`.
+  - `orders/[id]` also uses `LazyAppLayout` but passes `OrderDetailScreen` as `children` (AppLayout renders children instead of the switch).
+  - Create pages (`*/create`) and `pos` load their own screen via `next/dynamic`, without AppLayout. `transfers/create` is a server component (it exports `metadata`), so it does not use `ssr: false`.
 - Feature code lives in `src/features/<module>/{components,screens,services,types,utils}`.
-- Feature-specific sidebars and modals live in `src/features/<module>/components/`. Shared components live in `src/components/`. Layout lives in `src/components/layout/AppLayout.tsx`. Top navigation is the `NAV_ITEMS` array in `src/components/Navbar.tsx`.
+- Feature-specific sidebars and modals live in `src/features/<module>/components/`. Shared components live in `src/components/`. Layout lives in `src/components/layout/AppLayout.tsx`. Menu items and screen↔path mapping are `NAV_GROUPS` / `SCREEN_PATH_MAP` in `src/features/roles/config/navbar.ts`.
 - `src/lib/api/client.ts` is the only HTTP client. It reads the JWT from `localStorage` (`stockflow_token`).
   - Under `npm run dev` it **auto-logs in as `admin` / `TinPhat@2026`** only if this browser has never logged in. Disable with `NEXT_PUBLIC_DEV_AUTO_LOGIN=false`.
   - A 401 on an existing session clears the session and redirects to `/login`.
