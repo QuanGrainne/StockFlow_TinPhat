@@ -53,6 +53,7 @@ Clean Architecture with four projects. Dependency direction: API → Application
 - **Inventory model:**
   - Stock on hand lives in `TrxInventoryBalances`, keyed by warehouse, location, product, and lot.
   - Every stock movement must also append a `TrxInventoryTransactions` row (type, reference_type/reference_id, created_by).
+  - Use the shared ledger for both: `IInventoryLedger` (`Application/Common/Interfaces`, implemented by `Application/Common/Inventory/InventoryLedger.cs`, moving-average cost). New handlers inject it; older code calls it through `PurchaseStockOps` / `TransferStockOps`.
 - **Timestamps** are `timestamp without time zone`, with `Npgsql.EnableLegacyTimestampBehavior` on. Modules store Vietnam local time (see `TransferHelper.GetVietnamTime`).
 - **Controllers** are thin: build a command or query, call `_mediator.Send`, then map `IsSuccess` to `Ok` or `BadRequest(new { message })`.
 - **Authorization** (`StockFlow.API/Authorization/RequirePermissionAttribute.cs`):
@@ -73,7 +74,8 @@ Clean Architecture with four projects. Dependency direction: API → Application
   - `orders/[id]` also uses `LazyAppLayout` but passes `OrderDetailScreen` as `children` (AppLayout renders children instead of the switch).
   - Create pages (`*/create`) and `pos` load their own screen via `next/dynamic`, without AppLayout. `transfers/create` is a server component (it exports `metadata`), so it does not use `ssr: false`.
 - Feature code lives in `src/features/<module>/{components,screens,services,types,utils}`.
-- Feature-specific sidebars and modals live in `src/features/<module>/components/`. Shared components live in `src/components/`. Layout lives in `src/components/layout/AppLayout.tsx`. Menu items and screen↔path mapping are `NAV_GROUPS` / `SCREEN_PATH_MAP` in `src/features/roles/config/navbar.ts`.
+- Feature-specific sidebars and modals live in `src/features/<module>/components/`. Shared components live in `src/components/`. The shell lives in `src/components/layout/` (`AppLayout`, `LazyAppLayout`, `Header`, `Sidebar`, `FeatureGuard`). Menu items and screen↔path mapping are `NAV_GROUPS` / `SCREEN_PATH_MAP` in `src/lib/navigation/navbar.ts`; the stored role is in `src/lib/navigation/currentRole.ts`.
+- Admin screens (staff, roles, permission matrix, warehouse access) are in `src/features/admin/`; the goods catalog screen is `src/features/products/screens/GoodsCatalogScreen.tsx`. `src/features/admin/data/mockData.ts` is fake fallback data used only by `staffService` / `permissionService`.
 - `src/lib/api/client.ts` is the only HTTP client. It reads the JWT from `localStorage` (`stockflow_token`).
   - Under `npm run dev` it **auto-logs in as `admin` / `TinPhat@2026`** only if this browser has never logged in. Disable with `NEXT_PUBLIC_DEV_AUTO_LOGIN=false`.
   - A 401 on an existing session clears the session and redirects to `/login`.
@@ -107,13 +109,8 @@ Clean Architecture with four projects. Dependency direction: API → Application
 
 Feature branches are named `feature/<module>` (e.g. `feature/chuyen-hang`) and merge into `dev`, then `main` via PR. Commit messages are short and often Vietnamese (`feat: ...`, `Suppliers: ...`).
 
-## graphify
+## Structure standard
 
-This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.
-
-Rules:
-- When graphify-out/graph.json exists, run `graphify query "<question>"` before your first grep, search or source-file read for a codebase question, and put this rule in every subagent prompt that explores code. Read raw files only for lines the graph or an earlier read already located. Use `graphify path "<A>" "<B>"` for relationships and `graphify explain "<concept>"` for focused concepts. These return a scoped subgraph, usually much smaller than GRAPH_REPORT.md or raw grep output.
-- If graphify-out/wiki/index.md exists, use it for broad navigation instead of raw source browsing.
-- Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain do not surface enough context.
-- After modifying code, run `graphify update .` to keep the graph current (AST-only, no API cost).
-- A committed graphify-out/graph.json is rewritten whole on every build, so a large diff to it in a pull request is expected. Do not flag it as churn or suggest skipping the graph rebuild or its hooks.
+The team's structure rules live in `.claude/rules/` and override older wording elsewhere:
+- `00-principles.md` (scope, ask when unsure, self-check block), `10-backend-structure.md`, `20-frontend-structure.md`, `30-definition-of-done.md`, `40-refactor-safety.md`, `50-ai-usage-log.md`.
+- Refactor progress is tracked in `docs/refactor/CHECKLIST.md`; every AI-assisted task adds a row to `docs/ai-log/AI_LOG.md`.

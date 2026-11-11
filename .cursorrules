@@ -9,4 +9,5 @@ Always adhere to the detailed guidelines defined in AI_CODING_RULES.md.
 4. Database: All tables belong to schema `stockflow`. Use EF Core migrations for any schema changes.
 5. NuGet Packages: Always pin to version 9.x compatible packages.
 6. Frontend: Strict TypeScript (no `any`), use `src/lib/api/client.ts` with JWT bearer authentication. UI text must be professional Vietnamese.
-7. Follow business specifications from docs/Report1.docx and docs/Report3.docx (e.g. User Warehouse Access, BOM with finished goods and raw materials).
+7. Follow business specifications from docs/Report1.docx (scope) and the current Report 3 (the team's Google Doc; the old docs/Report3.docx was removed) (e.g. User Warehouse Access, BOM with finished goods and raw materials).
+8. Structure rules: follow `.claude/rules/` (backend, frontend, definition of done, refactor safety, AI usage log).
