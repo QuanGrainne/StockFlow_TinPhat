@@ -38,7 +38,8 @@ public sealed class InventoryLedger(IStockFlowDbContext context) : IInventoryLed
         IReadOnlyDictionary<int, MstProduct> products,
         StockRef reference,
         CancellationToken ct,
-        decimal? transactionPrice = null)
+        decimal? transactionPrice = null,
+        DateTime? transactionDate = null)
     {
         var balance = await FindBalanceAsync(key, ct);
 
@@ -71,7 +72,7 @@ public sealed class InventoryLedger(IStockFlowDbContext context) : IInventoryLed
             product.MovingAverageCost = newCost;
         }
 
-        AddCardEntry(key, qty, reference, transactionPrice ?? price, newCost, currentQty + qty);
+        AddCardEntry(key, qty, reference, transactionPrice ?? price, newCost, currentQty + qty, transactionDate);
     }
 
     /// <summary>
@@ -85,7 +86,8 @@ public sealed class InventoryLedger(IStockFlowDbContext context) : IInventoryLed
         IReadOnlyDictionary<int, MstProduct> products,
         StockRef reference,
         CancellationToken ct,
-        decimal? transactionPrice = null)
+        decimal? transactionPrice = null,
+        DateTime? transactionDate = null)
     {
         var balance = await FindBalanceAsync(key, ct);
 
@@ -125,13 +127,13 @@ public sealed class InventoryLedger(IStockFlowDbContext context) : IInventoryLed
             product.MovingAverageCost = newCost;
         }
 
-        AddCardEntry(key, -qty, reference, transactionPrice ?? price, newCost, remainingQty);
+        AddCardEntry(key, -qty, reference, transactionPrice ?? price, newCost, remainingQty, transactionDate);
     }
 
     /// <summary>Ghi 1 dòng thẻ kho: SL biến động, Giá GD, giá vốn và tồn cuối ngay sau giao dịch.</summary>
     private void AddCardEntry(
         StockKey key, decimal signedQty, StockRef reference,
-        decimal transactionPrice, decimal unitCostAfter, decimal balanceAfter)
+        decimal transactionPrice, decimal unitCostAfter, decimal balanceAfter, DateTime? transactionDate)
     {
         context.TrxInventoryTransactions.Add(new TrxInventoryTransaction
         {
@@ -143,7 +145,7 @@ public sealed class InventoryLedger(IStockFlowDbContext context) : IInventoryLed
             Quantity = signedQty,
             ReferenceType = reference.ReferenceType,
             ReferenceId = reference.ReferenceId,
-            TransactionDate = VietnamTime.Now,
+            TransactionDate = transactionDate ?? VietnamTime.Now,
             CreatedBy = reference.UserId,
             TransactionPrice = transactionPrice,
             UnitCost = unitCostAfter,

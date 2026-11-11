@@ -21,7 +21,8 @@ public interface IInventoryLedger
         IReadOnlyDictionary<int, MstProduct> products,
         StockRef reference,
         CancellationToken ct,
-        decimal? transactionPrice = null);
+        decimal? transactionPrice = null,
+        DateTime? transactionDate = null);
 
     /// <summary>Trừ tồn và tính ngược giá vốn bình quân + ghi thẻ kho (cho phép tồn âm).</summary>
     Task OutboundAsync(
@@ -31,5 +32,6 @@ public interface IInventoryLedger
         IReadOnlyDictionary<int, MstProduct> products,
         StockRef reference,
         CancellationToken ct,
-        decimal? transactionPrice = null);
+        decimal? transactionPrice = null,
+        DateTime? transactionDate = null);
 }

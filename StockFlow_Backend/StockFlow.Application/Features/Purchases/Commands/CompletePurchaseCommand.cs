@@ -6,6 +6,7 @@ using MediatR;
 using Microsoft.EntityFrameworkCore;
 using StockFlow.Application.Common;
 using StockFlow.Application.Common.Interfaces;
+using StockFlow.Application.Common.Inventory;
 using StockFlow.Application.Features.Purchases.DTOs;
 using StockFlow.Application.Features.PurchaseOrders.Helpers;
 using StockFlow.Application.Features.Purchases.Helpers;
@@ -19,11 +20,13 @@ public class CompletePurchaseCommandHandler : IRequestHandler<CompletePurchaseCo
 {
     private readonly IStockFlowDbContext _context;
     private readonly ICurrentUserService _currentUserService;
+    private readonly IInventoryLedger _inventoryLedger;
 
-    public CompletePurchaseCommandHandler(IStockFlowDbContext context, ICurrentUserService currentUserService)
+    public CompletePurchaseCommandHandler(IStockFlowDbContext context, ICurrentUserService currentUserService, IInventoryLedger inventoryLedger)
     {
         _context = context;
         _currentUserService = currentUserService;
+        _inventoryLedger = inventoryLedger;
     }
 
     public async Task<Result<PurchaseDetailDto>> Handle(CompletePurchaseCommand command, CancellationToken cancellationToken)
@@ -79,6 +82,12 @@ public class CompletePurchaseCommandHandler : IRequestHandler<CompletePurchaseCo
         {
             decimal totalAmount = 0;
 
+            // Sản phẩm của phiếu (đã Include, EF theo dõi) để sổ tồn kho cập nhật giá vốn chung MstProduct.MovingAverageCost
+            var products = receipt.DtlGoodsReceiptItems
+                .Where(i => i.Product != null)
+                .GroupBy(i => i.ProductId)
+                .ToDictionary(g => g.Key, g => g.First().Product);
+
             // 1. Cập nhật tồn kho, tính giá vốn và ghi thẻ kho cho từng mặt hàng
             foreach (var item in receipt.DtlGoodsReceiptItems)
             {
@@ -86,69 +95,15 @@ public class CompletePurchaseCommandHandler : IRequestHandler<CompletePurchaseCo
                 decimal unitPrice = item.UnitLandedCost ?? 0;
                 totalAmount += incomingQty * unitPrice;
 
-                // Kiểm tra Local change tracker trước để tránh duplicate key
-                var balance = _context.TrxInventoryBalances.Local
-                    .FirstOrDefault(b => b.WarehouseId == warehouseId &&
-                                         b.ProductId == item.ProductId &&
-                                         b.LocationId == item.LocationId &&
-                                         b.LotId == item.LotId)
-                    ?? await _context.TrxInventoryBalances
-                        .FirstOrDefaultAsync(b => b.WarehouseId == warehouseId &&
-                                                  b.ProductId == item.ProductId &&
-                                                  b.LocationId == item.LocationId &&
-                                                  b.LotId == item.LotId, cancellationToken);
-
-                decimal currentQty = balance?.Quantity ?? 0;
-                decimal currentCost = balance?.UnitCost ?? 0;
-
-                decimal newUnitCost = GoodsReceiptHelper.CalculateMovingAverageCost(
-                    currentQty, currentCost, incomingQty, unitPrice);
-
-                if (balance == null)
-                {
-                    balance = new TrxInventoryBalance
-                    {
-                        WarehouseId = warehouseId,
-                        ProductId = item.ProductId,
-                        LocationId = item.LocationId,
-                        LotId = item.LotId,
-                        Quantity = incomingQty,
-                        UnitCost = newUnitCost,
-                        LastUpdated = VietnamTime.Now
-                    };
-                    _context.TrxInventoryBalances.Add(balance);
-                }
-                else
-                {
-                    balance.Quantity = currentQty + incomingQty;
-                    balance.UnitCost = newUnitCost;
-                    balance.LastUpdated = VietnamTime.Now;
-                }
-
-                // Cập nhật giá vốn chung
-                if (item.Product != null)
-                {
-                    item.Product.MovingAverageCost = newUnitCost;
-                }
-
-                // Ghi thẻ kho
-                var invTx = new TrxInventoryTransaction
-                {
-                    WarehouseId = warehouseId,
-                    ProductId = item.ProductId,
-                    LocationId = item.LocationId,
-                    LotId = item.LotId,
-                    TransactionType = "INBOUND_RECEIPT",
-                    Quantity = incomingQty,
-                    ReferenceType = "GOODS_RECEIPT",
-                    ReferenceId = receipt.GrId,
-                    TransactionDate = receivedDate,
-                    CreatedBy = currentUserId,
-                    TransactionPrice = PurchaseStockOps.LinePrice(item), // Giá GD = giá nhập trên phiếu (sau giảm giá dòng)
-                    UnitCost = newUnitCost,
-                    BalanceAfter = balance.Quantity
-                };
-                _context.TrxInventoryTransactions.Add(invTx);
+                // Cộng tồn, tính giá vốn BQ gia quyền (cập nhật giá vốn chung MstProduct) và ghi thẻ kho
+                // qua sổ tồn kho dùng chung
+                await _inventoryLedger.InboundAsync(
+                    new StockKey(warehouseId, item.ProductId, item.LocationId, item.LotId),
+                    incomingQty, unitPrice, products,
+                    new StockRef("INBOUND_RECEIPT", "GOODS_RECEIPT", receipt.GrId, currentUserId),
+                    cancellationToken,
+                    transactionPrice: PurchaseStockOps.LinePrice(item), // Giá GD = giá nhập trên phiếu (sau giảm giá dòng)
+                    transactionDate: receivedDate);
             }
 
             // 2. Xử lý thanh toán & Công nợ
