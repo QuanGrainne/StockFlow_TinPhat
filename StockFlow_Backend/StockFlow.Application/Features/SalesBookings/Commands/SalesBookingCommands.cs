@@ -165,8 +165,7 @@ public class SalesBookingCommandHandler :
         }
         DateTime? deliveryDate = req.DeliveryDate.HasValue ? VietnamTime.From(req.DeliveryDate) : null;
 
-        var dbContext = _context as DbContext;
-        using var tx = dbContext != null ? await dbContext.Database.BeginTransactionAsync(ct) : null;
+        using var tx = await _context.BeginTransactionAsync(ct);
         try
         {
             if (booking == null)
@@ -354,8 +353,7 @@ public class SalesBookingCommandHandler :
         var settings = await _context.MstOrderSettings.AsNoTracking().FirstOrDefaultAsync(s => s.SettingId == 1, ct) ?? new MstOrderSetting();
         var now = VietnamTime.Now;
 
-        var dbContext = _context as DbContext;
-        using var tx = dbContext != null ? await dbContext.Database.BeginTransactionAsync(ct) : null;
+        using var tx = await _context.BeginTransactionAsync(ct);
         try
         {
             // Hàng trùng (cùng mã, cùng giá bán) cộng dồn số lượng

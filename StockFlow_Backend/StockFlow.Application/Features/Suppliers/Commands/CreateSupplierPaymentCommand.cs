@@ -162,8 +162,7 @@ public class CreateSupplierPaymentCommandHandler
             allocatedTotal = allocations.Sum(a => a.Amount);
         }
 
-        var dbContext = _context as DbContext;
-        using var transaction = dbContext != null ? await dbContext.Database.BeginTransactionAsync(cancellationToken) : null;
+        using var transaction = await _context.BeginTransactionAsync(cancellationToken);
         try
         {
             var seq = await _context.GetNextSequenceValueAsync(VoucherSequence, cancellationToken);

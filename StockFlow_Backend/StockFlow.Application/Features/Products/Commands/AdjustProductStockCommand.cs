@@ -83,8 +83,7 @@ public class AdjustProductStockHandler : IRequestHandler<AdjustProductStockComma
                 Notes = string.IsNullOrWhiteSpace(req.Note) ? autoNote : $"{autoNote} | {req.Note.Trim()}",
             };
 
-            var dbContext = _context as DbContext;
-            await using var transaction = dbContext != null ? await dbContext.Database.BeginTransactionAsync(ct) : null;
+            await using var transaction = await _context.BeginTransactionAsync(ct);
             _context.TrxStocktakes.Add(stocktake);
             var items = await StocktakeLogic.ReplaceItemsAsync(_context, stocktake,
                 new[] { new StocktakeItemRequest { ProductId = product.ProductId, ActualQty = previousQty + delta } }, userId, ct);

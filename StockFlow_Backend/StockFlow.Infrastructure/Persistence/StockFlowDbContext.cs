@@ -2153,6 +2153,9 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
         return Convert.ToInt64(result);
     }
 
+    public Task<Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction> BeginTransactionAsync(CancellationToken cancellationToken = default)
+        => Database.BeginTransactionAsync(cancellationToken);
+
     partial void OnModelCreatingPartial(ModelBuilder modelBuilder);
 }
 

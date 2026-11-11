@@ -68,8 +68,7 @@ public class StocktakeCommandHandler :
         if (!code.IsSuccess)
             return Result.Failure<StocktakeDetailDto>(code.Error!);
 
-        var dbContext = _context as DbContext;
-        await using var transaction = dbContext != null ? await dbContext.Database.BeginTransactionAsync(ct) : null;
+        await using var transaction = await _context.BeginTransactionAsync(ct);
         try
         {
             if (stocktake == null)
@@ -122,8 +121,7 @@ public class StocktakeCommandHandler :
         if (StocktakeLogic.Is(stocktake.Status, StocktakeLogic.Cancelled))
             return Result.Failure<StocktakeDetailDto>("Phiếu kiểm kho đã bị hủy trước đó.");
 
-        var dbContext = _context as DbContext;
-        await using var transaction = dbContext != null ? await dbContext.Database.BeginTransactionAsync(ct) : null;
+        await using var transaction = await _context.BeginTransactionAsync(ct);
         try
         {
             if (StocktakeLogic.Is(stocktake.Status, StocktakeLogic.Balanced))
@@ -181,8 +179,7 @@ public class StocktakeCommandHandler :
         if (!code.IsSuccess)
             return Result.Failure<StocktakeDetailDto>(code.Error!);
 
-        var dbContext = _context as DbContext;
-        await using var transaction = dbContext != null ? await dbContext.Database.BeginTransactionAsync(ct) : null;
+        await using var transaction = await _context.BeginTransactionAsync(ct);
         TrxStocktake merged;
         try
         {
