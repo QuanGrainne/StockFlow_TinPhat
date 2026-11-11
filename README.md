@@ -55,7 +55,7 @@ See [`docs/architecture.md`](docs/architecture.md) for detailed architecture ove
 
 ## Technology Stack
 - **Backend**: ASP.NET Core 9, EF Core 9, PostgreSQL, MediatR, FluentValidation
-- **Frontend**: Next.js 15 (App Router), React 19, TypeScript 5
+- **Frontend**: Next.js 16 (App Router), React 19, TypeScript 5
 - **Database**: PostgreSQL 15 via Npgsql
 
 ## Team

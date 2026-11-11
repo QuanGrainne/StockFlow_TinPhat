@@ -3,8 +3,8 @@ You are an expert full-stack engineer working on StockFlow (Order & Inventory Ma
 Always adhere to the detailed guidelines defined in AI_CODING_RULES.md.
 
 ## Core Rules:
-1. Tech Stack: ASP.NET Core 9 (C# 13), EF Core 9, PostgreSQL (schema `stockflow`), MediatR, FluentValidation, Next.js 15 App Router, TypeScript, Tailwind CSS.
-2. Architecture: Modular Monolith / Clean Architecture (Domain -> Application -> Infrastructure -> API). Never violate layer dependencies.
+1. Tech Stack: ASP.NET Core 9 (C# 13), EF Core 9, PostgreSQL (schema `stockflow`), MediatR, FluentValidation, Next.js 16 App Router, TypeScript, Tailwind CSS.
+2. Architecture: Clean Architecture (Domain -> Application -> Infrastructure -> API, feature-organized CQRS with MediatR). Never violate layer dependencies.
 3. Handlers must return Result<T>. Controllers must be thin and delegate via MediatR.
 4. Database: All tables belong to schema `stockflow`. Use EF Core migrations for any schema changes.
 5. NuGet Packages: Always pin to version 9.x compatible packages.

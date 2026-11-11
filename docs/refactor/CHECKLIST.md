@@ -30,8 +30,8 @@ Nhánh: `chore/structure-standard` (từ `dev`). Người phụ trách: ____  Ng
 - [x] Route trước = sau  - [x] lint không lỗi mới  - [x] Commit  - [x] **Xác nhận: Đạt**
 
 ## T5 – Đồng bộ file AI và tài liệu
-- [ ] Hết "Next.js 15"  - [ ] Hết "Modular Monolith"  - [ ] Hết trùng "## 6"  - [ ] Đường dẫn trong tài liệu tồn tại thật
-- [ ] Chỉ file .md/.cursorrules thay đổi  - [ ] Commit  - [ ] **Xác nhận: ____**
+- [x] Hết "Next.js 15"  - [x] Hết "Modular Monolith"  - [x] Hết trùng "## 6"  - [x] Đường dẫn trong tài liệu tồn tại thật
+- [x] Chỉ file .md/.cursorrules thay đổi  - [x] Commit  - [x] **Xác nhận: Đạt**
 
 ## Tổng kết
 - [ ] Bảng Trước/Sau  - [ ] Bảng tầng ↔ thư mục dán vào SDS 1.2  - [ ] Dòng AI_LOG cho từng đầu việc  - [ ] Quyết định push/PR: ____
