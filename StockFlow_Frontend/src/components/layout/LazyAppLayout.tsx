@@ -1,4 +1,4 @@
-// src/features/roles/components/LazyAppLayout.tsx
+// src/components/layout/LazyAppLayout.tsx
 // Khung quản lý (header + navbar) chỉ render ở client: AppLayout đọc vai trò từ localStorage (tránh lỗi hydration).
 'use client';
 

@@ -123,7 +123,7 @@ import { StockCardTab, type StockCardWarehouseOption } from './StockCardTab';
 import ProductFilterSidebar, {
   FilterSidebarState,
   INITIAL_FILTER_STATE,
-} from '@/components/ProductFilterSidebar';
+} from '@/features/products/components/ProductFilterSidebar';
 import { SlidersHorizontal, RotateCcw, Lock, Unlock } from 'lucide-react';
 
 // ─── Component Combobox Đa Năng (Vừa Tự Nhập Vừa Tự Chọn) ──────────────────────

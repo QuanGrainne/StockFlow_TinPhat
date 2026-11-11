@@ -26,8 +26,8 @@ Nhánh: `chore/structure-standard` (từ `dev`). Người phụ trách: ____  Ng
 - [x] Commit  - [x] **Xác nhận: Đạt**
 
 ## T4 – Gỡ phụ thuộc ngược, chuyển thành phần riêng
-- [ ] `from '@/app` = 0  - [ ] `src/components/` chỉ còn thành phần dùng chung  - [ ] AppLayout đã sang `components/layout/`
-- [ ] Route trước = sau  - [ ] lint không lỗi mới  - [ ] Commit  - [ ] **Xác nhận: ____**
+- [x] `from '@/app` = 0  - [x] `src/components/` chỉ còn thành phần dùng chung  - [x] AppLayout đã sang `components/layout/`
+- [x] Route trước = sau  - [x] lint không lỗi mới  - [x] Commit  - [x] **Xác nhận: Đạt**
 
 ## T5 – Đồng bộ file AI và tài liệu
 - [ ] Hết "Next.js 15"  - [ ] Hết "Modular Monolith"  - [ ] Hết trùng "## 6"  - [ ] Đường dẫn trong tài liệu tồn tại thật

@@ -7,7 +7,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { readDocumentLink, scrollToWhenReady } from '@/lib/navigation/documentLink';
-import SupplierFilterSidebar from '@/components/SupplierFilterSidebar';
+import SupplierFilterSidebar from '@/features/suppliers/components/SupplierFilterSidebar';
 import SupplierFormModal from '@/features/suppliers/components/SupplierFormModal';
 import SupplierToolbar from '@/features/suppliers/components/SupplierToolbar';
 import SuppliersTable from '@/features/suppliers/components/SuppliersTable';

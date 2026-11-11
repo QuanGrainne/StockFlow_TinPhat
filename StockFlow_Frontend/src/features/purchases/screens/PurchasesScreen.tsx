@@ -48,31 +48,18 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { linkDateFilter, readDocumentLink, scrollToWhenReady } from '@/lib/navigation/documentLink';
 import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import * as XLSX from 'xlsx';
-import PurchaseFilterSidebar from '@/components/PurchaseFilterSidebar';
+import PurchaseFilterSidebar from '@/features/purchases/components/PurchaseFilterSidebar';
 import { purchaseService } from '@/features/purchases/services/purchaseService';
 import { printPurchaseReceipt } from '@/features/purchases/utils/printPurchaseReceipt';
 import { PurchaseListRecord, PurchaseDetail, PurchaseItem, PurchasePayment, PurchaseReturnSummary } from '@/features/purchases/types';
+import type { PurchaseFilterState } from '@/features/purchases/types';
 import { useActiveWarehouse } from '@/lib/warehouse/useActiveWarehouse';
 import { supplierService } from '@/features/suppliers/services/supplierService';
 import { Supplier } from '@/features/suppliers/types';
 import { getDateRangeForPreset } from '@/features/transfers/utils/dateUtils';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-
-export type PurchaseStatus = 'draft' | 'completed' | 'canceled';
-
-export type PurchaseFilterState = {
-  statuses: PurchaseStatus[];
-  timeRange: string;
-  periodLabel?: string;
-  dateFrom?: string;
-  dateTo?: string;
-  createdBy?: string;
-  invoiceCode?: string;
-  importedBy?: string;
-  warehouseIds?: number[];
-  partnerId?: number;
-};
+// PurchaseStatus, PurchaseFilterState: xem features/purchases/types/filterTypes.ts
 
 type PriceSettingItem = {
   id: string;

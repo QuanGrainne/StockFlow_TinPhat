@@ -29,8 +29,8 @@ import {
 } from 'lucide-react';
 import { NumberInput } from '@/components/inputs/NumberInput';
 import * as XLSX from 'xlsx';
-import PurchaseFilterSidebar from '@/components/PurchaseFilterSidebar';
-import type { PurchaseFilterState } from '@/features/purchases/screens/PurchasesScreen';
+import PurchaseFilterSidebar from '@/features/purchases/components/PurchaseFilterSidebar';
+import type { PurchaseFilterState } from '@/features/purchases/types';
 import { useActiveWarehouse } from '@/lib/warehouse/useActiveWarehouse';
 import { getDateRangeForPreset } from '@/features/transfers/utils/dateUtils';
 import { purchaseReturnService } from '@/features/purchase-returns/services/purchaseReturnService';

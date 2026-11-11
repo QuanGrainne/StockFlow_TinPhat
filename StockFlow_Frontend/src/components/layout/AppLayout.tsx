@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { UserRole } from '../types';
-import { Header } from './common/Header';
-import { Sidebar } from './common/Sidebar';
-import { NoAccess } from './common/FeatureGuard';
-import { GoodsCatalogScreen } from './common/GoodsCatalogScreen';
+import { UserRole } from '@/features/roles/types';
+import { Header } from '@/features/roles/components/common/Header';
+import { Sidebar } from '@/features/roles/components/common/Sidebar';
+import { NoAccess } from '@/features/roles/components/common/FeatureGuard';
+import { GoodsCatalogScreen } from '@/features/roles/components/common/GoodsCatalogScreen';
 import SuppliersScreen from '@/features/suppliers/screens/SuppliersScreen';
 import CustomersScreen from '@/features/customers/screens/CustomersScreen';
 import PurchasesScreen from '@/features/purchases/screens/PurchasesScreen';
@@ -17,24 +17,24 @@ import OrdersScreen from '@/features/orders/screens/OrdersScreen';
 import SalesBookingsScreen from '@/features/sales-bookings/screens/SalesBookingsScreen';
 import SalesReturnsScreen from '@/features/sales-returns/screens/SalesReturnsScreen';
 import { OrderSettingsScreen } from '@/features/settings/screens/OrderSettingsScreen';
-import { permissionService } from '../services/permissionService';
-import { SCREEN_PATH_MAP, canOpenScreen, firstAllowedPath } from '../config/navbar';
-import { getStoredRole } from '../config/currentRole';
+import { permissionService } from '@/features/roles/services/permissionService';
+import { SCREEN_PATH_MAP, canOpenScreen, firstAllowedPath } from '@/features/roles/config/navbar';
+import { getStoredRole } from '@/features/roles/config/currentRole';
 
 // Màn hình theo chức năng (navbar dùng chung, xem config/navbar.ts)
-import { BomManagementScreen } from './manager/screens/BomManagementScreen';
+import { BomManagementScreen } from '@/features/roles/components/manager/screens/BomManagementScreen';
 
 // Production Screens
-import { ProductionTrackingScreen } from './production/screens/ProductionTrackingScreen';
-import { ProductionPlanImportScreen } from './production/screens/ProductionPlanImportScreen';
-import { ProductionReferenceLogsScreen } from './production/screens/ProductionReferenceLogsScreen';
+import { ProductionTrackingScreen } from '@/features/roles/components/production/screens/ProductionTrackingScreen';
+import { ProductionPlanImportScreen } from '@/features/roles/components/production/screens/ProductionPlanImportScreen';
+import { ProductionReferenceLogsScreen } from '@/features/roles/components/production/screens/ProductionReferenceLogsScreen';
 
 // Admin Screens
-import { AdminDashboard } from './admin/screens/AdminDashboard';
-import { StaffAccountsScreen } from './admin/screens/StaffAccountsScreen';
-import { RoleCatalogScreen } from './admin/screens/RoleCatalogScreen';
-import { WarehousePermissionsScreen } from './admin/screens/WarehousePermissionsScreen';
-import { PermissionMatrixScreen } from './admin/screens/PermissionMatrixScreen';
+import { AdminDashboard } from '@/features/roles/components/admin/screens/AdminDashboard';
+import { StaffAccountsScreen } from '@/features/roles/components/admin/screens/StaffAccountsScreen';
+import { RoleCatalogScreen } from '@/features/roles/components/admin/screens/RoleCatalogScreen';
+import { WarehousePermissionsScreen } from '@/features/roles/components/admin/screens/WarehousePermissionsScreen';
+import { PermissionMatrixScreen } from '@/features/roles/components/admin/screens/PermissionMatrixScreen';
 import { ROLE_SWITCHER_ENABLED } from '@/lib/auth/flags';
 
 interface AppLayoutProps {

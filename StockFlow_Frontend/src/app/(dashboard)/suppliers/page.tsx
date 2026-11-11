@@ -3,7 +3,7 @@
 import dynamic from 'next/dynamic';
 
 const AppLayout = dynamic(
-  () => import('@/features/roles/components/AppLayout').then((mod) => mod.AppLayout),
+  () => import('@/components/layout/AppLayout').then((mod) => mod.AppLayout),
   {
     ssr: false,
     loading: () => (
