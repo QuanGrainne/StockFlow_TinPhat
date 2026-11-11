@@ -111,8 +111,7 @@ public class CancelCustomerReceiptCommandHandler : IRequestHandler<CancelCustome
         if (bookingIdsOfReceipt.Count > 0 && await _context.TrxOrders.AnyAsync(o => o.BookingOrderId.HasValue && bookingIdsOfReceipt.Contains(o.BookingOrderId.Value) && o.Status == "COMPLETED", cancellationToken))
             return Result.Failure<bool>("Tiền trả trước của đơn đặt hàng đã được trừ vào hóa đơn giao hàng, không hủy phiếu thu được.");
 
-        var dbContext = _context as DbContext;
-        using var transaction = dbContext != null ? await dbContext.Database.BeginTransactionAsync(cancellationToken) : null;
+        using var transaction = await _context.BeginTransactionAsync(cancellationToken);
         try
         {
             decimal total = 0;

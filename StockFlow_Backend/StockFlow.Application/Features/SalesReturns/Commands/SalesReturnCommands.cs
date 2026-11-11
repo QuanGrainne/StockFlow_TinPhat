@@ -158,8 +158,7 @@ public class SalesReturnCommandHandler :
                 return Fail("Thời gian trả hàng không được trước thời gian bán.");
         }
 
-        var dbContext = _context as DbContext;
-        using var tx = dbContext != null ? await dbContext.Database.BeginTransactionAsync(ct) : null;
+        using var tx = await _context.BeginTransactionAsync(ct);
         try
         {
             var ret = new TrxReturnRequest
@@ -246,8 +245,7 @@ public class SalesReturnCommandHandler :
         if (!ret.WarehouseId.HasValue || !await _currentUser.HasWarehouseAccessAsync(ret.WarehouseId.Value, ct))
             return Result.Failure<bool>("Bạn không có quyền hủy phiếu trả hàng của chi nhánh này.");
 
-        var dbContext = _context as DbContext;
-        using var tx = dbContext != null ? await dbContext.Database.BeginTransactionAsync(ct) : null;
+        using var tx = await _context.BeginTransactionAsync(ct);
         try
         {
             // Xuất lại kho phần hàng đã nhập (dòng DEFECTIVE cũ nếu có thì chưa từng nhập kho)

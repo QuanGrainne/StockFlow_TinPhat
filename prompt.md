@@ -23,9 +23,9 @@ The purpose of this task is to create a clean, maintainable, buildable foundatio
 - Npgsql Entity Framework Core provider
 - pgAdmin 4 as the optional graphical database management tool
 
-## 2. Backend Architecture: Modular Monolith
+## 2. Backend Architecture: Clean Architecture
 
-The backend follows the **Modular Monolith** pattern with Clean Architecture principles, divided into 4 layers/projects:
+The backend follows Clean Architecture principles organized by feature, divided into 4 layers/projects:
 
 ### StockFlow.Domain
 - **Purpose**: The heart of the system — pure business logic with no external dependencies

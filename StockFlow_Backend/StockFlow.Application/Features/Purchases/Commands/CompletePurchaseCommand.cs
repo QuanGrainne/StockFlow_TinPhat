@@ -73,8 +73,7 @@ public class CompletePurchaseCommandHandler : IRequestHandler<CompletePurchaseCo
         // Thời điểm xác nhận nhập kho theo giờ Việt Nam
         DateTime receivedDate = VietnamTime.Now;
 
-        var dbContext = _context as DbContext;
-        using var transaction = dbContext != null ? await dbContext.Database.BeginTransactionAsync(cancellationToken) : null;
+        using var transaction = await _context.BeginTransactionAsync(cancellationToken);
 
         try
         {

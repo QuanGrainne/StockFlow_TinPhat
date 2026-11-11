@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using StockFlow.Domain.Entities;
 
 namespace StockFlow.Application.Common.Interfaces;
@@ -41,4 +42,7 @@ public interface IStockFlowDbContext
 
     Task<long> GetNextSequenceValueAsync(string sequenceName, CancellationToken cancellationToken = default);
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>Mở transaction trên DbContext; handler dùng hàm này thay cho việc ép kiểu về DbContext.</summary>
+    Task<IDbContextTransaction> BeginTransactionAsync(CancellationToken cancellationToken = default);
 }

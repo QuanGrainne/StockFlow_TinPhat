@@ -5,10 +5,10 @@
 
 import React, { use, Suspense } from 'react';
 import dynamic from 'next/dynamic';
-import OrderDetailClient from './OrderDetailClient';
+import OrderDetailScreen from '@/features/orders/screens/OrderDetailScreen';
 
 const AppLayout = dynamic(
-  () => import('@/features/roles/components/AppLayout').then((mod) => mod.AppLayout),
+  () => import('@/components/layout/AppLayout').then((mod) => mod.AppLayout),
   {
     ssr: false,
     loading: () => (
@@ -28,7 +28,7 @@ function OrderDetailContent({ params }: OrderDetailPageProps) {
 
   return (
     <AppLayout initialScreen="orders">
-      <OrderDetailClient id={resolvedParams.id} />
+      <OrderDetailScreen id={resolvedParams.id} />
     </AppLayout>
   );
 }

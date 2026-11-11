@@ -146,8 +146,7 @@ public class CreatePurchaseCommandHandler : IRequestHandler<CreatePurchaseComman
         string status = string.Equals(req.Status?.Trim(), "DRAFT", StringComparison.OrdinalIgnoreCase) ? "DRAFT" : "COMPLETED";
 
         // Thực hiện lưu trữ trong Database Transaction đảm bảo tính toàn vẹn tuyệt đối
-        var dbContext = _context as DbContext;
-        using var transaction = dbContext != null ? await dbContext.Database.BeginTransactionAsync(cancellationToken) : null;
+        using var transaction = await _context.BeginTransactionAsync(cancellationToken);
 
         try
         {

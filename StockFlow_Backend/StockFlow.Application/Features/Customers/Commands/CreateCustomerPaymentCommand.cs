@@ -142,8 +142,7 @@ public class CreateCustomerPaymentCommandHandler
             orderIds = allocations.Select(a => a.OrderId).ToList();
         }
 
-        var dbContext = _context as DbContext;
-        using var transaction = dbContext != null ? await dbContext.Database.BeginTransactionAsync(cancellationToken) : null;
+        using var transaction = await _context.BeginTransactionAsync(cancellationToken);
         try
         {
             var paymentDate = VietnamTime.From(req.PaymentDate);

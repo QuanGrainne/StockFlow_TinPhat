@@ -1,9 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using StockFlow.Domain.Interfaces;
 using StockFlow.Infrastructure.Persistence;
-using StockFlow.Infrastructure.Repositories;
 
 namespace StockFlow.Infrastructure;
 
@@ -41,12 +39,6 @@ public static class DependencyInjection
         services.AddScoped<StockFlow.Application.Common.Interfaces.ICurrentUserService, Services.CurrentUserService>();
         services.AddScoped<StockFlow.Application.Common.Interfaces.IUserPermissionService, Services.UserPermissionService>();
         services.AddScoped<StockFlow.Application.Common.Interfaces.ITransactionCodeGenerator, Services.TransactionCodeGenerator>();
-
-        // Unit of Work
-        services.AddScoped<IUnitOfWork, UnitOfWork>();
-
-        // Generic repository (concrete feature repos will also be registered here)
-        services.AddScoped(typeof(IRepository<>), typeof(GenericRepository<>));
 
         return services;
     }

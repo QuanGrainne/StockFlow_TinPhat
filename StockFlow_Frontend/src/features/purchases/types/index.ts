@@ -2,6 +2,7 @@
 // Định nghĩa kiểu dữ liệu cho module Quản lý Nhập hàng (Purchase Inbound)
 
 export * from './formTypes';
+export * from './filterTypes';
 
 export interface PurchaseItem {
   id?: string;
