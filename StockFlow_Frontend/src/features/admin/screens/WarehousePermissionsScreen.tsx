@@ -1,4 +1,4 @@
-// src/features/roles/components/admin/screens/WarehousePermissionsScreen.tsx
+// src/features/admin/screens/WarehousePermissionsScreen.tsx
 // Màn hình 3.2.1.9: Danh sách phân quyền kho (Data Isolation) theo giao diện AI Studio Ảnh 4
 
 import React, { useState, useEffect } from 'react';
@@ -16,8 +16,8 @@ import {
   Pencil,
   Trash2,
 } from 'lucide-react';
-import { StaffAccount, WarehouseFacility } from '../../../types';
-import { adminService } from '../../../services/adminService';
+import { StaffAccount, WarehouseFacility } from '../types';
+import { adminService } from '../services/adminService';
 
 export const getNextWarehouseCode = (list: WarehouseFacility[]): string => {
   let maxNum = 0;

@@ -2,7 +2,7 @@
 // Service kết nối API Danh mục Hàng hóa (Products) với backend ASP.NET Core & MediatR
 
 import { apiClient } from '@/lib/api/client';
-import { Product, ProductAttributeDef, ProductUnitConversion, ProductVariant } from '../types';
+import { Product, ProductAttributeDef, ProductUnitConversion, ProductVariant } from '@/features/admin/types';
 
 export interface CreateProductPayload {
   code: string;

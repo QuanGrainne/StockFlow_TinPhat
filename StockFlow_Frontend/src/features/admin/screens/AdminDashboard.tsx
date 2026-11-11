@@ -1,4 +1,4 @@
-// src/features/roles/components/admin/screens/AdminDashboard.tsx
+// src/features/admin/screens/AdminDashboard.tsx
 // Màn hình Tổng quan Quản trị viên (Admin Dashboard)
 
 import React, { useState, useEffect } from 'react';
@@ -13,7 +13,7 @@ import {
   Eye,
   EyeOff,
 } from 'lucide-react';
-import { adminService } from '../../../services/adminService';
+import { adminService } from '../services/adminService';
 
 interface AdminDashboardProps {
   onNavigate: (screenId: string) => void;

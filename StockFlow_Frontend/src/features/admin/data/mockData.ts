@@ -1,5 +1,7 @@
-// src/data/mockData.ts
+// src/features/admin/data/mockData.ts
 // Dữ liệu mẫu chuẩn nghiệp vụ Công ty Tín Phát (Máng cáp, Khay cáp, Gia công cơ khí)
+// DỮ LIỆU GIẢ – THIẾT KẾ ĐÍCH: không phải dữ liệu thật từ API. Hiện chỉ staffService (INITIAL_STAFF_ACCOUNTS)
+// và permissionService dùng làm giá trị dự phòng/mặc định; không dùng file này cho màn hình mới.
 
 import {
   Customer,

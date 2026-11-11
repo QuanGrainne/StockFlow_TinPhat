@@ -6,7 +6,7 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ShieldOff } from 'lucide-react';
-import { permissionService } from '@/features/roles/services/permissionService';
+import { permissionService } from '@/features/admin/services/permissionService';
 import { featureTitleOf, firstAllowedPath } from '@/lib/navigation/navbar';
 import { getStoredRole } from '@/lib/navigation/currentRole';
 

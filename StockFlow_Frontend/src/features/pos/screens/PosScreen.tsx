@@ -39,7 +39,7 @@ import type { CreateCustomerPayload } from '@/features/customers/types';
 import { orderSettingsService } from '@/features/settings/services/orderSettingsService';
 import { salesBookingService } from '@/features/sales-bookings/services/salesBookingService';
 import type { SaveSalesBookingPayload } from '@/features/sales-bookings/types';
-import { permissionService } from '@/features/roles/services/permissionService';
+import { permissionService } from '@/features/admin/services/permissionService';
 import { getStoredRole } from '@/lib/navigation/currentRole';
 import { getActiveWarehouse, TIN_PHAT_WAREHOUSES, useActiveWarehouse } from '@/lib/warehouse/useActiveWarehouse';
 import { posService, type PosSaleRequest } from '../services/posService';

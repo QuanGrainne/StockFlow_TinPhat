@@ -5,8 +5,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { message } from 'antd';
 import { ChevronDown, FileText } from 'lucide-react';
-import { UserRole } from '@/features/roles/types';
-import { permissionService } from '@/features/roles/services/permissionService';
+import { UserRole } from '@/features/admin/types';
+import { permissionService } from '@/features/admin/services/permissionService';
 import { NAV_GROUPS, type NavGroup } from '@/lib/navigation/navbar';
 
 interface SidebarProps {

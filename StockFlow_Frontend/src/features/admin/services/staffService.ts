@@ -1,4 +1,4 @@
-// src/features/roles/services/staffService.ts
+// src/features/admin/services/staffService.ts
 // Service chuyên biệt xử lý Tài khoản Nhân viên (Staff Accounts - Người 1 phụ trách)
 
 import { apiClient } from '@/lib/api/client';

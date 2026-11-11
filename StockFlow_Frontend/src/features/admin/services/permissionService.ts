@@ -1,4 +1,4 @@
-// src/features/roles/services/permissionService.ts
+// src/features/admin/services/permissionService.ts
 // Service chuyên biệt xử lý Vai trò & Phân quyền Kho (Roles & Warehouse Permissions - Người 2 phụ trách)
 
 import { apiClient } from '@/lib/api/client';

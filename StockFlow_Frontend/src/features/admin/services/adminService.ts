@@ -1,4 +1,4 @@
-// src/features/roles/services/adminService.ts
+// src/features/admin/services/adminService.ts
 // Cầu nối tương thích ngược (Backward Compatibility) kết hợp cả staffService và permissionService.
 // Giúp toàn bộ các màn hình cũ không bị lỗi import, đồng thời tách biệt code cho 2 thành viên.
 

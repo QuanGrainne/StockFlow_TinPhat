@@ -109,8 +109,8 @@ import {
   ChevronsRight,
 } from 'lucide-react';
 import { productService } from '../../services/productService';
-import { adminService } from '../../services/adminService';
-import { WarehouseFacility } from '../../types';
+import { adminService } from '@/features/admin/services/adminService';
+import { WarehouseFacility } from '@/features/admin/types';
 import { SkuAnalyticsModal } from './SkuAnalyticsModal';
 import { getActiveWarehouse } from '@/lib/warehouse/useActiveWarehouse';
 import ViewPriceBooksModal from './ViewPriceBooksModal';

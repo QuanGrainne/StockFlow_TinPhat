@@ -1,4 +1,4 @@
-// src/features/roles/components/admin/screens/StaffAccountsScreen.tsx
+// src/features/admin/screens/StaffAccountsScreen.tsx
 // Màn hình 3.2.1.3: Danh sách tài khoản nhân viên (User Accounts) theo giao diện AI Studio Ảnh 2
 
 import React, { useState, useEffect } from 'react';
@@ -20,8 +20,8 @@ import {
   Upload,
   Trash2,
 } from 'lucide-react';
-import { StaffAccount, UserRole, RoleDefinition, WarehouseFacility } from '../../../types';
-import { adminService } from '../../../services/adminService';
+import { StaffAccount, UserRole, RoleDefinition, WarehouseFacility } from '../types';
+import { adminService } from '../services/adminService';
 
 const WAREHOUSE_OPTIONS = [
   {

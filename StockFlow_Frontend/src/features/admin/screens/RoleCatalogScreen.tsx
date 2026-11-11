@@ -1,4 +1,4 @@
-// src/features/roles/components/admin/screens/RoleCatalogScreen.tsx
+// src/features/admin/screens/RoleCatalogScreen.tsx
 // Danh mục vai trò phân quyền (RBAC Roles) với đầy đủ tính năng CRUD
 
 import React, { useState, useEffect } from 'react';
@@ -13,8 +13,8 @@ import {
   Trash2,
   AlertTriangle,
 } from 'lucide-react';
-import { RoleDefinition } from '../../../types';
-import { adminService } from '../../../services/adminService';
+import { RoleDefinition } from '../types';
+import { adminService } from '../services/adminService';
 
 interface RoleCatalogScreenProps {
   onNavigate: (screenId: string, roleCode?: string) => void;

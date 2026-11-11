@@ -4,7 +4,7 @@
 import { clampPopoverLeft, DATE_POPOVER_WIDTH, PRESET_POPOVER_WIDTH } from '@/lib/ui/popover';
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { WarehouseFacility } from '@/features/roles/types';
+import { WarehouseFacility } from '@/features/admin/types';
 import { TransferFilterState, TransferStatus } from '../types';
 import { ChevronDown, Calendar, X, ChevronRight, ChevronLeft, Check } from 'lucide-react';
 import { useActiveWarehouse } from '@/lib/warehouse/useActiveWarehouse';

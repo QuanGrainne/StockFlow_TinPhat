@@ -1,11 +1,11 @@
-// src/features/roles/components/admin/screens/PermissionMatrixScreen.tsx
+// src/features/admin/screens/PermissionMatrixScreen.tsx
 // Màn hình Phân quyền vai trò: Cấu hình quyền hiển thị chức năng trên thanh Navbar cho từng vai trò
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { Shield, Save, RotateCcw, CheckCircle2, Check, Search, Package } from 'lucide-react';
-import { UserRole, RoleDefinition } from '../../../types';
-import { adminService, NAVBAR_FEATURES } from '../../../services/adminService';
-import { DEFAULT_ROLE_FEATURE_PERMS } from '../../../services/permissionService';
+import { UserRole, RoleDefinition } from '../types';
+import { adminService, NAVBAR_FEATURES } from '../services/adminService';
+import { DEFAULT_ROLE_FEATURE_PERMS } from '../services/permissionService';
 import { ADMIN_LOCKED_FEATURES, NAV_ITEMS_FLAT } from '@/lib/navigation/navbar';
 
 interface RoleColumn {

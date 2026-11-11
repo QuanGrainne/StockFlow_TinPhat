@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { UserRole } from '@/features/roles/types';
+import { UserRole } from '@/features/admin/types';
 import { Header } from '@/components/layout/Header';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { NoAccess } from '@/components/layout/FeatureGuard';
@@ -17,7 +17,7 @@ import OrdersScreen from '@/features/orders/screens/OrdersScreen';
 import SalesBookingsScreen from '@/features/sales-bookings/screens/SalesBookingsScreen';
 import SalesReturnsScreen from '@/features/sales-returns/screens/SalesReturnsScreen';
 import { OrderSettingsScreen } from '@/features/settings/screens/OrderSettingsScreen';
-import { permissionService } from '@/features/roles/services/permissionService';
+import { permissionService } from '@/features/admin/services/permissionService';
 import { SCREEN_PATH_MAP, canOpenScreen, firstAllowedPath } from '@/lib/navigation/navbar';
 import { getStoredRole } from '@/lib/navigation/currentRole';
 
@@ -30,11 +30,11 @@ import { ProductionPlanImportScreen } from '@/features/roles/components/producti
 import { ProductionReferenceLogsScreen } from '@/features/roles/components/production/screens/ProductionReferenceLogsScreen';
 
 // Admin Screens
-import { AdminDashboard } from '@/features/roles/components/admin/screens/AdminDashboard';
-import { StaffAccountsScreen } from '@/features/roles/components/admin/screens/StaffAccountsScreen';
-import { RoleCatalogScreen } from '@/features/roles/components/admin/screens/RoleCatalogScreen';
-import { WarehousePermissionsScreen } from '@/features/roles/components/admin/screens/WarehousePermissionsScreen';
-import { PermissionMatrixScreen } from '@/features/roles/components/admin/screens/PermissionMatrixScreen';
+import { AdminDashboard } from '@/features/admin/screens/AdminDashboard';
+import { StaffAccountsScreen } from '@/features/admin/screens/StaffAccountsScreen';
+import { RoleCatalogScreen } from '@/features/admin/screens/RoleCatalogScreen';
+import { WarehousePermissionsScreen } from '@/features/admin/screens/WarehousePermissionsScreen';
+import { PermissionMatrixScreen } from '@/features/admin/screens/PermissionMatrixScreen';
 import { ROLE_SWITCHER_ENABLED } from '@/lib/auth/flags';
 
 interface AppLayoutProps {
