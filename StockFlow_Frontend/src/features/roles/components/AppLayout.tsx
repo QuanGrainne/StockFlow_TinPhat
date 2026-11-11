@@ -5,17 +5,17 @@ import { Header } from './common/Header';
 import { Sidebar } from './common/Sidebar';
 import { NoAccess } from './common/FeatureGuard';
 import { GoodsCatalogScreen } from './common/GoodsCatalogScreen';
-import SuppliersClient from '@/app/(dashboard)/suppliers/SuppliersClient';
-import CustomersClient from '@/app/(dashboard)/customers/CustomersClient';
-import PurchasesClient from '@/app/(dashboard)/purchases/PurchasesClient';
-import PurchaseReturnsClient from '@/app/(dashboard)/purchase-returns/PurchaseReturnsClient';
-import PurchaseOrdersClient from '@/app/(dashboard)/purchase-orders/PurchaseOrdersClient';
-import PriceBooksClient from '@/features/price-books/screens/PriceBooksClient';
-import TransfersClient from '@/app/(dashboard)/transfers/TransfersClient';
-import StocktakesClient from '@/app/(dashboard)/stocktakes/StocktakesClient';
-import OrdersClient from '@/app/(dashboard)/orders/OrdersClient';
-import SalesBookingsClient from '@/app/(dashboard)/sales-booking/SalesBookingsClient';
-import SalesReturnsClient from '@/app/(dashboard)/sales-returns/SalesReturnsClient';
+import SuppliersScreen from '@/features/suppliers/screens/SuppliersScreen';
+import CustomersScreen from '@/features/customers/screens/CustomersScreen';
+import PurchasesScreen from '@/features/purchases/screens/PurchasesScreen';
+import PurchaseReturnsScreen from '@/features/purchase-returns/screens/PurchaseReturnsScreen';
+import PurchaseOrdersScreen from '@/features/purchase-orders/screens/PurchaseOrdersScreen';
+import PriceBooksScreen from '@/features/price-books/screens/PriceBooksScreen';
+import TransfersScreen from '@/features/transfers/screens/TransfersScreen';
+import StocktakesScreen from '@/features/stocktakes/screens/StocktakesScreen';
+import OrdersScreen from '@/features/orders/screens/OrdersScreen';
+import SalesBookingsScreen from '@/features/sales-bookings/screens/SalesBookingsScreen';
+import SalesReturnsScreen from '@/features/sales-returns/screens/SalesReturnsScreen';
 import { OrderSettingsScreen } from '@/features/settings/screens/OrderSettingsScreen';
 import { permissionService } from '../services/permissionService';
 import { SCREEN_PATH_MAP, canOpenScreen, firstAllowedPath } from '../config/navbar';
@@ -151,13 +151,13 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ initialScreen, children })
       // ─── Bán hàng ───
       case 'orders':
       case 'sales-orders-management':
-        return <OrdersClient onNavigate={handleNavigate} />;
+        return <OrdersScreen onNavigate={handleNavigate} />;
 
       case 'sales-booking':
-        return <SalesBookingsClient />;
+        return <SalesBookingsScreen />;
 
       case 'sales-returns':
-        return <SalesReturnsClient />;
+        return <SalesReturnsScreen />;
 
       // ─── Định mức BOM ───
       case 'manager-bom':
@@ -232,24 +232,24 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ initialScreen, children })
       case 'sales-customers':
       case 'manager-customers':
       case 'admin-customers':
-        return <CustomersClient onNavigate={handleNavigate} />;
+        return <CustomersScreen onNavigate={handleNavigate} />;
 
       case 'suppliers':
       case 'manager-suppliers':
       case 'admin-suppliers':
-        return <SuppliersClient onNavigate={handleNavigate} />;
+        return <SuppliersScreen onNavigate={handleNavigate} />;
 
       case 'purchases':
       case 'admin-purchases':
       case 'manager-purchases':
       case 'warehouse-purchases':
-        return <PurchasesClient onNavigate={handleNavigate} />;
+        return <PurchasesScreen onNavigate={handleNavigate} />;
 
       case 'purchase-returns':
-        return <PurchaseReturnsClient />;
+        return <PurchaseReturnsScreen />;
 
       case 'purchase-orders':
-        return <PurchaseOrdersClient key={purchaseOrdersKey} onNavigate={handleNavigate} />;
+        return <PurchaseOrdersScreen key={purchaseOrdersKey} onNavigate={handleNavigate} />;
 
       case 'goods-catalog':
       case 'admin-goods':
@@ -262,15 +262,15 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ initialScreen, children })
 
       case 'admin-price-books':
       case 'price-books':
-        return <PriceBooksClient />;
+        return <PriceBooksScreen />;
 
       case 'stocktakes':
-        return <StocktakesClient />;
+        return <StocktakesScreen />;
 
       case 'transfers':
       case 'admin-transfers':
       case 'manager-transfers':
-        return <TransfersClient />;
+        return <TransfersScreen />;
 
       default:
         // Đang tải quyền để chọn màn hình được phép

@@ -1,7 +1,8 @@
-// src/app/(dashboard)/purchase-orders/PurchaseOrdersClient.tsx
-// Màn hình Đặt hàng nhập — cùng bố cục với Nhập hàng / Hóa đơn:
-// Header 48px (tiêu đề + tìm kiếm + "+ Đặt hàng nhập" + Xuất file)
+// src/features/sales-bookings/screens/SalesBookingsScreen.tsx
+// Màn hình Đặt hàng (đơn đặt của khách) — cùng bố cục với Đặt hàng nhập / Hóa đơn:
+// Header 48px (tiêu đề + tìm kiếm + Gộp đơn + "+ Đặt hàng" + Xuất file)
 // → [Sidebar bộ lọc | Bảng có dòng tổng + chi tiết mở rộng] → footer phân trang.
+// Tạo / sửa đơn ở màn Bán hàng (tab "Đặt hàng"); đơn đặt không trừ tồn kho cho tới khi tạo hóa đơn giao hàng.
 
 'use client';
 
@@ -11,15 +12,18 @@ import { useSearchParams } from 'next/navigation';
 import { message } from 'antd';
 import { ChevronLeft, ChevronRight, FileDown, Inbox, Loader2, Merge, Plus, RefreshCw, Search, X } from 'lucide-react';
 
-import PurchaseOrderExpandedRow from '@/features/purchase-orders/components/PurchaseOrderExpandedRow';
-import PurchaseOrderFilterSidebar, {
-  type PurchaseOrderSidebarState,
-} from '@/features/purchase-orders/components/PurchaseOrderFilterSidebar';
-import { purchaseOrderService } from '@/features/purchase-orders/services/purchaseOrderService';
-import type { PurchaseOrderListFilter, PurchaseOrderListItem } from '@/features/purchase-orders/types';
-import { exportPurchaseOrdersToXLSX, PO_STATUS, PO_STATUS_OPTIONS } from '@/features/purchase-orders/utils/purchaseOrderUtils';
-import { supplierService } from '@/features/suppliers/services/supplierService';
-import type { Supplier } from '@/features/suppliers/types';
+import SalesBookingExpandedRow from '@/features/sales-bookings/components/SalesBookingExpandedRow';
+import SalesBookingFilterSidebar, {
+  type SalesBookingSidebarState,
+} from '@/features/sales-bookings/components/SalesBookingFilterSidebar';
+import { salesBookingService } from '@/features/sales-bookings/services/salesBookingService';
+import type { SalesBookingListFilter, SalesBookingListItem } from '@/features/sales-bookings/types';
+import {
+  BOOKING_DEFAULT_STATUSES,
+  BOOKING_STATUS,
+  BOOKING_STATUS_OPTIONS,
+  exportBookingsToXLSX,
+} from '@/features/sales-bookings/utils/salesBookingUtils';
 import { formatDateTimeVN } from '@/features/transfers/utils/dateUtils';
 import { getTimeRangeForPreset } from '@/components/filters/TimeRangeFilter';
 import { PartnerLink } from '@/components/links/EntityLinks';
@@ -27,45 +31,31 @@ import { readDocumentLink, scrollToWhenReady } from '@/lib/navigation/documentLi
 import { useActiveWarehouse } from '@/lib/warehouse/useActiveWarehouse';
 
 const money = new Intl.NumberFormat('vi-VN');
-const COLUMN_COUNT = 9;
+const COLUMN_COUNT = 8;
 const thCls = 'sticky top-0 z-20 bg-[#f7f8f9] py-2.5 px-3 border-b border-slate-200 whitespace-nowrap';
 const checkboxCls = 'rounded text-[#0070f4] focus:ring-[#0070f4] h-3.5 w-3.5 border-slate-300 cursor-pointer';
 
-function defaultSidebar(warehouseId: number): PurchaseOrderSidebarState {
+function defaultSidebar(warehouseId: number): SalesBookingSidebarState {
   const month = getTimeRangeForPreset('this_month');
   return {
     warehouseIds: [warehouseId],
     timeRange: month.timeRange,
     dateFrom: month.dateFrom,
     dateTo: month.dateTo,
-    statuses: ['DRAFT', 'ORDERED', 'PARTIAL', 'COMPLETED'],
-    partnerId: 0,
+    statuses: [...BOOKING_DEFAULT_STATUSES],
   };
 }
 
-interface PurchaseOrdersClientProps {
-  /** Điều hướng màn hình trong AppLayout (giữ tương thích) */
-  onNavigate?: (screenId: string) => void;
-}
-
-export default function PurchaseOrdersClient({}: PurchaseOrdersClientProps = {}) {
+export default function SalesBookingsScreen() {
   const { activeWarehouse, warehouses } = useActiveWarehouse();
-  // Link mở thẳng 1 phiếu (?code=PDN...&id=...): tìm theo mã, mọi chi nhánh, toàn thời gian
+  // ?code=DH...&id=...: mở thẳng 1 đơn (mọi chi nhánh, toàn thời gian); ?open=<id>: mở sẵn dòng (VD sau khi lưu ở POS)
   const searchParams = useSearchParams();
   const [docLink] = useState(() => readDocumentLink(searchParams));
-  // ?open=<id>: chỉ mở sẵn dòng phiếu trong danh sách mặc định (VD sau khi nhập hàng), không điền ô tìm kiếm
   const [openId] = useState(() => Number(searchParams.get('open')) || null);
 
-  const [sidebar, setSidebar] = useState<PurchaseOrderSidebarState>(() =>
+  const [sidebar, setSidebar] = useState<SalesBookingSidebarState>(() =>
     docLink
-      ? {
-          ...defaultSidebar(activeWarehouse.warehouseId),
-          warehouseIds: [],
-          timeRange: 'all_time',
-          dateFrom: '',
-          dateTo: '',
-          statuses: [...PO_STATUS_OPTIONS],
-        }
+      ? { ...defaultSidebar(activeWarehouse.warehouseId), warehouseIds: [], timeRange: 'all_time', dateFrom: '', dateTo: '', statuses: [...BOOKING_STATUS_OPTIONS] }
       : defaultSidebar(activeWarehouse.warehouseId)
   );
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -76,61 +66,59 @@ export default function PurchaseOrdersClient({}: PurchaseOrdersClientProps = {})
   const [pageSize, setPageSize] = useState(15);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [expandedId, setExpandedId] = useState<number | null>(() => docLink?.id ?? openId);
-  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [mergeOpen, setMergeOpen] = useState(false);
   const [merging, setMerging] = useState(false);
 
   useEffect(() => {
     if (!docLink && !openId) return;
-    // Link chỉ dùng 1 lần: gỡ tham số khỏi URL để F5 không nạp lại từ khóa cũ vào ô tìm kiếm
+    // Link chỉ dùng 1 lần: gỡ tham số khỏi URL để F5 không nạp lại
     window.history.replaceState(null, '', window.location.pathname);
     const rowId = docLink?.id ?? openId;
     if (!rowId) return;
     return scrollToWhenReady(`[data-doc-row="${rowId}"]`);
   }, [docLink, openId]);
 
+  // Quay lại từ tab Bán hàng (đặt / giao hàng ở tab khác) → tải lại danh sách
+  useEffect(() => {
+    const onFocus = () => setReloadTick((t) => t + 1);
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, []);
+
   useEffect(() => {
     const t = setTimeout(() => setSearch(searchInput.trim()), 300);
     return () => clearTimeout(t);
   }, [searchInput]);
 
-  useEffect(() => {
-    supplierService
-      .getSuppliers({ status: 'ACTIVE' })
-      .then(setSuppliers)
-      .catch(() => setSuppliers([]));
-  }, []);
-
-  const filter = useMemo<PurchaseOrderListFilter>(
+  const filter = useMemo<SalesBookingListFilter>(
     () => ({
       warehouseIds: sidebar.warehouseIds,
       statuses: sidebar.statuses,
       fromDate: sidebar.dateFrom || undefined,
       toDate: sidebar.dateTo || undefined,
-      partnerId: sidebar.partnerId || undefined,
       search: search || undefined,
     }),
     [sidebar, search]
   );
 
-  // Bỏ hết trạng thái → không có phiếu nào (API coi rỗng là "tất cả")
+  // Bỏ hết trạng thái → không có đơn nào (API coi rỗng là "tất cả")
   const noStatus = sidebar.statuses.length === 0;
   const requestKey = JSON.stringify({ ...filter, reloadTick });
-  const [result, setResult] = useState<{ key: string; items: PurchaseOrderListItem[] }>({ key: '', items: [] });
+  const [result, setResult] = useState<{ key: string; items: SalesBookingListItem[] }>({ key: '', items: [] });
   const loading = !noStatus && result.key === '';
 
   useEffect(() => {
     if (noStatus) return;
     let stale = false;
-    const params = JSON.parse(requestKey) as PurchaseOrderListFilter;
-    purchaseOrderService
-      .getPurchaseOrders(params)
+    const params = JSON.parse(requestKey) as SalesBookingListFilter;
+    salesBookingService
+      .getBookings(params)
       .then((items) => {
         if (!stale) setResult({ key: requestKey, items });
       })
       .catch((err: unknown) => {
         if (stale) return;
-        message.error(err instanceof Error ? err.message : 'Không thể tải danh sách đặt hàng nhập.');
+        message.error(err instanceof Error ? err.message : 'Không thể tải danh sách đặt hàng.');
         setResult({ key: requestKey, items: [] });
       });
     return () => {
@@ -143,48 +131,40 @@ export default function PurchaseOrdersClient({}: PurchaseOrdersClientProps = {})
   const safePage = Math.min(page, pageCount);
   const paged = rows.slice((safePage - 1) * pageSize, safePage * pageSize);
   const totals = useMemo(
-    () =>
-      rows.reduce(
-        (acc, r) => ({
-          ordered: acc.ordered + r.totalOrderedQty,
-          received: acc.received + r.totalReceivedQty,
-          amount: acc.amount + r.totalAmount,
-        }),
-        { ordered: 0, received: 0, amount: 0 }
-      ),
+    () => rows.reduce((acc, r) => ({ amount: acc.amount + r.totalAmount, paid: acc.paid + r.customerPaidAmount }), { amount: 0, paid: 0 }),
     [rows]
   );
 
-  const changeSidebar = (patch: Partial<PurchaseOrderSidebarState>) => {
+  const changeSidebar = (patch: Partial<SalesBookingSidebarState>) => {
     setSidebar((prev) => ({ ...prev, ...patch }));
     setPage(1);
     setExpandedId(null);
   };
 
-  const allPageSelected = paged.length > 0 && paged.every((r) => selectedIds.includes(r.poId));
+  const allPageSelected = paged.length > 0 && paged.every((r) => selectedIds.includes(r.orderId));
 
-  // Gộp đơn: chỉ phiếu chưa nhập hàng, cùng NCC, cùng chi nhánh
-  const selectedRows = rows.filter((r) => selectedIds.includes(r.poId));
+  // Gộp đơn: cùng khách, cùng chi nhánh, chưa giao (BR-09)
+  const selectedRows = rows.filter((r) => selectedIds.includes(r.orderId));
   const mergeError = (() => {
-    if (selectedRows.length < 2) return 'Cần chọn ít nhất 2 phiếu để gộp.';
-    const bad = selectedRows.find((r) => (r.status !== 'DRAFT' && r.status !== 'ORDERED') || r.totalReceivedQty > 0);
-    if (bad) return `Phiếu ${bad.poCode} (${PO_STATUS[bad.status].label}) không gộp được: chỉ gộp phiếu tạm hoặc đã đặt hàng chưa nhập.`;
-    if (new Set(selectedRows.map((r) => r.partnerId)).size > 1) return 'Chỉ gộp được các phiếu cùng nhà cung cấp.';
-    if (new Set(selectedRows.map((r) => r.warehouseId)).size > 1) return 'Chỉ gộp được các phiếu cùng chi nhánh nhận hàng.';
+    if (selectedRows.length < 2) return 'Cần chọn ít nhất 2 đơn để gộp.';
+    const bad = selectedRows.find((r) => (r.status !== 'DRAFT' && r.status !== 'CONFIRMED') || r.deliveredQuantity > 0);
+    if (bad) return `Đơn ${bad.orderCode} (${BOOKING_STATUS[bad.status].label}) không gộp được: chỉ gộp đơn Phiếu tạm / Đã xác nhận chưa giao hàng.`;
+    if (new Set(selectedRows.map((r) => r.partnerId)).size > 1) return 'Chỉ gộp được các đơn của cùng 1 khách hàng.';
+    if (new Set(selectedRows.map((r) => r.warehouseId)).size > 1) return 'Chỉ gộp được các đơn cùng chi nhánh xử lý.';
     return null;
   })();
 
   const handleMerge = async () => {
     setMerging(true);
     try {
-      const { poId } = await purchaseOrderService.mergePurchaseOrders(selectedRows.map((r) => r.poId));
-      message.success(`Đã gộp ${selectedRows.length} phiếu thành 1 phiếu mới`);
+      const res = await salesBookingService.mergeBookings(selectedRows.map((r) => r.orderId));
+      message.success(`Đã gộp ${selectedRows.length} đơn thành đơn ${res.orderCode}`);
       setMergeOpen(false);
       setSelectedIds([]);
-      setExpandedId(poId);
+      setExpandedId(res.orderId);
       setReloadTick((t) => t + 1);
     } catch (err) {
-      message.error(err instanceof Error ? err.message : 'Không gộp được phiếu.');
+      message.error(err instanceof Error ? err.message : 'Không gộp được đơn.');
     } finally {
       setMerging(false);
     }
@@ -195,7 +175,7 @@ export default function PurchaseOrdersClient({}: PurchaseOrdersClientProps = {})
       {/* 1. Header */}
       <header className="h-12 bg-white border-b border-slate-200 px-4 flex items-center justify-between gap-3 shrink-0">
         <div className="flex items-center gap-4 flex-1 max-w-xl">
-          <h1 className="text-[20px] font-bold text-[#15171a] leading-7 tracking-tight whitespace-nowrap">Đặt hàng nhập</h1>
+          <h1 className="text-[20px] font-bold text-[#15171a] leading-7 tracking-tight whitespace-nowrap">Đặt hàng</h1>
           <div className="relative flex-1">
             <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#677484] pointer-events-none" />
             <input
@@ -205,7 +185,7 @@ export default function PurchaseOrdersClient({}: PurchaseOrdersClientProps = {})
                 setSearchInput(e.target.value);
                 setPage(1);
               }}
-              placeholder="Theo mã phiếu, nhà cung cấp"
+              placeholder="Theo mã phiếu đặt, khách hàng, điện thoại"
               className="w-full h-8 pl-8 pr-8 rounded-full bg-[#f7f8f9] border border-slate-200 text-[13px] placeholder-[#677484] focus:outline-none focus:border-[#0070f4] focus:bg-white transition"
             />
             {searchInput && (
@@ -225,24 +205,27 @@ export default function PurchaseOrdersClient({}: PurchaseOrdersClientProps = {})
             type="button"
             onClick={() => setMergeOpen(true)}
             disabled={selectedRows.length < 2}
-            title={selectedRows.length < 2 ? 'Tick chọn từ 2 phiếu cùng nhà cung cấp để gộp' : `Gộp ${selectedRows.length} phiếu đã chọn`}
+            title={selectedRows.length < 2 ? 'Tick chọn từ 2 đơn cùng khách hàng để gộp' : `Gộp ${selectedRows.length} đơn đã chọn`}
             className="inline-flex items-center gap-1 px-3 h-8 rounded-[8px] border border-slate-300 hover:bg-[#f7f8f9] font-medium text-[13px] transition cursor-pointer bg-white disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Merge size={14} className="text-[#677484]" />
             <span>Gộp đơn{selectedRows.length >= 2 ? ` (${selectedRows.length})` : ''}</span>
           </button>
+          {/* Mở màn Bán hàng ở tab mới, giữ nguyên danh sách đặt hàng */}
           <Link
-            href="/purchase-orders/create"
+            href="/pos?newBooking=1"
+            target="_blank"
+            rel="noopener noreferrer"
             className="inline-flex items-center gap-1.5 px-3.5 h-8 rounded-[8px] bg-[#0070f4] hover:bg-[#005ac3] text-white font-semibold text-[13px] shadow-xs transition cursor-pointer"
           >
             <Plus size={15} className="stroke-[2.5]" />
-            <span>Đặt hàng nhập</span>
+            <span>Đặt hàng</span>
           </Link>
           <button
             type="button"
-            onClick={() => exportPurchaseOrdersToXLSX(selectedRows.length > 0 ? selectedRows : rows)}
+            onClick={() => exportBookingsToXLSX(selectedRows.length > 0 ? selectedRows : rows)}
             disabled={rows.length === 0}
-            title={selectedRows.length > 0 ? `Xuất ${selectedRows.length} phiếu đã chọn` : 'Xuất toàn bộ danh sách đang lọc'}
+            title={selectedRows.length > 0 ? `Xuất ${selectedRows.length} đơn đã chọn` : 'Xuất toàn bộ danh sách đang lọc'}
             className="inline-flex items-center gap-1 px-3 h-8 rounded-[8px] border border-slate-300 hover:bg-[#f7f8f9] font-medium text-[13px] transition cursor-pointer bg-white disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <FileDown size={14} className="text-[#677484]" />
@@ -253,10 +236,9 @@ export default function PurchaseOrdersClient({}: PurchaseOrdersClientProps = {})
 
       {/* 2. Bộ lọc + bảng */}
       <div className="flex-1 min-h-0 flex overflow-hidden">
-        <PurchaseOrderFilterSidebar
+        <SalesBookingFilterSidebar
           state={sidebar}
           warehouses={warehouses}
-          suppliers={suppliers}
           fallbackWarehouseId={activeWarehouse.warehouseId}
           onChange={changeSidebar}
           isCollapsed={sidebarCollapsed}
@@ -265,7 +247,7 @@ export default function PurchaseOrdersClient({}: PurchaseOrdersClientProps = {})
 
         <div className="flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden bg-white">
           <div className="flex-1 min-h-0 overflow-auto">
-            <table className="w-full text-left border-collapse min-w-[980px]">
+            <table className="w-full text-left border-collapse min-w-[940px]">
               <thead className="bg-[#f7f8f9] sticky top-0 z-20 border-b border-slate-200 text-[12px] font-semibold text-[#677484] shadow-xs">
                 <tr>
                   <th className={`${thCls} w-10 text-center`}>
@@ -275,20 +257,19 @@ export default function PurchaseOrdersClient({}: PurchaseOrdersClientProps = {})
                       onChange={(e) =>
                         setSelectedIds((prev) =>
                           e.target.checked
-                            ? Array.from(new Set([...prev, ...paged.map((r) => r.poId)]))
-                            : prev.filter((id) => !paged.some((r) => r.poId === id))
+                            ? Array.from(new Set([...prev, ...paged.map((r) => r.orderId)]))
+                            : prev.filter((id) => !paged.some((r) => r.orderId === id))
                         )
                       }
                       className={checkboxCls}
                     />
                   </th>
-                  <th className={thCls}>Mã đặt hàng nhập</th>
+                  <th className={thCls}>Mã đặt hàng</th>
                   <th className={thCls}>Thời gian</th>
-                  <th className={thCls}>Nhà cung cấp</th>
-                  <th className={thCls}>Chi nhánh</th>
-                  <th className={`${thCls} text-right`}>SL đặt</th>
-                  <th className={`${thCls} text-right`}>SL đã nhập</th>
-                  <th className={`${thCls} text-right`}>Tổng tiền</th>
+                  <th className={thCls}>Mã KH</th>
+                  <th className={thCls}>Khách hàng</th>
+                  <th className={`${thCls} text-right`}>Khách cần trả</th>
+                  <th className={`${thCls} text-right`}>Khách đã trả</th>
                   <th className={thCls}>Trạng thái</th>
                 </tr>
               </thead>
@@ -296,9 +277,8 @@ export default function PurchaseOrdersClient({}: PurchaseOrdersClientProps = {})
                 {!loading && paged.length > 0 && (
                   <tr className="bg-white border-b border-slate-200 font-bold text-[13px]">
                     <td colSpan={5}></td>
-                    <td className="py-2.5 px-3 text-right font-mono">{money.format(totals.ordered)}</td>
-                    <td className="py-2.5 px-3 text-right font-mono">{money.format(totals.received)}</td>
                     <td className="py-2.5 px-3 text-right font-mono">{money.format(totals.amount)}</td>
+                    <td className="py-2.5 px-3 text-right font-mono">{money.format(totals.paid)}</td>
                     <td></td>
                   </tr>
                 )}
@@ -307,7 +287,7 @@ export default function PurchaseOrdersClient({}: PurchaseOrdersClientProps = {})
                   <tr>
                     <td colSpan={COLUMN_COUNT} className="py-20 text-center text-[#677484]">
                       <RefreshCw size={20} className="animate-spin mx-auto mb-2 text-[#0070f4]" />
-                      Đang tải danh sách đặt hàng nhập...
+                      Đang tải danh sách đặt hàng...
                     </td>
                   </tr>
                 ) : paged.length === 0 ? (
@@ -317,36 +297,35 @@ export default function PurchaseOrdersClient({}: PurchaseOrdersClientProps = {})
                         <div className="w-16 h-16 rounded-full bg-[#e6f1fe] text-[#0070f4] flex items-center justify-center mb-3">
                           <Inbox size={32} className="stroke-[1.5]" />
                         </div>
-                        <h3 className="font-bold text-sm mb-1">Không tìm thấy phiếu đặt hàng nhập</h3>
+                        <h3 className="font-bold text-sm mb-1">Không tìm thấy kết quả</h3>
                         <p className="text-xs text-[#677484] max-w-sm">
-                          Chưa có phiếu phù hợp.{' '}
+                          Không tìm thấy đơn đặt hàng nào phù hợp.{' '}
                           <button
                             type="button"
                             onClick={() => {
-                              setSidebar(defaultSidebar(activeWarehouse.warehouseId));
+                              setSidebar({ ...defaultSidebar(activeWarehouse.warehouseId), timeRange: 'all_time', dateFrom: '', dateTo: '' });
                               setSearchInput('');
                               setPage(1);
                             }}
                             className="text-[#0070f4] font-semibold hover:underline cursor-pointer"
                           >
-                            Xóa bộ lọc
+                            Xem toàn thời gian
                           </button>{' '}
-                          hoặc bấm <strong>+ Đặt hàng nhập</strong> để tạo phiếu.
+                          hoặc bấm <strong>+ Đặt hàng</strong> để tạo đơn.
                         </p>
                       </div>
                     </td>
                   </tr>
                 ) : (
                   paged.map((r) => {
-                    const isExpanded = expandedId === r.poId;
-                    const isSelected = selectedIds.includes(r.poId);
-                    const st = PO_STATUS[r.status];
-                    const short = r.status !== 'DRAFT' && r.status !== 'CANCELLED' && r.totalReceivedQty < r.totalOrderedQty;
+                    const isExpanded = expandedId === r.orderId;
+                    const isSelected = selectedIds.includes(r.orderId);
+                    const st = BOOKING_STATUS[r.status] ?? { label: r.status, cls: 'bg-slate-50 text-slate-600 border-slate-200' };
                     return (
-                      <React.Fragment key={r.poId}>
+                      <React.Fragment key={r.orderId}>
                         <tr
-                          data-doc-row={r.poId}
-                          onClick={() => setExpandedId(isExpanded ? null : r.poId)}
+                          data-doc-row={r.orderId}
+                          onClick={() => setExpandedId(isExpanded ? null : r.orderId)}
                           className={`hover:bg-[#f7f8f9] transition cursor-pointer select-none border-b border-slate-100 ${
                             isExpanded ? 'bg-[#e6f1fe]/80 font-medium' : isSelected ? 'bg-[#e6f1fe]/50' : ''
                           } ${r.status === 'CANCELLED' ? 'text-[#677484]' : ''}`}
@@ -356,31 +335,35 @@ export default function PurchaseOrdersClient({}: PurchaseOrdersClientProps = {})
                               type="checkbox"
                               checked={isSelected}
                               onChange={(e) =>
-                                setSelectedIds((prev) => (e.target.checked ? [...prev, r.poId] : prev.filter((id) => id !== r.poId)))
+                                setSelectedIds((prev) => (e.target.checked ? [...prev, r.orderId] : prev.filter((id) => id !== r.orderId)))
                               }
                               className={checkboxCls}
                             />
                           </td>
-                          <td className="py-2.5 px-3 font-mono font-bold text-[#0070f4] whitespace-nowrap">{r.poCode}</td>
+                          <td className="py-2.5 px-3 font-mono font-bold text-[#0070f4] whitespace-nowrap">{r.orderCode}</td>
                           <td className="py-2.5 px-3 whitespace-nowrap">{formatDateTimeVN(r.orderDate)}</td>
+                          <td className="py-2.5 px-3 whitespace-nowrap">{r.partnerCode}</td>
                           <td className="py-2.5 px-3">
-                            <PartnerLink kind="supplier" code={r.partnerCode} partnerId={r.partnerId}>
+                            <PartnerLink kind="customer" code={r.partnerCode} partnerId={r.partnerId}>
                               {r.partnerName}
                             </PartnerLink>
                           </td>
-                          <td className="py-2.5 px-3">{r.warehouseName}</td>
-                          <td className="py-2.5 px-3 text-right font-mono">{money.format(r.totalOrderedQty)}</td>
-                          <td className={`py-2.5 px-3 text-right font-mono ${short ? 'text-[#fb2c36] font-semibold' : ''}`}>
-                            {money.format(r.totalReceivedQty)}
-                          </td>
                           <td className="py-2.5 px-3 text-right font-mono">{money.format(r.totalAmount)}</td>
+                          <td
+                            className={`py-2.5 px-3 text-right font-mono ${
+                              r.status !== 'CANCELLED' && r.customerPaidAmount < r.totalAmount ? 'text-[#fb2c36]' : ''
+                            }`}
+                            title={r.customerPaidAmount < r.totalAmount ? 'Khách chưa trả đủ' : undefined}
+                          >
+                            {money.format(r.customerPaidAmount)}
+                          </td>
                           <td className="py-2.5 px-3">
                             <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold border whitespace-nowrap ${st.cls}`}>{st.label}</span>
                           </td>
                         </tr>
                         {isExpanded && (
-                          <PurchaseOrderExpandedRow
-                            poId={r.poId}
+                          <SalesBookingExpandedRow
+                            orderId={r.orderId}
                             colSpan={COLUMN_COUNT}
                             onClose={() => setExpandedId(null)}
                             onChanged={() => setReloadTick((t) => t + 1)}
@@ -402,7 +385,7 @@ export default function PurchaseOrdersClient({}: PurchaseOrdersClientProps = {})
                 <strong className="text-[#15171a]">
                   {rows.length === 0 ? 0 : (safePage - 1) * pageSize + 1} - {Math.min(safePage * pageSize, rows.length)}
                 </strong>{' '}
-                trên <strong className="text-[#15171a]">{rows.length}</strong> phiếu
+                trên <strong className="text-[#15171a]">{rows.length}</strong> đơn
               </span>
               <select
                 value={pageSize}
@@ -448,33 +431,34 @@ export default function PurchaseOrdersClient({}: PurchaseOrdersClientProps = {})
       {mergeOpen && (
         <div className="fixed inset-0 z-[100] bg-black/50 flex items-center justify-center p-4">
           <div className="w-full max-w-lg bg-white rounded-xl shadow-2xl">
-            <div className="px-5 pt-4 pb-2 text-[16px] font-bold">Gộp đơn đặt hàng nhập</div>
+            <div className="px-5 pt-4 pb-2 text-[16px] font-bold">Gộp đơn đặt hàng</div>
             <div className="px-5 pb-4 space-y-3">
               {mergeError ? (
                 <div className="px-3 py-2 rounded-[8px] bg-[#fef2f2] border border-[#fecaca] text-[#fb2c36]">{mergeError}</div>
               ) : (
                 <p>
-                  Gộp <strong>{selectedRows.length}</strong> phiếu của nhà cung cấp <strong>{selectedRows[0]?.partnerName}</strong> thành 1 phiếu
-                  mới. Hàng trùng nhau được cộng số lượng; các phiếu gốc chuyển sang <strong>Đã hủy</strong>.
+                  Gộp <strong>{selectedRows.length}</strong> đơn của khách <strong>{selectedRows[0]?.partnerName}</strong> thành 1 đơn mới. Hàng
+                  trùng nhau (cùng giá) được cộng số lượng, tiền khách đã trả trước chuyển sang đơn mới; các đơn gốc chuyển sang{' '}
+                  <strong>Đã hủy</strong>.
                 </p>
               )}
               <div className="rounded-[8px] border border-slate-200 overflow-hidden">
                 <table className="w-full text-left border-collapse">
                   <thead className="bg-[#f7f8f9] border-b border-slate-200 text-[12px] font-semibold text-[#677484]">
                     <tr>
-                      <th className="py-2 px-3">Mã phiếu</th>
-                      <th className="py-2 px-3">Nhà cung cấp</th>
-                      <th className="py-2 px-3 text-right">SL đặt</th>
-                      <th className="py-2 px-3 text-right">Tổng tiền</th>
+                      <th className="py-2 px-3">Mã đặt hàng</th>
+                      <th className="py-2 px-3">Khách hàng</th>
+                      <th className="py-2 px-3 text-right">Khách cần trả</th>
+                      <th className="py-2 px-3 text-right">Đã trả</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {selectedRows.map((r) => (
-                      <tr key={r.poId}>
-                        <td className="py-2 px-3 font-mono font-bold text-[#0070f4]">{r.poCode}</td>
+                      <tr key={r.orderId}>
+                        <td className="py-2 px-3 font-mono font-bold text-[#0070f4]">{r.orderCode}</td>
                         <td className="py-2 px-3">{r.partnerName}</td>
-                        <td className="py-2 px-3 text-right font-mono">{money.format(r.totalOrderedQty)}</td>
                         <td className="py-2 px-3 text-right font-mono">{money.format(r.totalAmount)}</td>
+                        <td className="py-2 px-3 text-right font-mono">{money.format(r.paidAmount)}</td>
                       </tr>
                     ))}
                   </tbody>

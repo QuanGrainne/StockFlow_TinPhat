@@ -1,4 +1,4 @@
-// src/app/(dashboard)/orders/[id]/OrderDetailClient.tsx
+// src/features/orders/screens/OrderDetailScreen.tsx
 // Màn hình Chi tiết đơn hàng chuyên nghiệp chuẩn KiotViet
 
 'use client';
@@ -8,11 +8,11 @@ import { useRouter } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
 import { KiotVietOrderDetail } from '@/features/orders/components/KiotVietOrderDetail';
 
-interface OrderDetailClientProps {
+interface OrderDetailScreenProps {
   id: string;
 }
 
-export default function OrderDetailClient({ id }: OrderDetailClientProps) {
+export default function OrderDetailScreen({ id }: OrderDetailScreenProps) {
   const router = useRouter();
 
   return (

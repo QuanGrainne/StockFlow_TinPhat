@@ -1,4 +1,4 @@
-// src/app/(dashboard)/transfers/TransfersClient.tsx
+// src/features/transfers/screens/TransfersScreen.tsx
 // Màn hình 1: Danh sách phiếu chuyển hàng chuẩn theo giao diện KiotViet Ảnh 1
 
 'use client';
@@ -65,7 +65,7 @@ const statusBadgeConfig: Record<
   },
 };
 
-export default function TransfersClient() {
+export default function TransfersScreen() {
   const router = useRouter();
 
   // Link mở thẳng 1 phiếu (?code=&id=&date=, VD từ Thẻ kho)

@@ -1,4 +1,4 @@
-// src/app/(dashboard)/customers/CustomersClient.tsx
+// src/features/customers/screens/CustomersScreen.tsx
 // Danh sách Khách hàng — cùng bố cục với màn Nhà cung cấp / Chuyển hàng:
 // Header 48px (tiêu đề + tìm kiếm + nút) → [Sidebar bộ lọc | Bảng có dòng tổng + dòng chi tiết mở rộng] → footer phân trang.
 
@@ -45,12 +45,12 @@ const DEFAULT_WAREHOUSES = [
   { warehouseId: 6, code: 'K004', name: 'Kho Hoàn Kiếm' },
 ];
 
-interface CustomersClientProps {
+interface CustomersScreenProps {
   /** Điều hướng màn hình trong AppLayout (giữ tương thích, màn này chưa dùng) */
   onNavigate?: (screenId: string) => void;
 }
 
-export default function CustomersClient({ }: CustomersClientProps = {}) {
+export default function CustomersScreen({ }: CustomersScreenProps = {}) {
   // Link mở thẳng 1 khách hàng (?code=KH...&id=..., VD từ hóa đơn)
   const searchParams = useSearchParams();
   const [custLink] = useState(() => readDocumentLink(searchParams));

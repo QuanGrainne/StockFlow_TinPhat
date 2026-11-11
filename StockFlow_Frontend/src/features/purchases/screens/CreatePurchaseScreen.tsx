@@ -1,4 +1,4 @@
-// src/app/(dashboard)/purchases/create/CreatePurchaseClient.tsx
+// src/features/purchases/screens/CreatePurchaseScreen.tsx
 // Màn hình Tạo mới & Chỉnh sửa phiếu nhập hàng chuẩn hóa theo giao diện Chuyển hàng & KiotViet
 
 'use client';
@@ -136,12 +136,12 @@ function buildRowFromOrderItem(it: PurchaseOrderItem, quantity: number, prod?: B
   });
 }
 
-interface CreatePurchaseClientProps {
+interface CreatePurchaseScreenProps {
   /** receipt = phiếu nhập hàng (mặc định); order = phiếu đặt hàng nhập (không nhập kho, không thanh toán) */
   mode?: 'receipt' | 'order';
 }
 
-export default function CreatePurchaseClient({ mode = 'receipt' }: CreatePurchaseClientProps = {}) {
+export default function CreatePurchaseScreen({ mode = 'receipt' }: CreatePurchaseScreenProps = {}) {
   const isOrder = mode === 'order';
   const router = useRouter();
   const searchParams = useSearchParams();

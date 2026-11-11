@@ -4,7 +4,7 @@ import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { FeatureGuard } from '@/features/roles/components/common/FeatureGuard';
 
-const CreatePurchaseReturnClient = dynamic(() => import('./CreatePurchaseReturnClient'), {
+const CreatePurchaseReturnScreen = dynamic(() => import('@/features/purchase-returns/screens/CreatePurchaseReturnScreen'), {
   ssr: false,
   loading: () => (
     <div className="flex min-h-[calc(100vh-56px)] items-center justify-center bg-[#f7f9fa] text-sm text-[#8c8c8c]">
@@ -20,7 +20,7 @@ export default function CreatePurchaseReturnPage() {
   const { bfcacheId } = useRouter();
   return (
     <FeatureGuard anyOf={RETURN_FEATURES}>
-      <CreatePurchaseReturnClient key={bfcacheId} />
+      <CreatePurchaseReturnScreen key={bfcacheId} />
     </FeatureGuard>
   );
 }

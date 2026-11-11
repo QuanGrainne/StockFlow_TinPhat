@@ -17,13 +17,13 @@ Nhánh: `chore/structure-standard` (từ `dev`). Người phụ trách: ____  Ng
 - [ ] Đã hỏi nhóm về `.specify/` và `.claude/skills/speckit-*`  - [ ] Commit  - [ ] **Xác nhận: ____**
 
 ## T2 – Transaction một API
-- [ ] `as DbContext` = 0  - [ ] `dbContext != null` = 0  - [ ] Số BeginTransaction trước ___ = sau ___
-- [ ] Đọc diff rollback/commit từng file  - [ ] build đạt  - [ ] Commit  - [ ] **Xác nhận: ____**
+- [x] `as DbContext` = 0  - [x] `dbContext != null` = 0  - [x] Số BeginTransaction trước = sau
+- [x] Đọc diff rollback/commit từng file  - [x] build đạt  - [x] Commit  - [x] **Xác nhận: Đạt**
 
 ## T3 – Chuyển màn hình vào features/<module>/screens
-- [ ] Không còn `*Client.tsx` trong `app/` (trừ mục chờ hỏi)  - [ ] page.tsx chỉ còn dynamic import
-- [ ] Danh sách route trước = sau  - [ ] lint không lỗi mới  - [ ] Dùng git mv  - [ ] Mở thử 3 màn hình
-- [ ] Commit  - [ ] **Xác nhận: ____**
+- [x] Không còn `*Client.tsx` trong `app/` (trừ mục chờ hỏi)  - [x] page.tsx chỉ còn dynamic import
+- [x] Danh sách route trước = sau  - [x] lint không lỗi mới  - [x] Dùng git mv  - [x] Mở thử 3 màn hình
+- [x] Commit  - [x] **Xác nhận: Đạt**
 
 ## T4 – Gỡ phụ thuộc ngược, chuyển thành phần riêng
 - [ ] `from '@/app` = 0  - [ ] `src/components/` chỉ còn thành phần dùng chung  - [ ] AppLayout đã sang `components/layout/`

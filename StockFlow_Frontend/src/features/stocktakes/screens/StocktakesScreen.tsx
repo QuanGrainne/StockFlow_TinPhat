@@ -11,7 +11,7 @@ import { StarFilled, StarOutlined } from '@ant-design/icons';
 import * as XLSX from 'xlsx';
 import { AlertTriangle, Copy, FileDown, Inbox, Layers, Pencil, Plus, Printer, RefreshCcw, Search, Trash2, X } from 'lucide-react';
 import PurchaseFilterSidebar from '@/components/PurchaseFilterSidebar';
-import type { PurchaseFilterState } from '@/app/(dashboard)/purchases/PurchasesClient';
+import type { PurchaseFilterState } from '@/features/purchases/screens/PurchasesScreen';
 import { useActiveWarehouse } from '@/lib/warehouse/useActiveWarehouse';
 import { getDateRangeForPreset } from '@/features/transfers/utils/dateUtils';
 import { stocktakeService } from '@/features/stocktakes/services/stocktakeService';
@@ -56,7 +56,7 @@ interface MergePreviewRow {
   actualQty: number;
 }
 
-export default function StocktakesClient() {
+export default function StocktakesScreen() {
   const router = useRouter();
   const { activeWarehouse, warehouses } = useActiveWarehouse();
 

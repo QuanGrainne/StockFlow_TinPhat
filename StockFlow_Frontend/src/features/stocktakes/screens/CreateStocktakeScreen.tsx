@@ -78,7 +78,7 @@ async function freshStock(warehouseId: number, code: string, productId?: number)
   }
 }
 
-export default function CreateStocktakeClient() {
+export default function CreateStocktakeScreen() {
   const router = useRouter();
   const params = useSearchParams();
   const editId = params.get('edit');

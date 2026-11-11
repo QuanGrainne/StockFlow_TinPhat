@@ -1,5 +1,5 @@
-// src/app/(dashboard)/suppliers/SuppliersClient.tsx
-// Danh sách Nhà cung cấp — cùng bố cục với màn hình Chuyển hàng (TransfersClient):
+// src/features/suppliers/screens/SuppliersScreen.tsx
+// Danh sách Nhà cung cấp — cùng bố cục với màn hình Chuyển hàng (TransfersScreen):
 // Header 48px → [Sidebar bộ lọc | Bảng dữ liệu + footer]
 
 'use client';
@@ -15,11 +15,11 @@ import SupplierBulkActionBar from '@/features/suppliers/components/SupplierBulkA
 import { useSuppliers } from '@/features/suppliers/hooks/useSuppliers';
 import { supplierService } from '@/features/suppliers/services/supplierService';
 
-interface SuppliersClientProps {
+interface SuppliersScreenProps {
   onNavigate?: (screenId: string) => void;
 }
 
-export default function SuppliersClient({}: SuppliersClientProps = {}) {
+export default function SuppliersScreen({}: SuppliersScreenProps = {}) {
   // Link mở thẳng 1 NCC (?code=NCC...&id=..., VD từ phiếu trong Thẻ kho)
   const searchParams = useSearchParams();
   const [link] = useState(() => readDocumentLink(searchParams));

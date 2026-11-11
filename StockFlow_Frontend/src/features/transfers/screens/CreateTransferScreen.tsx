@@ -1,4 +1,4 @@
-// src/app/(dashboard)/transfers/create/CreateTransferClient.tsx
+// src/features/transfers/screens/CreateTransferScreen.tsx
 // Màn hình 2: Tạo mới & Chỉnh sửa phiếu chuyển hàng theo đúng thiết kế KiotViet Ảnh 2
 
 'use client';
@@ -53,7 +53,7 @@ interface CreateItemRow {
   notes?: string;
 }
 
-export default function CreateTransferClient() {
+export default function CreateTransferScreen() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const editTransferId = searchParams.get('id');

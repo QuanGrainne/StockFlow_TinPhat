@@ -13,7 +13,7 @@ import {
   X,
   Check,
 } from 'lucide-react';
-import type { PurchaseFilterState, PurchaseStatus } from '@/app/(dashboard)/purchases/PurchasesClient';
+import type { PurchaseFilterState, PurchaseStatus } from '@/features/purchases/screens/PurchasesScreen';
 import { WarehouseItem } from '@/lib/warehouse/useActiveWarehouse';
 import { Supplier } from '@/features/suppliers/types';
 import {

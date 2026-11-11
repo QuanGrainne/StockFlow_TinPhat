@@ -1,4 +1,4 @@
-// src/app/(dashboard)/sales-returns/SalesReturnsClient.tsx
+// src/features/sales-returns/screens/SalesReturnsScreen.tsx
 // Màn hình Trả hàng (khách trả lại hàng đã mua) — cùng bố cục với Đặt hàng / Hóa đơn:
 // Header 48px (tiêu đề + tìm kiếm + "+ Trả hàng" + Xuất file) → [Sidebar bộ lọc | Bảng + chi tiết mở rộng] → footer phân trang.
 // "+ Trả hàng": chọn hóa đơn gốc (BR-18) → mở tab Trả hàng ở màn Bán hàng (tab mới).
@@ -43,7 +43,7 @@ function defaultSidebar(warehouseId: number): SalesReturnSidebarState {
   };
 }
 
-export default function SalesReturnsClient() {
+export default function SalesReturnsScreen() {
   const { activeWarehouse, warehouses } = useActiveWarehouse();
   // ?code=TH...&id=...: mở thẳng 1 phiếu (mọi chi nhánh, toàn thời gian)
   const searchParams = useSearchParams();

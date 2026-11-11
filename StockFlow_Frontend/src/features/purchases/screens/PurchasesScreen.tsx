@@ -269,7 +269,7 @@ function PurchaseReturnHistory({ returns }: { returns: PurchaseReturnSummary[] }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-export default function PurchasesClient({ onNavigate }: { onNavigate?: (screen: string) => void } = {}) {
+export default function PurchasesScreen({ onNavigate }: { onNavigate?: (screen: string) => void } = {}) {
   const router = useRouter();
   const { activeWarehouse, warehouses } = useActiveWarehouse();
 

@@ -1,4 +1,4 @@
-// src/app/(dashboard)/orders/OrdersClient.tsx
+// src/features/orders/screens/OrdersScreen.tsx
 // Màn hình Hóa đơn — cùng bố cục với Khách hàng / Nhà cung cấp / Nhập hàng:
 // Header 48px (tiêu đề + tìm kiếm + "+ Hóa đơn" mở màn Bán hàng + Xuất file)
 // → [Sidebar bộ lọc | Bảng có dòng tổng + chi tiết mở rộng (Thông tin / Lịch sử thanh toán)] → footer phân trang.
@@ -61,12 +61,12 @@ function defaultSidebar(warehouseId: number): OrderSidebarState {
   };
 }
 
-interface OrdersClientProps {
+interface OrdersScreenProps {
   /** Điều hướng màn hình trong AppLayout (giữ tương thích) */
   onNavigate?: (screenId: string) => void;
 }
 
-export default function OrdersClient({}: OrdersClientProps = {}) {
+export default function OrdersScreen({}: OrdersScreenProps = {}) {
   const { activeWarehouse, warehouses } = useActiveWarehouse();
   // Link mở thẳng 1 hóa đơn (?code=HD...&id=..., VD từ sổ công nợ khách hàng): tìm theo mã, mọi chi nhánh, toàn thời gian
   const searchParams = useSearchParams();
