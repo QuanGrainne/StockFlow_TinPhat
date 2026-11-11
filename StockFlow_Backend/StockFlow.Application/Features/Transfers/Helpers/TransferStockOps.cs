@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using StockFlow.Application.Common.Interfaces;
+using StockFlow.Application.Common.Inventory;
 using StockFlow.Application.Features.Purchases.Helpers;
 using StockFlow.Domain.Entities;
 
@@ -60,21 +61,21 @@ public static class TransferStockOps
         if (qty <= 0) return cost;
 
         var products = new Dictionary<int, MstProduct> { [product.ProductId] = product };
-        var reference = new PurchaseStockOps.StockRef(transactionType, referenceType, transferId, userId);
+        var reference = new StockRef(transactionType, referenceType, transferId, userId);
         var remaining = qty;
         foreach (var b in rows.Where(b => (b.Quantity ?? 0) > 0).OrderByDescending(b => b.Quantity).ToList())
         {
             if (remaining <= 0) break;
             var take = Math.Min(remaining, b.Quantity ?? 0);
             await PurchaseStockOps.OutboundAsync(context,
-                new PurchaseStockOps.StockKey(b.WarehouseId, b.ProductId, b.LocationId, b.LotId),
+                new StockKey(b.WarehouseId, b.ProductId, b.LocationId, b.LotId),
                 take, b.UnitCost ?? cost, products, reference, ct);
             remaining -= take;
         }
         if (remaining > 0)
         {
             await PurchaseStockOps.OutboundAsync(context,
-                new PurchaseStockOps.StockKey(warehouseId, product.ProductId, null, null),
+                new StockKey(warehouseId, product.ProductId, null, null),
                 remaining, cost, products, reference, ct);
         }
         return cost;
@@ -89,8 +90,8 @@ public static class TransferStockOps
         if (qty <= 0) return Task.CompletedTask;
         var products = new Dictionary<int, MstProduct> { [product.ProductId] = product };
         return PurchaseStockOps.InboundAsync(context,
-            new PurchaseStockOps.StockKey(warehouseId, product.ProductId, null, null),
+            new StockKey(warehouseId, product.ProductId, null, null),
             qty, unitCost, products,
-            new PurchaseStockOps.StockRef(transactionType, referenceType, transferId, userId), ct);
+            new StockRef(transactionType, referenceType, transferId, userId), ct);
     }
 }
