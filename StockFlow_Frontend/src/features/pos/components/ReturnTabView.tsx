@@ -116,9 +116,9 @@ export function ReturnTabView({ tab, userName, onChange, onDone, canReturn, ware
   };
 
   return (
-    <div className="flex-1 min-h-0 flex gap-3 p-3">
+    <div className="flex-1 min-h-0 flex overflow-hidden">
       {/* ── Trái: hàng của hóa đơn gốc ── */}
-      <div className="flex-1 min-w-0 flex flex-col gap-2">
+      <div className="flex-1 min-w-0 flex flex-col gap-2 p-3">
         <div className="flex-1 min-h-0 overflow-y-auto space-y-2 pr-1">
           {tab.lines.length === 0 ? (
             <div className="h-full flex items-center justify-center">
@@ -212,7 +212,7 @@ export function ReturnTabView({ tab, userName, onChange, onDone, canReturn, ware
       </div>
 
       {/* ── Phải: tiền trả khách ── */}
-      <aside className="w-[420px] max-w-[34vw] shrink-0 bg-white rounded-xl border border-slate-200/80 shadow-[0_1px_3px_rgba(15,23,42,0.06)] flex flex-col p-4">
+      <aside className="w-[400px] max-w-[34vw] shrink-0 bg-white border-l border-slate-200 flex flex-col p-4 text-[14px]">
         <div className="flex items-center justify-between gap-2">
           <span className="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-lg bg-[#f1f3f6] text-[14px] min-w-0 max-w-[60%] whitespace-nowrap" title={userName}>
             <CircleUserRound size={16} className="text-[#677484] shrink-0" />
