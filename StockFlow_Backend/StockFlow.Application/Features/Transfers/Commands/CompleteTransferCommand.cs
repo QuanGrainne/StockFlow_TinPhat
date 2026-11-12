@@ -43,7 +43,7 @@ public class CompleteTransferCommandHandler : IRequestHandler<CompleteTransferCo
             return Result.Failure<TransferDetailDto>("Bạn không có quyền xuất hàng chuyển kho từ kho này.");
         }
 
-        if (!string.Equals(transfer.Status, "DRAFT", StringComparison.OrdinalIgnoreCase))
+        if (!transfer.CanIssue())
         {
             return Result.Failure<TransferDetailDto>($"Chỉ phiếu ở trạng thái 'Phiếu tạm' mới có thể xuất chuyển đi. Trạng thái hiện tại: {transfer.Status}.");
         }
@@ -76,7 +76,7 @@ public class CompleteTransferCommandHandler : IRequestHandler<CompleteTransferCo
                 "TRANSFER_OUT", transfer.StockTransferId, command.UserId, cancellationToken);
         }
 
-        transfer.Status = "IN_TRANSIT";
+        transfer.MarkInTransit();
         if (!transfer.TransferDate.HasValue)
         {
             transfer.TransferDate = TransferHelper.GetVietnamTime();

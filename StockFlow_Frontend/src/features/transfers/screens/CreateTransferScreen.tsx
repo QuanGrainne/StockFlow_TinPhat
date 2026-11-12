@@ -30,7 +30,7 @@ import { transferService } from '@/features/transfers/services/transferService';
 import { ProductForTransfer, TransferItem } from '@/features/transfers/types';
 import { toLocalDatetimeInputString } from '@/features/transfers/utils/dateUtils';
 import { productService, BackendProduct } from '@/features/products/services/productService';
-import { AddFromCategoryPopover } from '@/features/purchases/components/AddFromCategoryPopover';
+import { AddFromCategoryPopover } from '@/features/purchases';
 import { NumberInput } from '@/components/inputs/NumberInput';
 import { ProductThumb } from '@/components/ProductThumb';
 
@@ -109,7 +109,7 @@ export default function CreateTransferScreen() {
             setUserDisplay(matched.name || (u?.fullName || u?.username || 'Quản trị viên Hệ thống'));
           }
         }
-      });
+      }).catch(() => undefined); // T18: getStaffList ném lỗi khi API lỗi; ở đây chỉ để lấy avatar nên bỏ qua.
     } catch {
       // ignore
     }

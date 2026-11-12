@@ -22,7 +22,7 @@ import {
   RETURN_STATUS,
   RETURN_STATUS_OPTIONS,
 } from '@/features/sales-returns/utils/salesReturnUtils';
-import { formatDateTimeVN } from '@/features/transfers/utils/dateUtils';
+import { formatDateTimeVN } from '@/lib/utils/date';
 import { getTimeRangeForPreset } from '@/components/filters/TimeRangeFilter';
 import { PartnerLink } from '@/components/links/EntityLinks';
 import { readDocumentLink, scrollToWhenReady } from '@/lib/navigation/documentLink';

@@ -8,7 +8,7 @@ import { useRouter } from 'next/navigation';
 import { message } from 'antd';
 import { ArrowDownToLine, CheckCheck, Copy, FileDown, Loader2, Pencil, Printer, Save, Trash2 } from 'lucide-react';
 import { DocumentCodeLink, PartnerLink, ProductCodeLink } from '@/components/links/EntityLinks';
-import { formatDateTimeVN } from '@/features/transfers/utils/dateUtils';
+import { formatDateTimeVN } from '@/lib/utils/date';
 import { toLinkDate } from '@/lib/navigation/documentLink';
 import { purchaseOrderService } from '../services/purchaseOrderService';
 import type { PurchaseOrderDetail, PurchaseOrderItem } from '../types';

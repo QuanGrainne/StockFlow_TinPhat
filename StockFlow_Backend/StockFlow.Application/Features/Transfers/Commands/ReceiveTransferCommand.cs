@@ -47,7 +47,7 @@ public class ReceiveTransferCommandHandler : IRequestHandler<ReceiveTransferComm
             return Result.Failure<TransferDetailDto>("Bạn không có quyền xác nhận nhận hàng cho kho nhận này.");
         }
 
-        if (!string.Equals(transfer.Status, "IN_TRANSIT", StringComparison.OrdinalIgnoreCase))
+        if (!transfer.CanReceive())
         {
             return Result.Failure<TransferDetailDto>($"Chỉ phiếu ở trạng thái 'Đang chuyển' mới có thể nhận hàng. Trạng thái hiện tại: {transfer.Status}.");
         }
@@ -113,7 +113,7 @@ public class ReceiveTransferCommandHandler : IRequestHandler<ReceiveTransferComm
                 "TRANSFER_IN", transfer.StockTransferId, command.UserId, cancellationToken);
         }
 
-        transfer.Status = "RECEIVED";
+        transfer.MarkReceived();
         transfer.ReceivedDate = receivedDate;
         // Ghi chú nhận lưu riêng (không nối vào ghi chú chuyển như trước)
         if (!string.IsNullOrWhiteSpace(command.Request.Notes))

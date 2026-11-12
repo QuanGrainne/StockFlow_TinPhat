@@ -2,7 +2,7 @@
 // Nhãn trạng thái + xuất Excel / in phiếu Trả hàng
 
 import * as XLSX from 'xlsx';
-import { formatDateTimeVN } from '@/features/transfers/utils/dateUtils';
+import { formatDateTimeVN } from '@/lib/utils/date';
 import { escapeHtml, printDateTime, printHtml, printMoney, printQty } from '@/lib/print/printHtml';
 import type { SalesReturnDetail, SalesReturnListItem, SalesReturnStatus } from '../types';
 

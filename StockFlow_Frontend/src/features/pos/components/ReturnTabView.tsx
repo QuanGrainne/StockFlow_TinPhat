@@ -11,7 +11,7 @@ import Link from 'next/link';
 import { message } from 'antd';
 import { CircleUserRound, Minus, Pencil, Plus, RefreshCw, Search, Trash2, Undo2, X } from 'lucide-react';
 import { ProductThumb } from '@/components/ProductThumb';
-import { invoiceLinkHref } from '@/features/orders/components/InvoicePreviewModal';
+import { invoiceLinkHref } from '@/features/orders';
 import { salesReturnService } from '@/features/sales-returns/services/salesReturnService';
 import { posService } from '../services/posService';
 import type { PosCustomer } from '../types';
