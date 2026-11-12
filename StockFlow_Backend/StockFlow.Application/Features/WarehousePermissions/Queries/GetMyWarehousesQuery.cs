@@ -38,11 +38,8 @@ public class GetMyWarehousesQueryHandler : IRequestHandler<GetMyWarehousesQuery,
             .Where(w => w.IsActive != false)
             .AsNoTracking();
 
-        // Nếu không phải Admin, chỉ lấy các kho thuộc danh sách được phân quyền
-        if (!_currentUserService.IsAdmin)
-        {
-            query = query.Where(w => authorizedWarehouseIds.Contains(w.WarehouseId));
-        }
+        // Mọi vai trò (kể cả Admin) chỉ lấy các kho được tích trong phân quyền kho
+        query = query.Where(w => authorizedWarehouseIds.Contains(w.WarehouseId));
 
         var warehouses = await query.OrderBy(w => w.WarehouseId).ToListAsync(cancellationToken);
 

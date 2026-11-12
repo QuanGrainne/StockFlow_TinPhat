@@ -171,7 +171,7 @@ public class CreateProductCommandHandler : IRequestHandler<CreateProductCommand,
             int warehouseId = req.InitialWarehouseId ?? 0;
             if (warehouseId <= 0)
             {
-                if (_currentUserService.IsAuthenticated && !_currentUserService.IsAdmin)
+                if (_currentUserService.IsAuthenticated)
                 {
                     var authorizedIds = await _currentUserService.GetAuthorizedWarehouseIdsAsync(cancellationToken);
                     warehouseId = authorizedIds.FirstOrDefault();
@@ -185,7 +185,7 @@ public class CreateProductCommandHandler : IRequestHandler<CreateProductCommand,
             }
 
             // Kiểm tra phân quyền truy cập kho đối với tài khoản nhân sự
-            if (_currentUserService.IsAuthenticated && !_currentUserService.IsAdmin)
+            if (_currentUserService.IsAuthenticated)
             {
                 var hasAccess = await _currentUserService.HasWarehouseAccessAsync(warehouseId, cancellationToken);
                 if (!hasAccess)

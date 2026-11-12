@@ -9,16 +9,13 @@ public class CurrentUserService : ICurrentUserService
 {
     private readonly IHttpContextAccessor _httpContextAccessor;
     private readonly IStockFlowDbContext _context;
-    private readonly IUserPermissionService _permissionService;
 
     public CurrentUserService(
         IHttpContextAccessor httpContextAccessor,
-        IStockFlowDbContext context,
-        IUserPermissionService permissionService)
+        IStockFlowDbContext context)
     {
         _httpContextAccessor = httpContextAccessor;
         _context = context;
-        _permissionService = permissionService;
     }
 
     private ClaimsPrincipal? User => _httpContextAccessor.HttpContext?.User;
@@ -74,28 +71,12 @@ public class CurrentUserService : ICurrentUserService
         }
     }
 
-    /// <summary>
-    /// Kiểm tra Admin theo vai trò hiện tại trong DB (claim Role trong token có thể đã cũ).
-    /// </summary>
-    private Task<bool> IsAdminInDbAsync(CancellationToken cancellationToken)
-        => UserId.HasValue
-            ? _permissionService.IsAdminAsync(UserId.Value, cancellationToken)
-            : Task.FromResult(false);
-
     public async Task<IReadOnlyList<int>> GetAuthorizedWarehouseIdsAsync(CancellationToken cancellationToken = default)
     {
-        // 1. Quản trị viên (Admin) luôn có quyền trên toàn bộ các kho đang hoạt động
-        if (await IsAdminInDbAsync(cancellationToken))
-        {
-            return await _context.MstWarehouses
-                .Where(w => w.IsActive != false)
-                .OrderBy(w => w.WarehouseId)
-                .Select(w => w.WarehouseId)
-                .ToListAsync(cancellationToken);
-        }
-
-        // 2. Luôn đọc bảng phân quyền jnc_user_warehouse_access trong DB (không tin claim WarehouseId
-        //    trong token: token sống 7 ngày, Admin thu hồi kho phải có hiệu lực ngay).
+        // Mọi vai trò, KỂ CẢ Admin, chỉ có quyền trên các kho được tích trong jnc_user_warehouse_access
+        // (quyết định nhóm 12/11/2026: Admin không còn toàn quyền mọi kho; Admin tự tích kho cho mình ở màn
+        // Phân quyền kho — màn đó chỉ cần [RequireAdmin], không phụ thuộc quyền kho nên không bị khoá ngoài).
+        // Luôn đọc DB, không tin claim WarehouseId trong token (token sống 7 ngày, thu hồi kho phải có hiệu lực ngay).
         if (UserId.HasValue)
         {
             return await _context.JncUserWarehouseAccesses
@@ -110,12 +91,6 @@ public class CurrentUserService : ICurrentUserService
 
     public async Task<bool> HasWarehouseAccessAsync(int warehouseId, CancellationToken cancellationToken = default)
     {
-        // Admin luôn có quyền truy cập mọi kho
-        if (await IsAdminInDbAsync(cancellationToken))
-        {
-            return true;
-        }
-
         // Nếu người dùng không xác thực token, không cho phép truy cập tài nguyên kho
         if (!IsAuthenticated)
         {
