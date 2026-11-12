@@ -85,8 +85,19 @@ export default function LoginPage() {
     }`;
 
   return (
-    // Nền: ảnh toàn cảnh nhà xưởng Tín Phát (.stockflow-login-bg trong globals.css)
-    <div className="min-h-screen flex items-center justify-center stockflow-login-bg px-4 py-10">
+    // Nền: ảnh toàn cảnh nhà xưởng Tín Phát (kèm style trực tiếp để dev HMR áp dụng ngay kể cả khi CSS cache chưa reload)
+    <div
+      className="min-h-screen flex items-center justify-center stockflow-login-bg px-4 py-10"
+      style={{
+        backgroundColor: '#f0f2f7',
+        backgroundImage:
+          "linear-gradient(rgba(241, 245, 249, 0.16), rgba(241, 245, 249, 0.28)), url('/brand/bg-login-nha-xuong.jpg')",
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
+        backgroundAttachment: 'fixed',
+      }}
+    >
       <div className="w-full max-w-[590px] bg-white/94 backdrop-blur-sm border border-white/80 rounded-2xl shadow-[0_20px_50px_-12px_rgba(15,23,42,0.32)] px-6 py-10 sm:px-12 sm:py-12">
         {/* Logo / Branding */}
         <div className="flex flex-col items-center">
