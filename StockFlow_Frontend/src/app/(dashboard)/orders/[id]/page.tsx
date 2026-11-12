@@ -25,7 +25,7 @@ export default function OrderDetailPage(props: OrderDetailPageProps) {
   return (
     <Suspense
       fallback={
-        <div className="flex h-screen items-center justify-center bg-[#f7f9fa] text-sm text-slate-400">
+        <div className="flex h-screen items-center justify-center stockflow-brand-bg text-sm text-slate-400">
           Đang tải Chi tiết đơn hàng...
         </div>
       }
