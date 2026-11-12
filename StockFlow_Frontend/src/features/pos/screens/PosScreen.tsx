@@ -32,7 +32,6 @@ import {
   X,
 } from 'lucide-react';
 import { ProductThumb } from '@/components/ProductThumb';
-import { FormHeaderUserBar } from '@/components/FormHeaderUserBar';
 import { CustomerFormModal } from '@/features/customers/components/CustomerFormModal';
 import { customerService } from '@/features/customers/services/customerService';
 import type { CreateCustomerPayload } from '@/features/customers/types';
@@ -961,12 +960,15 @@ export default function PosScreen() {
   const nowLocal = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
 
   return (
-    <div className="h-screen w-full flex flex-col bg-[#e9ebef] text-[14px] text-[#15171a] select-none overflow-hidden">
-      {/* ═══ 1. THANH TRÊN ═══ */}
-      <header className="h-[52px] shrink-0 bg-[#0070f4] flex items-end gap-2 px-2 pt-2">
+    // Nằm trong khung AppLayout (Header + thanh menu chung) → chiếm trọn vùng nội dung bên dưới
+    <div className="h-full min-h-0 w-full flex flex-col text-[14px] text-[#15171a] select-none overflow-hidden">
+      {/* ═══ 1. THANH CÔNG CỤ — cùng kiểu thanh tiêu đề các trang khác (Khách hàng, Nhà cung cấp...) ═══ */}
+      <header className="min-h-12 shrink-0 bg-white/84 backdrop-blur-[2px] border-b border-slate-200 flex flex-wrap items-center gap-x-3 gap-y-2 px-3 sm:px-4 py-2 relative z-30">
+        <h1 className="text-[20px] font-bold text-[#15171a] leading-7 tracking-tight whitespace-nowrap">Bán hàng</h1>
+
         {/* Tìm hàng hóa */}
-        <div ref={productBoxRef} className="relative w-[480px] max-w-[38vw] self-center mb-2">
-          <Search size={17} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#677484]" />
+        <div ref={productBoxRef} className="relative w-[420px] max-w-full basis-[280px] grow sm:grow-0">
+          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#677484] pointer-events-none" />
           <input
             ref={productSearchRef}
             value={productQuery}
@@ -989,7 +991,7 @@ export default function PosScreen() {
               } else if (e.key === 'Escape') setProductDropdown(false);
             }}
             placeholder={isReturn ? 'Tìm hàng trả (F3)' : 'Tìm hàng hóa (F3)'}
-            className="w-full h-9 pl-9 pr-3 rounded-lg bg-white text-[14px] placeholder-[#94a3b8] outline-none"
+            className="w-full h-8 pl-9 pr-3 rounded-full bg-[#f7f8f9] border border-slate-200 text-[13px] placeholder-[#677484] outline-none focus:border-[#0070f4] focus:bg-white transition"
           />
           {productDropdown && productQuery.trim() && (
             <div className="absolute left-0 right-0 top-full mt-1 z-50 bg-white rounded-xl shadow-[0_10px_30px_rgba(15,23,42,0.2)] border border-slate-200 max-h-[440px] overflow-y-auto divide-y divide-slate-100">
@@ -1025,7 +1027,7 @@ export default function PosScreen() {
         </div>
 
         {/* Tab hóa đơn */}
-        <div className="flex-1 min-w-0 flex items-end gap-1 overflow-x-auto">
+        <div className="flex-1 min-w-0 basis-[240px] flex items-center gap-1.5 overflow-x-auto">
           {tabs.map((t) => {
             const active = t.id === tab.id;
             const tabIsBooking = (t.kind ?? 'INVOICE') === 'BOOKING';
@@ -1035,8 +1037,12 @@ export default function PosScreen() {
               <div
                 key={t.id}
                 onClick={() => setActiveTabId(t.id)}
-                className={`relative h-[44px] shrink-0 px-4 flex items-center gap-2.5 rounded-t-lg cursor-pointer ${
-                  active ? 'bg-[#e9ebef] text-[#15171a] font-bold' : 'text-white/90 hover:bg-white/10'
+                className={`relative h-8 shrink-0 pl-1.5 pr-2 flex items-center gap-1.5 rounded-[8px] border text-[13px] cursor-pointer transition ${
+                  active
+                    ? tabIsBooking
+                      ? 'bg-[#fff7ed] border-[#f97316]/50 font-semibold'
+                      : 'bg-[#e6f1fe] border-[#0070f4]/40 text-[#0070f4] font-semibold'
+                    : 'bg-white border-slate-200 text-[#15171a] hover:border-[#0070f4]/50'
                 }`}
               >
                 <button
@@ -1048,46 +1054,46 @@ export default function PosScreen() {
                     switchTabKind(t);
                   }}
                   title={canSwitch ? (tabIsBooking ? 'Chuyển sang hóa đơn' : 'Chuyển sang đặt hàng') : undefined}
-                  className={`p-1 rounded-full ${canSwitch ? 'cursor-pointer hover:bg-black/10' : 'cursor-default'} ${
-                    active ? (tabIsBooking ? 'bg-[#fff1e6] text-[#f97316]' : 'bg-[#e6f1fe] text-[#0070f4]') : ''
+                  className={`p-1 rounded-full ${canSwitch ? 'cursor-pointer hover:bg-black/5' : 'cursor-default'} ${
+                    tabIsBooking ? 'text-[#f97316]' : t.kind === 'RETURN' ? 'text-[#677484]' : 'text-[#0070f4]'
                   }`}
                 >
-                  {t.kind === 'RETURN' ? <Undo2 size={15} /> : <ArrowLeftRight size={15} />}
+                  {t.kind === 'RETURN' ? <Undo2 size={14} /> : <ArrowLeftRight size={14} />}
                 </button>
                 <span className={tabIsBooking && active ? 'text-[#f97316]' : ''}>{t.name}</span>
-                {t.lines.length > 0 && !active && <span className="text-[11px] opacity-80">({t.lines.length})</span>}
+                {t.lines.length > 0 && !active && <span className="text-[11px] text-[#677484]">({t.lines.length})</span>}
                 <button
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
                     closeTab(t.id);
                   }}
-                  className="p-0.5 rounded hover:bg-black/10 cursor-pointer"
+                  className="p-0.5 rounded text-[#677484] hover:bg-black/5 hover:text-[#fb2c36] cursor-pointer"
                   title="Đóng hóa đơn"
                 >
-                  <X size={15} />
+                  <X size={14} />
                 </button>
               </div>
             );
           })}
-          <div className="h-[44px] shrink-0 flex items-center">
+          <div className="h-8 shrink-0 flex items-center rounded-[8px] border border-dashed border-slate-300 text-[#0070f4]">
             <button
               type="button"
               onClick={() => addTab()}
-              className="h-full px-2 text-white hover:bg-white/10 rounded-t-lg cursor-pointer"
+              className="h-full px-2 hover:bg-[#e6f1fe] rounded-[8px] cursor-pointer"
               title={defaultKind === 'BOOKING' ? 'Thêm đặt hàng mới' : 'Thêm hóa đơn mới'}
             >
-              <PlusCircle size={20} />
+              <PlusCircle size={18} />
             </button>
             {canInvoice && canBooking && (
               <button
                 type="button"
                 data-pos-menu
                 onClick={openAddMenu}
-                className="h-full px-1 text-white hover:bg-white/10 rounded-t-lg cursor-pointer"
+                className="h-full px-1 hover:bg-[#e6f1fe] rounded-[8px] cursor-pointer"
                 title="Thêm hóa đơn / đặt hàng"
               >
-                <ChevronDown size={16} />
+                <ChevronDown size={15} />
               </button>
             )}
           </div>
@@ -1109,40 +1115,36 @@ export default function PosScreen() {
           </div>
         )}
 
-        {/* Bên phải: xử lý đặt hàng, trả hàng, kho làm việc + người dùng, menu */}
-        <div className="self-center mb-2 flex items-center gap-1 text-white">
+        {/* Bên phải: xử lý đặt hàng, trả hàng, menu hiển thị (kho làm việc + người dùng đã có ở Header chung) */}
+        <div className="ml-auto flex flex-wrap items-center gap-2">
           {canInvoice && (
             <button
               type="button"
               onClick={() => setPicker('booking')}
-              className="group relative p-2 rounded-full hover:bg-white/15 cursor-pointer"
-              aria-label="Xử lý đặt hàng"
+              className="inline-flex items-center gap-1.5 px-3 h-8 rounded-[8px] border border-slate-300 bg-white hover:bg-[#f7f8f9] hover:border-[#0070f4] text-[13px] font-medium cursor-pointer transition"
             >
-              <ShoppingBag size={20} />
-              <span className="pointer-events-none absolute right-0 top-full mt-2 z-50 hidden group-hover:block whitespace-nowrap rounded-md bg-white px-3 py-1.5 text-[13px] text-[#15171a] shadow-lg border border-slate-200">
-                Xử lý đặt hàng
-              </span>
+              <ShoppingBag size={15} className="text-[#677484]" />
+              <span>Xử lý đặt hàng</span>
             </button>
           )}
           {canReturn && (
             <button
               type="button"
               onClick={() => setPicker('return')}
-              className="group relative p-2 rounded-full hover:bg-white/15 cursor-pointer"
-              aria-label="Trả hàng"
+              className="inline-flex items-center gap-1.5 px-3 h-8 rounded-[8px] border border-slate-300 bg-white hover:bg-[#f7f8f9] hover:border-[#0070f4] text-[13px] font-medium cursor-pointer transition"
             >
-              <Undo2 size={20} />
-              <span className="pointer-events-none absolute right-0 top-full mt-2 z-50 hidden group-hover:block whitespace-nowrap rounded-md bg-white px-3 py-1.5 text-[13px] text-[#15171a] shadow-lg border border-slate-200">
-                Trả hàng
-              </span>
+              <Undo2 size={15} className="text-[#677484]" />
+              <span>Trả hàng</span>
             </button>
           )}
-          <div className="bg-white rounded-lg px-2 py-1 text-[#15171a]">
-            <FormHeaderUserBar />
-          </div>
           <div ref={menuRef} className="relative">
-            <button type="button" onClick={() => setMenuOpen((v) => !v)} className="p-2 rounded-lg hover:bg-white/15 cursor-pointer">
-              <Menu size={20} />
+            <button
+              type="button"
+              onClick={() => setMenuOpen((v) => !v)}
+              className="w-8 h-8 rounded-[8px] border border-slate-300 bg-white hover:bg-[#f7f8f9] hover:border-[#0070f4] text-[#677484] flex items-center justify-center cursor-pointer transition"
+              title="Tùy chọn hiển thị"
+            >
+              <Menu size={16} />
             </button>
             {menuOpen && (
               <div className="absolute right-0 top-full mt-2 z-50 w-[320px] bg-white text-[#15171a] rounded-xl shadow-[0_10px_30px_rgba(15,23,42,0.2)] border border-slate-200 p-4 space-y-4">
@@ -1205,14 +1207,47 @@ export default function PosScreen() {
           }}
         />
       ) : (
-      <div className="flex-1 min-h-0 flex gap-2 p-2">
-        {/* ── Bên trái: hàng trong hóa đơn ── */}
-        <div className="flex-1 min-w-0 flex flex-col gap-2">
-          <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden space-y-2 pr-1">
+      <div className="flex-1 min-h-0 flex gap-3 p-3">
+        {/* ── Bên trái: giỏ hàng — một thẻ trắng: tiêu đề cột → các dòng hàng → ghi chú đơn ── */}
+        <div className="flex-1 min-w-0 flex flex-col bg-white rounded-xl border border-slate-200/80 shadow-[0_1px_3px_rgba(15,23,42,0.06)] overflow-hidden">
+          {tab.lines.length > 0 && (
+            <div className="shrink-0 h-9 px-4 flex items-center gap-3 bg-[#f7f8f9] border-b border-slate-200 text-[12px] font-semibold text-[#677484]">
+              <span className="w-5 text-center">#</span>
+              <span className="w-[18px] shrink-0" />
+              {prefs.image && <span className="w-12 shrink-0" />}
+              {prefs.code && <span className="w-24 shrink-0">Mã hàng</span>}
+              <span className="flex-1 min-w-[110px]">Tên hàng</span>
+              <span className="w-[84px] shrink-0 text-center">ĐVT</span>
+              <span className="w-[124px] shrink-0 text-center">Số lượng</span>
+              <span className="w-28 shrink-0 text-right">Đơn giá</span>
+              <span className="w-24 shrink-0 text-right">Thành tiền</span>
+              <span className="w-[26px] shrink-0" />
+            </div>
+          )}
+          <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
             {tab.lines.length === 0 ? (
-              <div className="h-full flex flex-col items-center justify-center text-[#94a3b8]">
-                <Search size={36} strokeWidth={1.5} />
-                <p className="mt-2 text-[14px]">Tìm hàng hóa (F3) để thêm vào {isBooking ? 'đơn đặt hàng' : 'hóa đơn'}</p>
+              <div className="h-full flex flex-col items-center justify-center px-6 text-center">
+                <div className="w-16 h-16 rounded-full bg-[#e6f1fe] text-[#0070f4] flex items-center justify-center">
+                  <Search size={30} strokeWidth={1.8} />
+                </div>
+                <p className="mt-4 text-[16px] font-semibold">
+                  Chưa có hàng trong {isBooking ? 'đơn đặt hàng' : 'hóa đơn'}
+                </p>
+                <p className="mt-1 text-[13px] text-[#677484]">Tìm hàng hóa ở ô phía trên để thêm vào giỏ</p>
+                <div className="mt-4 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-[12px] text-[#677484]">
+                  {[
+                    ['F3', 'Tìm hàng'],
+                    ['F4', 'Tìm khách'],
+                    ['F9', isBooking ? 'Đặt hàng' : 'Thanh toán'],
+                  ].map(([key, label]) => (
+                    <span key={key} className="inline-flex items-center gap-1.5">
+                      <kbd className="min-w-7 h-6 px-1.5 rounded-md border border-slate-300 border-b-2 bg-white text-[11px] font-semibold text-[#15171a] inline-flex items-center justify-center">
+                        {key}
+                      </kbd>
+                      {label}
+                    </span>
+                  ))}
+                </div>
               </div>
             ) : (
               tab.lines.map((l, idx) => {
@@ -1223,32 +1258,36 @@ export default function PosScreen() {
                 return (
                   <div
                     key={l.key}
-                    className={`bg-white rounded-xl border px-4 py-3 ${active ? 'border-[#0070f4]' : 'border-transparent hover:border-[#0070f4]/60'}`}
+                    className={`px-4 py-2.5 border-b border-slate-100 border-l-2 transition-colors ${
+                      active ? 'bg-[#eff6ff] border-l-[#0070f4]' : 'border-l-transparent hover:bg-[#f7faff]'
+                    }`}
                   >
                     <div className="flex items-center gap-3">
-                      <span className="w-5 text-center">{idx + 1}</span>
+                      <span className="w-5 text-center text-[#677484]">{idx + 1}</span>
                       <button
                         type="button"
                         onClick={() => updateTab((t) => ({ lines: t.lines.filter((x) => x.key !== l.key), paid: resetPaid(t) }))}
-                        className="text-[#15171a] hover:text-[#fb2c36] cursor-pointer"
+                        className="text-[#94a3b8] hover:text-[#fb2c36] cursor-pointer shrink-0"
                         title="Xóa hàng"
                       >
                         <Trash2 size={18} />
                       </button>
                       {prefs.image && <ProductThumb src={l.imageUrl} alt={l.name} size={48} />}
-                      {prefs.code && <span className="w-24 shrink-0 truncate">{l.code}</span>}
+                      {prefs.code && <span className="w-24 shrink-0 truncate text-[13px] text-[#677484]">{l.code}</span>}
                       <div className="flex-1 min-w-[110px] flex items-center gap-2">
-                        <span className="line-clamp-2" title={l.name}>{l.name}</span>
+                        <span className="line-clamp-2 font-medium" title={l.name}>{l.name}</span>
                         <span title={`${l.code} • ${l.name}`}>
-                          <Info size={15} className="text-[#677484] shrink-0" />
+                          <Info size={15} className="text-[#94a3b8] shrink-0" />
                         </span>
                       </div>
-                      <span className="shrink-0 max-w-[110px] truncate px-2 py-0.5 rounded bg-[#e6f1fe] text-[#0070f4] text-[13px]" title={l.uom}>
-                        {l.uom}
+                      <span className="w-[84px] shrink-0 flex justify-center">
+                        <span className="max-w-full truncate px-2 py-0.5 rounded bg-[#e6f1fe] text-[#0070f4] text-[13px]" title={l.uom}>
+                          {l.uom}
+                        </span>
                       </span>
 
                       {/* Số lượng ± (rê chuột xem tồn / đặt) */}
-                      <div className="relative group shrink-0 flex items-center gap-2">
+                      <div className="relative group w-[124px] shrink-0 flex items-center justify-center gap-2">
                         <button
                           type="button"
                           onClick={() => updateLine(l.key, { quantity: Math.max(1, l.quantity - 1) })}
@@ -1312,7 +1351,7 @@ export default function PosScreen() {
                           const p = products.find((x) => x.productId === l.productId);
                           if (p) addProduct(p, true);
                         }}
-                        className="p-1 rounded hover:bg-slate-100 cursor-pointer"
+                        className="w-[26px] shrink-0 p-1 rounded text-[#677484] hover:bg-slate-100 hover:text-[#0070f4] cursor-pointer"
                         title="Thêm dòng cho hàng này"
                       >
                         <Plus size={18} />
@@ -1334,20 +1373,25 @@ export default function PosScreen() {
             )}
           </div>
 
-          {/* Ghi chú đơn hàng */}
-          <div className="shrink-0 bg-white rounded-xl px-4 h-12 flex items-center gap-2">
-            <Pencil size={16} className="text-[#677484]" />
+          {/* Chân giỏ hàng: ghi chú đơn + tổng số lượng */}
+          <div className="shrink-0 border-t border-slate-200 bg-[#fafbfc] px-4 h-12 flex items-center gap-2">
+            <Pencil size={16} className="text-[#677484] shrink-0" />
             <input
               value={tab.notes}
               onChange={(e) => updateTab({ notes: e.target.value })}
               placeholder="Ghi chú đơn hàng"
-              className="flex-1 bg-transparent outline-none placeholder-[#677484]"
+              className="flex-1 min-w-0 bg-transparent outline-none placeholder-[#94a3b8]"
             />
+            {tab.lines.length > 0 && (
+              <span className="shrink-0 text-[13px] text-[#677484]">
+                {tab.lines.length} dòng • SL <b className="text-[#15171a]">{fmt(totalQty)}</b>
+              </span>
+            )}
           </div>
         </div>
 
         {/* ── Bên phải: khách hàng & thanh toán ── */}
-        <aside className="w-[420px] max-w-[34vw] shrink-0 bg-white rounded-xl flex flex-col p-4">
+        <aside className="w-[420px] max-w-[34vw] shrink-0 bg-white rounded-xl border border-slate-200/80 shadow-[0_1px_3px_rgba(15,23,42,0.06)] flex flex-col p-4">
           {/* Người bán + thời gian */}
           <div className="flex items-center justify-between gap-2">
             <span
@@ -1458,7 +1502,7 @@ export default function PosScreen() {
           </div>
 
           {/* Tổng tiền */}
-          <div className="mt-5 space-y-4 text-[15px]">
+          <div className="mt-4 pt-4 border-t border-dashed border-slate-200 space-y-3.5 text-[15px]">
             <div className="flex items-center justify-between">
               <span>
                 Tổng tiền hàng <span className="ml-8 text-[#677484]">{fmt(totalQty)}</span>
@@ -1498,9 +1542,9 @@ export default function PosScreen() {
                 <span>{fmt(depositApplied)}</span>
               </div>
             )}
-            <div className="flex items-center justify-between font-bold">
+            <div className="-mx-1 px-3 py-2.5 rounded-lg bg-[#eff6ff] flex items-center justify-between font-bold">
               <span>Khách cần trả</span>
-              <span className="text-[20px] text-[#0070f4]">{fmt(isBooking ? due : dueNow)}</span>
+              <span className="text-[22px] text-[#0070f4]">{fmt(isBooking ? due : dueNow)}</span>
             </div>
             {isBooking && (tab.bookingPaid ?? 0) > 0 && (
               <div className="flex items-center justify-between">
@@ -1515,20 +1559,30 @@ export default function PosScreen() {
               </div>
             </div>
 
-            {/* Phương thức thanh toán */}
-            <div className="flex items-center gap-5 pt-1 text-[14px]">
-              {PAY_METHODS.map((m) => (
-                <label key={m.value} className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    name={`pay-${tab.id}`}
-                    checked={tab.payMethod === m.value}
-                    onChange={() => updateTab({ payMethod: m.value })}
-                    className="h-[18px] w-[18px] accent-[#0070f4] cursor-pointer"
-                  />
-                  {m.label}
-                </label>
-              ))}
+            {/* Phương thức thanh toán — nút chọn (vẫn là radio để dùng được bằng bàn phím) */}
+            <div className="grid grid-cols-2 gap-2 pt-1 text-[14px]">
+              {PAY_METHODS.map((m) => {
+                const selected = tab.payMethod === m.value;
+                return (
+                  <label
+                    key={m.value}
+                    className={`h-10 rounded-lg border flex items-center justify-center gap-2 cursor-pointer transition ${
+                      selected
+                        ? 'border-[#0070f4] bg-[#eff6ff] text-[#0070f4] font-semibold'
+                        : 'border-slate-300 text-[#15171a] hover:border-[#0070f4]/60'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name={`pay-${tab.id}`}
+                      checked={selected}
+                      onChange={() => updateTab({ payMethod: m.value })}
+                      className="h-4 w-4 accent-[#0070f4] cursor-pointer"
+                    />
+                    {m.label}
+                  </label>
+                );
+              })}
             </div>
 
             {tab.payMethod === 'VIETQR' && (
@@ -1582,10 +1636,11 @@ export default function PosScreen() {
             onClick={() => void handleCheckout()}
             disabled={submitting || (isBooking ? !canBooking : !canInvoice)}
             title={isBooking ? (canBooking ? undefined : 'Chưa được phân quyền Đặt hàng') : canInvoice ? 'F9' : 'Chưa được phân quyền Bán hàng'}
-            className="mt-auto h-14 rounded-xl bg-[#0070f4] hover:bg-[#005ac3] text-white text-[17px] font-bold tracking-wide flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+            className="mt-auto pt-0 h-14 rounded-xl bg-[#0070f4] hover:bg-[#005ac3] active:bg-[#004fa8] text-white text-[17px] font-bold tracking-wide flex items-center justify-center gap-2 shadow-[0_6px_16px_-6px_rgba(0,112,244,0.6)] cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed disabled:shadow-none"
           >
             {submitting ? <RefreshCw size={18} className="animate-spin" /> : <Check size={18} className="hidden" />}
             {isBooking ? (tab.bookingId ? 'LƯU ĐƠN ĐẶT HÀNG' : 'ĐẶT HÀNG') : 'THANH TOÁN'}
+            <span className="ml-1 px-1.5 rounded bg-white/20 text-[11px] font-semibold tracking-normal">F9</span>
           </button>
         </aside>
       </div>
