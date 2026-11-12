@@ -1,6 +1,7 @@
 // src/features/admin/services/permissionService.ts
 // Service chuyên biệt xử lý Vai trò & Phân quyền Kho (Roles & Warehouse Permissions - Người 2 phụ trách)
 
+import { tabSession } from '@/lib/auth/tabSession';
 import { apiClient } from '@/lib/api/client';
 import { ADMIN_LOCKED_FEATURES, NAV_ITEMS_FLAT } from '@/lib/navigation/navbar';
 import { ROLE_SWITCHER_ENABLED } from '@/lib/auth/flags';
@@ -60,7 +61,7 @@ export const permissionService = {
   // ─── 1. Physical Warehouses (Data Isolation - Phân quyền kho) ─────────────
   async getWarehouseFacilities(): Promise<WarehouseFacility[]> {
     try {
-      const token = typeof window !== 'undefined' ? localStorage.getItem('stockflow_token') ?? undefined : undefined;
+      const token = typeof window !== 'undefined' ? tabSession.get('stockflow_token') ?? undefined : undefined;
       const apiData = await apiClient.get<any[]>('/api/warehouses', token);
       if (Array.isArray(apiData) && apiData.length > 0) {
         const mapped: WarehouseFacility[] = apiData
@@ -111,7 +112,7 @@ export const permissionService = {
 
   async getMyWarehouseFacilities(): Promise<WarehouseFacility[]> {
     try {
-      const token = typeof window !== 'undefined' ? localStorage.getItem('stockflow_token') ?? undefined : undefined;
+      const token = typeof window !== 'undefined' ? tabSession.get('stockflow_token') ?? undefined : undefined;
       const apiData = await apiClient.get<any[]>('/api/warehouses/my-warehouses', token);
       if (Array.isArray(apiData) && apiData.length > 0) {
         return apiData
@@ -139,7 +140,7 @@ export const permissionService = {
     address: string;
     area?: string;
   }): Promise<WarehouseFacility> {
-    const token = typeof window !== 'undefined' ? localStorage.getItem('stockflow_token') ?? undefined : undefined;
+    const token = typeof window !== 'undefined' ? tabSession.get('stockflow_token') ?? undefined : undefined;
     let createdApi: any = null;
 
     try {
@@ -192,7 +193,7 @@ export const permissionService = {
       isActive?: boolean;
     }
   ): Promise<WarehouseFacility> {
-    const token = typeof window !== 'undefined' ? localStorage.getItem('stockflow_token') ?? undefined : undefined;
+    const token = typeof window !== 'undefined' ? tabSession.get('stockflow_token') ?? undefined : undefined;
     const target = warehouseFacilities.find(
       (w) =>
         (typeof idOrCode === 'number' && w.warehouseId === idOrCode) ||
@@ -252,7 +253,7 @@ export const permissionService = {
   },
 
   async deleteWarehouseFacility(idOrCode: string | number): Promise<boolean> {
-    const token = typeof window !== 'undefined' ? localStorage.getItem('stockflow_token') ?? undefined : undefined;
+    const token = typeof window !== 'undefined' ? tabSession.get('stockflow_token') ?? undefined : undefined;
     const target = warehouseFacilities.find(
       (w) =>
         (typeof idOrCode === 'number' && w.warehouseId === idOrCode) ||
@@ -287,7 +288,7 @@ export const permissionService = {
   },
 
   async updateWarehousePermissions(staffId: string, assignedWarehouses: string[]): Promise<StaffAccount> {
-    const token = typeof window !== 'undefined' ? localStorage.getItem('stockflow_token') ?? undefined : undefined;
+    const token = typeof window !== 'undefined' ? tabSession.get('stockflow_token') ?? undefined : undefined;
     const numericId = parseInt(staffId.replace(/\D/g, ''), 10);
 
     if (!isNaN(numericId) && numericId > 0) {
@@ -332,7 +333,7 @@ export const permissionService = {
   // ─── 2. Roles & RBAC Matrix (Danh mục vai trò & Ma trận quyền) ───────────
   async getRoleDefinitions(): Promise<RoleDefinition[]> {
     try {
-      const token = typeof window !== 'undefined' ? localStorage.getItem('stockflow_token') ?? undefined : undefined;
+      const token = typeof window !== 'undefined' ? tabSession.get('stockflow_token') ?? undefined : undefined;
       const data = await apiClient.get<RoleDefinition[]>('/api/Roles', token);
       if (Array.isArray(data) && data.length > 0) {
         roleDefinitions = data;
@@ -345,7 +346,7 @@ export const permissionService = {
   },
 
   async createRole(payload: { name: string; code: string; description?: string; rank?: string }): Promise<RoleDefinition> {
-    const token = typeof window !== 'undefined' ? localStorage.getItem('stockflow_token') ?? undefined : undefined;
+    const token = typeof window !== 'undefined' ? tabSession.get('stockflow_token') ?? undefined : undefined;
     try {
       const created = await apiClient.post<RoleDefinition>('/api/Roles', payload, token);
       roleDefinitions.push(created);
@@ -357,7 +358,7 @@ export const permissionService = {
   },
 
   async updateRole(idOrCode: string, payload: { name: string; description?: string }): Promise<RoleDefinition | null> {
-    const token = typeof window !== 'undefined' ? localStorage.getItem('stockflow_token') ?? undefined : undefined;
+    const token = typeof window !== 'undefined' ? tabSession.get('stockflow_token') ?? undefined : undefined;
     try {
       const updated = await apiClient.put<RoleDefinition>(`/api/Roles/${encodeURIComponent(idOrCode)}`, payload, token);
       const idx = roleDefinitions.findIndex(r => r.id === idOrCode || r.code === idOrCode);
@@ -372,7 +373,7 @@ export const permissionService = {
   },
 
   async deleteRole(idOrCode: string): Promise<boolean> {
-    const token = typeof window !== 'undefined' ? localStorage.getItem('stockflow_token') ?? undefined : undefined;
+    const token = typeof window !== 'undefined' ? tabSession.get('stockflow_token') ?? undefined : undefined;
     try {
       await apiClient.delete(`/api/Roles/${encodeURIComponent(idOrCode)}`, token);
       roleDefinitions = roleDefinitions.filter(r => r.id !== idOrCode && r.code !== idOrCode);
@@ -385,7 +386,7 @@ export const permissionService = {
 
   async getPermissionMatrix(roleCode: string): Promise<PermissionMatrixModule[]> {
     try {
-      const token = typeof window !== 'undefined' ? localStorage.getItem('stockflow_token') ?? undefined : undefined;
+      const token = typeof window !== 'undefined' ? tabSession.get('stockflow_token') ?? undefined : undefined;
       const data = await apiClient.get<PermissionMatrixModule[]>(`/api/Roles/${encodeURIComponent(roleCode)}/permissions`, token);
       if (Array.isArray(data) && data.length > 0) {
         permissionMatrices[roleCode] = data;
@@ -416,7 +417,7 @@ export const permissionService = {
 
   async savePermissionMatrix(roleCode: string, modules: PermissionMatrixModule[]): Promise<boolean> {
     // Lưu lên server trước; chỉ cập nhật cache/giao diện khi server chấp nhận (backend mới là nơi chặn quyền).
-    const token = typeof window !== 'undefined' ? localStorage.getItem('stockflow_token') ?? undefined : undefined;
+    const token = typeof window !== 'undefined' ? tabSession.get('stockflow_token') ?? undefined : undefined;
     try {
       await apiClient.put(`/api/Roles/${encodeURIComponent(roleCode)}/permissions`, modules, token);
     } catch (e) {
@@ -519,7 +520,7 @@ let matrixCache: { token: string; at: number; matrix: Record<string, string[]> }
 let lastAllowed: { token: string; role: string; feats: Set<string> } | null = null;
 
 function authToken(): string | undefined {
-  return typeof window !== 'undefined' ? localStorage.getItem('stockflow_token') ?? undefined : undefined;
+  return typeof window !== 'undefined' ? tabSession.get('stockflow_token') ?? undefined : undefined;
 }
 
 function clearFeatureCaches() {

@@ -1,6 +1,7 @@
 // src/features/admin/services/staffService.ts
 // Service chuyên biệt xử lý Tài khoản Nhân viên (Staff Accounts - Người 1 phụ trách)
 
+import { tabSession } from '@/lib/auth/tabSession';
 import { apiClient } from '@/lib/api/client';
 import { StaffAccount, SystemUser } from '../types';
 import { INITIAL_STAFF_ACCOUNTS } from '../data/mockData';
@@ -10,7 +11,7 @@ let staffAccounts = [...INITIAL_STAFF_ACCOUNTS];
 export const staffService = {
   async getStaffList(search?: string, statusFilter?: string, deptFilter?: string): Promise<StaffAccount[]> {
     try {
-      const token = typeof window !== 'undefined' ? localStorage.getItem('stockflow_token') ?? undefined : undefined;
+      const token = typeof window !== 'undefined' ? tabSession.get('stockflow_token') ?? undefined : undefined;
       const params = new URLSearchParams();
       if (search) params.append('search', search);
       if (statusFilter && statusFilter !== 'ALL') params.append('status', statusFilter);
@@ -50,7 +51,7 @@ export const staffService = {
   },
 
   async createStaff(payload: Omit<StaffAccount, 'id'>): Promise<StaffAccount> {
-    const token = typeof window !== 'undefined' ? localStorage.getItem('stockflow_token') ?? undefined : undefined;
+    const token = typeof window !== 'undefined' ? tabSession.get('stockflow_token') ?? undefined : undefined;
     try {
       const newStaff = await apiClient.post<StaffAccount>('/api/Staff', payload, token);
       staffAccounts.unshift(newStaff);
@@ -63,7 +64,7 @@ export const staffService = {
 
   async updateStaff(id: string, updates: Partial<StaffAccount>): Promise<StaffAccount> {
     try {
-      const token = typeof window !== 'undefined' ? localStorage.getItem('stockflow_token') ?? undefined : undefined;
+      const token = typeof window !== 'undefined' ? tabSession.get('stockflow_token') ?? undefined : undefined;
       const numericId = parseInt(id.replace(/\D/g, ''), 10);
       if (!isNaN(numericId)) {
         const updated = await apiClient.put<StaffAccount>(`/api/Staff/${numericId}`, updates, token);
@@ -99,7 +100,7 @@ export const staffService = {
 
   async toggleStaffStatus(id: string): Promise<StaffAccount> {
     try {
-      const token = typeof window !== 'undefined' ? localStorage.getItem('stockflow_token') ?? undefined : undefined;
+      const token = typeof window !== 'undefined' ? tabSession.get('stockflow_token') ?? undefined : undefined;
       const numericId = parseInt(id.replace(/\D/g, ''), 10);
       if (!isNaN(numericId)) {
         const res = await apiClient.put<{ isActive: boolean }>(`/api/Staff/${numericId}/toggle-status`, {}, token);
@@ -155,7 +156,7 @@ export const staffService = {
 
   async resetStaffPassword(id: string): Promise<string> {
     try {
-      const token = typeof window !== 'undefined' ? localStorage.getItem('stockflow_token') ?? undefined : undefined;
+      const token = typeof window !== 'undefined' ? tabSession.get('stockflow_token') ?? undefined : undefined;
       const numericId = parseInt(id.replace(/\D/g, ''), 10);
       if (!isNaN(numericId)) {
         const res = await apiClient.post<{ defaultPassword: string }>(`/api/Staff/${numericId}/reset-password`, {}, token);

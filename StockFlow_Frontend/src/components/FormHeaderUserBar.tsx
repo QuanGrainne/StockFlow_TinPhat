@@ -3,6 +3,7 @@
 // Góc phải thanh tiêu đề của các form (Chuyển hàng, Kiểm kho...): chọn Kho làm việc + avatar người dùng.
 // Đổi kho ở đây cập nhật kho làm việc toàn hệ thống (useActiveWarehouse).
 
+import { tabSession } from '@/lib/auth/tabSession';
 import React, { useEffect, useState } from 'react';
 import { Check, ChevronDown, Warehouse } from 'lucide-react';
 import { useActiveWarehouse, type WarehouseItem } from '@/lib/warehouse/useActiveWarehouse';
@@ -26,7 +27,7 @@ interface StoredUser {
 
 function readUser(): StoredUser {
   try {
-    const raw = localStorage.getItem('stockflow_user');
+    const raw = tabSession.get('stockflow_user');
     return raw ? (JSON.parse(raw) as StoredUser) : {};
   } catch {
     return {};

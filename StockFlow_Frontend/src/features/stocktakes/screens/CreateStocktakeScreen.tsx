@@ -5,6 +5,7 @@
 // Lưu tạm = phiếu tạm (chưa đổi tồn kho) · Hoàn thành = cân bằng kho (tồn kho = SL thực tế).
 // ?edit=<id>: mở lại phiếu tạm · ?copy=<id>: tạo phiếu mới từ phiếu cũ.
 
+import { tabSession } from '@/lib/auth/tabSession';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -53,7 +54,7 @@ const qtyFmt = (n: number) => n.toLocaleString('vi-VN', { maximumFractionDigits:
 
 function readUserName(): string {
   try {
-    const raw = localStorage.getItem('stockflow_user');
+    const raw = tabSession.get('stockflow_user');
     if (!raw) return '';
     const u = JSON.parse(raw) as { fullName?: string; username?: string };
     return u.fullName || u.username || '';

@@ -1,6 +1,7 @@
 // src/features/products/services/goodsCatalogService.ts
 // Service kết nối API Danh mục Hàng hóa (Products) với backend ASP.NET Core & MediatR
 
+import { tabSession } from '@/lib/auth/tabSession';
 import { apiClient } from '@/lib/api/client';
 import { Product, ProductAttributeDef, ProductUnitConversion, ProductVariant } from '@/features/admin/types';
 
@@ -153,7 +154,7 @@ export const productService = {
     status?: string;
   }): Promise<Product[]> {
     try {
-      const token = typeof window !== 'undefined' ? localStorage.getItem('stockflow_token') ?? undefined : undefined;
+      const token = typeof window !== 'undefined' ? tabSession.get('stockflow_token') ?? undefined : undefined;
       const query = new URLSearchParams();
       if (params?.search) query.append('search', params.search);
       if (params?.type && params.type !== 'ALL') query.append('type', params.type);
@@ -175,7 +176,7 @@ export const productService = {
 
   async getProductById(id: number | string): Promise<Product | null> {
     try {
-      const token = typeof window !== 'undefined' ? localStorage.getItem('stockflow_token') ?? undefined : undefined;
+      const token = typeof window !== 'undefined' ? tabSession.get('stockflow_token') ?? undefined : undefined;
       return await apiClient.get<Product>(`/api/Products/${id}`, token);
     } catch (e) {
       console.error('API getProductById failed:', e);
@@ -184,7 +185,7 @@ export const productService = {
   },
 
   async createProduct(payload: CreateProductPayload): Promise<Product> {
-    const token = typeof window !== 'undefined' ? localStorage.getItem('stockflow_token') ?? undefined : undefined;
+    const token = typeof window !== 'undefined' ? tabSession.get('stockflow_token') ?? undefined : undefined;
     try {
       return await apiClient.post<Product>('/api/Products', payload, token);
     } catch (e) {
@@ -194,7 +195,7 @@ export const productService = {
   },
 
   async updateProduct(id: number | string, payload: UpdateProductPayload): Promise<Product> {
-    const token = typeof window !== 'undefined' ? localStorage.getItem('stockflow_token') ?? undefined : undefined;
+    const token = typeof window !== 'undefined' ? tabSession.get('stockflow_token') ?? undefined : undefined;
     try {
       return await apiClient.put<Product>(`/api/Products/${id}`, payload, token);
     } catch (e) {
@@ -205,13 +206,13 @@ export const productService = {
 
   /** Đảo trạng thái kinh doanh; trả về trạng thái mới (true = đang kinh doanh) */
   async toggleProductStatus(id: number | string): Promise<boolean> {
-    const token = typeof window !== 'undefined' ? localStorage.getItem('stockflow_token') ?? undefined : undefined;
+    const token = typeof window !== 'undefined' ? tabSession.get('stockflow_token') ?? undefined : undefined;
     const res = await apiClient.patch<{ isActive: boolean }>(`/api/Products/${id}/toggle-status`, undefined, token);
     return res.isActive;
   },
 
   async deleteProduct(id: number | string): Promise<boolean> {
-    const token = typeof window !== 'undefined' ? localStorage.getItem('stockflow_token') ?? undefined : undefined;
+    const token = typeof window !== 'undefined' ? tabSession.get('stockflow_token') ?? undefined : undefined;
     try {
       await apiClient.delete(`/api/Products/${id}`, token);
       return true;
@@ -223,7 +224,7 @@ export const productService = {
 
   async getCategories(): Promise<ProductCategoryItem[]> {
     try {
-      const token = typeof window !== 'undefined' ? localStorage.getItem('stockflow_token') ?? undefined : undefined;
+      const token = typeof window !== 'undefined' ? tabSession.get('stockflow_token') ?? undefined : undefined;
       return await apiClient.get<ProductCategoryItem[]>('/api/Products/categories', token);
     } catch (e) {
       console.warn('API getCategories failed:', e);
@@ -231,13 +232,13 @@ export const productService = {
     }
   },
   async createCategory(payload: { categoryName: string; description?: string }): Promise<ProductCategoryItem> {
-    const token = typeof window !== 'undefined' ? localStorage.getItem('stockflow_token') ?? undefined : undefined;
+    const token = typeof window !== 'undefined' ? tabSession.get('stockflow_token') ?? undefined : undefined;
     return await apiClient.post<ProductCategoryItem>('/api/Products/categories', payload, token);
   },
 
   async getUnits(): Promise<ProductUnitItem[]> {
     try {
-      const token = typeof window !== 'undefined' ? localStorage.getItem('stockflow_token') ?? undefined : undefined;
+      const token = typeof window !== 'undefined' ? tabSession.get('stockflow_token') ?? undefined : undefined;
       return await apiClient.get<ProductUnitItem[]>('/api/Products/units', token);
     } catch (e) {
       console.warn('API getUnits failed:', e);
@@ -246,7 +247,7 @@ export const productService = {
   },
 
   async importProducts(payload: ImportProductsPayload): Promise<ImportProductsResult> {
-    const token = typeof window !== 'undefined' ? localStorage.getItem('stockflow_token') ?? undefined : undefined;
+    const token = typeof window !== 'undefined' ? tabSession.get('stockflow_token') ?? undefined : undefined;
     try {
       return await apiClient.post<ImportProductsResult>('/api/Products/import', payload, token);
     } catch (e) {

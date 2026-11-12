@@ -5,6 +5,7 @@
 // - ?edit=<id>  : mở lại phiếu tạm để sửa / hoàn thành
 // - không tham số: trả hàng tự do (chọn NCC + tìm hàng hóa trong kho làm việc)
 
+import { tabSession } from '@/lib/auth/tabSession';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -66,7 +67,7 @@ const lineTotal = (r: ReturnRow) => Math.round(r.quantity * r.returnPrice);
 
 function getUserDisplay(): string {
   try {
-    const raw = localStorage.getItem('stockflow_user');
+    const raw = tabSession.get('stockflow_user');
     if (!raw) return 'Người dùng';
     const u = JSON.parse(raw) as { fullName?: string; username?: string };
     return u.fullName || u.username || 'Người dùng';

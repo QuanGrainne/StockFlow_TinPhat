@@ -1,3 +1,4 @@
+import { tabSession } from '@/lib/auth/tabSession';
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { UserRole } from '@/features/admin/types';
@@ -125,13 +126,13 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ initialScreen, children })
     if (!ROLE_SWITCHER_ENABLED) return;
     setCurrentRole(newRole);
     if (typeof window !== 'undefined') {
-      localStorage.setItem('stockflow_current_role', newRole);
-      const userStr = localStorage.getItem('stockflow_user');
+      tabSession.set('stockflow_current_role', newRole);
+      const userStr = tabSession.get('stockflow_user');
       if (userStr) {
         try {
           const u = JSON.parse(userStr);
           u.roles = [newRole];
-          localStorage.setItem('stockflow_user', JSON.stringify(u));
+          tabSession.set('stockflow_user', JSON.stringify(u));
         } catch { }
       }
     }
