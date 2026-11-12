@@ -1,5 +1,5 @@
 // src/components/layout/Header.tsx
-// Header giao diện: Topbar chuẩn theo thiết kế AI Studio (Logo SF, Badge Role, Search input, User profile avatar & Switch Role dropdown khớp Ảnh 4)
+// Header giao diện: Topbar chuẩn theo thiết kế AI Studio (Logo Tín Phát, Badge Role, Search input, User profile avatar & Switch Role dropdown khớp Ảnh 4)
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { UserRole, StaffAccount, WarehouseFacility } from '@/features/admin/types';
@@ -24,6 +24,7 @@ import { adminService } from '@/features/admin/services/adminService';
 import { useRouter } from 'next/navigation';
 import { TIN_PHAT_WAREHOUSES, setActiveWarehouseGlobal } from '@/lib/warehouse/useActiveWarehouse';
 import { ROLE_SWITCHER_ENABLED } from '@/lib/auth/flags';
+import { BrandLogo } from '@/components/brand/BrandLogo';
 
 interface HeaderProps {
   currentRole: UserRole;
@@ -496,9 +497,7 @@ export const Header: React.FC<HeaderProps> = ({
     <header className="min-h-16 bg-white border-b border-slate-200 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-3 sm:px-6 py-2 sticky top-0 z-40 select-none">
       {/* Left: Logo & Role Badge */}
       <div className="flex items-center gap-3 min-w-0">
-        <div className="w-9 h-9 rounded-[8px] bg-[#1E56A0] text-white flex items-center justify-center font-bold text-sm tracking-tight shadow-xs">
-          SF
-        </div>
+        <BrandLogo width={56} className="shrink-0" priority />
         <div>
           <div className="flex items-center gap-2">
             <span className="text-base font-bold text-slate-900 tracking-tight">StockFlow</span>
