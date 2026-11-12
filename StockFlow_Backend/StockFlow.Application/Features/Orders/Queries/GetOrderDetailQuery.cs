@@ -9,6 +9,7 @@ using Microsoft.EntityFrameworkCore;
 using StockFlow.Application.Common;
 using StockFlow.Application.Common.Interfaces;
 using StockFlow.Application.Features.Orders.DTOs;
+using StockFlow.Application.Features.Orders.Helpers;
 
 namespace StockFlow.Application.Features.Orders.Queries;
 
@@ -19,11 +20,16 @@ public class GetOrderDetailQueryHandler : IRequestHandler<GetOrderDetailQuery, R
 {
     private readonly IStockFlowDbContext _context;
     private readonly ICurrentUserService _currentUserService;
+    private readonly IUserPermissionService _permissionService;
 
-    public GetOrderDetailQueryHandler(IStockFlowDbContext context, ICurrentUserService currentUserService)
+    public GetOrderDetailQueryHandler(
+        IStockFlowDbContext context,
+        ICurrentUserService currentUserService,
+        IUserPermissionService permissionService)
     {
         _context = context;
         _currentUserService = currentUserService;
+        _permissionService = permissionService;
     }
 
     public async Task<Result<OrderDetailDto>> Handle(GetOrderDetailQuery request, CancellationToken cancellationToken)
@@ -56,16 +62,15 @@ public class GetOrderDetailQueryHandler : IRequestHandler<GetOrderDetailQuery, R
             return Result<OrderDetailDto>.Failure($"Không tìm thấy đơn hàng #{request.OrderId ?? (object?)request.OrderCode}.");
         }
 
-        // Phân quyền kho: Người dùng không phải Admin chỉ được xem đơn thuộc kho mình phụ trách
-        var primaryWarehouse = order.TrxStockIssues.Select(si => si.Warehouse).FirstOrDefault();
-        if (_currentUserService.IsAuthenticated && !_currentUserService.IsAdmin && primaryWarehouse != null)
+        // Phân quyền kho (BR-04): chỉ xem được chứng từ thuộc kho mình được phân quyền.
+        // Kiểm tra cả người chưa được gán kho nào và chứng từ chưa có phiếu xuất.
+        if (!await OrderWarehouseAccess.CanAccessAsync(_context, _currentUserService, _permissionService, order, cancellationToken))
         {
-            var authorizedWarehouseIds = await _currentUserService.GetAuthorizedWarehouseIdsAsync(cancellationToken);
-            if (authorizedWarehouseIds.Count > 0 && !authorizedWarehouseIds.Contains(primaryWarehouse.WarehouseId))
-            {
-                return Result<OrderDetailDto>.Failure("Bạn không có quyền truy cập dữ liệu của chi nhánh/kho này.");
-            }
+            return Result<OrderDetailDto>.Failure("Bạn không có quyền truy cập dữ liệu của chi nhánh/kho này.");
         }
+
+        // Kho hiển thị trên hóa đơn (giữ nguyên cách lấy cũ, chỉ dùng để hiển thị)
+        var primaryWarehouse = order.TrxStockIssues.Select(si => si.Warehouse).FirstOrDefault();
 
         // Lấy lịch sử giao dịch thanh toán
         var financialTxs = await _context.TrxFinancialTransactions
