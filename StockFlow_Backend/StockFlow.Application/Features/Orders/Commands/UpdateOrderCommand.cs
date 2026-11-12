@@ -7,6 +7,7 @@ using Microsoft.EntityFrameworkCore;
 using StockFlow.Application.Common;
 using StockFlow.Application.Common.Interfaces;
 using StockFlow.Application.Features.Orders.DTOs;
+using StockFlow.Application.Features.Orders.Helpers;
 using StockFlow.Application.Features.Orders.Queries;
 
 namespace StockFlow.Application.Features.Orders.Commands;
@@ -18,15 +19,18 @@ public class UpdateOrderCommandHandler : IRequestHandler<UpdateOrderCommand, Res
     private readonly IStockFlowDbContext _context;
     private readonly ICurrentUserService _currentUserService;
     private readonly IMediator _mediator;
+    private readonly IUserPermissionService _permissionService;
 
     public UpdateOrderCommandHandler(
         IStockFlowDbContext context,
         ICurrentUserService currentUserService,
-        IMediator mediator)
+        IMediator mediator,
+        IUserPermissionService permissionService)
     {
         _context = context;
         _currentUserService = currentUserService;
         _mediator = mediator;
+        _permissionService = permissionService;
     }
 
     public async Task<Result<OrderDetailDto>> Handle(UpdateOrderCommand request, CancellationToken cancellationToken)
@@ -46,6 +50,12 @@ public class UpdateOrderCommandHandler : IRequestHandler<UpdateOrderCommand, Res
         if (order == null)
         {
             return Result<OrderDetailDto>.Failure($"Không tìm thấy đơn hàng #{request.IdOrCode}.");
+        }
+
+        // Phân quyền kho (BR-04): chỉ sửa được chứng từ thuộc kho mình được phân quyền
+        if (!await OrderWarehouseAccess.CanAccessAsync(_context, _currentUserService, _permissionService, order, cancellationToken))
+        {
+            return Result<OrderDetailDto>.Failure("Bạn không có quyền sửa đơn hàng của chi nhánh này.");
         }
 
         // Cập nhật loại đơn hàng (INVOICE hoặc BOOKING)
