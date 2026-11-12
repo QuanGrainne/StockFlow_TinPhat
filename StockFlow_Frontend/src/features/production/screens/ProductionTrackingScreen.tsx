@@ -575,7 +575,7 @@ export const ProductionTrackingScreen: React.FC<ProductionTrackingScreenProps> =
     const scrapTotal = orderLogs.reduce((acc, curr) => acc + (Number(curr.scrapQty) || 0), 0) + 40; // 85 Cái lũy kế
 
     return (
-      <div className="p-6 bg-slate-50/60 min-h-screen text-slate-800 space-y-6">
+      <div className="p-6 bg-transparent min-h-full text-slate-800 space-y-6">
         {/* Toast Notification */}
         {toastMessage && (
           <div className="fixed top-20 right-8 z-50 bg-emerald-600 text-white px-4 py-2.5 rounded-xl shadow-xl text-xs font-semibold flex items-center gap-2 animate-bounce">
@@ -1039,7 +1039,7 @@ export const ProductionTrackingScreen: React.FC<ProductionTrackingScreenProps> =
   // RENDER 2: MÀN HÌNH THEO DÕI LỆNH SẢN XUẤT (DATA GRID - KHỚP ẢNH 1 & ẢNH 2)
   // ════════════════════════════════════════════════════════════════════════════
   return (
-    <div className="p-6 bg-slate-50/60 min-h-screen text-slate-800 space-y-6">
+    <div className="p-6 bg-transparent min-h-full text-slate-800 space-y-6">
       {/* Toast Notification */}
       {toastMessage && (
         <div className="fixed top-20 right-8 z-50 bg-slate-900 text-white px-4 py-2.5 rounded-xl shadow-xl text-xs font-semibold flex items-center gap-2 animate-in fade-in">

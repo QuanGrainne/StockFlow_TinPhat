@@ -428,7 +428,7 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   return (
-    <header className="min-h-16 bg-white border-b border-slate-200 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-3 sm:px-6 py-2 sticky top-0 z-40 select-none">
+    <header className="min-h-16 bg-white/85 border-b border-slate-200 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-3 sm:px-6 py-2 sticky top-0 z-40 select-none">
       {/* Left: Logo & Role Badge */}
       <div className="flex items-center gap-3 min-w-0">
         <BrandLogo width={56} className="shrink-0" priority />

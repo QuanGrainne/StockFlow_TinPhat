@@ -895,7 +895,7 @@ export default function CreatePurchaseScreen({ mode = 'receipt' }: CreatePurchas
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-56px)] bg-[#f5f5f5] text-[13px] text-[#15171a] select-none overflow-hidden font-sans">
+    <div className="flex flex-col h-[calc(100vh-56px)] bg-transparent text-[13px] text-[#15171a] select-none overflow-hidden font-sans">
       {/* Toast Alert */}
       {toastMessage && (
         <div
@@ -948,7 +948,7 @@ export default function CreatePurchaseScreen({ mode = 'receipt' }: CreatePurchas
       )}
 
       {/* ─── 1. Header Toolbar Bar (Theo đúng chuẩn chuyển hàng) ─── */}
-      <header className="h-12 bg-white border-b border-slate-200 px-4 flex items-center justify-between gap-3 shrink-0 relative z-30">
+      <header className="h-12 bg-white/85 backdrop-blur-[2px] border-b border-slate-200 px-4 flex items-center justify-between gap-3 shrink-0 relative z-30">
         {/* Left: Back Arrow + Nhập hàng title */}
         <div className="flex items-center gap-3">
           <Link
@@ -1153,7 +1153,7 @@ export default function CreatePurchaseScreen({ mode = 'receipt' }: CreatePurchas
       {/* ─── 2. Main Content Split View (Left Table + Right Sidebar) ─── */}
       <div className="flex-1 flex overflow-hidden relative">
         {/* LEFT COLUMN: Products Table or Empty Excel State */}
-        <div className="flex-1 flex flex-col bg-white overflow-hidden">
+        <div className="flex-1 flex flex-col bg-white/65 overflow-hidden">
           {/* Bảng hàng hóa: cột Ảnh / Tồn kho / Giá vốn / Giá bán bật-tắt bằng nút con mắt */}
           <div className="flex-1 overflow-auto">
             <div style={{ minWidth: tableMinWidth }}>
@@ -1396,7 +1396,7 @@ export default function CreatePurchaseScreen({ mode = 'receipt' }: CreatePurchas
 
         {/* ─── 3. RIGHT SIDEBAR: Purchase Header & Actions ─── */}
         {!isSidebarCollapsed && (
-          <aside className="w-[380px] bg-white border-l border-slate-200 flex flex-col shrink-0 text-[13px] text-[#15171a]">
+          <aside className="w-[380px] bg-white/80 backdrop-blur-[2px] border-l border-slate-200 flex flex-col shrink-0 text-[13px] text-[#15171a]">
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
               {/* Người nhập + Thời gian nhập */}
               <div className="flex items-center justify-between gap-3">

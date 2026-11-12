@@ -167,9 +167,9 @@ export default function TransfersScreen() {
   };
 
   return (
-    <div className="flex-1 h-full min-h-0 flex flex-col bg-[#f5f5f5] overflow-hidden select-none text-[13px] text-[#15171a] font-sans">
-      {/* 1. Header Toolbar Bar (Theo đúng thiết kế KiotViet) */}
-      <header className="min-h-12 bg-white border-b border-slate-200 px-3 sm:px-4 py-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 shrink-0">
+    <div className="flex-1 h-full min-h-0 flex flex-col bg-transparent overflow-hidden select-none text-[13px] text-[#15171a] font-sans">
+      {/* 1. Header Toolbar Bar */}
+      <header className="min-h-12 bg-white/84 backdrop-blur-[2px] border-b border-slate-200 px-3 sm:px-4 py-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 shrink-0">
         {/* Left: Title & Search bar */}
         <div className="flex items-center gap-4 flex-1 basis-[320px] min-w-[260px] max-w-xl">
           <h1 className="text-[20px] font-bold text-[#15171a] leading-7 tracking-tight whitespace-nowrap">
@@ -242,7 +242,7 @@ export default function TransfersScreen() {
         />
 
         {/* Data Table Workspace */}
-        <div className="flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden bg-white">
+        <div className="flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden bg-white/62">
           <div className="flex-1 min-h-0 overflow-auto">
             <table className="w-full text-left border-collapse min-w-[900px]">
               <thead className="bg-[#f7f8f9] sticky top-0 z-20 border-b border-slate-200 text-[12px] font-semibold text-[#677484] shadow-xs">
@@ -273,7 +273,7 @@ export default function TransfersScreen() {
               <tbody className="divide-y divide-slate-100">
                 {/* Dòng tổng giá trị chuyển theo đúng Ảnh 1 & Ảnh 2 */}
                 {transfers.length > 0 && !loading && (
-                  <tr className="bg-white border-b border-slate-200 font-bold text-[#15171a] text-[13px]">
+                  <tr className="bg-white/75 border-b border-slate-200 font-bold text-[#15171a] text-[13px]">
                     <td colSpan={7}></td>
                     <td className="py-2.5 px-3 text-right font-mono font-bold text-[#15171a]">
                       {transfers.reduce((sum, t) => sum + (t.totalAmount || 0), 0).toLocaleString('vi-VN')}
@@ -446,7 +446,7 @@ export default function TransfersScreen() {
           </div>
 
           {/* Footer Bar */}
-          <footer className="min-h-10 bg-white border-t border-slate-200 px-3 sm:px-4 py-1.5 flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5 text-[12px] text-[#677484] shrink-0">
+          <footer className="min-h-10 bg-white/82 backdrop-blur-[2px] border-t border-slate-200 px-3 sm:px-4 py-1.5 flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5 text-[12px] text-[#677484] shrink-0">
             <div>
               Hiển thị <strong className="text-[#15171a] font-bold">{transfers.length}</strong> trên{' '}
               <strong className="text-[#15171a] font-bold">{transfers.length}</strong> giao dịch

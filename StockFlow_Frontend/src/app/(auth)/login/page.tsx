@@ -14,14 +14,12 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
-  const [info, setInfo] = useState('');
   const [invalid, setInvalid] = useState<InvalidField>(null);
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError('');
-    setInfo('');
     setInvalid(null);
 
     if (!username || !password) {
@@ -77,13 +75,6 @@ export default function LoginPage() {
     }
   }
 
-  // Chưa có chức năng tự đặt lại mật khẩu: Quản trị viên đặt lại trong màn Tài khoản nhân viên
-  function handleForgotPassword() {
-    setError('');
-    setInvalid(null);
-    setInfo('Vui lòng liên hệ Quản trị viên để được cấp lại mật khẩu.');
-  }
-
   const usernameInvalid = invalid === 'username' || invalid === 'both';
   const passwordInvalid = invalid === 'password' || invalid === 'both';
   const fieldClass = (isInvalid: boolean) =>
@@ -94,8 +85,9 @@ export default function LoginPage() {
     }`;
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#f0f2f7] px-4 py-10">
-      <div className="w-full max-w-[590px] bg-white rounded-2xl shadow-[0_1px_3px_rgba(15,23,42,0.06)] px-6 py-10 sm:px-12 sm:py-12">
+    // Nền: ảnh toàn cảnh nhà xưởng Tín Phát (.stockflow-login-bg trong globals.css)
+    <div className="min-h-screen flex items-center justify-center stockflow-login-bg px-4 py-10">
+      <div className="w-full max-w-[590px] bg-white/94 backdrop-blur-sm border border-white/80 rounded-2xl shadow-[0_20px_50px_-12px_rgba(15,23,42,0.32)] px-6 py-10 sm:px-12 sm:py-12">
         {/* Logo / Branding */}
         <div className="flex flex-col items-center">
           <BrandLogo width={128} priority />
@@ -107,11 +99,6 @@ export default function LoginPage() {
         {error && (
           <div className="mb-5 px-4 py-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
             {error}
-          </div>
-        )}
-        {info && (
-          <div className="mb-5 px-4 py-3 rounded-lg bg-blue-50 border border-blue-200 text-blue-700 text-sm">
-            {info}
           </div>
         )}
 
@@ -157,20 +144,10 @@ export default function LoginPage() {
             </button>
           </div>
 
-          <div className="flex justify-end mt-3">
-            <button
-              type="button"
-              onClick={handleForgotPassword}
-              className="text-[15px] text-[#D71920] hover:underline"
-            >
-              Quên mật khẩu?
-            </button>
-          </div>
-
           <button
             type="submit"
             disabled={loading}
-            className="w-full h-12 mt-8 rounded-lg bg-[#D71920] hover:bg-[#BE141B] active:bg-[#A51117] text-white text-[15px] font-medium transition disabled:opacity-60 disabled:cursor-not-allowed"
+            className="w-full h-12 mt-10 rounded-lg bg-[#D71920] hover:bg-[#BE141B] active:bg-[#A51117] text-white text-[15px] font-medium transition disabled:opacity-60 disabled:cursor-not-allowed"
           >
             {loading ? 'Đang đăng nhập...' : 'Đăng nhập'}
           </button>

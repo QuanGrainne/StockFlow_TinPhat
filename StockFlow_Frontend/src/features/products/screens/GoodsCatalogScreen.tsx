@@ -3062,7 +3062,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
   };
 
   return (
-    <div className="flex-1 h-full min-h-0 flex flex-col bg-[#f5f5f5] overflow-hidden select-none text-[13px] text-[#15171a] font-sans relative">
+    <div className="flex-1 h-full min-h-0 flex flex-col bg-transparent overflow-hidden select-none text-[13px] text-[#15171a] font-sans relative">
       {/* Toast Notification */}
       {toastMessage && (
         <div className="fixed top-20 right-8 z-50 bg-slate-900 text-white px-4 py-2.5 rounded-lg shadow-xl text-xs font-semibold flex items-center gap-2 animate-in fade-in">
@@ -3071,8 +3071,8 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
         </div>
       )}
 
-      {/* 1. Header Toolbar Bar (Chuẩn thiết kế KiotViet giống Chuyển hàng) */}
-      <header className="min-h-12 bg-white border-b border-slate-200 px-3 sm:px-4 py-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 shrink-0">
+      {/* 1. Header Toolbar Bar */}
+      <header className="min-h-12 bg-white/84 backdrop-blur-[2px] border-b border-slate-200 px-3 sm:px-4 py-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 shrink-0">
         {/* Left: Title & Search bar */}
         <div className="flex items-center gap-4 flex-1 basis-[320px] min-w-[260px] max-w-xl">
           <h1 className="text-[20px] font-bold text-[#15171a] leading-7 tracking-tight whitespace-nowrap">
@@ -3222,7 +3222,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
         />
 
         {/* Data Table Workspace */}
-        <div className="flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden bg-white">
+        <div className="flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden bg-white/62">
 
           {/* Action Bar khi chọn ít nhất 1 dòng */}
           {selectedItemIds.length > 0 && (
@@ -4257,7 +4257,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
         </div>
 
         {/* ─── Thanh Phân Trang Chuẩn Mẫu ─── */}
-        <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2 bg-white border-t border-slate-200 text-xs text-slate-600 select-none shrink-0">
+        <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2 bg-white/82 backdrop-blur-[2px] border-t border-slate-200 text-xs text-slate-600 select-none shrink-0">
           {/* Khối Trái: Chọn số dòng hiển thị */}
           <div className="flex items-center gap-2">
             <span className="text-[#677484] font-normal">Hiển thị</span>

@@ -23,7 +23,7 @@ export const NoAccess: React.FC<NoAccessProps> = ({ feature, homePath, fullScree
   const router = useRouter();
   const title = feature ? featureTitleOf(feature) : undefined;
   return (
-    <div className={`flex items-center justify-center px-4 ${fullScreen ? 'min-h-screen bg-[#F8FAFC]' : 'py-24'}`}>
+    <div className={`flex items-center justify-center px-4 ${fullScreen ? 'min-h-screen stockflow-brand-bg' : 'py-24'}`}>
       <div className="max-w-md w-full bg-white border border-slate-200 rounded-xl shadow-sm p-8 text-center">
         <div className="mx-auto mb-4 w-12 h-12 rounded-full bg-red-50 flex items-center justify-center text-red-500">
           <ShieldOff size={22} />
@@ -87,7 +87,7 @@ export const FeatureGuard: React.FC<FeatureGuardProps> = ({ anyOf, children }) =
 
   if (!state) {
     return (
-      <div className="flex h-screen items-center justify-center bg-[#f7f9fa] text-sm text-slate-400">Đang kiểm tra quyền...</div>
+      <div className="flex h-screen items-center justify-center stockflow-brand-bg text-sm text-slate-400">Đang kiểm tra quyền...</div>
     );
   }
   if (!state.allowed) return <NoAccess feature={state.feature} homePath={state.home} fullScreen />;

@@ -280,9 +280,10 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ initialScreen, children })
   };
 
   return (
-    <div className="h-screen bg-[#F8FAFC] text-slate-800 flex flex-col font-sans overflow-hidden">
+    // Nền ảnh nhà xưởng Tín Phát (nhạt) cho toàn bộ khu làm việc; các vùng main để trong suốt để thấy nền
+    <div className="h-screen stockflow-brand-bg text-slate-800 flex flex-col font-sans overflow-hidden">
       {/* 1. Header & Top Navigation Tabs Bar (Cố định ở đỉnh, không bị cuộn trôi) */}
-      <div className="shrink-0 z-40 bg-white shadow-2xs">
+      <div className="shrink-0 z-40 bg-white/88 backdrop-blur-xs shadow-2xs">
         <Header
           currentRole={currentRole}
           onRoleChange={handleRoleChange}
@@ -297,7 +298,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ initialScreen, children })
 
       {/* 2. Main Workspace Content (Chỉ cuộn vùng nội dung) */}
       {children ? (
-        <main className="flex-1 min-w-0 overflow-y-auto bg-[#F4F6F9]">
+        <main className="flex-1 min-w-0 overflow-y-auto bg-transparent">
           {children}
         </main>
       ) : activeScreen === 'transfers' || activeScreen.includes('transfers') ||
@@ -313,19 +314,19 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ initialScreen, children })
         activeScreen === 'price-books' || activeScreen === 'admin-price-books' ||
         activeScreen === 'stocktakes' ||
         activeScreen.includes('price-book') ? (
-        <main className="flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden bg-[#F8FAFC]">
+        <main className="flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden bg-transparent">
           {renderActiveScreen()}
         </main>
       ) : activeScreen === 'orders' || activeScreen.includes('orders') ? (
-        <main className="flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden bg-[#F8FAFC]">
+        <main className="flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden bg-transparent">
           {renderActiveScreen()}
         </main>
       ) : activeScreen === 'admin-order-settings' || activeScreen.includes('order-settings') ? (
-        <main className="flex-1 min-w-0 overflow-y-auto bg-slate-50">
+        <main className="flex-1 min-w-0 overflow-y-auto bg-transparent">
           {renderActiveScreen()}
         </main>
       ) : (
-        <main className="flex-1 min-w-0 overflow-y-auto p-6 lg:p-8 bg-[#F8FAFC]">
+        <main className="flex-1 min-w-0 overflow-y-auto p-6 lg:p-8 bg-transparent">
           <div className="max-w-7xl mx-auto">{renderActiveScreen()}</div>
         </main>
       )}

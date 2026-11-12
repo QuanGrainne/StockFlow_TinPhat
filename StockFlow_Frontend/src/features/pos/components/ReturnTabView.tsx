@@ -9,7 +9,7 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { message } from 'antd';
-import { CircleUserRound, Minus, Pencil, Plus, RefreshCw, Search, Trash2, X } from 'lucide-react';
+import { CircleUserRound, Minus, Pencil, Plus, RefreshCw, Search, Trash2, Undo2, X } from 'lucide-react';
 import { ProductThumb } from '@/components/ProductThumb';
 import { invoiceLinkHref } from '@/features/orders/components/InvoicePreviewModal';
 import { salesReturnService } from '@/features/sales-returns/services/salesReturnService';
@@ -116,13 +116,21 @@ export function ReturnTabView({ tab, userName, onChange, onDone, canReturn, ware
   };
 
   return (
-    <div className="flex-1 min-h-0 flex gap-2 p-2">
+    <div className="flex-1 min-h-0 flex gap-3 p-3">
       {/* ── Trái: hàng của hóa đơn gốc ── */}
       <div className="flex-1 min-w-0 flex flex-col gap-2">
         <div className="flex-1 min-h-0 overflow-y-auto space-y-2 pr-1">
           {tab.lines.length === 0 ? (
-            <div className="h-full flex items-center justify-center text-[#94a3b8]">
-              {isQuick ? 'Tìm hàng trả (F3) để thêm vào phiếu trả' : 'Hóa đơn không còn hàng để trả'}
+            <div className="h-full flex items-center justify-center">
+              <div className="bg-white border border-slate-200/80 rounded-xl px-8 py-6 text-center shadow-[0_1px_3px_rgba(15,23,42,0.06)]">
+                <div className="mx-auto w-14 h-14 rounded-full bg-[#fff1e6] text-[#f97316] flex items-center justify-center">
+                  <Undo2 size={26} />
+                </div>
+                <p className="mt-3 text-[15px] font-semibold text-[#15171a]">
+                  {isQuick ? 'Chưa có hàng trả' : 'Hóa đơn không còn hàng để trả'}
+                </p>
+                {isQuick && <p className="mt-1 text-[13px] text-[#677484]">Tìm hàng trả (F3) để thêm vào phiếu trả</p>}
+              </div>
             </div>
           ) : (
             tab.lines.map((l, idx) => {
@@ -192,7 +200,7 @@ export function ReturnTabView({ tab, userName, onChange, onDone, canReturn, ware
           )}
         </div>
 
-        <div className="shrink-0 bg-white rounded-xl px-4 h-12 flex items-center gap-2">
+        <div className="shrink-0 bg-white border border-slate-200/80 rounded-xl px-4 h-12 flex items-center gap-2">
           <Pencil size={16} className="text-[#677484]" />
           <input
             value={tab.notes}
@@ -204,7 +212,7 @@ export function ReturnTabView({ tab, userName, onChange, onDone, canReturn, ware
       </div>
 
       {/* ── Phải: tiền trả khách ── */}
-      <aside className="w-[420px] max-w-[34vw] shrink-0 bg-white rounded-xl flex flex-col p-4">
+      <aside className="w-[420px] max-w-[34vw] shrink-0 bg-white rounded-xl border border-slate-200/80 shadow-[0_1px_3px_rgba(15,23,42,0.06)] flex flex-col p-4">
         <div className="flex items-center justify-between gap-2">
           <span className="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-lg bg-[#f1f3f6] text-[14px] min-w-0 max-w-[60%] whitespace-nowrap" title={userName}>
             <CircleUserRound size={16} className="text-[#677484] shrink-0" />

@@ -105,7 +105,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentRole, activeScreen, onN
   return (
     <div
       ref={containerRef}
-      className="bg-white border-b border-slate-200 px-3 sm:px-6 py-2 flex flex-wrap items-center justify-between gap-2 select-none relative z-30 overflow-visible"
+      className="bg-white/82 border-b border-slate-200 px-3 sm:px-6 py-2 flex flex-wrap items-center justify-between gap-2 select-none relative z-30 overflow-visible"
     >
       <div className="flex flex-wrap items-center gap-1.5 overflow-visible min-w-0 flex-1">
         {visibleGroups.map((group) => {

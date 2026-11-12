@@ -276,9 +276,9 @@ export const ReceiveTransferScreen: React.FC<Props> = ({
   const formattedTransferDate = formatDateTimeVN(transfer.transferDate);
 
   return (
-    <div className="fixed inset-0 z-50 bg-[#f5f5f5] flex flex-col text-[13px] text-[#15171a] select-none animate-in fade-in duration-200 font-sans">
+    <div className="fixed inset-0 z-50 stockflow-brand-bg flex flex-col text-[13px] text-[#15171a] select-none animate-in fade-in duration-200 font-sans">
       {/* 1. Thanh Topbar Navigation */}
-      <header className="h-12 bg-white border-b border-slate-200 px-4 flex items-center relative shrink-0 shadow-2xs">
+      <header className="h-12 bg-white/85 backdrop-blur-[2px] border-b border-slate-200 px-4 flex items-center relative shrink-0 shadow-2xs">
         {/* Nút quay lại & Tiêu đề */}
         <div className="flex items-center gap-3 z-10">
           <button
@@ -333,9 +333,9 @@ export const ReceiveTransferScreen: React.FC<Props> = ({
       {/* 2. Thân màn hình: 2 Cột (Trái: Bảng kiểm đếm | Phải: Thông tin phiếu & Nút Nhận hàng) */}
       <div className="flex-1 flex overflow-hidden">
         {/* CỘT TRÁI: Tabs & Bảng sản phẩm kiểm đếm */}
-        <main className="flex-1 flex flex-col bg-white overflow-hidden border-r border-slate-200">
+        <main className="flex-1 flex flex-col bg-white/65 overflow-hidden border-r border-slate-200">
           {/* Tabs: Tất cả | Khớp | Lệch | Chưa nhận */}
-          <div className="h-10 border-b border-slate-200 px-4 flex items-center gap-6 bg-white shrink-0">
+          <div className="h-10 border-b border-slate-200 px-4 flex items-center gap-6 bg-white/80 shrink-0">
             <button
               type="button"
               onClick={() => setActiveTab('ALL')}
@@ -520,7 +520,7 @@ export const ReceiveTransferScreen: React.FC<Props> = ({
         </main>
 
         {/* CỘT PHẢI: Sidebar Thông tin phiếu & Nút Nhận hàng */}
-        <aside className="w-80 bg-white flex flex-col justify-between shrink-0 shadow-xs border-l border-slate-200">
+        <aside className="w-80 bg-white/80 backdrop-blur-[2px] flex flex-col justify-between shrink-0 shadow-xs border-l border-slate-200">
           <div className="p-4 space-y-3.5 overflow-y-auto">
             {/* User & Date picker */}
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
