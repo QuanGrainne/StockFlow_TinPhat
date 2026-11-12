@@ -10,6 +10,10 @@ public partial class TrxProductionOrder
 
     public string? ProductionOrderCode { get; set; }
 
+    /// <summary>
+    /// OBSOLETE: giữ tạm, cho phép null. Nguồn số liệu là <see cref="TrxProductionOrderItem"/>
+    /// (received_qty). Xoá cột này bằng migration riêng khi không còn code nào đọc.
+    /// </summary>
     public decimal? ActualQuantity { get; set; }
 
     public string? Status { get; set; }

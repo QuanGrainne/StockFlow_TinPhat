@@ -2015,8 +2015,8 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                         .HasColumnName("product_id");
 
                     b.Property<decimal?>("Quantity")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("numeric(18,6)")
                         .HasColumnName("quantity");
 
                     b.Property<decimal?>("UnitCost")
@@ -2102,8 +2102,8 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("TransactionId"));
 
                     b.Property<decimal?>("BalanceAfter")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("numeric(18,6)")
                         .HasColumnName("balance_after");
 
                     b.Property<int>("CreatedBy")
@@ -2123,8 +2123,8 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                         .HasColumnName("product_id");
 
                     b.Property<decimal?>("Quantity")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("numeric(18,6)")
                         .HasColumnName("quantity");
 
                     b.Property<int?>("ReferenceId")

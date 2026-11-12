@@ -1326,7 +1326,7 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
             entity.Property(e => e.LotId).HasColumnName("lot_id");
             entity.Property(e => e.ProductId).HasColumnName("product_id");
             entity.Property(e => e.Quantity)
-                .HasPrecision(18, 2)
+                .HasPrecision(18, 6)
                 .HasColumnName("quantity");
             entity.Property(e => e.UnitCost)
                 .HasPrecision(18, 4)
@@ -1399,7 +1399,7 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
             entity.Property(e => e.LotId).HasColumnName("lot_id");
             entity.Property(e => e.ProductId).HasColumnName("product_id");
             entity.Property(e => e.Quantity)
-                .HasPrecision(18, 2)
+                .HasPrecision(18, 6)
                 .HasColumnName("quantity");
             entity.Property(e => e.ReferenceId).HasColumnName("reference_id");
             entity.Property(e => e.ReferenceType)
@@ -1419,7 +1419,7 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
                 .HasPrecision(18, 2)
                 .HasColumnName("unit_cost");
             entity.Property(e => e.BalanceAfter)
-                .HasPrecision(18, 2)
+                .HasPrecision(18, 6)
                 .HasColumnName("balance_after");
 
             entity.HasOne(d => d.CreatedByNavigation).WithMany(p => p.TrxInventoryTransactions)
