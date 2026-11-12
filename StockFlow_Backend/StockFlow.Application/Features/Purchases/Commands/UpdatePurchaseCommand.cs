@@ -8,6 +8,7 @@ using Microsoft.EntityFrameworkCore;
 using StockFlow.Application.Common;
 using StockFlow.Application.Common.Interfaces;
 using StockFlow.Application.Features.Purchases.DTOs;
+using StockFlow.Application.Features.PurchaseOrders.Helpers;
 using StockFlow.Application.Features.PurchaseReturns.Helpers;
 using StockFlow.Application.Features.Purchases.Helpers;
 using StockFlow.Domain.Entities;
@@ -119,8 +120,7 @@ public class UpdatePurchaseCommandHandler : IRequestHandler<UpdatePurchaseComman
             receipt.ReceivedDate = req.ReceivedDate.HasValue ? VietnamTime.From(req.ReceivedDate) : receipt.ReceivedDate;
             receipt.Notes = req.Notes?.Trim();
 
-            var dbContext = _context as DbContext;
-            using var transaction = dbContext != null ? await dbContext.Database.BeginTransactionAsync(cancellationToken) : null;
+            using var transaction = await _context.BeginTransactionAsync(cancellationToken);
 
             // Phiếu đã nhập: đảo nhập kho theo các dòng cũ trước khi thay bằng dòng mới
             var oldItems = receipt.DtlGoodsReceiptItems.ToList();
@@ -177,6 +177,7 @@ public class UpdatePurchaseCommandHandler : IRequestHandler<UpdatePurchaseComman
             }
 
             await _context.SaveChangesAsync(cancellationToken);
+            await PurchaseOrderHelper.RecalculateStatusAsync(_context, receipt.PurchaseOrderId, cancellationToken);
             if (transaction != null) await transaction.CommitAsync(cancellationToken);
 
             var responseItems = newItems.Select(i =>

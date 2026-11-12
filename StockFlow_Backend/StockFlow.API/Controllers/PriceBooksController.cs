@@ -29,6 +29,7 @@ public class PriceBooksController : ControllerBase
     [HttpGet]
     [ProducesResponseType(typeof(List<PriceBookDto>), StatusCodes.Status200OK)]
     [RequirePermission("GOODS_READ")]
+    [RequireFeature("feat-price-books", "feat-pos", "feat-invoices", "feat-goods")]
     public async Task<IActionResult> GetPriceBooks(
         [FromQuery] string? search,
         [FromQuery] bool? isActive,
@@ -49,6 +50,7 @@ public class PriceBooksController : ControllerBase
     [ProducesResponseType(typeof(PriceBookDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [RequirePermission("GOODS_READ")]
+    [RequireFeature("feat-price-books")]
     public async Task<IActionResult> GetPriceBookById(int id)
     {
         var result = await _mediator.Send(new GetPriceBookByIdQuery(id));
@@ -66,6 +68,7 @@ public class PriceBooksController : ControllerBase
     [ProducesResponseType(typeof(PriceBookDto), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [RequirePermission("GOODS_CREATE")]
+    [RequireFeature("feat-price-books")]
     public async Task<IActionResult> CreatePriceBook([FromBody] CreatePriceBookCommand command)
     {
         var result = await _mediator.Send(command);
@@ -83,6 +86,7 @@ public class PriceBooksController : ControllerBase
     [ProducesResponseType(typeof(PriceBookDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [RequirePermission("GOODS_UPDATE")]
+    [RequireFeature("feat-price-books")]
     public async Task<IActionResult> UpdatePriceBook(int id, [FromBody] UpdatePriceBookCommand command)
     {
         if (id != command.PriceBookId)
@@ -105,6 +109,7 @@ public class PriceBooksController : ControllerBase
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [RequirePermission("GOODS_DELETE")]
+    [RequireFeature("feat-price-books")]
     public async Task<IActionResult> DeletePriceBook(int id)
     {
         var result = await _mediator.Send(new DeletePriceBookCommand(id));
@@ -121,6 +126,7 @@ public class PriceBooksController : ControllerBase
     [HttpGet("matrix")]
     [ProducesResponseType(typeof(PriceBookMatrixResultDto), StatusCodes.Status200OK)]
     [RequirePermission("GOODS_READ")]
+    [RequireFeature("feat-price-books", "feat-pos", "feat-invoices", "feat-goods")]
     public async Task<IActionResult> GetPriceMatrix(
         [FromQuery] int? warehouseId,
         [FromQuery] string? search,
@@ -128,7 +134,8 @@ public class PriceBooksController : ControllerBase
         [FromQuery] string? stockCondition,
         [FromQuery] string? priceBookIds,
         [FromQuery] int page = 1,
-        [FromQuery] int pageSize = 20)
+        [FromQuery] int pageSize = 20,
+        [FromQuery] bool allProducts = false)
     {
         List<int>? ids = null;
         if (!string.IsNullOrWhiteSpace(priceBookIds))
@@ -147,7 +154,8 @@ public class PriceBooksController : ControllerBase
             stockCondition,
             ids,
             page,
-            pageSize
+            pageSize,
+            allProducts
         ));
 
         if (!result.IsSuccess)
@@ -164,6 +172,7 @@ public class PriceBooksController : ControllerBase
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [RequirePermission("GOODS_UPDATE")]
+    [RequireFeature("feat-price-books")]
     public async Task<IActionResult> UpdatePrices(int id, [FromBody] List<UpdateProductPriceItemDto> items)
     {
         var result = await _mediator.Send(new UpdatePriceBookPricesCommand(id, items));
@@ -183,6 +192,7 @@ public class PriceBooksController : ControllerBase
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [RequirePermission("GOODS_UPDATE")]
+    [RequireFeature("feat-price-books")]
     public async Task<IActionResult> ApplyFormula(int id, [FromBody] ApplyFormulaRequestDto? body = null)
     {
         var result = await _mediator.Send(new ApplyPriceBookFormulaCommand(id, body?.CategoryIds, body?.AllProducts ?? false));

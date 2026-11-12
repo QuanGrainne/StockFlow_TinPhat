@@ -2,6 +2,7 @@
 
 // Modal "Thanh toán" nợ nhà cung cấp (theo mẫu KiotViet): tạo phiếu chi PC..., phân bổ vào các phiếu nhập còn nợ.
 
+import { tabSession } from '@/lib/auth/tabSession';
 import React, { useMemo, useState } from 'react';
 import { Info, Loader2, X } from 'lucide-react';
 import { NumberInput } from '@/components/inputs/NumberInput';
@@ -34,7 +35,7 @@ function allocateFifo(amount: number, receipts: SupplierOpenReceipt[]): Record<n
 function currentUserName(): string {
   if (typeof window === 'undefined') return '';
   try {
-    const raw = localStorage.getItem('stockflow_user');
+    const raw = tabSession.get('stockflow_user');
     const u = raw ? (JSON.parse(raw) as { fullName?: string; username?: string }) : null;
     return u?.fullName || u?.username || '';
   } catch {
@@ -284,6 +285,11 @@ export default function SupplierPaymentModal({
                 </tbody>
               </table>
               <div className="flex items-center justify-end gap-10 px-3 py-2.5 border-t border-slate-100">
+                {unallocated > 0 && allocatedTotal < totalRemaining && (
+                  <span className="mr-auto text-[12px] text-[#677484]">
+                    Tiền chưa phân bổ sẽ tự trừ vào phiếu nhập còn nợ cũ nhất khi tạo phiếu chi.
+                  </span>
+                )}
                 <span>Tiền chưa phân bổ:</span>
                 <span className={`font-bold ${unallocated < 0 ? 'text-[#fb2c36]' : ''}`}>{fmt(unallocated)}</span>
               </div>

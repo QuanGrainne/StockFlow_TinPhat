@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using StockFlow.Application.Common;
 using StockFlow.Application.Common.Interfaces;
+using StockFlow.Application.Common.Inventory;
 using StockFlow.Application.Features.PurchaseReturns.DTOs;
 using StockFlow.Application.Features.Purchases.Helpers;
 using StockFlow.Domain.Entities;
@@ -175,7 +176,7 @@ public static class PurchaseReturnLogic
             {
                 // Trả hàng tự do: giá nhập = giá vốn hiện tại tại kho
                 var (_, cost) = await PurchaseStockOps.GetBalanceAsync(
-                    context, new PurchaseStockOps.StockKey(warehouseId, line.ProductId, null, null), ct);
+                    context, new StockKey(warehouseId, line.ProductId, null, null), ct);
                 var importPrice = cost > 0 ? cost : products[line.ProductId].MovingAverageCost ?? 0;
                 items.Add(new DtlPurchaseReturnItem
                 {
@@ -240,17 +241,18 @@ public static class PurchaseReturnLogic
         CancellationToken ct)
     {
         var factor = NetFactor(ret, items);
-        var reference = new PurchaseStockOps.StockRef("OUTBOUND_PURCHASE_RETURN", ReferenceType, ret.PurchaseReturnId, userId);
+        var reference = new StockRef("OUTBOUND_PURCHASE_RETURN", ReferenceType, ret.PurchaseReturnId, userId);
         foreach (var item in items)
         {
             await PurchaseStockOps.OutboundAsync(
                 context,
-                new PurchaseStockOps.StockKey(ret.WarehouseId, item.ProductId, item.LocationId, item.LotId),
+                new StockKey(ret.WarehouseId, item.ProductId, item.LocationId, item.LotId),
                 item.Quantity,
                 (item.ReturnPrice ?? 0) * factor,
                 products,
                 reference,
-                ct);
+                ct,
+                item.ReturnPrice ?? 0); // Giá GD = giá trả trên phiếu
         }
 
         var total = ret.TotalAmount ?? 0;
@@ -289,17 +291,18 @@ public static class PurchaseReturnLogic
             .ToDictionaryAsync(p => p.ProductId, ct);
 
         var factor = NetFactor(ret, items);
-        var reference = new PurchaseStockOps.StockRef("PURCHASE_RETURN_CANCEL", ReferenceType, ret.PurchaseReturnId, userId);
+        var reference = new StockRef("PURCHASE_RETURN_CANCEL", ReferenceType, ret.PurchaseReturnId, userId);
         foreach (var item in items)
         {
             await PurchaseStockOps.InboundAsync(
                 context,
-                new PurchaseStockOps.StockKey(ret.WarehouseId, item.ProductId, item.LocationId, item.LotId),
+                new StockKey(ret.WarehouseId, item.ProductId, item.LocationId, item.LotId),
                 item.Quantity,
                 (item.ReturnPrice ?? 0) * factor,
                 products,
                 reference,
-                ct);
+                ct,
+                item.ReturnPrice ?? 0); // Giá GD = giá trả trên phiếu
         }
 
         var refunds = await context.TrxFinancialTransactions
@@ -334,8 +337,8 @@ public static class PurchaseReturnLogic
             .AsNoTracking()
             .Include(t => t.CreatedByNavigation)
             .Where(t => t.TxType == RefundTxType && t.ReferenceType == ReferenceType && t.ReferenceId == ret.PurchaseReturnId)
-            .OrderBy(t => t.TransactionDate)
-            .ThenBy(t => t.TxId)
+            .OrderByDescending(t => t.TransactionDate) // phiếu mới nhất lên đầu
+            .ThenByDescending(t => t.TxId)
             .ToListAsync(ct);
         var code = ret.ReturnCode ?? $"THN{ret.PurchaseReturnId:D6}";
         return txs.Select(t => new PurchaseReturnPaymentDto(

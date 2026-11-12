@@ -131,8 +131,16 @@ public sealed class JsonAuthorizationResultHandler : IAuthorizationMiddlewareRes
                 .OfType<AdminRequirement>()
                 .Any() ?? false;
 
+            var features = authorizeResult.AuthorizationFailure?.FailedRequirements
+                .OfType<FeatureRequirement>()
+                .SelectMany(r => r.FeatureNames)
+                .Distinct()
+                .ToList() ?? new List<string>();
+
             var message = adminOnly
                 ? "Chỉ Quản trị viên mới được thực hiện thao tác này."
+                : features.Count > 0
+                ? $"Vai trò của bạn chưa được phân quyền chức năng {string.Join(" / ", features)}."
                 : missing.Count > 0
                 ? $"Bạn không có quyền thực hiện thao tác này (cần quyền {string.Join(", ", missing)})."
                 : "Bạn không có quyền thực hiện thao tác này.";

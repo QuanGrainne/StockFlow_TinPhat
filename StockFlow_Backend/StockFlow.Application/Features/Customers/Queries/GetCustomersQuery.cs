@@ -3,16 +3,28 @@ using Microsoft.EntityFrameworkCore;
 using StockFlow.Application.Common;
 using StockFlow.Application.Common.Interfaces;
 using StockFlow.Application.Features.Customers.DTOs;
+using StockFlow.Application.Features.Customers.Helpers;
 
 namespace StockFlow.Application.Features.Customers.Queries;
 
 /// <summary>
-/// Truy vấn danh sách Khách hàng từ bảng mst_business_partners với partner_type = 'CUSTOMER'.
+/// Danh sách Khách hàng (mst_business_partners, partner_type CUSTOMER / BOTH) kèm bộ lọc như màn Nhà cung cấp:
+/// chi nhánh tạo, ngày tạo, giới tính, tổng bán (giá trị + khoảng thời gian tính), nợ hiện tại, trạng thái.
 /// </summary>
 public record GetCustomersQuery(
     string? Search = null,
     string? DebtStatus = null,
-    string? Status = null
+    string? Status = null,
+    int? CreatedWarehouseId = null,
+    DateTime? CreatedFrom = null,
+    DateTime? CreatedTo = null,
+    string? Gender = null,
+    decimal? MinSales = null,
+    decimal? MaxSales = null,
+    DateTime? SalesFrom = null,
+    DateTime? SalesTo = null,
+    decimal? MinDebt = null,
+    decimal? MaxDebt = null
 ) : IRequest<Result<List<CustomerDto>>>;
 
 public class GetCustomersQueryHandler : IRequestHandler<GetCustomersQuery, Result<List<CustomerDto>>>
@@ -26,13 +38,14 @@ public class GetCustomersQueryHandler : IRequestHandler<GetCustomersQuery, Resul
 
     public async Task<Result<List<CustomerDto>>> Handle(GetCustomersQuery query, CancellationToken cancellationToken)
     {
-        // 1. Chỉ lấy đối tác có loại là Khách hàng (CUSTOMER hoặc BOTH) - LOẠI BỎ TOÀN BỘ SUPPLIER
         var dbQuery = _context.MstBusinessPartners
-            .Where(p => p.PartnerType != null && 
-                       (p.PartnerType.ToUpper() == "CUSTOMER" || p.PartnerType.ToUpper() == "BOTH"))
+            .Where(p => p.PartnerType != null &&
+                        (p.PartnerType.ToUpper() == "CUSTOMER" || p.PartnerType.ToUpper() == "BOTH"))
+            // Ẩn hồ sơ "Khách lẻ" dùng nội bộ cho đơn POS không chọn khách
+            .Where(p => p.PartnerCode != "KH00000")
             .AsNoTracking();
 
-        // 2. Tìm kiếm từ khóa đa năng (Mã, Tên, Số điện thoại, Email, Địa chỉ)
+        // Từ khóa: mã, tên, điện thoại (1, 2), email, địa chỉ
         if (!string.IsNullOrWhiteSpace(query.Search))
         {
             var s = query.Search.ToLower().Trim();
@@ -40,71 +53,62 @@ public class GetCustomersQueryHandler : IRequestHandler<GetCustomersQuery, Resul
                 (p.PartnerCode != null && p.PartnerCode.ToLower().Contains(s)) ||
                 (p.PartnerName != null && p.PartnerName.ToLower().Contains(s)) ||
                 (p.Phone != null && p.Phone.ToLower().Contains(s)) ||
+                (p.Phone2 != null && p.Phone2.ToLower().Contains(s)) ||
                 (p.Email != null && p.Email.ToLower().Contains(s)) ||
                 (p.Address != null && p.Address.ToLower().Contains(s)));
         }
 
-        // 3. Lọc theo tình trạng công nợ
+        // Tình trạng công nợ (giữ tương thích bộ lọc cũ)
         if (!string.IsNullOrWhiteSpace(query.DebtStatus) && !query.DebtStatus.Equals("ALL", StringComparison.OrdinalIgnoreCase))
         {
             if (query.DebtStatus.Equals("HAS_DEBT", StringComparison.OrdinalIgnoreCase))
-            {
                 dbQuery = dbQuery.Where(p => (p.CurrentDebt ?? 0) > 0);
-            }
             else if (query.DebtStatus.Equals("NO_DEBT", StringComparison.OrdinalIgnoreCase))
-            {
                 dbQuery = dbQuery.Where(p => (p.CurrentDebt ?? 0) <= 0);
-            }
             else if (query.DebtStatus.Equals("OVER_LIMIT", StringComparison.OrdinalIgnoreCase))
-            {
                 dbQuery = dbQuery.Where(p => (p.CurrentDebt ?? 0) > (p.CreditLimit ?? 0));
-            }
         }
 
-        // 4. Lọc theo trạng thái hoạt động (ACTIVE / INACTIVE)
+        // Trạng thái hoạt động
         if (!string.IsNullOrWhiteSpace(query.Status) && !query.Status.Equals("ALL", StringComparison.OrdinalIgnoreCase))
         {
             if (query.Status.Equals("ACTIVE", StringComparison.OrdinalIgnoreCase))
-            {
                 dbQuery = dbQuery.Where(p => p.IsActive != false);
-            }
             else if (query.Status.Equals("INACTIVE", StringComparison.OrdinalIgnoreCase))
-            {
                 dbQuery = dbQuery.Where(p => p.IsActive == false);
-            }
         }
 
-        // 5. Sắp xếp: ID mới nhất lên trước
-        var rawList = await dbQuery
-            .OrderByDescending(p => p.PartnerId)
-            .ToListAsync(cancellationToken);
+        // Chi nhánh tạo
+        if (query.CreatedWarehouseId.HasValue && query.CreatedWarehouseId.Value > 0)
+            dbQuery = dbQuery.Where(p => p.CreatedWarehouseId == query.CreatedWarehouseId.Value);
 
-        // 6. Map sang DTO
-        var dtos = rawList.Select(p =>
+        // Ngày tạo (theo ngày)
+        if (query.CreatedFrom.HasValue)
+            dbQuery = dbQuery.Where(p => p.CreatedAt >= query.CreatedFrom.Value.Date);
+        if (query.CreatedTo.HasValue)
         {
-            var creditLimit = p.CreditLimit ?? 0;
-            var currentDebt = p.CurrentDebt ?? 0;
-            var isOverLimit = creditLimit > 0 && currentDebt > creditLimit;
-            var status = (p.IsActive != false) ? "ACTIVE" : "INACTIVE";
+            var end = query.CreatedTo.Value.Date.AddDays(1);
+            dbQuery = dbQuery.Where(p => p.CreatedAt < end);
+        }
 
-            return new CustomerDto(
-                Id: p.PartnerId.ToString(),
-                PartnerId: p.PartnerId,
-                Code: p.PartnerCode ?? $"KH{p.PartnerId.ToString().PadLeft(5, '0')}",
-                Name: p.PartnerName ?? "Khách hàng chưa đặt tên",
-                Type: p.PartnerType ?? "CUSTOMER",
-                Phone: p.Phone,
-                Email: p.Email,
-                Address: p.Address,
-                CreditLimit: creditLimit,
-                CurrentDebt: currentDebt,
-                CurrentPayable: p.CurrentPayable ?? 0,
-                Status: status,
-                IsOverCreditLimit: isOverLimit
-            );
-        }).ToList();
+        // Giới tính
+        var gender = CustomerProfileHelper.NormalizeGender(query.Gender);
+        if (gender != null)
+            dbQuery = dbQuery.Where(p => p.Gender == gender);
 
-        return Result<List<CustomerDto>>.Success(dtos);
+        // Nợ hiện tại (khoảng giá trị)
+        if (query.MinDebt.HasValue) dbQuery = dbQuery.Where(p => (p.CurrentDebt ?? 0) >= query.MinDebt.Value);
+        if (query.MaxDebt.HasValue) dbQuery = dbQuery.Where(p => (p.CurrentDebt ?? 0) <= query.MaxDebt.Value);
+
+        var partners = await dbQuery.OrderByDescending(p => p.PartnerId).ToListAsync(cancellationToken);
+        var lookups = await CustomerProfileHelper.LoadLookupsAsync(_context, partners, query.SalesFrom, query.SalesTo, cancellationToken);
+
+        var dtos = partners.Select(p => CustomerProfileHelper.ToDto(p, lookups));
+
+        // Tổng bán (khoảng giá trị, tính trong khoảng thời gian bán đã chọn)
+        if (query.MinSales.HasValue) dtos = dtos.Where(d => d.TotalSales >= query.MinSales.Value);
+        if (query.MaxSales.HasValue) dtos = dtos.Where(d => d.TotalSales <= query.MaxSales.Value);
+
+        return Result<List<CustomerDto>>.Success(dtos.ToList());
     }
 }
-

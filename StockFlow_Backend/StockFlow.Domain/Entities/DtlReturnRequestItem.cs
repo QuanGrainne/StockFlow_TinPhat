@@ -19,6 +19,12 @@ public partial class DtlReturnRequestItem
 
     public string? Notes { get; set; }
 
+    /// <summary>Giá bán trên hóa đơn (sau giảm giá dòng)</summary>
+    public decimal SalePrice { get; set; }
+
+    /// <summary>Giá nhập lại (tiền trả khách cho 1 đơn vị)</summary>
+    public decimal ReturnPrice { get; set; }
+
     public virtual DtlOrderItem? OrderItem { get; set; }
 
     public virtual MstProduct Product { get; set; } = null!;

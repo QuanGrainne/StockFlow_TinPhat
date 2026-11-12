@@ -16,6 +16,7 @@ import {
   Calendar,
   Layers,
   ArrowRight,
+  ArrowLeft,
   Info,
 } from 'lucide-react';
 import { orderSettingsService } from '../services/orderSettingsService';
@@ -109,7 +110,7 @@ export function OrderSettingsScreen({ onNavigate }: OrderSettingsScreenProps) {
 
   if (loading) {
     return (
-      <div className="flex-1 flex items-center justify-center bg-slate-50">
+      <div className="flex-1 flex items-center justify-center bg-transparent">
         <div className="text-center">
           <div className="w-10 h-10 border-4 border-[#1E56A0] border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
           <p className="text-sm text-slate-500 font-medium">Đang tải thiết lập đơn hàng...</p>
@@ -119,7 +120,7 @@ export function OrderSettingsScreen({ onNavigate }: OrderSettingsScreenProps) {
   }
 
   return (
-    <div className="flex-1 overflow-y-auto bg-slate-50">
+    <div className="flex-1 overflow-y-auto bg-transparent">
       {/* Toast alert */}
       {toast && (
         <div className="fixed top-20 right-6 z-50 animate-in fade-in slide-in-from-top-4">
@@ -159,6 +160,17 @@ export function OrderSettingsScreen({ onNavigate }: OrderSettingsScreenProps) {
             </div>
           </div>
           <div className="flex items-center gap-3">
+            {onNavigate && (
+              <button
+                type="button"
+                onClick={() => onNavigate('orders')}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-slate-300 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 transition cursor-pointer shadow-2xs"
+                title="Quay lại danh sách Quản lý đơn hàng"
+              >
+                <ArrowLeft className="w-3.5 h-3.5 text-slate-500" />
+                <span>Quản lý đơn hàng</span>
+              </button>
+            )}
             <button
               type="button"
               onClick={loadSettings}

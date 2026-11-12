@@ -25,6 +25,7 @@ public class WarehousePermissionsController : ControllerBase
     [HttpGet]
     [ProducesResponseType(typeof(List<WarehouseStaffAccessDto>), StatusCodes.Status200OK)]
     [RequirePermission("AUTH_READ")]
+    [RequireFeature("feat-warehouse-perms")]
     public async Task<IActionResult> GetWarehousePermissions([FromQuery] string? search, [FromQuery] string? warehouseFilter)
     {
         var result = await _mediator.Send(new GetWarehousePermissionsQuery(search, warehouseFilter));

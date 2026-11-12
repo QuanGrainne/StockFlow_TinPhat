@@ -92,7 +92,8 @@ public class GetProductsForTransferQueryHandler : IRequestHandler<GetProductsFor
                     stockBalances.Where(b => b.WarehouseId == request.SourceWarehouseId && b.ProductId == p.ProductId), p),
                 StandardPrice: p.StandardPrice ?? 0,
                 SourceStock: sourceStock,
-                DestStock: destStock
+                DestStock: destStock,
+                ImageUrl: p.ImageUrl
             );
         }).ToList();
 

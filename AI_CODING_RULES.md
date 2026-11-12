@@ -2,6 +2,7 @@
 
 > **Mục đích:** Tài liệu này là "kim chỉ nam" bắt buộc dành cho mọi Developer và Công cụ AI (Cursor, ChatGPT, GitHub Copilot, Antigravity, Claude...) tham gia phát triển dự án **StockFlow - Hệ thống Quản lý Đơn hàng & Tồn kho Công ty Tín Phát**.
 > Mọi code được sinh ra phải tuân thủ nghiêm ngặt các nguyên tắc dưới đây để đảm bảo tính đồng bộ, sạch đẹp và kiến trúc không bị phá vỡ.
+> **Chuẩn cấu trúc và quy trình** (backend, frontend, Definition of Done, refactor, nhật ký AI) nằm trong [`.claude/rules/`](.claude/rules/); khi tài liệu này và `.claude/rules/` khác nhau, theo `.claude/rules/`.
 
 ---
 
@@ -12,8 +13,8 @@
 | **Backend** | ASP.NET Core Web API | **.NET 9 (`net9.0`)**, C# 13 |
 | **ORM / Data** | Entity Framework Core | **EF Core 9.x**, Provider: **Npgsql 9.x** |
 | **Database** | PostgreSQL | Schema: `stockflow` (Cổng 5432) |
-| **Pattern BE** | Modular Monolith / Clean Architecture | **CQRS + MediatR**, FluentValidation, Result Pattern |
-| **Frontend** | Next.js (App Router) | **Next.js 15**, React 19, TypeScript |
+| **Pattern BE** | Clean Architecture (CQRS theo tính năng) | **CQRS + MediatR**, FluentValidation, Result Pattern |
+| **Frontend** | Next.js (App Router) | **Next.js 16**, React 19, TypeScript |
 | **Styling** | Tailwind CSS | Responsive, Clean Dashboard UI |
 | **Auth** | JWT Bearer Authentication | Token lưu `localStorage`, Header `Authorization: Bearer <token>` |
 
@@ -31,7 +32,7 @@ StockFlow.Infrastructure ──────────────────�
 ```
 
 ### 🔹 Layer 1: `StockFlow.Domain` (Trọng tâm nghiệp vụ)
-- **Chứa:** Entities, Enums, Value Objects, Domain Exceptions, Repository Interfaces (`IRepository<T>`, `IUnitOfWork`).
+- **Chứa:** Entities (một lớp một bảng: `Mst*`, `Trx*`, `Dtl*`, `Sec*`, `Jnc*`). Hiện chưa có Enums / Value Objects / Domain Exceptions riêng.
 - **Nguyên tắc vàng:** 
   - KHÔNG tham chiếu tới bất kỳ dự án nào khác.
   - KHÔNG cài thêm NuGet package bên ngoài (trừ package ngôn ngữ C#).
@@ -151,7 +152,7 @@ StockFlow.Infrastructure ──────────────────�
 
 ### 5.3 🗂️ Left Filter Sidebar
 
-**File tham chiếu:** [`ProductFilterSidebar.tsx`](file:///f:/Ki_9/DO_AN/StockFlow_TinPhat/StockFlow_Frontend/src/components/ProductFilterSidebar.tsx)
+**File tham chiếu:** [`ProductFilterSidebar.tsx`](StockFlow_Frontend/src/features/products/components/ProductFilterSidebar.tsx)
 
 ```tsx
 // Wrapper chuẩn
@@ -241,7 +242,7 @@ StockFlow.Infrastructure ──────────────────�
 
 ### 5.6 📊 Ant Design Table
 
-**File tham chiếu:** [`ProductsClient.tsx`](file:///f:/Ki_9/DO_AN/StockFlow_TinPhat/StockFlow_Frontend/src/app/(dashboard)/products/ProductsClient.tsx) — dòng 978-1025
+**File tham chiếu:** [`GoodsCatalogScreen.tsx`](StockFlow_Frontend/src/features/products/screens/GoodsCatalogScreen.tsx)
 
 ```tsx
 // Wrapper Table
@@ -333,7 +334,7 @@ rowClassName={(record) =>
 
 ### 5.8 🪟 Modal / Dialog
 
-**File tham chiếu:** [`CreateProductModal.tsx`](file:///f:/Ki_9/DO_AN/StockFlow_TinPhat/StockFlow_Frontend/src/components/CreateProductModal.tsx)
+**File tham chiếu:** [`SupplierFormModal.tsx`](StockFlow_Frontend/src/features/suppliers/components/SupplierFormModal.tsx)
 
 ```tsx
 // Overlay backdrop
@@ -395,60 +396,50 @@ rowClassName={(record) =>
 
 ### 5.9 🧭 Navbar — Thêm menu item mới
 
-**File tham chiếu:** [`Navbar.tsx`](file:///f:/Ki_9/DO_AN/StockFlow_TinPhat/StockFlow_Frontend/src/components/Navbar.tsx)
+**File tham chiếu:** [`navbar.ts`](StockFlow_Frontend/src/lib/navigation/navbar.ts) (nguồn duy nhất cho menu và ma trận phân quyền), hiển thị bởi [`Sidebar.tsx`](StockFlow_Frontend/src/components/layout/Sidebar.tsx) / [`Header.tsx`](StockFlow_Frontend/src/components/layout/Header.tsx).
 
-Khi thêm route mới, **chỉnh sửa mảng `NAV_ITEMS`**:
-```tsx
-const NAV_ITEMS: NavItem[] = [
-  { label: 'Tổng quan', href: '/dashboard' },
-  { label: 'Hàng hóa', href: '/products' },
-  {
-    label: 'Mua hàng',           // Label trên Navbar
-    children: [
-      { label: 'Nhập hàng', href: '/purchases' },
-      { label: 'Trả hàng NCC', href: '/purchases/returns' },
-    ]
-  },
-  // ...
-];
+Khi thêm chức năng mới, **thêm một mục vào `NAV_GROUPS`** (mỗi mục = 1 chức năng được phân quyền):
+```ts
+{
+  screen: 'transfers',            // mã màn hình (activeScreen), khớp case trong AppLayout
+  path: '/transfers',             // đường dẫn trang
+  featureId: 'feat-transfers',    // mã chức năng trong ma trận phân quyền
+  title: 'Chuyển hàng',
+  desc: '...',
+  icon: Repeat,                   // icon lucide-react
+  backendModule: 'STOCK',         // phân hệ quyền backend (PermissionConstants)
+}
 ```
-
-Active link style: `bg-white/20 text-white` | Inactive: `text-white/85 hover:bg-white/15`
+`SCREEN_PATH_MAP`, `SCREEN_FEATURE_MAP` được sinh tự động từ `NAV_GROUPS`. Sau đó thêm `case` trong `AppLayout` và tạo `page.tsx` (mục 5.10).
 
 ---
 
 ### 5.10 📦 Cấu trúc file mỗi module Frontend
 
-Mỗi phân hệ mới phải theo đúng cấu trúc:
+Mỗi phân hệ mới phải theo đúng cấu trúc (chi tiết: [`.claude/rules/20-frontend-structure.md`](.claude/rules/20-frontend-structure.md)):
 
 ```
 src/app/(dashboard)/{ten-module}/
-├── page.tsx                    ← Entry: dùng dynamic() để lazy-load
-└── {TenModule}Client.tsx       ← Toàn bộ UI logic (Client Component)
+└── page.tsx                         ← Chỉ định tuyến: render LazyAppLayout
 
-src/components/
-└── {TenModule}FilterSidebar.tsx ← Filter sidebar riêng (nếu cần)
-└── Create{TenModule}Modal.tsx   ← Modal tạo mới
+src/features/{ten-module}/
+├── screens/{TenModule}Screen.tsx    ← Toàn bộ UI logic của màn hình
+├── components/                      ← Filter sidebar, modal riêng của module
+├── services/                        ← Gọi API qua lib/api/client.ts
+└── types/  utils/  hooks/
 ```
 
-**`page.tsx` chuẩn:**
+**`page.tsx` chuẩn (trang danh sách):**
 ```tsx
 'use client';
-import dynamic from 'next/dynamic';
 
-const Client = dynamic(() => import('./{TenModule}Client'), {
-  ssr: false,
-  loading: () => (
-    <div className="flex min-h-[calc(100vh-56px)] items-center justify-center bg-[#f7f9fa] text-sm text-[#8c8c8c]">
-      Đang tải...
-    </div>
-  ),
-});
+import { LazyAppLayout } from '@/components/layout/LazyAppLayout';
 
 export default function {TenModule}Page() {
-  return <Client />;
+  return <LazyAppLayout initialScreen="{ma-man-hinh}" />;
 }
 ```
+Màn hình được chọn trong `AppLayout` bằng `switch (activeScreen)`. Trang tạo phiếu (`*/create`) nạp màn hình riêng bằng `next/dynamic`.
 
 ---
 
@@ -459,12 +450,12 @@ export default function {TenModule}Page() {
 | `antd` | Table, Button, Input, Pagination, Tag, Modal | **Bắt buộc** cho table và nút |
 | `@ant-design/icons` | Icon trong Ant components | `SearchOutlined`, `PlusOutlined`, `CloudDownloadOutlined`... |
 | `lucide-react` | Icon trong custom UI | `ChevronDown`, `X`, `Check`, `Calendar`, `Filter`... |
-| `next/dynamic` | Lazy-load Client page | Bắt buộc `ssr: false` cho trang có state |
+| `next/dynamic` | `LazyAppLayout`, trang tạo phiếu | `ssr: false` cho trang có state (không dùng trong server component) |
 | `next/navigation` | `usePathname`, `useRouter` | Route navigation |
 
 **Không dùng:**
 - ❌ `react-icons` (dùng `lucide-react` thay thế)
-- ❌ `moment.js` (dùng `Intl.DateTimeFormat` hoặc `date-fns`)
+- ❌ `moment.js` (dùng `Intl.DateTimeFormat`; không thêm thư viện ngày giờ mới nếu chưa được nhóm duyệt)
 - ❌ Ant Design Modal (dùng custom modal theo pattern 5.8)
 
 ---
@@ -503,7 +494,7 @@ const stockFormatter = new Intl.NumberFormat('vi-VN', {
 
 ---
 
-## 6. 📝 MẪU PROMPT CHUẨN DÀNH CHO TEAM KHI RA LỆNH CHO AI
+## 7. 📝 MẪU PROMPT CHUẨN DÀNH CHO TEAM KHI RA LỆNH CHO AI
 
 Khi bất kỳ ai trong team yêu cầu AI viết code cho một tính năng mới, hãy copy đoạn prompt mẫu này gửi kèm:
 
@@ -517,7 +508,7 @@ Tuân thủ nghiêm ngặt:
 1. Backend: 
    - Đặt Entity/Interface tại StockFlow.Domain.
    - Viết Command/Query/Handler/Validator (MediatR + FluentValidation) tại StockFlow.Application, trả về Result<T>.
-   - Cấu hình EF Core DbContext/Repository tại StockFlow.Infrastructure (schema stockflow).
+   - Cấu hình EF Core DbContext tại StockFlow.Infrastructure (schema stockflow).
    - Controller mỏng tại StockFlow.API.
    - Các gói NuGet phải ở phiên bản .NET 9.x.
 2. Frontend:

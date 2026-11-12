@@ -21,7 +21,7 @@ public class CreatePosOrderRequest
 {
     public int PartnerId { get; set; }
     public int WarehouseId { get; set; } = 3; // Default Kho Tổng Gia Lâm (K001)
-    public string PaymentMethod { get; set; } = "CASH"; // CASH, VIETQR, POS_CARD, DEBT, WALLET
+    public string PaymentMethod { get; set; } = "CASH"; // CASH, VIETQR, DEBT
     public decimal SubTotal { get; set; }
     public string DiscountType { get; set; } = "AMOUNT"; // "PERCENT" hoặc "AMOUNT"
     public decimal DiscountValue { get; set; }
@@ -37,6 +37,8 @@ public class CreatePosOrderRequest
     public bool IssueStockNow { get; set; } = true;
     public string? ClientRequestId { get; set; } // Chống gửi trùng request (Idempotency)
     public DateTime? OrderDate { get; set; } // Ngày giao dịch (khi lock_transaction_time = false)
+    /// <summary>Tạo hóa đơn từ đơn đặt hàng (order_type = BOOKING): trừ tiền khách đã trả trước, cập nhật SL đã giao</summary>
+    public int? BookingOrderId { get; set; }
     public List<PosOrderItemRequest> Items { get; set; } = new();
 }
 
@@ -57,6 +59,8 @@ public class PosOrderResultDto
     public string PaymentStatus { get; set; } = string.Empty;
     public string Status { get; set; } = string.Empty;
     public DateTime OrderDate { get; set; }
+    /// <summary>Tiền khách trả trước ở đơn đặt hàng đã trừ vào hóa đơn</summary>
+    public decimal DepositAmount { get; set; }
     public int? StockIssueId { get; set; }
     public string? StockIssueCode { get; set; }
     public decimal CustomerCurrentDebt { get; set; }
@@ -69,6 +73,7 @@ public class PosOrderSummaryDto
     public string OrderCode { get; set; } = string.Empty;
     public string PartnerName { get; set; } = string.Empty;
     public string PartnerPhone { get; set; } = string.Empty;
+    public string PartnerCode { get; set; } = string.Empty;
     public decimal SubTotal { get; set; }
     public decimal DiscountAmount { get; set; }
     public decimal TotalAmount { get; set; }
@@ -82,5 +87,8 @@ public class PosOrderSummaryDto
     public string WarehouseName { get; set; } = string.Empty;
     public string PaymentMethod { get; set; } = string.Empty;
     public bool HasReturn { get; set; }
+    public string? ReturnCode { get; set; }
+    /// <summary>Nhân viên tạo hóa đơn</summary>
+    public string CreatedByName { get; set; } = string.Empty;
     public string? Notes { get; set; }
 }

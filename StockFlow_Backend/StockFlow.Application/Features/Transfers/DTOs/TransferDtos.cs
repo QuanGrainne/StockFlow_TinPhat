@@ -35,7 +35,8 @@ public record TransferItemDetailDto(
     decimal? ReceivedQuantity,
     decimal TransferPrice,
     decimal LineTotal,
-    string? Notes
+    string? Notes,
+    string? ReceiveNotes = null
 );
 
 public record TransferDetailDto(
@@ -56,7 +57,9 @@ public record TransferDetailDto(
     decimal? TotalReceivedQuantity,
     decimal TotalAmount,
     string? Notes,
-    List<TransferItemDetailDto> Items
+    List<TransferItemDetailDto> Items,
+    string? ReceivedByName = null,
+    string? ReceiveNotes = null
 );
 
 public record ProductWithStockDto(
@@ -67,7 +70,8 @@ public record ProductWithStockDto(
     decimal CostPrice,
     decimal StandardPrice,
     decimal SourceStock,
-    decimal DestStock
+    decimal DestStock,
+    string? ImageUrl = null
 );
 
 public class CreateTransferItemRequest
@@ -97,11 +101,20 @@ public class UpdateTransferRequest
     public List<CreateTransferItemRequest> Items { get; set; } = new();
 }
 
+/// <summary>Sửa ghi chú phiếu chuyển: null = giữ nguyên, chuỗi rỗng = xóa.</summary>
+public class UpdateTransferNotesRequest
+{
+    public string? Notes { get; set; }
+    public string? ReceiveNotes { get; set; }
+}
+
 public class ReceiveTransferItemRequest
 {
     public int? TransferItemId { get; set; }
     public int ProductId { get; set; }
     public decimal ReceivedQuantity { get; set; }
+    /// <summary>Ghi chú dòng hàng lúc nhận (VD: "thiếu 1")</summary>
+    public string? Notes { get; set; }
 }
 
 public class ReceiveTransferRequest

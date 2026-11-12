@@ -1,8 +1,6 @@
-﻿export default function inventoryPage() {
-  return (
-    <div>
-      <h1 className="text-2xl font-semibold text-gray-900">Kho hàng</h1>
-      <p className="text-gray-500 mt-2">Tính năng đang được xây dựng...</p>
-    </div>
-  );
+import { redirect } from 'next/navigation';
+
+// Trang cũ: chuyển sang chức năng tương ứng trên navbar
+export default function LegacyPage() {
+  redirect('/dashboard');
 }

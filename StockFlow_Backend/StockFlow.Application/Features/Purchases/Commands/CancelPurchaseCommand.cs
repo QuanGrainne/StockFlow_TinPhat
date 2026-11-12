@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using StockFlow.Application.Common;
 using StockFlow.Application.Common.Interfaces;
 using StockFlow.Application.Features.Purchases.DTOs;
+using StockFlow.Application.Features.PurchaseOrders.Helpers;
 using StockFlow.Application.Features.PurchaseReturns.Helpers;
 using StockFlow.Application.Features.Purchases.Helpers;
 
@@ -55,8 +56,7 @@ public class CancelPurchaseCommandHandler : IRequestHandler<CancelPurchaseComman
                     $"Phiếu nhập đã có phiếu trả hàng nhập {string.Join(", ", returnCodes)}. Vui lòng hủy phiếu trả hàng trước.");
             }
 
-            var dbContext = _context as DbContext;
-            using var transaction = dbContext != null ? await dbContext.Database.BeginTransactionAsync(cancellationToken) : null;
+            using var transaction = await _context.BeginTransactionAsync(cancellationToken);
 
             // Hủy phiếu ĐÃ NHẬP KHO: đảo tồn kho + giá vốn, hủy khoản trả lúc nhập, giảm công nợ NCC
             if (string.Equals(receipt.Status, "COMPLETED", StringComparison.OrdinalIgnoreCase))
@@ -118,6 +118,7 @@ public class CancelPurchaseCommandHandler : IRequestHandler<CancelPurchaseComman
             }
 
             await _context.SaveChangesAsync(cancellationToken);
+            await PurchaseOrderHelper.RecalculateStatusAsync(_context, receipt.PurchaseOrderId, cancellationToken);
             if (transaction != null) await transaction.CommitAsync(cancellationToken);
 
             return Result.Success(true);

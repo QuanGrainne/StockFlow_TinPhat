@@ -90,7 +90,11 @@ public class SaveRolePermissionsCommandHandler : IRequestHandler<SaveRolePermiss
         }
 
         // 3. Cập nhật navigation property role.Permissions
-        role.Permissions.Clear();
+        // Giữ nguyên các mã chức năng navbar (FEAT_*), chỉ thay quyền phân hệ
+        foreach (var old in role.Permissions.Where(p => !FeatureConstants.IsFeatureCode(p.PermissionCode)).ToList())
+        {
+            role.Permissions.Remove(old);
+        }
         foreach (var code in targetCodes)
         {
             if (permMap.TryGetValue(code.ToUpperInvariant(), out var p))

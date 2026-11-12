@@ -19,7 +19,9 @@ public record GetPriceBookMatrixQuery(
     string? StockCondition = "ALL",
     List<int>? PriceBookIds = null,
     int PageIndex = 1,
-    int PageSize = 20
+    int PageSize = 20,
+    // true: mọi hàng hóa (kể cả chưa có trong bảng giá tự tạo) — POS cần giá của mọi hàng theo từng bảng giá
+    bool AllProducts = false
 ) : IRequest<Result<PriceBookMatrixResultDto>>;
 
 public class GetPriceBookMatrixQueryHandler : IRequestHandler<GetPriceBookMatrixQuery, Result<PriceBookMatrixResultDto>>
@@ -78,7 +80,8 @@ public class GetPriceBookMatrixQueryHandler : IRequestHandler<GetPriceBookMatrix
             .Select(b => b.PriceBookId)
             .ToList();
 
-        if (customBookIds.Any())
+        // Đang tìm kiếm: vẫn tìm ra hàng chưa có trong bảng giá (ô giá trống, nhập giá để thêm vào bảng giá)
+        if (customBookIds.Any() && !request.AllProducts && string.IsNullOrWhiteSpace(request.Search))
         {
             var allowedProductIds = _context.DtlPriceBookItems
                 .Where(i => customBookIds.Contains(i.PriceBookId))

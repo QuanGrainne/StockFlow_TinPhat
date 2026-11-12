@@ -11,6 +11,8 @@ import { Supplier, SupplierDetail, SupplierRecentReceipt, SupplierDebtLedgerEntr
 import { getSupplierStatusBadge } from '../utils/status';
 import { exportSupplierLedgerToXLSX, exportSupplierReceiptsToXLSX } from '../utils/exportExcel';
 import { formatDateOnlyVN, formatDateTimeVN } from '@/features/transfers/utils/dateUtils';
+import { DocumentCodeLink } from '@/components/links/EntityLinks';
+import { toLinkDate } from '@/lib/navigation/documentLink';
 
 interface SupplierExpandedRowProps {
   supplier: Supplier;
@@ -101,7 +103,19 @@ function ReceiptsTable({ receipts, emptyText }: { receipts: SupplierRecentReceip
               const st = getReceiptStatus(r.status, r.type);
               return (
                 <tr key={`${r.type ?? "GR"}-${r.receiptId || i}`} className="hover:bg-[#f7f8f9]">
-                  <td className="py-2.5 px-3 text-[#0070f4] font-medium">{r.receiptNumber}</td>
+                  <td className="py-2.5 px-3 font-medium">
+                    {r.receiptId ? (
+                      <DocumentCodeLink
+                        kind={r.type === 'PURCHASE_RETURN' ? 'purchase-return' : 'purchase'}
+                        code={r.receiptNumber}
+                        id={r.receiptId}
+                        date={toLinkDate(r.receiptDate)}
+                        warehouseId={r.warehouseId}
+                      />
+                    ) : (
+                      <span className="text-[#0070f4]">{r.receiptNumber}</span>
+                    )}
+                  </td>
                   <td className="py-2.5 px-3 text-[#15171a] whitespace-nowrap">{formatDateTimeVN(r.receiptDate)}</td>
                   <td className="py-2.5 px-3 text-[#15171a]">{r.createdByName || '—'}</td>
                   <td className="py-2.5 px-3 text-[#15171a]">{r.warehouseName || '—'}</td>
@@ -236,12 +250,6 @@ export default function SupplierExpandedRow({
                         <InfoField label="Địa chỉ" value={supplier.address} />
                       </div>
                     </div>
-
-                    {/* Ghi chú */}
-                    <div className="flex items-center gap-2 text-[13px] text-[#677484]">
-                      <Pencil size={14} />
-                      <span>Chưa có ghi chú</span>
-                    </div>
                   </div>
 
                   {/* Footer: Xóa (trái) — Chỉnh sửa, Ngừng hoạt động (phải) */}
@@ -366,7 +374,16 @@ export default function SupplierExpandedRow({
                                     l.type === 'OPENING' ? 'text-[#15171a]' : 'text-[#0070f4]'
                                   }`}
                                 >
-                                  {l.code}
+                                  {l.referenceId && (l.type === 'GOODS_RECEIPT' || l.type === 'SUPPLIER_RETURN') ? (
+                                    <DocumentCodeLink
+                                      kind={l.type === 'GOODS_RECEIPT' ? 'purchase' : 'purchase-return'}
+                                      code={l.code}
+                                      id={l.referenceId}
+                                      date={toLinkDate(l.date)}
+                                    />
+                                  ) : (
+                                    l.code
+                                  )}
                                 </td>
                                 <td className="py-2.5 px-3 text-[#15171a] whitespace-nowrap">
                                   {l.date ? formatDateTimeVN(l.date) : '—'}
