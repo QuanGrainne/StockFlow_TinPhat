@@ -58,7 +58,7 @@ public class GetProductByIdQueryHandler : IRequestHandler<GetProductByIdQuery, R
             }).ToList();
 
         // Data Isolation: Nếu là tài khoản nhân viên (không phải Admin), ẩn các kho không có quyền
-        if (_currentUserService.IsAuthenticated && !_currentUserService.IsAdmin)
+        if (_currentUserService.IsAuthenticated)
         {
             var authorizedIds = await _currentUserService.GetAuthorizedWarehouseIdsAsync(cancellationToken);
             warehouses = warehouses.Where(w => authorizedIds.Contains(w.WarehouseId)).ToList();
