@@ -47,7 +47,7 @@ public class UpdateTransferCommandHandler : IRequestHandler<UpdateTransferComman
             return Result.Failure<TransferDetailDto>("Bạn không có quyền sửa phiếu chuyển hàng của kho xuất này.");
         }
 
-        if (!string.Equals(transfer.Status, "DRAFT", StringComparison.OrdinalIgnoreCase))
+        if (!transfer.CanEdit())
         {
             return Result.Failure<TransferDetailDto>($"Chỉ có thể sửa phiếu ở trạng thái 'Phiếu tạm'. Trạng thái hiện tại: {transfer.Status}.");
         }
