@@ -760,17 +760,18 @@ export const StaffAccountsScreen: React.FC<StaffAccountsScreenProps> = ({
       {/* MODAL: Tạo tài khoản mới (Khớp 100% Ảnh 2 bên trái - MÀN HÌNH 3.2.1.4) */}
       {editModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4 animate-in fade-in">
-          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-2xl p-6 relative">
+          {/* Modal gọn hơn (max-w-xl), cao tối đa 85% màn hình: tiêu đề + nút cố định, phần thân cuộn lên xuống */}
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-xl max-h-[85vh] flex flex-col overflow-hidden relative">
             <button
               type="button"
               onClick={() => setEditModalOpen(false)}
-              className="absolute top-5 right-5 text-slate-400 hover:text-slate-600 transition cursor-pointer"
+              className="absolute top-4 right-4 z-10 text-slate-400 hover:text-slate-600 transition cursor-pointer"
             >
               <X size={18} />
             </button>
 
             {/* Header Modal */}
-            <div className="flex items-center gap-3 mb-5">
+            <div className="flex items-center gap-3 px-5 pt-4 pb-3 border-b border-slate-100 shrink-0">
               <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 border border-blue-100 flex items-center justify-center shrink-0">
                 <UserPlus size={18} />
               </div>
@@ -781,7 +782,8 @@ export const StaffAccountsScreen: React.FC<StaffAccountsScreenProps> = ({
               </div>
             </div>
 
-            <form onSubmit={handleSaveStaff} className="space-y-3.5">
+            <form onSubmit={handleSaveStaff} className="flex-1 min-h-0 flex flex-col">
+              <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4 space-y-3.5">
               {/* Mục Avatar nhân viên */}
               <div className="flex items-center gap-4 p-3 rounded-xl bg-slate-50 border border-slate-200/80">
                 <div className="relative shrink-0">
@@ -1082,9 +1084,10 @@ export const StaffAccountsScreen: React.FC<StaffAccountsScreenProps> = ({
                   </p>
                 )}
               </div>
+              </div>
 
-              {/* Action buttons */}
-              <div className="pt-2 flex items-center justify-end gap-2.5">
+              {/* Action buttons — cố định ở chân modal */}
+              <div className="shrink-0 px-5 py-3 border-t border-slate-100 bg-white flex items-center justify-end gap-2.5">
                 <button
                   type="button"
                   onClick={() => setEditModalOpen(false)}
