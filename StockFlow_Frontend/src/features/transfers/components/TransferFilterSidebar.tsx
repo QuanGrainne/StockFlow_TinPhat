@@ -428,7 +428,7 @@ export const TransferFilterSidebar: React.FC<Props> = ({
     <aside
       className={`relative ${
         isCollapsed ? 'w-0 border-r-0' : 'w-60 border-r border-slate-200'
-      } h-full min-h-0 bg-white flex flex-col shrink-0 transition-all duration-200 text-[13px] text-[#15171a] select-none font-sans`}
+      } h-full min-h-0 bg-white/75 backdrop-blur-[2px] flex flex-col shrink-0 transition-all duration-200 text-[13px] text-[#15171a] select-none font-sans`}
     >
       {/* Nút thu gọn / mở rộng bộ lọc theo chuẩn giao diện Ảnh 3 */}
       <button

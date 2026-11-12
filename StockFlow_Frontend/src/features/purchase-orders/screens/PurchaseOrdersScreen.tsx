@@ -191,9 +191,9 @@ export default function PurchaseOrdersScreen({}: PurchaseOrdersScreenProps = {})
   };
 
   return (
-    <div className="flex-1 h-full min-h-0 flex flex-col bg-[#f5f5f5] overflow-hidden select-none text-[13px] text-[#15171a] font-sans">
+    <div className="flex-1 h-full min-h-0 flex flex-col bg-transparent overflow-hidden select-none text-[13px] text-[#15171a] font-sans">
       {/* 1. Header */}
-      <header className="h-12 bg-white border-b border-slate-200 px-4 flex items-center justify-between gap-3 shrink-0">
+      <header className="h-12 bg-white/84 backdrop-blur-[2px] border-b border-slate-200 px-4 flex items-center justify-between gap-3 shrink-0">
         <div className="flex items-center gap-4 flex-1 max-w-xl">
           <h1 className="text-[20px] font-bold text-[#15171a] leading-7 tracking-tight whitespace-nowrap">Đặt hàng nhập</h1>
           <div className="relative flex-1">
@@ -263,7 +263,7 @@ export default function PurchaseOrdersScreen({}: PurchaseOrdersScreenProps = {})
           onToggleCollapse={() => setSidebarCollapsed((v) => !v)}
         />
 
-        <div className="flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden bg-white">
+        <div className="flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden bg-white/62">
           <div className="flex-1 min-h-0 overflow-auto">
             <table className="w-full text-left border-collapse min-w-[980px]">
               <thead className="bg-[#f7f8f9] sticky top-0 z-20 border-b border-slate-200 text-[12px] font-semibold text-[#677484] shadow-xs">
@@ -294,7 +294,7 @@ export default function PurchaseOrdersScreen({}: PurchaseOrdersScreenProps = {})
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {!loading && paged.length > 0 && (
-                  <tr className="bg-white border-b border-slate-200 font-bold text-[13px]">
+                  <tr className="bg-white/75 border-b border-slate-200 font-bold text-[13px]">
                     <td colSpan={5}></td>
                     <td className="py-2.5 px-3 text-right font-mono">{money.format(totals.ordered)}</td>
                     <td className="py-2.5 px-3 text-right font-mono">{money.format(totals.received)}</td>
@@ -395,7 +395,7 @@ export default function PurchaseOrdersScreen({}: PurchaseOrdersScreenProps = {})
           </div>
 
           {/* Footer phân trang */}
-          <footer className="h-10 bg-white border-t border-slate-200 px-4 flex items-center justify-between text-[12px] text-[#677484] shrink-0">
+          <footer className="h-10 bg-white/82 backdrop-blur-[2px] border-t border-slate-200 px-4 flex items-center justify-between text-[12px] text-[#677484] shrink-0">
             <div className="flex items-center gap-3">
               <span>
                 Hiển thị{' '}

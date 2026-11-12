@@ -291,9 +291,9 @@ export default function StocktakesScreen() {
     : null;
 
   return (
-    <div className="flex-1 h-full min-h-0 flex flex-col bg-[#f5f5f5] overflow-hidden select-none text-[13px] text-[#15171a] font-sans">
+    <div className="flex-1 h-full min-h-0 flex flex-col bg-transparent overflow-hidden select-none text-[13px] text-[#15171a] font-sans">
       {/* 1. Header */}
-      <header className="min-h-12 bg-white border-b border-slate-200 px-3 sm:px-4 py-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 shrink-0">
+      <header className="min-h-12 bg-white/84 backdrop-blur-[2px] border-b border-slate-200 px-3 sm:px-4 py-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 shrink-0">
         <div className="flex items-center gap-4 flex-1 basis-[320px] min-w-[260px] max-w-xl">
           <h1 className="text-[20px] font-bold leading-7 tracking-tight whitespace-nowrap">Phiếu kiểm kho</h1>
           <div className="relative flex-1">
@@ -374,7 +374,7 @@ export default function StocktakesScreen() {
           </button>
         </div>
 
-        <div className="flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden bg-white">
+        <div className="flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden bg-white/62">
           <div className="flex-1 min-h-0 overflow-auto">
             <table className="w-full text-left border-collapse min-w-[1100px]">
               <thead className="text-[12px] font-semibold text-[#677484]">
@@ -494,7 +494,7 @@ export default function StocktakesScreen() {
               </tbody>
             </table>
           </div>
-          <footer className="h-10 bg-white border-t border-slate-200 px-4 flex items-center text-[12px] text-[#677484] shrink-0">
+          <footer className="h-10 bg-white/82 backdrop-blur-[2px] border-t border-slate-200 px-4 flex items-center text-[12px] text-[#677484] shrink-0">
             Hiển thị <strong className="mx-1 text-[#15171a]">{filtered.length}</strong> phiếu kiểm kho
           </footer>
         </div>

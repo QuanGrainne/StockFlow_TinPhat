@@ -110,7 +110,7 @@ export function OrderSettingsScreen({ onNavigate }: OrderSettingsScreenProps) {
 
   if (loading) {
     return (
-      <div className="flex-1 flex items-center justify-center bg-slate-50">
+      <div className="flex-1 flex items-center justify-center bg-transparent">
         <div className="text-center">
           <div className="w-10 h-10 border-4 border-[#1E56A0] border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
           <p className="text-sm text-slate-500 font-medium">Đang tải thiết lập đơn hàng...</p>
@@ -120,7 +120,7 @@ export function OrderSettingsScreen({ onNavigate }: OrderSettingsScreenProps) {
   }
 
   return (
-    <div className="flex-1 overflow-y-auto bg-slate-50">
+    <div className="flex-1 overflow-y-auto bg-transparent">
       {/* Toast alert */}
       {toast && (
         <div className="fixed top-20 right-6 z-50 animate-in fade-in slide-in-from-top-4">

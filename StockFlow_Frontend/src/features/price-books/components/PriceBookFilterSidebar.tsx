@@ -125,7 +125,7 @@ export default function PriceBookFilterSidebar({
     'h-9 w-full rounded-[8px] border border-slate-300 bg-white px-2.5 text-[13px] text-[#15171a] outline-none transition focus:border-[#0070f4] cursor-pointer';
 
   return (
-    <aside className="w-[240px] shrink-0 bg-white border-r border-slate-200 p-3.5 space-y-4 select-none text-[#15171a] block relative overflow-visible">
+    <aside className="w-[240px] shrink-0 bg-white/75 backdrop-blur-[2px] border-r border-slate-200 p-3.5 space-y-4 select-none text-[#15171a] block relative overflow-visible">
       {/* 1. Bảng giá */}
       <div className="relative">
         <div className="flex items-center justify-between">

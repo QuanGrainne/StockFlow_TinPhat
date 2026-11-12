@@ -74,7 +74,7 @@ export default function SuppliersTable({
     pagedItems.length > 0 && pagedItems.every((s) => selectedRowKeys.includes(s.id));
 
   return (
-    <div className="flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden bg-white">
+    <div className="flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden bg-white/62">
       <div className="flex-1 min-h-0 overflow-auto">
         <table className="w-full text-left border-collapse min-w-[900px]">
           <thead className="bg-[#f7f8f9] sticky top-0 z-20 border-b border-slate-200 text-[12px] font-semibold text-[#677484] shadow-xs">
@@ -103,7 +103,7 @@ export default function SuppliersTable({
           <tbody className="divide-y divide-slate-100">
             {/* Dòng tổng giống màn hình Chuyển hàng */}
             {pagedItems.length > 0 && !loading && (
-              <tr className="bg-white border-b border-slate-200 font-bold text-[#15171a] text-[13px]">
+              <tr className="bg-white/75 border-b border-slate-200 font-bold text-[#15171a] text-[13px]">
                 <td colSpan={6}></td>
                 <td className="py-2.5 px-3 text-right font-mono font-bold text-[#15171a]">
                   {currencyFormatter.format(totalPurchased)}
@@ -248,7 +248,7 @@ export default function SuppliersTable({
       </div>
 
       {/* Footer Bar */}
-      <footer className="min-h-10 bg-white border-t border-slate-200 px-3 sm:px-4 py-1.5 flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5 text-[12px] text-[#677484] shrink-0">
+      <footer className="min-h-10 bg-white/82 backdrop-blur-[2px] border-t border-slate-200 px-3 sm:px-4 py-1.5 flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5 text-[12px] text-[#677484] shrink-0">
         <div className="flex items-center gap-3">
           <span>
             Hiển thị <strong className="text-[#15171a] font-bold">{rangeStart}</strong>

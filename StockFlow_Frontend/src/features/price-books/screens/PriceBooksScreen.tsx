@@ -658,11 +658,11 @@ export default function PriceBooksClient() {
   };
 
   return (
-    <div className="flex-1 h-full min-h-0 flex flex-col bg-[#f5f5f5] overflow-hidden text-[13px] text-[#15171a] font-sans">
+    <div className="flex-1 h-full min-h-0 flex flex-col bg-transparent overflow-hidden text-[13px] text-[#15171a] font-sans">
       {contextHolder}
 
       {/* 1. Header: tiêu đề + tìm kiếm | + Bảng giá, Xuất file (giống Nhập hàng / Trả hàng nhập) */}
-      <header className="min-h-12 bg-white border-b border-slate-200 px-3 sm:px-4 py-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 shrink-0">
+      <header className="min-h-12 bg-white/84 backdrop-blur-[2px] border-b border-slate-200 px-3 sm:px-4 py-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 shrink-0">
         <div className="flex items-center gap-4 flex-1 basis-[320px] min-w-[260px] max-w-xl">
           <h1 className="text-[20px] font-bold leading-7 tracking-tight whitespace-nowrap">Thiết lập giá</h1>
           <div className="relative flex-1">
@@ -744,7 +744,7 @@ export default function PriceBooksClient() {
       />
 
       {/* 3. Bảng giá */}
-      <main className="min-w-0 flex-1 flex flex-col bg-white overflow-hidden">
+      <main className="min-w-0 flex-1 flex flex-col bg-white/62 overflow-hidden">
         {activeCustomBook && (
           <div className="px-4 py-2 border-b border-slate-200 text-[12px] text-[#677484]">
             Đang xem bảng giá <strong className="text-[#15171a]">{activeCustomBook.priceBookName}</strong> ({totalCount} hàng hóa)
