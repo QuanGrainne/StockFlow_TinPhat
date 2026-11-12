@@ -15,6 +15,9 @@ public partial class DtlStockIssueItem
 
     public int? LotId { get; set; }
 
+    /// <summary>Kho của từng dòng (BR-55). Null với dòng cũ chưa có kho riêng.</summary>
+    public int? WarehouseId { get; set; }
+
     public decimal? RequestedQty { get; set; }
 
     public decimal? ActualIssuedQty { get; set; }
@@ -26,5 +29,7 @@ public partial class DtlStockIssueItem
     public virtual DtlOrderItem? OrderItem { get; set; }
 
     public virtual TrxStockIssue StockIssue { get; set; } = null!;
+
+    public virtual MstWarehouse? Warehouse { get; set; }
 }
 

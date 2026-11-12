@@ -1,19 +1,14 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace StockFlow.Domain.Entities;
 
+/// <summary>Đầu lệnh sản xuất. Thành phẩm nằm ở <see cref="TrxProductionOrderItem"/>.</summary>
 public partial class TrxProductionOrder
 {
     public int ProductionOrderId { get; set; }
 
     public string? ProductionOrderCode { get; set; }
-
-    public int ProductId { get; set; }
-
-    public int BomId { get; set; }
-
-    public decimal? PlannedQuantity { get; set; }
 
     public decimal? ActualQuantity { get; set; }
 
@@ -31,18 +26,13 @@ public partial class TrxProductionOrder
 
     public virtual SecUser? AssignedToNavigation { get; set; }
 
-    public virtual MstBom Bom { get; set; } = null!;
-
     public virtual SecUser CreatedByNavigation { get; set; } = null!;
-
-    public virtual MstProduct Product { get; set; } = null!;
 
     public virtual ICollection<TrxFinishedGoodsReceipt> TrxFinishedGoodsReceipts { get; set; } = new List<TrxFinishedGoodsReceipt>();
 
-    public virtual ICollection<TrxProductionMaterialRequirement> TrxProductionMaterialRequirements { get; set; } = new List<TrxProductionMaterialRequirement>();
+    public virtual ICollection<TrxProductionOrderItem> TrxProductionOrderItems { get; set; } = new List<TrxProductionOrderItem>();
 
     public virtual ICollection<TrxProductionReport> TrxProductionReports { get; set; } = new List<TrxProductionReport>();
 
     public virtual ICollection<TrxStockIssue> TrxStockIssues { get; set; } = new List<TrxStockIssue>();
 }
-

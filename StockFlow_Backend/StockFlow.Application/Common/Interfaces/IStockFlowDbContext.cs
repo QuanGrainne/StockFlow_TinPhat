@@ -39,6 +39,7 @@ public interface IStockFlowDbContext
     DbSet<DtlStockTransferItem> DtlStockTransferItems { get; }
     DbSet<TrxStockIssue> TrxStockIssues { get; }
     DbSet<DtlStockIssueItem> DtlStockIssueItems { get; }
+    DbSet<TrxProductionOrderItem> TrxProductionOrderItems { get; }
 
     Task<long> GetNextSequenceValueAsync(string sequenceName, CancellationToken cancellationToken = default);
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);

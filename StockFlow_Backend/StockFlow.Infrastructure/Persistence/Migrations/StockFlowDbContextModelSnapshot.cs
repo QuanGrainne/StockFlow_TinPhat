@@ -58,30 +58,38 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("material_id");
 
-                    b.Property<decimal?>("Quantity")
-                        .HasPrecision(18, 4)
-                        .HasColumnType("numeric(18,4)")
+                    b.Property<decimal>("Quantity")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("numeric(18,6)")
                         .HasColumnName("quantity");
 
                     b.Property<int>("UnitId")
                         .HasColumnType("integer")
                         .HasColumnName("unit_id");
 
-                    b.Property<decimal?>("WastageRate")
-                        .HasPrecision(5, 2)
-                        .HasColumnType("numeric(5,2)")
+                    b.Property<decimal>("WastageRate")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(7, 4)
+                        .HasColumnType("numeric(7,4)")
+                        .HasDefaultValue(0m)
                         .HasColumnName("wastage_rate");
 
                     b.HasKey("BomItemId")
                         .HasName("dtl_bom_items_pkey");
 
-                    b.HasIndex("BomId");
-
                     b.HasIndex("MaterialId");
 
                     b.HasIndex("UnitId");
 
-                    b.ToTable("dtl_bom_items", "stockflow");
+                    b.HasIndex(new[] { "BomId", "MaterialId" }, "uq_dtl_bom_items_bom_material")
+                        .IsUnique();
+
+                    b.ToTable("dtl_bom_items", "stockflow", t =>
+                        {
+                            t.HasCheckConstraint("ck_dtl_bom_items_quantity", "quantity > 0");
+
+                            t.HasCheckConstraint("ck_dtl_bom_items_wastage_rate", "wastage_rate >= 0 AND wastage_rate <= 100");
+                        });
                 });
 
             modelBuilder.Entity("StockFlow.Domain.Entities.DtlGoodsReceiptItem", b =>
@@ -525,8 +533,8 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("SiItemId"));
 
                     b.Property<decimal?>("ActualIssuedQty")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("numeric(18,6)")
                         .HasColumnName("actual_issued_qty");
 
                     b.Property<int?>("LotId")
@@ -542,13 +550,17 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                         .HasColumnName("order_item_id");
 
                     b.Property<decimal?>("RequestedQty")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("numeric(18,6)")
                         .HasColumnName("requested_qty");
 
                     b.Property<int>("StockIssueId")
                         .HasColumnType("integer")
                         .HasColumnName("stock_issue_id");
+
+                    b.Property<int?>("WarehouseId")
+                        .HasColumnType("integer")
+                        .HasColumnName("warehouse_id");
 
                     b.HasKey("SiItemId")
                         .HasName("dtl_stock_issue_items_pkey");
@@ -560,6 +572,8 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                     b.HasIndex("OrderItemId");
 
                     b.HasIndex("StockIssueId");
+
+                    b.HasIndex("WarehouseId");
 
                     b.ToTable("dtl_stock_issue_items", "stockflow");
                 });
@@ -786,6 +800,15 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp without time zone")
                         .HasColumnName("created_at");
 
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("description");
+
+                    b.Property<DateOnly?>("EffectiveDate")
+                        .HasColumnType("date")
+                        .HasColumnName("effective_date");
+
                     b.Property<bool?>("IsActive")
                         .HasColumnType("boolean")
                         .HasColumnName("is_active");
@@ -793,6 +816,14 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                     b.Property<int>("ProductId")
                         .HasColumnType("integer")
                         .HasColumnName("product_id");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("Draft")
+                        .HasColumnName("status");
 
                     b.Property<string>("Version")
                         .HasMaxLength(20)
@@ -802,9 +833,14 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                     b.HasKey("BomId")
                         .HasName("mst_boms_pkey");
 
-                    b.HasIndex("ProductId");
+                    b.HasIndex(new[] { "ProductId" }, "uq_mst_boms_one_active_per_product")
+                        .IsUnique()
+                        .HasFilter("status = 'Active'");
 
-                    b.ToTable("mst_boms", "stockflow");
+                    b.ToTable("mst_boms", "stockflow", t =>
+                        {
+                            t.HasCheckConstraint("ck_mst_boms_status", "status IN ('Draft', 'Active', 'Inactive')");
+                        });
                 });
 
             modelBuilder.Entity("StockFlow.Domain.Entities.MstBusinessPartner", b =>
@@ -2285,43 +2321,95 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("RequirementId"));
 
-                    b.Property<decimal?>("IssuedQty")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)")
+                    b.Property<string>("AdjustReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("adjust_reason");
+
+                    b.Property<DateTime?>("AdjustedAt")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("adjusted_at");
+
+                    b.Property<int?>("AdjustedBy")
+                        .HasColumnType("integer")
+                        .HasColumnName("adjusted_by");
+
+                    b.Property<bool>("IsAdjusted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_adjusted");
+
+                    b.Property<decimal>("IssuedQty")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(18, 6)
+                        .HasColumnType("numeric(18,6)")
+                        .HasDefaultValue(0m)
                         .HasColumnName("issued_qty");
 
                     b.Property<int>("MaterialId")
                         .HasColumnType("integer")
                         .HasColumnName("material_id");
 
-                    b.Property<int>("ProductionOrderId")
-                        .HasColumnType("integer")
-                        .HasColumnName("production_order_id");
+                    b.Property<decimal>("NormPerUnit")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("numeric(18,6)")
+                        .HasColumnName("norm_per_unit");
 
-                    b.Property<decimal?>("RequiredQty")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)")
+                    b.Property<int>("ProductionOrderItemId")
+                        .HasColumnType("integer")
+                        .HasColumnName("production_order_item_id");
+
+                    b.Property<decimal>("RequiredQty")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(18, 6)
+                        .HasColumnType("numeric(18,6)")
+                        .HasDefaultValue(0m)
                         .HasColumnName("required_qty");
 
-                    b.Property<decimal?>("ShortageQty")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)")
+                    b.Property<decimal>("ShortageQty")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(18, 6)
+                        .HasColumnType("numeric(18,6)")
+                        .HasDefaultValue(0m)
                         .HasColumnName("shortage_qty");
+
+                    b.Property<int?>("SourceBomItemId")
+                        .HasColumnType("integer")
+                        .HasColumnName("source_bom_item_id");
 
                     b.Property<int>("UnitId")
                         .HasColumnType("integer")
                         .HasColumnName("unit_id");
 
+                    b.Property<decimal>("WastageRate")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(7, 4)
+                        .HasColumnType("numeric(7,4)")
+                        .HasDefaultValue(0m)
+                        .HasColumnName("wastage_rate");
+
                     b.HasKey("RequirementId")
                         .HasName("trx_production_material_requirements_pkey");
 
+                    b.HasIndex("AdjustedBy");
+
                     b.HasIndex("MaterialId");
 
-                    b.HasIndex("ProductionOrderId");
+                    b.HasIndex("SourceBomItemId");
 
                     b.HasIndex("UnitId");
 
-                    b.ToTable("trx_production_material_requirements", "stockflow");
+                    b.HasIndex(new[] { "ProductionOrderItemId" }, "ix_trx_prod_mat_req_order_item_id");
+
+                    b.ToTable("trx_production_material_requirements", "stockflow", t =>
+                        {
+                            t.HasCheckConstraint("ck_trx_prod_mat_req_norm_per_unit", "norm_per_unit >= 0");
+
+                            t.HasCheckConstraint("ck_trx_prod_mat_req_quantities", "required_qty >= 0 AND issued_qty >= 0 AND shortage_qty >= 0");
+
+                            t.HasCheckConstraint("ck_trx_prod_mat_req_wastage_rate", "wastage_rate >= 0 AND wastage_rate <= 100");
+                        });
                 });
 
             modelBuilder.Entity("StockFlow.Domain.Entities.TrxProductionOrder", b =>
@@ -2342,10 +2430,6 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("assigned_to");
 
-                    b.Property<int>("BomId")
-                        .HasColumnType("integer")
-                        .HasColumnName("bom_id");
-
                     b.Property<int>("CreatedBy")
                         .HasColumnType("integer")
                         .HasColumnName("created_by");
@@ -2358,15 +2442,6 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)")
                         .HasColumnName("notes");
-
-                    b.Property<decimal?>("PlannedQuantity")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)")
-                        .HasColumnName("planned_quantity");
-
-                    b.Property<int>("ProductId")
-                        .HasColumnType("integer")
-                        .HasColumnName("product_id");
 
                     b.Property<string>("ProductionOrderCode")
                         .HasMaxLength(30)
@@ -2387,16 +2462,68 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("AssignedTo");
 
-                    b.HasIndex("BomId");
-
                     b.HasIndex("CreatedBy");
-
-                    b.HasIndex("ProductId");
 
                     b.HasIndex(new[] { "ProductionOrderCode" }, "uq_trx_production_orders_1")
                         .IsUnique();
 
                     b.ToTable("trx_production_orders", "stockflow");
+                });
+
+            modelBuilder.Entity("StockFlow.Domain.Entities.TrxProductionOrderItem", b =>
+                {
+                    b.Property<int>("ProductionOrderItemId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("production_order_item_id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("ProductionOrderItemId"));
+
+                    b.Property<int>("BomId")
+                        .HasColumnType("integer")
+                        .HasColumnName("bom_id");
+
+                    b.Property<decimal>("PlannedQty")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("numeric(18,6)")
+                        .HasColumnName("planned_qty");
+
+                    b.Property<int>("ProductId")
+                        .HasColumnType("integer")
+                        .HasColumnName("product_id");
+
+                    b.Property<int>("ProductionOrderId")
+                        .HasColumnType("integer")
+                        .HasColumnName("production_order_id");
+
+                    b.Property<decimal>("ReceivedQty")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(18, 6)
+                        .HasColumnType("numeric(18,6)")
+                        .HasDefaultValue(0m)
+                        .HasColumnName("received_qty");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("Not Started")
+                        .HasColumnName("status");
+
+                    b.HasKey("ProductionOrderItemId")
+                        .HasName("trx_production_order_items_pkey");
+
+                    b.HasIndex("BomId");
+
+                    b.HasIndex("ProductId");
+
+                    b.HasIndex(new[] { "ProductionOrderId" }, "ix_trx_production_order_items_order_id");
+
+                    b.ToTable("trx_production_order_items", "stockflow", t =>
+                        {
+                            t.HasCheckConstraint("ck_trx_production_order_items_qty", "planned_qty > 0 AND received_qty >= 0");
+                        });
                 });
 
             modelBuilder.Entity("StockFlow.Domain.Entities.TrxProductionReport", b =>
@@ -3248,6 +3375,11 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasConstraintName("fk_dtl_stock_issue_items_stock_issue_id");
 
+                    b.HasOne("StockFlow.Domain.Entities.MstWarehouse", "Warehouse")
+                        .WithMany()
+                        .HasForeignKey("WarehouseId")
+                        .HasConstraintName("fk_dtl_stock_issue_items_warehouse_id");
+
                     b.Navigation("Lot");
 
                     b.Navigation("MaterialRequirement");
@@ -3255,6 +3387,8 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                     b.Navigation("OrderItem");
 
                     b.Navigation("StockIssue");
+
+                    b.Navigation("Warehouse");
                 });
 
             modelBuilder.Entity("StockFlow.Domain.Entities.DtlStockTransferItem", b =>
@@ -3797,17 +3931,28 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("StockFlow.Domain.Entities.TrxProductionMaterialRequirement", b =>
                 {
+                    b.HasOne("StockFlow.Domain.Entities.SecUser", "AdjustedByNavigation")
+                        .WithMany()
+                        .HasForeignKey("AdjustedBy")
+                        .HasConstraintName("fk_trx_production_material_requirements_adjusted_by");
+
                     b.HasOne("StockFlow.Domain.Entities.MstProduct", "Material")
                         .WithMany("TrxProductionMaterialRequirements")
                         .HasForeignKey("MaterialId")
                         .IsRequired()
                         .HasConstraintName("fk_trx_production_material_requirements_material_id");
 
-                    b.HasOne("StockFlow.Domain.Entities.TrxProductionOrder", "ProductionOrder")
+                    b.HasOne("StockFlow.Domain.Entities.TrxProductionOrderItem", "ProductionOrderItem")
                         .WithMany("TrxProductionMaterialRequirements")
-                        .HasForeignKey("ProductionOrderId")
+                        .HasForeignKey("ProductionOrderItemId")
                         .IsRequired()
-                        .HasConstraintName("fk_trx_production_material_requirements_production_order_id");
+                        .HasConstraintName("fk_trx_production_material_requirements_order_item_id");
+
+                    b.HasOne("StockFlow.Domain.Entities.DtlBomItem", "SourceBomItem")
+                        .WithMany("TrxProductionMaterialRequirements")
+                        .HasForeignKey("SourceBomItemId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_trx_production_material_requirements_source_bom_item_id");
 
                     b.HasOne("StockFlow.Domain.Entities.MstUnit", "Unit")
                         .WithMany("TrxProductionMaterialRequirements")
@@ -3815,9 +3960,13 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasConstraintName("fk_trx_production_material_requirements_unit_id");
 
+                    b.Navigation("AdjustedByNavigation");
+
                     b.Navigation("Material");
 
-                    b.Navigation("ProductionOrder");
+                    b.Navigation("ProductionOrderItem");
+
+                    b.Navigation("SourceBomItem");
 
                     b.Navigation("Unit");
                 });
@@ -3829,31 +3978,42 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                         .HasForeignKey("AssignedTo")
                         .HasConstraintName("fk_trx_production_orders_assigned_to");
 
-                    b.HasOne("StockFlow.Domain.Entities.MstBom", "Bom")
-                        .WithMany("TrxProductionOrders")
-                        .HasForeignKey("BomId")
-                        .IsRequired()
-                        .HasConstraintName("fk_trx_production_orders_bom_id");
-
                     b.HasOne("StockFlow.Domain.Entities.SecUser", "CreatedByNavigation")
                         .WithMany("TrxProductionOrderCreatedByNavigations")
                         .HasForeignKey("CreatedBy")
                         .IsRequired()
                         .HasConstraintName("fk_trx_production_orders_created_by");
 
+                    b.Navigation("AssignedToNavigation");
+
+                    b.Navigation("CreatedByNavigation");
+                });
+
+            modelBuilder.Entity("StockFlow.Domain.Entities.TrxProductionOrderItem", b =>
+                {
+                    b.HasOne("StockFlow.Domain.Entities.MstBom", "Bom")
+                        .WithMany("TrxProductionOrderItems")
+                        .HasForeignKey("BomId")
+                        .IsRequired()
+                        .HasConstraintName("fk_trx_production_order_items_bom_id");
+
                     b.HasOne("StockFlow.Domain.Entities.MstProduct", "Product")
-                        .WithMany("TrxProductionOrders")
+                        .WithMany("TrxProductionOrderItems")
                         .HasForeignKey("ProductId")
                         .IsRequired()
-                        .HasConstraintName("fk_trx_production_orders_product_id");
+                        .HasConstraintName("fk_trx_production_order_items_product_id");
 
-                    b.Navigation("AssignedToNavigation");
+                    b.HasOne("StockFlow.Domain.Entities.TrxProductionOrder", "ProductionOrder")
+                        .WithMany("TrxProductionOrderItems")
+                        .HasForeignKey("ProductionOrderId")
+                        .IsRequired()
+                        .HasConstraintName("fk_trx_production_order_items_production_order_id");
 
                     b.Navigation("Bom");
 
-                    b.Navigation("CreatedByNavigation");
-
                     b.Navigation("Product");
+
+                    b.Navigation("ProductionOrder");
                 });
 
             modelBuilder.Entity("StockFlow.Domain.Entities.TrxProductionReport", b =>
@@ -4088,6 +4248,11 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                     b.Navigation("Warehouse");
                 });
 
+            modelBuilder.Entity("StockFlow.Domain.Entities.DtlBomItem", b =>
+                {
+                    b.Navigation("TrxProductionMaterialRequirements");
+                });
+
             modelBuilder.Entity("StockFlow.Domain.Entities.DtlGoodsReceiptItem", b =>
                 {
                     b.Navigation("DtlInboundCostAllocations");
@@ -4109,7 +4274,7 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                 {
                     b.Navigation("DtlBomItems");
 
-                    b.Navigation("TrxProductionOrders");
+                    b.Navigation("TrxProductionOrderItems");
                 });
 
             modelBuilder.Entity("StockFlow.Domain.Entities.MstBusinessPartner", b =>
@@ -4183,7 +4348,7 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
 
                     b.Navigation("TrxProductionMaterialRequirements");
 
-                    b.Navigation("TrxProductionOrders");
+                    b.Navigation("TrxProductionOrderItems");
                 });
 
             modelBuilder.Entity("StockFlow.Domain.Entities.MstProductCategory", b =>
@@ -4345,11 +4510,16 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                 {
                     b.Navigation("TrxFinishedGoodsReceipts");
 
-                    b.Navigation("TrxProductionMaterialRequirements");
+                    b.Navigation("TrxProductionOrderItems");
 
                     b.Navigation("TrxProductionReports");
 
                     b.Navigation("TrxStockIssues");
+                });
+
+            modelBuilder.Entity("StockFlow.Domain.Entities.TrxProductionOrderItem", b =>
+                {
+                    b.Navigation("TrxProductionMaterialRequirements");
                 });
 
             modelBuilder.Entity("StockFlow.Domain.Entities.TrxProductionReport", b =>
