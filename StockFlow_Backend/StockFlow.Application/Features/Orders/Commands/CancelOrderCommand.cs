@@ -15,6 +15,8 @@ namespace StockFlow.Application.Features.Orders.Commands;
 /// - Giảm công nợ khách đúng phần còn nợ của hóa đơn; phiếu thu tiền của hóa đơn chuyển sang CANCELLED
 ///   (tiền khách đã trả coi như trả lại khách).
 /// - Hóa đơn chuyển sang CANCELLED. Hóa đơn đã hủy không hủy lại được.
+/// - Hóa đơn tạo từ đơn đặt hàng: chỉ tác động lên hóa đơn; đơn đặt gốc giữ nguyên trạng thái (Hoàn thành),
+///   tiền trả trước đã trừ vào hóa đơn quay lại thành tiền khách trả trước trong công nợ.
 /// </summary>
 public record CancelOrderCommand(int OrderId) : IRequest<Result<bool>>;
 
@@ -85,7 +87,8 @@ public class CancelOrderCommandHandler : IRequestHandler<CancelOrderCommand, Res
         // 2. Công nợ khách: bỏ phần còn nợ của hóa đơn; hủy phiếu thu của hóa đơn
         if (string.Equals(order.Status, "COMPLETED", StringComparison.OrdinalIgnoreCase) && order.Partner != null)
         {
-            // Tiền trả trước của đơn đặt đã trừ vào hóa đơn trả lại cho đơn đặt (khách vẫn đang trả trước)
+            // Tiền trả trước của đơn đặt đã trừ vào hóa đơn: quay lại thành tiền khách trả trước trong công nợ
+            // (cửa hàng đang nợ khách khoản này; đơn đặt gốc không mở lại)
             order.Partner.CurrentDebt = (order.Partner.CurrentDebt ?? 0) - (order.OutstandingAmount ?? 0) - order.DepositAmount;
         }
         var receipts = await _context.TrxFinancialTransactions
@@ -98,14 +101,8 @@ public class CancelOrderCommandHandler : IRequestHandler<CancelOrderCommand, Res
         order.UpdatedAt = VietnamTime.Now;
         order.UpdatedBy = userId;
 
+        // Hóa đơn là chứng từ độc lập sau khi tạo: hủy hóa đơn không đổi trạng thái đơn đặt gốc
         await _context.SaveChangesAsync(ct);
-
-        // Hóa đơn giao của đơn đặt hàng: SL đã giao giảm → mở lại đơn (Đang giao / Đã xác nhận)
-        if (order.BookingOrderId.HasValue)
-        {
-            await SalesBookingOps.RecomputeStatusAsync(_context, order.BookingOrderId.Value, userId, ct);
-            await _context.SaveChangesAsync(ct);
-        }
         return Result.Success(true);
     }
 }

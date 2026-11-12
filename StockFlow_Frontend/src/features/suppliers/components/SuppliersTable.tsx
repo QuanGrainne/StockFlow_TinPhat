@@ -31,6 +31,8 @@ interface SuppliersTableProps {
   onToggleStatus: (partnerId: number) => void;
   onDelete: (sup: Supplier) => void;
   onPaymentCreated: (partnerId: number, voucherCode: string) => void;
+  /** Sau khi điều chỉnh công nợ: tải lại chi tiết + danh sách */
+  onDataChanged: (partnerId: number) => void;
   onResetFilters: () => void;
   page: number;
   pageSize: number;
@@ -61,6 +63,7 @@ export default function SuppliersTable({
   onToggleStatus,
   onDelete,
   onPaymentCreated,
+  onDataChanged,
   onResetFilters,
   page,
   pageSize,
@@ -237,6 +240,7 @@ export default function SuppliersTable({
                         onToggleStatus={onToggleStatus}
                         onDelete={onDelete}
                         onPaymentCreated={onPaymentCreated}
+                        onDataChanged={onDataChanged}
                       />
                     )}
                   </React.Fragment>

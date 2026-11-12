@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { useActiveWarehouse, type WarehouseItem } from '@/lib/warehouse/useActiveWarehouse';
 import { FormHeaderUserBar } from '@/components/layout/FormHeaderUserBar';
+import { ProductThumb } from '@/components/ProductThumb';
 import { AddFromCategoryPopover } from '@/features/purchases';
 import type { BackendProduct } from '@/features/products/services/productService';
 import { transferService } from '@/features/transfers/services/transferService';
@@ -484,10 +485,13 @@ export default function CreateStocktakeScreen() {
                     onClick={() => addProduct(p)}
                     className="p-2.5 hover:bg-[#eff6ff] flex items-center justify-between cursor-pointer group"
                   >
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-[#0070f4] group-hover:underline">{p.productCode}</span>
-                      <span className="text-[11px] font-medium">{p.productName}</span>
-                      <span className="text-[10px] px-1.5 rounded-[4px] bg-[#f7f8f9] text-[#677484]">{p.unitName}</span>
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <ProductThumb src={p.imageUrl} alt={p.productName} />
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="font-bold text-[#0070f4] group-hover:underline">{p.productCode}</span>
+                        <span className="text-[11px] font-medium truncate">{p.productName}</span>
+                        <span className="text-[10px] px-1.5 rounded-[4px] bg-[#f7f8f9] text-[#677484] shrink-0">{p.unitName}</span>
+                      </div>
                     </div>
                     <div className="flex flex-col items-end">
                       <span className="text-[10px] text-[#677484]">Tồn kho:</span>

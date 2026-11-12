@@ -1,7 +1,8 @@
 // src/features/sales-bookings/types.ts
 // Kiểu dữ liệu Đơn đặt hàng của khách (DH...): đặt trước, không trừ kho; giao bằng hóa đơn tạo từ đơn.
 
-export type SalesBookingStatus = 'DRAFT' | 'CONFIRMED' | 'DELIVERING' | 'FINISHED' | 'CANCELLED';
+/** Phiếu tạm → (tạo hóa đơn) Hoàn thành, hoặc Đã hủy. Mỗi đơn ra đúng 1 hóa đơn. */
+export type SalesBookingStatus = 'DRAFT' | 'FINISHED' | 'CANCELLED';
 
 export interface SalesBookingListItem {
   orderId: number;

@@ -35,6 +35,8 @@ export interface PosSaleRequest {
   orderDate?: string;
   /** Hóa đơn giao hàng tạo từ đơn đặt hàng: server trừ tiền khách đã trả trước của đơn */
   bookingOrderId?: number;
+  /** Hóa đơn từ đơn, khách lấy thiếu: true = tạo đơn đặt mới (Phiếu tạm) cho phần còn lại */
+  createRemainderBooking?: boolean;
   items: {
     productId: number;
     quantity: number;
@@ -59,6 +61,9 @@ export interface PosSaleResult {
   outstandingAmount: number;
   /** Tiền trả trước của đơn đặt hàng đã trừ vào hóa đơn */
   depositAmount?: number;
+  /** Đơn đặt mới tạo cho phần khách chưa lấy */
+  remainderBookingId?: number | null;
+  remainderBookingCode?: string | null;
   message?: string;
 }
 

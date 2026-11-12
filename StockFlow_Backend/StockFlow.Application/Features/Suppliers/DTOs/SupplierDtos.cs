@@ -51,7 +51,7 @@ public record SupplierRecentReceiptDto(
 public record SupplierDebtLedgerEntryDto(
     string Code,
     DateTime? Date,
-    string Type,          // GOODS_RECEIPT | PAYMENT | OPENING
+    string Type,          // GOODS_RECEIPT | PAYMENT | SUPPLIER_RETURN | SUPPLIER_REFUND | ADJUST | OPENING
     string TypeLabel,     // Nhập hàng | Thanh toán | Nợ đầu kỳ
     int? ReferenceId,
     decimal Amount,       // + tăng nợ, - giảm nợ

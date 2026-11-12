@@ -47,6 +47,7 @@ import { tabSession } from '@/lib/auth/tabSession';
 import { posService, type PosSaleRequest } from '../services/posService';
 import { ReturnTabView } from '../components/ReturnTabView';
 import { PickBookingDialog, PickInvoiceDialog } from '../components/PosPickerDialogs';
+import { BookingShortageDialog, type BookingShortageLine } from '../components/BookingShortageDialog';
 import { salesReturnService } from '@/features/sales-returns/services/salesReturnService';
 import type { PosCustomer, PosPriceBook, PosProduct } from '../types';
 import {
@@ -311,6 +312,8 @@ export default function PosScreen() {
   const [orderDiscountOpen, setOrderDiscountOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  /** Hóa đơn từ đơn đặt, khách lấy thiếu: các dòng thiếu (mở hộp hỏi tạo đơn chờ) */
+  const [shortage, setShortage] = useState<BookingShortageLine[] | null>(null);
   const [now, setNow] = useState(() => new Date());
 
   const productSearchRef = useRef<HTMLInputElement>(null);
@@ -486,9 +489,14 @@ export default function PosScreen() {
             message.info(`Đã chuyển chi nhánh làm việc sang ${wh.name} (chi nhánh xử lý của đơn ${b.orderCode}).`);
           }
         }
+        if (kind === 'INVOICE' && b.status !== 'DRAFT') {
+          message.warning(`Đơn ${b.orderCode} đã hoàn thành hoặc đã hủy — không tạo hóa đơn được nữa.`);
+          return;
+        }
         const firstDelivery = b.invoices.every((i) => i.status !== 'COMPLETED');
+        // Mỗi đơn ra đúng 1 hóa đơn: mở đủ SL đặt, người bán sửa theo SL khách lấy thực tế
         const lines: PosLine[] = b.items
-          .map((it) => ({ it, qty: kind === 'BOOKING' ? it.quantity : Math.max(0, it.quantity - it.deliveredQuantity) }))
+          .map((it) => ({ it, qty: it.quantity }))
           .filter((x) => x.qty > 0)
           .map(({ it, qty }) => ({
             key: newId(),
@@ -541,6 +549,17 @@ export default function PosScreen() {
           bookingId: copyId ? null : b.orderId,
           bookingCode: copyId ? null : b.orderCode,
           bookingPaid: copyId ? 0 : kind === 'BOOKING' ? b.paidAmount : b.remainingDeposit,
+          // Hóa đơn từ đơn: nhớ SL đặt để hỏi tạo đơn chờ khi khách lấy thiếu
+          bookingItems:
+            kind === 'INVOICE' && !copyId
+              ? b.items.map((it) => ({
+                  productId: it.productId,
+                  code: it.productCode,
+                  name: it.productName,
+                  unit: it.unit,
+                  quantity: it.quantity,
+                }))
+              : undefined,
           warehouseId: b.warehouseId,
           deliveryDate: toLocalInput(b.deliveryDate),
           orderDate: copyId ? null : toLocalInput(b.orderDate),
@@ -865,7 +884,8 @@ export default function PosScreen() {
   };
 
   // ── Thanh toán ──
-  const handleCheckout = async () => {
+  /** remainderChoice: undefined = chưa hỏi; true/false = đã chọn ở hộp "Khách lấy thiếu" (tạo đơn chờ / chỉ thanh toán) */
+  const handleCheckout = async (remainderChoice?: boolean) => {
     if (tab.kind === 'RETURN') return; // tab Trả hàng có nút TRẢ HÀNG riêng
     if (isBooking) return handleSaveBooking();
     if (submitting) return;
@@ -881,6 +901,26 @@ export default function PosScreen() {
     if (tab.warehouseId && tab.warehouseId !== warehouseId)
       return message.error('Hóa đơn của đơn đặt hàng phải xuất từ chi nhánh xử lý của đơn — hãy đổi chi nhánh làm việc.');
     if (!tab.customer && paid < dueNow) return message.error('Khách lẻ phải thanh toán đủ. Chọn khách hàng để ghi nợ phần còn thiếu.');
+
+    // Hóa đơn từ đơn đặt: khách lấy ít hơn số đặt → hỏi tạo đơn chờ cho phần còn lại hay chỉ thanh toán
+    if (tab.bookingId && tab.bookingItems && remainderChoice === undefined) {
+      const taken = new Map<number, number>();
+      tab.lines.forEach((l) => taken.set(l.productId, (taken.get(l.productId) ?? 0) + l.quantity));
+      const ordered = new Map<number, BookingShortageLine>();
+      tab.bookingItems.forEach((it) => {
+        const cur = ordered.get(it.productId);
+        if (cur) cur.ordered += it.quantity;
+        else ordered.set(it.productId, { productId: it.productId, code: it.code, name: it.name, unit: it.unit, ordered: it.quantity, taken: 0 });
+      });
+      const short = [...ordered.values()]
+        .map((x) => ({ ...x, taken: Math.min(x.ordered, taken.get(x.productId) ?? 0) }))
+        .filter((x) => x.taken < x.ordered);
+      if (short.length > 0) {
+        setShortage(short);
+        return;
+      }
+    }
+    const createRemainderBooking = remainderChoice === true;
 
     const notes = buildNotes();
 
@@ -898,6 +938,7 @@ export default function PosScreen() {
       clientRequestId: `${tab.id}-${tab.lines.length}-${subTotal}`,
       orderDate: !lockSaleTime && saleTime ? new Date(saleTime).toISOString() : undefined,
       bookingOrderId: tab.bookingId ?? undefined,
+      createRemainderBooking,
       items: tab.lines.map((l) => {
         const c = lineCalc(l);
         // Bán cao hơn đơn giá: gửi giá bán làm đơn giá gốc, không giảm giá (server không nhận giảm giá âm)
@@ -924,8 +965,11 @@ export default function PosScreen() {
           tab.bookingCode ? ` (giao theo đơn ${tab.bookingCode})` : '',
           res.depositAmount ? `. Đã trừ ${fmt(res.depositAmount)} tiền khách trả trước` : '',
           res.changeAmount > 0 ? `. Tiền thừa trả khách: ${fmt(res.changeAmount)}` : '',
-        ].join('')
+          res.remainderBookingCode ? `. Đã tạo đơn chờ ${res.remainderBookingCode} cho phần khách chưa lấy` : '',
+        ].join(''),
+        res.remainderBookingCode ? 6 : undefined
       );
+      setShortage(null);
       closeTab(tab.id);
       setSaleTime(null);
       setReloadTick((t) => t + 1); // tồn kho thay đổi
@@ -1670,6 +1714,16 @@ export default function PosScreen() {
             setActiveTabId(t.id);
             setPicker(null);
           }}
+        />
+      )}
+      {shortage && tab.bookingCode && (
+        <BookingShortageDialog
+          bookingCode={tab.bookingCode}
+          lines={shortage}
+          leftoverDeposit={Math.max(0, (tab.bookingPaid ?? 0) - depositApplied)}
+          busy={submitting}
+          onClose={() => setShortage(null)}
+          onSubmit={(createRemainder) => void handleCheckout(createRemainder)}
         />
       )}
       {picker === 'booking' && (

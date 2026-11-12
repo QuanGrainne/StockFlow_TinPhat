@@ -187,7 +187,7 @@ public class CreatePosOrderCommandHandler : IRequestHandler<CreatePosOrderComman
         TrxOrder? booking = null;
         if (req.BookingOrderId is > 0)
         {
-            booking = await _context.TrxOrders
+            booking = await _context.TrxOrders.Include(o => o.DtlOrderItems)
                 .FirstOrDefaultAsync(o => o.OrderId == req.BookingOrderId.Value && o.OrderType == SalesBookingOps.OrderType, cancellationToken);
             if (booking == null)
                 return Result<PosOrderResultDto>.Failure("Không tìm thấy đơn đặt hàng để tạo hóa đơn.");
@@ -369,9 +369,10 @@ public class CreatePosOrderCommandHandler : IRequestHandler<CreatePosOrderComman
                      || (customer.PartnerName != null && customer.PartnerName.Contains("Khách lẻ"));
 
         // Hóa đơn từ đơn đặt hàng: tiền khách đã trả trước (còn dư) được trừ vào hóa đơn
-        decimal depositApplied = booking != null
-            ? Math.Min(finalTotal, await SalesBookingOps.RemainingDepositAsync(_context, booking, cancellationToken))
+        decimal depositBefore = booking != null
+            ? await SalesBookingOps.RemainingDepositAsync(_context, booking, cancellationToken)
             : 0;
+        decimal depositApplied = Math.Min(finalTotal, depositBefore);
         decimal dueNow = finalTotal - depositApplied;
 
         bool isRecordDebtExcess = !isWalkIn && string.Equals(req.ExcessAction, "RECORD_DEBT", StringComparison.OrdinalIgnoreCase);
@@ -633,10 +634,35 @@ CreatedBy = currentUserId,
 
             await _context.SaveChangesAsync(cancellationToken);
 
-            // Đơn đặt hàng: cập nhật SL đã giao → Đang giao hàng / Hoàn thành
+            // Đơn đặt hàng: chốt SL đơn = SL hóa đơn → Hoàn thành; khách lấy thiếu thì (nếu chọn) tách đơn chờ cho phần còn lại
+            TrxOrder? remainderBooking = null;
             if (booking != null && isCompleted)
             {
-                await SalesBookingOps.RecomputeStatusAsync(_context, booking.OrderId, currentUserId, cancellationToken);
+                var sourceDiscountBefore = booking.DiscountAmount;
+                var remainder = SalesBookingOps.SettleWithInvoice(
+                    _context,
+                    booking,
+                    calculatedItems.Select(c => new SalesBookingOps.InvoiceLine(
+                        c.RequestItem.ProductId,
+                        c.RequestItem.UnitId > 0 ? c.RequestItem.UnitId : c.Product.BaseUnitId,
+                        c.RequestItem.Quantity,
+                        c.OriginalPrice,
+                        c.DiscountType,
+                        c.DiscountValue,
+                        c.UnitPrice)).ToList(),
+                    new SalesBookingOps.InvoiceMoney(serverSubTotal, orderDiscountType, orderDiscountValue, orderDiscountAmount, finalTotal),
+                    currentUserId);
+
+                if (req.CreateRemainderBooking && remainder.Count > 0)
+                {
+                    // Tiền trả trước chưa trừ vào hóa đơn → chuyển sang đơn chờ (công nợ khách không đổi)
+                    var leftoverDeposit = Math.Max(0, depositBefore - depositApplied);
+                    remainderBooking = SalesBookingOps.BuildRemainderBooking(
+                        booking, remainder, sourceDiscountBefore, orderDiscountAmount, leftoverDeposit,
+                        await _codeGenerator.GenerateCodeAsync("BOOKING", settings, cancellationToken), currentUserId);
+                    _context.TrxOrders.Add(remainderBooking);
+                    if (leftoverDeposit > 0) booking.PaidAmount = Math.Max(0, (booking.PaidAmount ?? 0) - leftoverDeposit);
+                }
                 await _context.SaveChangesAsync(cancellationToken);
             }
 
@@ -663,6 +689,8 @@ CreatedBy = currentUserId,
                 TotalAmount = finalTotal,
                 PaidAmount = totalPaid,
                 DepositAmount = depositApplied,
+                RemainderBookingId = remainderBooking?.OrderId,
+                RemainderBookingCode = remainderBooking?.OrderCode,
                 ChangeAmount = changeAmount,
                 OutstandingAmount = outstanding,
                 PaymentStatus = paymentStatus,
