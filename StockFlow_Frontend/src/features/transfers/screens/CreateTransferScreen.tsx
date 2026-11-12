@@ -3,6 +3,7 @@
 
 'use client';
 
+import { tabSession } from '@/lib/auth/tabSession';
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -75,7 +76,7 @@ export default function CreateTransferScreen() {
 
   useEffect(() => {
     try {
-      const raw = localStorage.getItem('stockflow_user');
+      const raw = tabSession.get('stockflow_user');
       let u: any = null;
       if (raw) {
         u = JSON.parse(raw);
@@ -567,10 +568,13 @@ export default function CreateTransferScreen() {
     return items.reduce((acc, it) => acc + (Number(it.lineTotal) || 0), 0);
   }, [items]);
 
-  // Destination Warehouses list (excluding source warehouse)
+  // Kho nhận: MỌI kho đang hoạt động trong hệ thống trừ kho xuất (UC-33: chuyển sang chi nhánh khác).
+  // Kho xuất (chọn ở "Kho làm việc") chỉ gồm kho được phân quyền — allWarehouses.
   const availableDestWarehouses = useMemo(() => {
-    return allWarehouses.filter((w) => w.warehouseId !== sourceWarehouseId);
-  }, [allWarehouses, sourceWarehouseId]);
+    return facilities
+      .filter((f) => f.status === 'ACTIVE' && typeof f.warehouseId === 'number' && f.warehouseId !== sourceWarehouseId)
+      .map((f) => ({ warehouseId: f.warehouseId as number, code: f.code, name: f.name }));
+  }, [facilities, sourceWarehouseId]);
 
   // Validation Before Save
   const validateForm = (): boolean => {

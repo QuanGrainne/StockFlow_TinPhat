@@ -11,6 +11,7 @@ import {
   SupplierFilterState,
   WarehouseOption,
 } from '../types';
+import { useAuthorizedWarehouses } from '@/lib/warehouse/useActiveWarehouse';
 
 /** Mở sẵn từ link (?code=NCC...&id=...): điền ô tìm kiếm + mở dòng chi tiết NCC */
 export interface SupplierInitialLink {
@@ -35,7 +36,8 @@ export function useSuppliers(initial?: SupplierInitialLink) {
     dateTo: '',
   });
   const [selectedLocation, setSelectedLocation] = useState<string>('ALL');
-  const [warehousesList, setWarehousesList] = useState<WarehouseOption[]>([]);
+  // Bộ lọc "Chi nhánh nhập" chỉ gồm các kho tài khoản được phân quyền (Admin: tất cả)
+  const { warehouses: warehousesList } = useAuthorizedWarehouses();
 
   // Selection & Pagination State
   const [selectedRowKeys, setSelectedRowKeys] = useState<string[]>([]);
@@ -71,19 +73,6 @@ export function useSuppliers(initial?: SupplierInitialLink) {
       cancelled = true;
     };
   }, [linkedId]);
-
-  // 1. Tải danh sách kho khi khởi tạo
-  useEffect(() => {
-    async function loadWhs() {
-      try {
-        const whs = await supplierService.getWarehouses();
-        setWarehousesList(whs);
-      } catch (err) {
-        console.warn('Lỗi tải danh sách kho:', err);
-      }
-    }
-    loadWhs();
-  }, []);
 
   // 2. Tải danh sách nhà cung cấp từ API
   const loadSuppliers = async () => {

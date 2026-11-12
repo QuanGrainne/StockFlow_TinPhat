@@ -41,7 +41,8 @@ import { salesBookingService } from '@/features/sales-bookings/services/salesBoo
 import type { SaveSalesBookingPayload } from '@/features/sales-bookings/types';
 import { permissionService } from '@/features/admin/services/permissionService';
 import { getStoredRole } from '@/lib/navigation/currentRole';
-import { getActiveWarehouse, TIN_PHAT_WAREHOUSES, useActiveWarehouse } from '@/lib/warehouse/useActiveWarehouse';
+import { getActiveWarehouse, getAuthorizedWarehouses, useActiveWarehouse } from '@/lib/warehouse/useActiveWarehouse';
+import { tabSession } from '@/lib/auth/tabSession';
 import { posService, type PosSaleRequest } from '../services/posService';
 import { ReturnTabView } from '../components/ReturnTabView';
 import { PickBookingDialog, PickInvoiceDialog } from '../components/PosPickerDialogs';
@@ -318,7 +319,14 @@ export default function PosScreen() {
   const menuRef = useRef<HTMLDivElement>(null);
 
   const [userName] = useState(() => {
-    const u = readStorage<{ fullName?: string; username?: string } | null>('stockflow_user', null);
+    // Người dùng của phiên tab hiện tại (mỗi tab một phiên đăng nhập)
+    let u: { fullName?: string; username?: string } | null = null;
+    try {
+      const raw = tabSession.get('stockflow_user');
+      u = raw ? (JSON.parse(raw) as { fullName?: string; username?: string }) : null;
+    } catch {
+      u = null;
+    }
     return u?.fullName || u?.username || 'Thu ngân';
   });
 
@@ -397,7 +405,7 @@ export default function PosScreen() {
       .getSource(returnInvoiceId)
       .then((src) => {
         if (src.warehouseId !== getActiveWarehouse().warehouseId) {
-          const wh = TIN_PHAT_WAREHOUSES.find((w) => w.warehouseId === src.warehouseId);
+          const wh = getAuthorizedWarehouses().find((w) => w.warehouseId === src.warehouseId);
           if (wh) {
             setActiveWarehouse(wh);
             message.info(`Đã chuyển chi nhánh làm việc sang ${wh.name} (chi nhánh bán của hóa đơn ${src.invoiceCode}).`);
@@ -471,7 +479,7 @@ export default function PosScreen() {
       .then(([b, books]) => {
         // Đơn thuộc chi nhánh khác → chuyển chi nhánh làm việc sang chi nhánh xử lý của đơn
         if (b.warehouseId !== getActiveWarehouse().warehouseId) {
-          const wh = TIN_PHAT_WAREHOUSES.find((w) => w.warehouseId === b.warehouseId);
+          const wh = getAuthorizedWarehouses().find((w) => w.warehouseId === b.warehouseId);
           if (wh) {
             setActiveWarehouse(wh);
             message.info(`Đã chuyển chi nhánh làm việc sang ${wh.name} (chi nhánh xử lý của đơn ${b.orderCode}).`);

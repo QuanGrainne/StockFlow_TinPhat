@@ -58,31 +58,6 @@ export const supplierService = {
   },
 
   /**
-   * Lấy danh sách các Chi nhánh / Kho nhập hàng hoạt động
-   */
-  async getWarehouses(): Promise<{ warehouseId: number; code: string; name: string }[]> {
-    try {
-      const data = await apiClient.get<any[]>('/api/Suppliers/warehouses');
-      if (Array.isArray(data)) {
-        return data.map((w) => ({
-          warehouseId: w.warehouseId,
-          code: w.code || `K${w.warehouseId}`,
-          name: w.name || `Kho #${w.warehouseId}`,
-        }));
-      }
-      return [];
-    } catch (e) {
-      console.warn('Không thể tải danh sách kho từ API, dùng danh sách kho mặc định Tín Phát:', e);
-      return [
-        { warehouseId: 3, code: 'K001', name: 'Kho Tổng Gia Lâm' },
-        { warehouseId: 4, code: 'K002', name: 'Kho Đông Anh' },
-        { warehouseId: 5, code: 'K003', name: 'Kho Hà Đông' },
-        { warehouseId: 6, code: 'K004', name: 'Kho Hoàn Kiếm' },
-      ];
-    }
-  },
-
-  /**
    * Lấy chi tiết hồ sơ Nhà cung cấp và lịch sử các đợt nhập kho liên kết
    */
   async getSupplierById(id: number | string): Promise<SupplierDetail> {

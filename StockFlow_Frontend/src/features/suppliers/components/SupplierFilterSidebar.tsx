@@ -21,13 +21,6 @@ const STATUS_OPTIONS: { label: string; value: SupplierFilterState['status'] }[] 
   { label: 'Ngừng hoạt động', value: 'INACTIVE' },
 ];
 
-const DEFAULT_WAREHOUSES = [
-  { warehouseId: 3, code: 'K001', name: 'Kho Tổng Gia Lâm' },
-  { warehouseId: 4, code: 'K002', name: 'Kho Đông Anh' },
-  { warehouseId: 5, code: 'K003', name: 'Kho Hà Đông' },
-  { warehouseId: 6, code: 'K004', name: 'Kho Hoàn Kiếm' },
-];
-
 const labelCls = 'block text-[11px] font-bold text-[#677484] mb-1.5 uppercase tracking-wide';
 
 export default function SupplierFilterSidebar({
@@ -37,7 +30,7 @@ export default function SupplierFilterSidebar({
   isCollapsed = false,
   onToggleCollapse,
 }: SupplierFilterSidebarProps) {
-  const warehouses = warehousesList && warehousesList.length > 0 ? warehousesList : DEFAULT_WAREHOUSES;
+  const warehouses = warehousesList ?? [];
 
   return (
     <aside

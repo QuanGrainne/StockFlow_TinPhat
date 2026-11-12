@@ -57,6 +57,7 @@ export function calculateDaysUntilOutOfStock(
 // Hỗ trợ thiết kế Tạo hàng hóa StockFlow chuẩn với Đơn vị tính, Thuộc tính và Ma trận biến thể
 // Hỗ trợ cả TỰ NHẬP (free text) và TỰ CHỌN (dropdown suggestions) cho tất cả các trường dữ liệu
 
+import { tabSession } from '@/lib/auth/tabSession';
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { readDocumentLink, scrollToWhenReady } from '@/lib/navigation/documentLink';
@@ -112,7 +113,7 @@ import { productService } from '../services/goodsCatalogService';
 import { adminService } from '@/features/admin/services/adminService';
 import { WarehouseFacility } from '@/features/admin/types';
 import { SkuAnalyticsModal } from '../components/SkuAnalyticsModal';
-import { getActiveWarehouse } from '@/lib/warehouse/useActiveWarehouse';
+import { getActiveWarehouse, useAuthorizedWarehouses } from '@/lib/warehouse/useActiveWarehouse';
 import ViewPriceBooksModal from '../components/ViewPriceBooksModal';
 import GoodsExportModal from '../components/GoodsExportModal';
 import GoodsExportDownloadDock from '../components/GoodsExportDownloadDock';
@@ -1119,7 +1120,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
     if (typeof window !== 'undefined') {
       const activeWh = getActiveWarehouse();
       if (activeWh && activeWh.name) return activeWh.name;
-      const stored = localStorage.getItem('stockflow_selected_branch');
+      const stored = tabSession.get('stockflow_selected_branch');
       if (stored && stored !== 'ALL') return stored;
     }
     return 'Kho Tổng Gia Lâm';
@@ -1127,7 +1128,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
 
   // Danh sách các cơ sở kho thực tế (lấy động từ Database qua adminService)
   const [facilities, setFacilities] = useState<WarehouseFacility[]>([]);
-  const [userWarehouseAccess, setUserWarehouseAccess] = useState<string[]>([]);
+  const { warehouses: authorizedWarehouses } = useAuthorizedWarehouses();
 
   // Phân bổ tồn kho theo chi nhánh trong Form Thêm/Sửa
   const [formWarehouseStocks, setFormWarehouseStocks] = useState<Record<string, number>>({});
@@ -1497,40 +1498,6 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
 
     fetchApiProducts();
 
-    // Trích xuất danh sách kho được phân quyền của user từ storage
-    const extractUserWarehouses = (userObj: any): string[] => {
-      if (!userObj) return [];
-      const list: string[] = [];
-      if (Array.isArray(userObj.warehouses)) {
-        userObj.warehouses.forEach((w: any) => {
-          if (typeof w === 'string') list.push(w);
-          else {
-            if (w.warehouseName) list.push(w.warehouseName);
-            if (w.warehouseCode) list.push(w.warehouseCode);
-            if (w.name) list.push(w.name);
-            if (w.code) list.push(w.code);
-            if (w.warehouseId) list.push(String(w.warehouseId));
-          }
-        });
-      }
-      if (Array.isArray(userObj.assignedWarehouses)) {
-        userObj.assignedWarehouses.forEach((w: any) => {
-          if (typeof w === 'string') list.push(w);
-        });
-      }
-      return Array.from(new Set(list));
-    };
-
-    const rawUser = typeof window !== 'undefined' ? localStorage.getItem('stockflow_user') : null;
-    if (rawUser) {
-      try {
-        const u = JSON.parse(rawUser);
-        setUserWarehouseAccess(extractUserWarehouses(u));
-      } catch (e) {
-        console.error('Failed to parse user in GoodsCatalogScreen:', e);
-      }
-    }
-
     // Tải danh sách cơ sở kho thực tế từ DB/Cache
     adminService.getWarehouseFacilities().then((facs) => {
       if (facs && facs.length > 0) {
@@ -1544,13 +1511,6 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
       if (branchName && branchName !== 'ALL') {
         setWarehouseFilter(branchName);
       }
-      const curUserRaw = typeof window !== 'undefined' ? localStorage.getItem('stockflow_user') : null;
-      if (curUserRaw) {
-        try {
-          const curU = JSON.parse(curUserRaw);
-          setUserWarehouseAccess(extractUserWarehouses(curU));
-        } catch {}
-      }
     };
     window.addEventListener('stockflow_branch_changed', handleBranchSync);
     window.addEventListener('stockflow:warehouse-changed', handleBranchSync);
@@ -1563,8 +1523,8 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
   }, []);
 
   // Xác định quyền Admin
-  const rawRole = typeof window !== 'undefined' ? localStorage.getItem('stockflow_current_role') : null;
-  const rawUserStr = typeof window !== 'undefined' ? localStorage.getItem('stockflow_user') : null;
+  const rawRole = typeof window !== 'undefined' ? tabSession.get('stockflow_current_role') : null;
+  const rawUserStr = typeof window !== 'undefined' ? tabSession.get('stockflow_user') : null;
   let parsedUser: any = null;
   try {
     if (rawUserStr) parsedUser = JSON.parse(rawUserStr);
@@ -1576,21 +1536,13 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
     parsedUser?.code === 'NV-ADMIN' ||
     parsedUser?.username?.toLowerCase() === 'admin';
 
-  // Danh sách kho ĐƯỢC PHÂN QUYỀN (Data Isolation)
+  // Danh sách kho ĐƯỢC PHÂN QUYỀN (Data Isolation): lấy từ server theo tài khoản của tab này,
+  // nên Admin đổi phân quyền là màn này nhận ngay (không phải đăng xuất / đăng nhập lại).
   const permittedFacilities = useMemo(() => {
     if (facilities.length === 0) return [];
-    if (isAdmin) return facilities;
-
-    const allowed = userWarehouseAccess.map((s) => s.trim().toLowerCase());
-    if (allowed.length === 0) return [];
-
-    return facilities.filter((fac) => {
-      const nameMatch = allowed.includes(fac.name.trim().toLowerCase());
-      const codeMatch = allowed.includes(fac.code.trim().toLowerCase());
-      const idMatch = fac.id ? allowed.includes(fac.id.trim().toLowerCase()) : false;
-      return nameMatch || codeMatch || idMatch;
-    });
-  }, [facilities, isAdmin, userWarehouseAccess]);
+    const allowedIds = new Set(authorizedWarehouses.map((w) => w.warehouseId));
+    return facilities.filter((fac) => fac.warehouseId !== undefined && allowedIds.has(fac.warehouseId));
+  }, [facilities, authorizedWarehouses]);
 
   // Auto-validate và đồng bộ warehouseFilter theo danh sách kho có quyền
   useEffect(() => {
@@ -1607,7 +1559,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
       const firstBranch = permittedFacilities[0].name;
       setWarehouseFilter(firstBranch);
       if (typeof window !== 'undefined') {
-        localStorage.setItem('stockflow_selected_branch', firstBranch);
+        tabSession.set('stockflow_selected_branch', firstBranch);
       }
     }
   }, [permittedFacilities, facilities.length, warehouseFilter]);
