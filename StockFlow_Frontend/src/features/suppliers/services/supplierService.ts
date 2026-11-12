@@ -10,6 +10,7 @@ import {
   CreateSupplierPaymentPayload,
   SupplierPaymentResult,
 } from '../types';
+import type { DebtAdjustmentDetail, DebtAdjustPayload, DebtAdjustResult } from '@/components/debt/types';
 
 export const supplierService = {
   /**
@@ -115,6 +116,24 @@ export const supplierService = {
       console.error(`Lỗi khi xóa Nhà cung cấp #${id}:`, e);
       throw e;
     }
+  },
+
+  /** Điều chỉnh công nợ NCC: tạo phiếu DC..., nợ cần trả = payload.newDebt */
+  async adjustSupplierDebt(id: number, payload: DebtAdjustPayload): Promise<DebtAdjustResult> {
+    return apiClient.post<DebtAdjustResult>(`/api/Suppliers/${id}/debt-adjustments`, payload);
+  },
+
+  async getDebtAdjustment(id: number, code: string): Promise<DebtAdjustmentDetail> {
+    return apiClient.get<DebtAdjustmentDetail>(`/api/Suppliers/${id}/debt-adjustments/${encodeURIComponent(code)}`);
+  },
+
+  /** Sửa phiếu điều chỉnh: payload.newDebt = nợ cần trả ngay sau phiếu */
+  async updateDebtAdjustment(id: number, code: string, payload: DebtAdjustPayload): Promise<void> {
+    await apiClient.put(`/api/Suppliers/${id}/debt-adjustments/${encodeURIComponent(code)}`, payload);
+  },
+
+  async cancelDebtAdjustment(id: number, code: string): Promise<void> {
+    await apiClient.post(`/api/Suppliers/${id}/debt-adjustments/${encodeURIComponent(code)}/cancel`, {});
   },
 
   /** Tạo phiếu chi thanh toán nợ NCC (PC000001...), có phân bổ vào phiếu nhập */

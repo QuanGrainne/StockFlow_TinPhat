@@ -307,8 +307,8 @@ export function PickBookingDialog({
     salesBookingService
       .getBookings({
         warehouseIds: [warehouseId],
-        // Chỉ đơn còn giao được: Phiếu tạm, Đã xác nhận, Đang giao hàng
-        statuses: ['DRAFT', 'CONFIRMED', 'DELIVERING'],
+        // Chỉ đơn còn tạo hóa đơn được: Phiếu tạm
+        statuses: ['DRAFT'],
         search: q.code || q.customer || q.notes || undefined,
         productSearch: q.productCode || q.productName || undefined,
         fromDate: q.from || undefined,

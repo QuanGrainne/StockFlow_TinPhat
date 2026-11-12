@@ -3,15 +3,14 @@
 // Chi tiết Đơn đặt hàng dạng dòng mở rộng — bố cục theo KiotViet:
 //   [Thông tin] (+ [Lịch sử hóa đơn] khi đã tạo hóa đơn, [Lịch sử thanh toán] khi có phiếu thu của đơn / hóa đơn của đơn)
 //   Thông tin: khách hàng + mã đơn, lưới thông tin (người tạo, ngày đặt, bảng giá, chi nhánh, dự kiến giao, trạng thái),
-//   bảng hàng "SL đặt/đã giao", ghi chú + tổng tiền.
-//   Thao tác: Hủy, Sao chép, Xuất file | Xử lý đơn hàng, Sửa đơn, Lưu, Kết thúc, In.
+//   bảng hàng, ghi chú + tổng tiền. Đơn đã tạo hóa đơn: SL trên đơn = SL hóa đơn.
+//   Thao tác: Hủy, Sao chép, Xuất file | Xử lý đơn hàng, Sửa đơn, Lưu, In.
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { message } from "antd";
 import {
-  CheckCheck,
   ClipboardCheck,
   Copy,
   ExternalLink,
@@ -27,7 +26,7 @@ import { formatDateTimeVN } from "@/features/transfers/utils/dateUtils";
 import { documentLinkHref } from "@/lib/navigation/documentLink";
 import { invoiceLinkHref } from "@/features/orders/components/InvoicePreviewModal";
 import { salesBookingService } from "../services/salesBookingService";
-import type { SalesBookingDetail, SalesBookingStatus } from "../types";
+import type { SalesBookingDetail } from "../types";
 import {
   BOOKING_STATUS,
   exportBookingDetailToXLSX,
@@ -89,7 +88,7 @@ const outlineBtnCls =
 const primaryBtnCls =
   "inline-flex items-center gap-1.5 px-3.5 h-8 rounded-[8px] bg-[#0070f4] hover:bg-[#005ac3] text-white text-[13px] font-semibold shadow-xs transition cursor-pointer disabled:opacity-60";
 
-type ConfirmKind = "cancel" | "finish";
+type ConfirmKind = "cancel";
 type TabKey = "info" | "invoices" | "payments";
 
 interface Props {
@@ -120,7 +119,6 @@ export default function SalesBookingExpandedRow({
   // Các trường sửa nhanh (Lưu)
   const [notes, setNotes] = useState("");
   const [deliveryDate, setDeliveryDate] = useState("");
-  const [status, setStatus] = useState<SalesBookingStatus>("DRAFT");
   const [saving, setSaving] = useState(false);
   const loading = result.key !== key;
 
@@ -133,7 +131,6 @@ export default function SalesBookingExpandedRow({
         setResult({ key: `${orderId}#${reloadTick}`, data });
         setNotes(splitNotes(data.notes).text);
         setDeliveryDate(toLocalInput(data.deliveryDate));
-        setStatus(data.status);
       })
       .catch((err: unknown) => {
         if (!alive) return;
@@ -165,17 +162,8 @@ export default function SalesBookingExpandedRow({
     if (!b || !confirm) return;
     setBusy(true);
     try {
-      if (confirm === "cancel")
-        await salesBookingService.cancelBooking(
-          b.orderId,
-          b.paidAmount > 0 && keepDeposit,
-        );
-      else await salesBookingService.finishBooking(b.orderId);
-      message.success(
-        confirm === "cancel"
-          ? `Đã hủy đơn ${b.orderCode}`
-          : `Đã kết thúc đơn ${b.orderCode}`,
-      );
+      await salesBookingService.cancelBooking(b.orderId, b.paidAmount > 0 && keepDeposit);
+      message.success(`Đã hủy đơn ${b.orderCode}`);
       setConfirm(null);
       reload();
     } catch (err) {
@@ -185,7 +173,7 @@ export default function SalesBookingExpandedRow({
     }
   };
 
-  /** Lưu: ghi chú, dự kiến giao, và Phiếu tạm → Đã xác nhận */
+  /** Lưu: ghi chú, dự kiến giao */
   const handleSave = async () => {
     if (!b) return;
     setSaving(true);
@@ -200,8 +188,6 @@ export default function SalesBookingExpandedRow({
           ? new Date(deliveryDate).toISOString()
           : null,
       });
-      if (b.status === "DRAFT" && status === "CONFIRMED")
-        await salesBookingService.confirmBooking(b.orderId);
       message.success(`Đã lưu đơn ${b.orderCode}`);
       reload();
     } catch (err) {
@@ -240,12 +226,12 @@ export default function SalesBookingExpandedRow({
 
   const hasDelivery = b.invoices.some((i) => i.status === "COMPLETED");
   const isOpen = isBookingOpen(b.status);
-  const canEdit =
-    (b.status === "DRAFT" || b.status === "CONFIRMED") && !hasDelivery;
+  const canEdit = b.status === "DRAFT" && !hasDelivery;
   const canCancel = isOpen && !hasDelivery;
   const canSaveInfo = b.status !== "CANCELLED";
   const priceBook = splitNotes(b.notes).priceBook ?? "Bảng giá chung";
   const totalQty = b.items.reduce((s, i) => s + i.quantity, 0);
+  const customerPaid = b.customerPaidAmount ?? b.paidAmount;
   const tabs: { key: TabKey; label: string }[] = [
     { key: "info", label: "Thông tin" },
     ...(b.invoices.length > 0
@@ -374,42 +360,16 @@ export default function SalesBookingExpandedRow({
                   </span>
                 )}
               </div>
-              {/* Phiếu tạm → Đã xác nhận; các trạng thái khác do giao hàng / Kết thúc / Hủy quyết định */}
-              {b.status === "DRAFT" && (
-                <div className="flex items-center gap-3">
-                  <span className={labelCls}>Trạng thái:</span>
-                  <select
-                    value={status}
-                    onChange={(e) =>
-                      setStatus(e.target.value as SalesBookingStatus)
-                    }
-                    className={`${fieldCls} cursor-pointer`}
-                  >
-                    {(["DRAFT", "CONFIRMED"] as SalesBookingStatus[]).map(
-                      (s) => (
-                        <option key={s} value={s}>
-                          {BOOKING_STATUS[s].label}
-                        </option>
-                      ),
-                    )}
-                  </select>
-                </div>
-              )}
             </div>
 
-            {/* Hàng đặt: SL đặt / đã giao */}
+            {/* Hàng đặt (đơn đã tạo hóa đơn: SL = SL hóa đơn) */}
             <div className="rounded-[8px] border border-slate-200 overflow-hidden">
               <table className="w-full text-left border-collapse">
                 <thead className={theadCls}>
                   <tr>
                     <th className="py-2 px-3 w-32">Mã hàng</th>
                     <th className="py-2 px-3">Tên hàng</th>
-                    <th
-                      className="py-2 px-3 w-28 text-right"
-                      title="Số lượng đặt / đã giao"
-                    >
-                      Số lượng
-                    </th>
+                    <th className="py-2 px-3 w-28 text-right">Số lượng</th>
                     <th className="py-2 px-3 w-28 text-right">Đơn giá</th>
                     <th className="py-2 px-3 w-24 text-right">Giảm giá</th>
                     <th className="py-2 px-3 w-28 text-right">Giá bán</th>
@@ -430,18 +390,7 @@ export default function SalesBookingExpandedRow({
                         <span className="text-[#677484]"> ({it.unit})</span>
                       </td>
                       <td className="py-2.5 px-3 text-right font-mono whitespace-nowrap">
-                        {qty(it.quantity)}/
-                        <span
-                          className={
-                            it.deliveredQuantity >= it.quantity
-                              ? "text-[#0070f4]"
-                              : it.deliveredQuantity > 0
-                                ? "text-[#d97706]"
-                                : "text-[#fb2c36]"
-                          }
-                        >
-                          {qty(it.deliveredQuantity)}
-                        </span>
+                        {qty(it.quantity)}
                       </td>
                       <td className="py-2.5 px-3 text-right font-mono">
                         {fmt(it.originalPrice)}
@@ -484,15 +433,16 @@ export default function SalesBookingExpandedRow({
                   <dd className="font-mono">{fmt(b.discountAmount)}</dd>
                 </div>
                 <div className="flex justify-between">
-                  <dt className="font-semibold">Tổng cộng</dt>
-                  <dd className="font-mono font-semibold">
-                    {fmt(b.totalAmount)}
-                  </dd>
-                </div>
-                <div className="flex justify-between">
                   <dt className="text-[#677484]">Khách đã trả</dt>
                   <dd className="font-mono text-[#16a34a]">
-                    {fmt(b.customerPaidAmount ?? b.paidAmount)}
+                    {fmt(customerPaid)}
+                  </dd>
+                </div>
+                {/* Tổng cộng = tiền phiếu đặt − khách đã trả (phần khách còn phải trả) */}
+                <div className="flex justify-between">
+                  <dt className="font-semibold">Tổng cộng</dt>
+                  <dd className="font-mono font-semibold">
+                    {fmt(Math.max(0, b.totalAmount - customerPaid))}
                   </dd>
                 </div>
               </dl>
@@ -562,15 +512,6 @@ export default function SalesBookingExpandedRow({
                 )}{" "}
                 Lưu
               </button>
-              {b.status === "DELIVERING" && (
-                <button
-                  type="button"
-                  onClick={() => setConfirm("finish")}
-                  className={outlineBtnCls}
-                >
-                  <CheckCheck size={14} /> Kết thúc
-                </button>
-              )}
               <button
                 type="button"
                 onClick={() => printSalesBooking(b, notes.trim())}
@@ -703,12 +644,10 @@ export default function SalesBookingExpandedRow({
         <div className="fixed inset-0 z-[100] bg-black/50 flex items-center justify-center p-4">
           <div className="w-full max-w-md bg-white rounded-xl shadow-2xl">
             <div className="px-5 pt-4 pb-2 text-[16px] font-bold">
-              {confirm === "cancel"
-                ? "Hủy đơn đặt hàng"
-                : "Kết thúc đơn đặt hàng"}
+              Hủy đơn đặt hàng
             </div>
             <div className="px-5 pb-4">
-              {confirm === "cancel" ? (
+              {(
                 <>
                   Bạn có chắc muốn hủy đơn <strong>{b.orderCode}</strong>? Hàng
                   đang giữ cho đơn sẽ được nhả ra để bán.
@@ -750,17 +689,6 @@ export default function SalesBookingExpandedRow({
                           </span>
                         </span>
                       </label>
-                    </div>
-                  )}
-                </>
-              ) : (
-                <>
-                  Đơn <strong>{b.orderCode}</strong> chuyển sang Hoàn thành và
-                  không giao phần hàng còn lại (nhả hàng đang giữ).
-                  {b.remainingDeposit > 0 && (
-                    <div className="mt-2 text-[#677484]">
-                      Tiền trả trước còn dư {fmt(b.remainingDeposit)} được giữ
-                      trong công nợ của khách.
                     </div>
                   )}
                 </>

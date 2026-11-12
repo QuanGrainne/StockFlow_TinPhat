@@ -92,7 +92,10 @@ const fieldCls =
   'w-full h-9 px-3 rounded-[8px] border border-slate-300 text-[13px] text-[#15171a] bg-white focus:outline-none focus:border-[#0070f4]';
 
 export default function CustomerPaymentModal({ customer, currentDebt, openOrders, onClose, onSuccess }: CustomerPaymentModalProps) {
-  const [paymentDateTime, setPaymentDateTime] = useState(() => toLocalDatetimeInputString(new Date()));
+  // Giờ mặc định lúc mở form (chỉ đến phút); không đổi thì gửi trống để server lấy giờ thật lúc lưu (đến giây),
+  // tránh phiếu thu tạo sau bị xếp trước các chứng từ cùng phút trong sổ công nợ
+  const [initialDateTime] = useState(() => toLocalDatetimeInputString(new Date()));
+  const [paymentDateTime, setPaymentDateTime] = useState(initialDateTime);
   const [method, setMethod] = useState<PayMethod>('CASH');
   const [amount, setAmount] = useState(0);
   const [notes, setNotes] = useState('');
@@ -145,7 +148,8 @@ export default function CustomerPaymentModal({ customer, currentDebt, openOrders
     try {
       const result = await customerService.createCustomerPayment(customer.id, {
         amount,
-        paymentDate: paymentDateTime ? new Date(paymentDateTime).toISOString() : undefined,
+        paymentDate:
+          paymentDateTime && paymentDateTime !== initialDateTime ? new Date(paymentDateTime).toISOString() : undefined,
         paymentMethod: method,
         notes: notes.trim() || undefined,
         allocations: allocList,

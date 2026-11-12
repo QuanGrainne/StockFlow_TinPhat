@@ -157,6 +157,51 @@ public class SuppliersController : ControllerBase
         return Ok(result.Value);
     }
 
+    /// <summary>
+    /// Điều chỉnh công nợ nhà cung cấp: đặt Nợ cần trả NCC bằng giá trị nhập (âm = NCC nợ cửa hàng, 0 = hết nợ), ghi phiếu DC000001...
+    /// </summary>
+    [HttpPost("{id}/debt-adjustments")]
+    [ProducesResponseType(typeof(AdjustSupplierDebtResultDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [RequirePermission("FIN_CREATE")]
+    [RequireFeature("feat-suppliers")]
+    public async Task<IActionResult> AdjustSupplierDebt(int id, [FromBody] AdjustSupplierDebtRequest request)
+    {
+        var result = await _mediator.Send(new AdjustSupplierDebtCommand(id, request));
+        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { message = result.Error });
+    }
+
+    /// <summary>Xem phiếu điều chỉnh công nợ NCC DC... (giá trị nợ sau điều chỉnh, ngày, người tạo, mô tả)</summary>
+    [HttpGet("{id}/debt-adjustments/{code}")]
+    [ProducesResponseType(typeof(SupplierDebtAdjustmentDto), StatusCodes.Status200OK)]
+    [RequirePermission("PARTNER_READ")]
+    [RequireFeature("feat-suppliers")]
+    public async Task<IActionResult> GetSupplierDebtAdjustment(int id, string code)
+    {
+        var result = await _mediator.Send(new GetSupplierDebtAdjustmentQuery(id, code));
+        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { message = result.Error });
+    }
+
+    /// <summary>Sửa phiếu điều chỉnh công nợ NCC: giá trị nợ sau điều chỉnh, ngày, mô tả</summary>
+    [HttpPut("{id}/debt-adjustments/{code}")]
+    [RequirePermission("FIN_UPDATE")]
+    [RequireFeature("feat-suppliers")]
+    public async Task<IActionResult> UpdateSupplierDebtAdjustment(int id, string code, [FromBody] AdjustSupplierDebtRequest request)
+    {
+        var result = await _mediator.Send(new UpdateSupplierDebtAdjustmentCommand(id, code, request));
+        return result.IsSuccess ? Ok(new { success = true }) : BadRequest(new { message = result.Error });
+    }
+
+    /// <summary>Xóa (hủy) phiếu điều chỉnh công nợ NCC: nợ cần trả trừ lại chênh lệch của phiếu</summary>
+    [HttpPost("{id}/debt-adjustments/{code}/cancel")]
+    [RequirePermission("FIN_UPDATE")]
+    [RequireFeature("feat-suppliers")]
+    public async Task<IActionResult> CancelSupplierDebtAdjustment(int id, string code)
+    {
+        var result = await _mediator.Send(new CancelSupplierDebtAdjustmentCommand(id, code));
+        return result.IsSuccess ? Ok(new { success = true }) : BadRequest(new { message = result.Error });
+    }
+
     [HttpDelete("{id}")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]

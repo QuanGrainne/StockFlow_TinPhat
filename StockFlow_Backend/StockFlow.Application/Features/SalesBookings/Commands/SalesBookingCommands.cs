@@ -13,7 +13,7 @@ namespace StockFlow.Application.Features.SalesBookings.Commands;
 public record SaveSalesBookingCommand(int? OrderId, SaveSalesBookingRequest Request) : IRequest<Result<SalesBookingSaveResultDto>>;
 
 /// <summary>
-/// Thao tác trạng thái: CONFIRM (xác nhận), CANCEL (hủy), FINISH (kết thúc, không giao phần còn lại).
+/// Thao tác trạng thái: CANCEL (hủy đơn Phiếu tạm chưa tạo hóa đơn).
 /// Hủy đơn có tiền trả trước: KeepDeposit = false → hủy phiếu thu (hoàn tiền cho khách);
 /// true → giữ phiếu thu thành khoản khách trả trước chung (không gắn đơn), công nợ khách giữ nguyên.
 /// </summary>
@@ -81,7 +81,7 @@ public class SalesBookingCommandHandler :
             booking = await _context.TrxOrders.Include(o => o.DtlOrderItems)
                 .FirstOrDefaultAsync(o => o.OrderId == command.OrderId.Value && o.OrderType == SalesBookingOps.OrderType, ct);
             if (booking == null) return Fail("Không tìm thấy đơn đặt hàng.");
-            if (booking.Status is not (SalesBookingOps.Draft or SalesBookingOps.Confirmed))
+            if (booking.Status != SalesBookingOps.Draft)
                 return Fail($"Đơn {booking.OrderCode} đang ở trạng thái không cho phép sửa.");
             if (await _context.TrxOrders.AnyAsync(o => o.BookingOrderId == booking.OrderId && o.Status == "COMPLETED", ct))
                 return Fail($"Đơn {booking.OrderCode} đã tạo hóa đơn giao hàng, không sửa được.");
@@ -241,7 +241,7 @@ public class SalesBookingCommandHandler :
         customer.CurrentDebt = (customer.CurrentDebt ?? 0) - amount;
     }
 
-    // ───────────────────────── Xác nhận / hủy / kết thúc ─────────────────────────
+    // ───────────────────────── Hủy đơn ─────────────────────────
     public async Task<Result<bool>> Handle(SalesBookingActionCommand command, CancellationToken ct)
     {
         if (!_currentUser.UserId.HasValue) return Result.Failure<bool>("Không xác định được người dùng đăng nhập.");
@@ -256,11 +256,6 @@ public class SalesBookingCommandHandler :
         var hasInvoice = await _context.TrxOrders.AnyAsync(o => o.BookingOrderId == booking.OrderId && o.Status == "COMPLETED", ct);
         switch (command.Action.ToUpperInvariant())
         {
-            case "CONFIRM":
-                if (booking.Status != SalesBookingOps.Draft) return Result.Failure<bool>("Chỉ xác nhận được đơn ở trạng thái Phiếu tạm.");
-                booking.Status = SalesBookingOps.Confirmed;
-                break;
-
             case "CANCEL":
                 if (!SalesBookingOps.IsOpen(booking.Status)) return Result.Failure<bool>($"Đơn {booking.OrderCode} đã hoàn thành hoặc đã hủy.");
                 if (hasInvoice)
@@ -290,13 +285,6 @@ public class SalesBookingCommandHandler :
                 booking.PaidAmount = 0;
                 booking.PaymentStatus = "UNPAID";
                 booking.Status = SalesBookingOps.Cancelled;
-                break;
-
-            case "FINISH":
-                if (booking.Status != SalesBookingOps.Delivering)
-                    return Result.Failure<bool>("Chỉ kết thúc được đơn đang giao hàng (đã giao 1 phần).");
-                // Tiền trả trước còn dư (nếu có) giữ lại thành tiền khách trả trước trong công nợ
-                booking.Status = SalesBookingOps.Finished;
                 break;
 
             default:
@@ -341,8 +329,8 @@ public class SalesBookingCommandHandler :
             .OrderBy(o => o.OrderDate).ThenBy(o => o.OrderId)
             .ToListAsync(ct);
         if (sources.Count != ids.Count) return Fail("Có đơn đặt hàng không tồn tại.");
-        var bad = sources.FirstOrDefault(o => o.Status is not (SalesBookingOps.Draft or SalesBookingOps.Confirmed));
-        if (bad != null) return Fail($"Đơn {bad.OrderCode} không gộp được: chỉ gộp đơn Phiếu tạm hoặc Đã xác nhận, chưa giao hàng.");
+        var bad = sources.FirstOrDefault(o => o.Status != SalesBookingOps.Draft);
+        if (bad != null) return Fail($"Đơn {bad.OrderCode} không gộp được: chỉ gộp đơn ở trạng thái Phiếu tạm.");
         if (sources.Select(o => o.PartnerId).Distinct().Count() > 1) return Fail("Chỉ gộp được các đơn của cùng 1 khách hàng (BR-09).");
         if (sources.Select(o => o.WarehouseId).Distinct().Count() > 1) return Fail("Chỉ gộp được các đơn cùng chi nhánh xử lý.");
         var warehouseId = sources[0].WarehouseId!.Value;
@@ -379,7 +367,7 @@ public class SalesBookingCommandHandler :
             {
                 OrderCode = await _codeGenerator.GenerateCodeAsync("BOOKING", settings, ct),
                 OrderType = SalesBookingOps.OrderType,
-                Status = sources.Any(o => o.Status == SalesBookingOps.Confirmed) ? SalesBookingOps.Confirmed : SalesBookingOps.Draft,
+                Status = SalesBookingOps.Draft,
                 PartnerId = sources[0].PartnerId,
                 WarehouseId = warehouseId,
                 OrderDate = now,

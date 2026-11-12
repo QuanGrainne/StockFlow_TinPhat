@@ -189,6 +189,21 @@ export function useSuppliers(initial?: SupplierInitialLink) {
     loadSuppliers();
   };
 
+  // 6c. Sau khi tạo / sửa / xóa phiếu điều chỉnh công nợ: tải lại chi tiết NCC đang mở + danh sách
+  const handleDataChanged = async (partnerId: number) => {
+    try {
+      const detail = await supplierService.getSupplierById(partnerId);
+      setDetailsCache((prev) => ({ ...prev, [partnerId]: detail }));
+    } catch {
+      setDetailsCache((prev) => {
+        const next = { ...prev };
+        delete next[partnerId];
+        return next;
+      });
+    }
+    loadSuppliers();
+  };
+
   // 7. Handlers lọc
   const handleFilterChange = (patch: Partial<SupplierFilterState>) => {
     setFilterState((prev) => ({ ...prev, ...patch }));
@@ -419,6 +434,7 @@ export function useSuppliers(initial?: SupplierInitialLink) {
     loadSuppliers,
     handleRowClick,
     handlePaymentCreated,
+    handleDataChanged,
     handleFilterChange,
     handleResetFilters,
     handleOpenCreate,

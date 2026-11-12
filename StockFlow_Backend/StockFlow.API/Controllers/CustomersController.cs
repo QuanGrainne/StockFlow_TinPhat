@@ -195,6 +195,51 @@ public class CustomersController : ControllerBase
     }
 
     /// <summary>
+    /// Điều chỉnh công nợ khách hàng: đặt Nợ cần thu bằng giá trị nhập (âm = cửa hàng nợ khách, 0 = hết nợ), ghi phiếu DC000001...
+    /// </summary>
+    [HttpPost("{id}/debt-adjustments")]
+    [ProducesResponseType(typeof(AdjustCustomerDebtResultDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [RequirePermission("FIN_CREATE")]
+    [RequireFeature("feat-customers")]
+    public async Task<IActionResult> AdjustCustomerDebt(int id, [FromBody] AdjustCustomerDebtRequest request)
+    {
+        var result = await _mediator.Send(new AdjustCustomerDebtCommand(id, request));
+        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { message = result.Error });
+    }
+
+    /// <summary>Xem phiếu điều chỉnh công nợ DC... (giá trị nợ sau điều chỉnh, ngày, người tạo, mô tả)</summary>
+    [HttpGet("{id}/debt-adjustments/{code}")]
+    [ProducesResponseType(typeof(CustomerDebtAdjustmentDto), StatusCodes.Status200OK)]
+    [RequirePermission("PARTNER_READ")]
+    [RequireFeature("feat-customers")]
+    public async Task<IActionResult> GetCustomerDebtAdjustment(int id, string code)
+    {
+        var result = await _mediator.Send(new GetCustomerDebtAdjustmentQuery(id, code));
+        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { message = result.Error });
+    }
+
+    /// <summary>Sửa phiếu điều chỉnh công nợ: giá trị nợ sau điều chỉnh, ngày, mô tả</summary>
+    [HttpPut("{id}/debt-adjustments/{code}")]
+    [RequirePermission("FIN_UPDATE")]
+    [RequireFeature("feat-customers")]
+    public async Task<IActionResult> UpdateCustomerDebtAdjustment(int id, string code, [FromBody] AdjustCustomerDebtRequest request)
+    {
+        var result = await _mediator.Send(new UpdateCustomerDebtAdjustmentCommand(id, code, request));
+        return result.IsSuccess ? Ok(new { success = true }) : BadRequest(new { message = result.Error });
+    }
+
+    /// <summary>Xóa (hủy) phiếu điều chỉnh công nợ: công nợ khách trừ lại chênh lệch của phiếu</summary>
+    [HttpPost("{id}/debt-adjustments/{code}/cancel")]
+    [RequirePermission("FIN_UPDATE")]
+    [RequireFeature("feat-customers")]
+    public async Task<IActionResult> CancelCustomerDebtAdjustment(int id, string code)
+    {
+        var result = await _mediator.Send(new CancelCustomerDebtAdjustmentCommand(id, code));
+        return result.IsSuccess ? Ok(new { success = true }) : BadRequest(new { message = result.Error });
+    }
+
+    /// <summary>
     /// Cập nhật thông tin Khách hàng.
     /// </summary>
     [HttpPut("{id}")]

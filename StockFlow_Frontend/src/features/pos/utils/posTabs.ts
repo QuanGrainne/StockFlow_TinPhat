@@ -50,6 +50,8 @@ export interface PosTab {
   bookingCode?: string | null;
   /** BOOKING (sửa): tiền khách đã trả trước; INVOICE từ đơn: tiền trả trước còn lại được trừ vào hóa đơn */
   bookingPaid?: number;
+  /** INVOICE từ đơn: các dòng hàng đã đặt (so với SL khách lấy để hỏi tạo đơn chờ cho phần còn lại) */
+  bookingItems?: { productId: number; code: string; name: string; unit: string; quantity: number }[];
   /** Chi nhánh xử lý của đơn đặt (hóa đơn từ đơn / sửa đơn phải ở đúng chi nhánh này) */
   warehouseId?: number | null;
   /** Thời gian giao hàng (YYYY-MM-DDTHH:mm) */

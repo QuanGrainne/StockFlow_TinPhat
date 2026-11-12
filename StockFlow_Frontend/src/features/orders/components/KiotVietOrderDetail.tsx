@@ -39,11 +39,16 @@ interface KiotVietOrderDetailProps {
 /** Hộp xác nhận hủy hóa đơn (modal tự dựng theo chuẩn AI_CODING_RULES §5.8) */
 function CancelConfirmDialog({
   orderCode,
+  bookingCode,
+  deposit,
   busy,
   onConfirm,
   onClose,
 }: {
   orderCode: string;
+  /** Hóa đơn tạo từ đơn đặt: đơn đặt gốc giữ nguyên, không mở lại */
+  bookingCode?: string | null;
+  deposit?: number;
   busy: boolean;
   onConfirm: () => void;
   onClose: () => void;
@@ -68,6 +73,12 @@ function CancelConfirmDialog({
         <div className="px-6 py-5 text-sm text-slate-700">
           Bạn có chắc chắn muốn hủy hóa đơn <strong>{orderCode}</strong>? Hệ thống sẽ hoàn lại tồn kho, giảm công nợ khách hàng và hủy
           phiếu thu của hóa đơn này.
+          {bookingCode && (
+            <div className="mt-3 rounded-md bg-[#fffbeb] border border-[#fde68a] px-3 py-2 text-[13px] text-[#92400e]">
+              Hóa đơn tạo từ đơn đặt <strong>{bookingCode}</strong>: đơn đặt giữ nguyên trạng thái Hoàn thành, không mở lại.
+              {deposit ? ` Tiền khách trả trước ${money.format(deposit)} đã trừ vào hóa đơn sẽ quay lại công nợ khách (cửa hàng đang nợ khách).` : ''}
+            </div>
+          )}
         </div>
         <footer className="flex items-center justify-end gap-3 border-t border-slate-200 px-6 py-4">
           <button
@@ -519,7 +530,11 @@ export const KiotVietOrderDetail: React.FC<KiotVietOrderDetailProps> = ({
       )}
 
       {confirmCancel && (
-        <CancelConfirmDialog orderCode={order.orderCode} busy={cancelling} onConfirm={handleCancel} onClose={() => setConfirmCancel(false)} />
+        <CancelConfirmDialog
+          orderCode={order.orderCode}
+          bookingCode={order.bookingOrderCode}
+          deposit={order.depositAmount}
+          busy={cancelling} onConfirm={handleCancel} onClose={() => setConfirmCancel(false)} />
       )}
     </>
   );

@@ -79,6 +79,7 @@ export default function SuppliersScreen({}: SuppliersScreenProps = {}) {
           onToggleStatus={s.handleToggleStatus}
           onDelete={s.handleDelete}
           onPaymentCreated={s.handlePaymentCreated}
+          onDataChanged={s.handleDataChanged}
           onResetFilters={s.handleResetFilters}
           page={s.page}
           pageSize={s.pageSize}

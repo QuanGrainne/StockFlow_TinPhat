@@ -37,8 +37,10 @@ public class CreatePosOrderRequest
     public bool IssueStockNow { get; set; } = true;
     public string? ClientRequestId { get; set; } // Chống gửi trùng request (Idempotency)
     public DateTime? OrderDate { get; set; } // Ngày giao dịch (khi lock_transaction_time = false)
-    /// <summary>Tạo hóa đơn từ đơn đặt hàng (order_type = BOOKING): trừ tiền khách đã trả trước, cập nhật SL đã giao</summary>
+    /// <summary>Tạo hóa đơn từ đơn đặt hàng (order_type = BOOKING): trừ tiền khách đã trả trước, đơn đặt chốt bằng SL hóa đơn → Hoàn thành</summary>
     public int? BookingOrderId { get; set; }
+    /// <summary>Hóa đơn từ đơn đặt, khách lấy thiếu: true = tạo đơn đặt mới (Phiếu tạm) cho phần còn lại; false = bỏ phần còn lại</summary>
+    public bool CreateRemainderBooking { get; set; }
     public List<PosOrderItemRequest> Items { get; set; } = new();
 }
 
@@ -61,6 +63,9 @@ public class PosOrderResultDto
     public DateTime OrderDate { get; set; }
     /// <summary>Tiền khách trả trước ở đơn đặt hàng đã trừ vào hóa đơn</summary>
     public decimal DepositAmount { get; set; }
+    /// <summary>Đơn đặt mới tạo cho phần khách chưa lấy (nếu có)</summary>
+    public int? RemainderBookingId { get; set; }
+    public string? RemainderBookingCode { get; set; }
     public int? StockIssueId { get; set; }
     public string? StockIssueCode { get; set; }
     public decimal CustomerCurrentDebt { get; set; }
