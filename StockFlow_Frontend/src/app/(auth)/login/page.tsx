@@ -1,5 +1,6 @@
 'use client';
 
+import { tabSession } from '@/lib/auth/tabSession';
 import { useState, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { Eye, EyeOff, Lock, User } from 'lucide-react';
@@ -48,8 +49,8 @@ export default function LoginPage() {
       }
 
       const data = await res.json();
-      localStorage.setItem('stockflow_token', data.token);
-      localStorage.setItem('stockflow_user', JSON.stringify(data));
+      tabSession.set('stockflow_token', data.token);
+      tabSession.set('stockflow_user', JSON.stringify(data));
 
       // Xác định đúng vai trò của tài khoản nhân viên vừa đăng nhập
       const rawRole = (Array.isArray(data.roles) && data.roles.length > 0)
@@ -64,10 +65,10 @@ export default function LoginPage() {
       else if (upperRole.includes('PROD') || upperRole.includes('SANXUAT')) targetRole = 'PRODUCTION';
       else targetRole = 'SALES';
 
-      localStorage.setItem('stockflow_current_role', targetRole);
+      tabSession.set('stockflow_current_role', targetRole);
 
       // Vào Tổng quan; vai trò không được phân quyền Tổng quan sẽ tự chuyển sang trang đầu tiên được phép
-      localStorage.removeItem('stockflow_active_screen');
+      tabSession.remove('stockflow_active_screen');
       router.push('/dashboard');
     } catch {
       setError('Không thể kết nối đến máy chủ. Vui lòng thử lại.');

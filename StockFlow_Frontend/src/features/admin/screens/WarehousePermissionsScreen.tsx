@@ -1,6 +1,7 @@
 // src/features/admin/screens/WarehousePermissionsScreen.tsx
 // Màn hình 3.2.1.9: Danh sách phân quyền kho (Data Isolation) theo giao diện AI Studio Ảnh 4
 
+import { tabSession } from '@/lib/auth/tabSession';
 import React, { useState, useEffect } from 'react';
 import {
   Warehouse,
@@ -18,6 +19,7 @@ import {
 } from 'lucide-react';
 import { StaffAccount, WarehouseFacility } from '../types';
 import { adminService } from '../services/adminService';
+import { refreshAuthorizedWarehouses } from '@/lib/warehouse/useActiveWarehouse';
 
 export const getNextWarehouseCode = (list: WarehouseFacility[]): string => {
   let maxNum = 0;
@@ -86,6 +88,8 @@ export const WarehousePermissionsScreen: React.FC = () => {
       ]);
       setFacilities(facs);
       setStaffList(staffs);
+      // Đồng bộ danh sách kho được phân quyền dùng chung (Header, bộ lọc kho các màn)
+      void refreshAuthorizedWarehouses();
     } finally {
       setLoading(false);
     }
@@ -110,6 +114,7 @@ export const WarehousePermissionsScreen: React.FC = () => {
     if (!selectedStaff) return;
     try {
       await adminService.updateWarehousePermissions(selectedStaff.id, selectedWarehouses);
+      void refreshAuthorizedWarehouses();
     } catch (err) {
       alert('Không thể cập nhật phân quyền kho: ' + (err instanceof Error ? err.message : String(err)));
       return;
@@ -117,7 +122,7 @@ export const WarehousePermissionsScreen: React.FC = () => {
 
     // Đồng bộ session người dùng đang đăng nhập nếu đúng nhân sự này
     if (typeof window !== 'undefined') {
-      const rawUser = localStorage.getItem('stockflow_user');
+      const rawUser = tabSession.get('stockflow_user');
       if (rawUser) {
         try {
           const uObj = JSON.parse(rawUser);
@@ -132,7 +137,7 @@ export const WarehousePermissionsScreen: React.FC = () => {
               warehouseCode: w,
               warehouseName: w,
             }));
-            localStorage.setItem('stockflow_user', JSON.stringify(uObj));
+            tabSession.set('stockflow_user', JSON.stringify(uObj));
             window.dispatchEvent(
               new CustomEvent('stockflow_user_updated', {
                 detail: { assignedWarehouses: selectedWarehouses },
@@ -257,6 +262,7 @@ export const WarehousePermissionsScreen: React.FC = () => {
     try {
       await adminService.deleteWarehouseFacility(fac.warehouseId || fac.code);
       setFacilities((prev) => prev.filter((f) => f.code !== fac.code && f.id !== fac.id));
+      void refreshAuthorizedWarehouses();
       showToast(`Đã xóa cơ sở kho ${fac.name} (${fac.code})`);
       await loadData();
     } catch (err: any) {

@@ -3,6 +3,7 @@
 
 'use client';
 
+import { tabSession } from '@/lib/auth/tabSession';
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -169,7 +170,7 @@ export default function CreatePurchaseScreen({ mode = 'receipt' }: CreatePurchas
 
   useEffect(() => {
     try {
-      const raw = localStorage.getItem('stockflow_user');
+      const raw = tabSession.get('stockflow_user');
       let u: any = null;
       if (raw) {
         u = JSON.parse(raw);

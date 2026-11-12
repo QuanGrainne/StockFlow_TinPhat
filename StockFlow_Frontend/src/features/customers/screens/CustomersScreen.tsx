@@ -13,7 +13,7 @@ import CustomerExpandedRow from '@/features/customers/components/CustomerExpande
 import { CustomerFormModal } from '@/features/customers/components/CustomerFormModal';
 import { customerService } from '@/features/customers/services/customerService';
 import { exportCustomersToXLSX } from '@/features/customers/utils/exportExcel';
-import { supplierService } from '@/features/suppliers/services/supplierService';
+import { useAuthorizedWarehouses } from '@/lib/warehouse/useActiveWarehouse';
 import type { CreateCustomerPayload, Customer, CustomerDetail, CustomerFilterState } from '@/features/customers/types';
 import { readDocumentLink, scrollToWhenReady } from '@/lib/navigation/documentLink';
 
@@ -38,13 +38,6 @@ const DEFAULT_FILTER: CustomerFilterState = {
   maxDebt: '',
 };
 
-const DEFAULT_WAREHOUSES = [
-  { warehouseId: 3, code: 'K001', name: 'Kho Tổng Gia Lâm' },
-  { warehouseId: 4, code: 'K002', name: 'Kho Đông Anh' },
-  { warehouseId: 5, code: 'K003', name: 'Kho Hà Đông' },
-  { warehouseId: 6, code: 'K004', name: 'Kho Hoàn Kiếm' },
-];
-
 interface CustomersScreenProps {
   /** Điều hướng màn hình trong AppLayout (giữ tương thích, màn này chưa dùng) */
   onNavigate?: (screenId: string) => void;
@@ -59,7 +52,8 @@ export default function CustomersScreen({ }: CustomersScreenProps = {}) {
     custLink ? { ...DEFAULT_FILTER, search: custLink.code, status: 'ALL' } : DEFAULT_FILTER
   );
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [warehouses, setWarehouses] = useState(DEFAULT_WAREHOUSES);
+  // Bộ lọc "Chi nhánh tạo" chỉ gồm các kho tài khoản được phân quyền (Admin: tất cả)
+  const { warehouses } = useAuthorizedWarehouses();
   const [reloadTick, setReloadTick] = useState(0);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(15);
@@ -97,16 +91,6 @@ export default function CustomersScreen({ }: CustomersScreenProps = {}) {
       stale = true;
     };
   }, [requestKey]);
-
-  // Danh sách chi nhánh cho bộ lọc "Chi nhánh tạo"
-  useEffect(() => {
-    supplierService
-      .getWarehouses()
-      .then((whs) => {
-        if (Array.isArray(whs) && whs.length > 0) setWarehouses(whs);
-      })
-      .catch(() => { });
-  }, []);
 
   // Mở thẳng khách theo link: tải chi tiết + cuộn tới dòng
   useEffect(() => {
