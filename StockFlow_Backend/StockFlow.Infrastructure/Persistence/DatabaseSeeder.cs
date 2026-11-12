@@ -144,6 +144,10 @@ public static class DatabaseSeeder
             }
         }
 
+        // Phân quyền kho mẫu CHỈ gán khi DB chưa có dòng phân quyền nào (DB mới).
+        // Trước đây mỗi lần API khởi động đều thêm lại → Admin gỡ quyền kho xong, restart lại hiện ra như "gán cứng".
+        var seedWarehouseAccess = !await context.JncUserWarehouseAccesses.AnyAsync();
+
         var warehouseAccesses = new[]
         {
             (Username: "admin", WarehouseId: 3),
@@ -157,7 +161,7 @@ public static class DatabaseSeeder
             (Username: "whstaff01", WarehouseId: 3),
             (Username: "prodstaff01", WarehouseId: 4)
         };
-        foreach (var (username, warehouseId) in warehouseAccesses)
+        foreach (var (username, warehouseId) in seedWarehouseAccess ? warehouseAccesses : [])
         {
             if (userIds.TryGetValue(username, out var userId))
             {
@@ -193,7 +197,7 @@ public static class DatabaseSeeder
             ("admin", "K003"), ("manager01", "K003"),
             ("admin", "K004")
         };
-        foreach (var (username, whCode) in physicalAccesses)
+        foreach (var (username, whCode) in seedWarehouseAccess ? physicalAccesses : [])
         {
             if (userIds.TryGetValue(username, out var uid) && whMap.TryGetValue(whCode, out var wid))
             {
