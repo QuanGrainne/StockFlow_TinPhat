@@ -35,7 +35,7 @@ public class GetProductsQueryHandler : IRequestHandler<GetProductsQuery, Result<
         // Kiểm tra phân quyền truy cập kho nếu query chỉ định WarehouseId cụ thể
         if (query.WarehouseId.HasValue && query.WarehouseId.Value > 0)
         {
-            if (_currentUserService.IsAuthenticated && !_currentUserService.IsAdmin)
+            if (_currentUserService.IsAuthenticated)
             {
                 var hasAccess = await _currentUserService.HasWarehouseAccessAsync(query.WarehouseId.Value, cancellationToken);
                 if (!hasAccess)
@@ -83,7 +83,7 @@ public class GetProductsQueryHandler : IRequestHandler<GetProductsQuery, Result<
 
         // Lấy danh sách ID kho được cấp quyền nếu là tài khoản nhân sự
         IReadOnlyList<int>? authorizedWarehouseIds = null;
-        if (_currentUserService.IsAuthenticated && !_currentUserService.IsAdmin)
+        if (_currentUserService.IsAuthenticated)
         {
             authorizedWarehouseIds = await _currentUserService.GetAuthorizedWarehouseIdsAsync(cancellationToken);
         }

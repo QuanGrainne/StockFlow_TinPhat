@@ -104,7 +104,7 @@ src/
 ```
 
 Page loading path: `page.tsx → LazyAppLayout → AppLayout (Header + Sidebar + permission check) → switch (activeScreen) → features/<module>/screens/<Module>Screen`.
-`orders/[id]` and `pos` pass their screen to `LazyAppLayout` as `children`; create pages (`*/create`) load their own screen with `next/dynamic`.
+`orders/[id]` passes its screen to `LazyAppLayout` as `children`; create pages (`*/create`) and `pos` (fullscreen, wrapped in `FeatureGuard`) load their own screen with `next/dynamic`.
 
 ---
 

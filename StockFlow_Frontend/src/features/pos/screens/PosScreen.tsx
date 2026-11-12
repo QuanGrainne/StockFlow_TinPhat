@@ -11,7 +11,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { message } from 'antd';
+import { FormHeaderUserBar } from '@/components/layout/FormHeaderUserBar';
 import {
+  ArrowLeft,
   ArrowLeftRight,
   Check,
   ChevronDown,
@@ -960,14 +962,23 @@ export default function PosScreen() {
   const nowLocal = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
 
   return (
-    // Nằm trong khung AppLayout (Header + thanh menu chung) → chiếm trọn vùng nội dung bên dưới
-    <div className="h-full min-h-0 w-full flex flex-col text-[14px] text-[#15171a] select-none overflow-hidden">
-      {/* ═══ 1. THANH CÔNG CỤ — cùng kiểu thanh tiêu đề các trang khác (Khách hàng, Nhà cung cấp...) ═══ */}
-      <header className="min-h-12 shrink-0 bg-white/84 backdrop-blur-[2px] border-b border-slate-200 flex flex-wrap items-center gap-x-3 gap-y-2 px-3 sm:px-4 py-2 relative z-30">
-        <h1 className="text-[20px] font-bold text-[#15171a] leading-7 tracking-tight whitespace-nowrap">Bán hàng</h1>
+    // Trang toàn màn hình kiểu form tạo phiếu (cùng bố cục màn Tạo chuyển hàng / Nhập hàng)
+    <div className="h-screen w-full flex flex-col stockflow-brand-bg text-[13px] text-[#15171a] select-none overflow-hidden font-sans">
+      {/* ═══ 1. THANH TRÊN — quay lại + tiêu đề + tìm hàng + tab hóa đơn + kho làm việc / người dùng ═══ */}
+      <header className="min-h-12 shrink-0 bg-white border-b border-slate-200 flex flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-1.5 relative z-30">
+        <div className="flex items-center gap-3 shrink-0">
+          <Link
+            href="/orders"
+            className="p-1 rounded-[8px] text-[#677484] hover:text-[#15171a] hover:bg-[#f7f8f9] transition cursor-pointer"
+            title="Quay lại danh sách hóa đơn"
+          >
+            <ArrowLeft size={18} className="stroke-[2.5]" />
+          </Link>
+          <span className="text-[20px] font-semibold text-[#15171a] tracking-tight whitespace-nowrap leading-[36px]">Bán hàng</span>
+        </div>
 
         {/* Tìm hàng hóa */}
-        <div ref={productBoxRef} className="relative w-[420px] max-w-full basis-[280px] grow sm:grow-0">
+        <div ref={productBoxRef} className="relative w-[380px] max-w-full basis-[260px] grow sm:grow-0">
           <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#677484] pointer-events-none" />
           <input
             ref={productSearchRef}
@@ -1115,7 +1126,7 @@ export default function PosScreen() {
           </div>
         )}
 
-        {/* Bên phải: xử lý đặt hàng, trả hàng, menu hiển thị (kho làm việc + người dùng đã có ở Header chung) */}
+        {/* Bên phải: xử lý đặt hàng, trả hàng, menu hiển thị, kho làm việc + người dùng */}
         <div className="ml-auto flex flex-wrap items-center gap-2">
           {canInvoice && (
             <button
@@ -1137,6 +1148,7 @@ export default function PosScreen() {
               <span>Trả hàng</span>
             </button>
           )}
+          <FormHeaderUserBar />
           <div ref={menuRef} className="relative">
             <button
               type="button"
@@ -1207,23 +1219,21 @@ export default function PosScreen() {
           }}
         />
       ) : (
-      <div className="flex-1 min-h-0 flex gap-3 p-3">
-        {/* ── Bên trái: giỏ hàng — một thẻ trắng: tiêu đề cột → các dòng hàng → ghi chú đơn ── */}
-        <div className="flex-1 min-w-0 flex flex-col bg-white rounded-xl border border-slate-200/80 shadow-[0_1px_3px_rgba(15,23,42,0.06)] overflow-hidden">
-          {tab.lines.length > 0 && (
-            <div className="shrink-0 h-9 px-4 flex items-center gap-3 bg-[#f7f8f9] border-b border-slate-200 text-[12px] font-semibold text-[#677484]">
-              <span className="w-5 text-center">#</span>
-              <span className="w-[18px] shrink-0" />
-              {prefs.image && <span className="w-12 shrink-0" />}
-              {prefs.code && <span className="w-24 shrink-0">Mã hàng</span>}
-              <span className="flex-1 min-w-[110px]">Tên hàng</span>
-              <span className="w-[84px] shrink-0 text-center">ĐVT</span>
-              <span className="w-[124px] shrink-0 text-center">Số lượng</span>
-              <span className="w-28 shrink-0 text-right">Đơn giá</span>
-              <span className="w-24 shrink-0 text-right">Thành tiền</span>
-              <span className="w-[26px] shrink-0" />
-            </div>
-          )}
+      <div className="flex-1 min-h-0 flex overflow-hidden">
+        {/* ── Bên trái: bảng hàng hóa sát mép (tiêu đề cột xanh nhạt như màn Chuyển hàng / Nhập hàng) ── */}
+        <div className="flex-1 min-w-0 flex flex-col bg-white overflow-hidden">
+          <div className="shrink-0 h-10 px-4 flex items-center gap-3 bg-[#e8f2ff] border-b border-slate-200 text-[13px] font-semibold text-[#15171a]">
+            <span className="w-5 text-center">STT</span>
+            <span className="w-[18px] shrink-0" />
+            {prefs.image && <span className="w-12 shrink-0" />}
+            {prefs.code && <span className="w-24 shrink-0">Mã hàng</span>}
+            <span className="flex-1 min-w-[110px]">Tên hàng</span>
+            <span className="w-[84px] shrink-0 text-center">ĐVT</span>
+            <span className="w-[124px] shrink-0 text-center">Số lượng</span>
+            <span className="w-28 shrink-0 text-right">Đơn giá</span>
+            <span className="w-24 shrink-0 text-right">Thành tiền</span>
+            <span className="w-[26px] shrink-0" />
+          </div>
           <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
             {tab.lines.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center px-6 text-center">
@@ -1391,7 +1401,7 @@ export default function PosScreen() {
         </div>
 
         {/* ── Bên phải: khách hàng & thanh toán ── */}
-        <aside className="w-[420px] max-w-[34vw] shrink-0 bg-white rounded-xl border border-slate-200/80 shadow-[0_1px_3px_rgba(15,23,42,0.06)] flex flex-col p-4">
+        <aside className="w-[400px] max-w-[34vw] shrink-0 bg-white border-l border-slate-200 flex flex-col p-4 text-[14px]">
           {/* Người bán + thời gian */}
           <div className="flex items-center justify-between gap-2">
             <span

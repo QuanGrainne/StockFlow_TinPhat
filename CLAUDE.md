@@ -77,8 +77,8 @@ Clean Architecture with four projects. Dependency direction: API → Application
 - Pages use a "shell + screen switch" pattern: `page.tsx` → `LazyAppLayout` → `AppLayout` → `src/features/<module>/screens/<Module>Screen.tsx`.
   - A list page (`src/app/(dashboard)/<route>/page.tsx`) is `'use client'` and only renders `<LazyAppLayout initialScreen="..." />` (`src/components/layout/LazyAppLayout.tsx`, `next/dynamic` with `ssr: false`). Do not re-declare `next/dynamic` for AppLayout in a page.
   - `AppLayout` renders Header + Sidebar, checks feature permissions, and picks the screen with `switch (activeScreen)`.
-  - `orders/[id]` and `pos` also use `LazyAppLayout` but pass their screen as `children` (AppLayout renders children instead of the switch). `pos` wraps `PosScreen` in `FeatureGuard`.
-  - Create pages (`*/create`) load their own screen via `next/dynamic`, without AppLayout. `transfers/create` is a server component (it exports `metadata`), so it does not use `ssr: false`.
+  - `orders/[id]` also uses `LazyAppLayout` but passes `OrderDetailScreen` as `children` (AppLayout renders children instead of the switch).
+  - Create pages (`*/create`) and `pos` (a fullscreen form wrapped in `FeatureGuard`) load their own screen via `next/dynamic`, without AppLayout. `transfers/create` is a server component (it exports `metadata`), so it does not use `ssr: false`.
 - **Dependency direction:** `app` → `components/layout` → `features` → `components` (shared) + `lib`.
   - `components/layout/` (the shell) may import `features`. The rest of `components/` and all of `lib/` must not import `features` (and `lib/` must not import `components`).
   - A feature may import another feature's `types` and `services`, or what that feature exports from its public entry `features/<m>/index.ts` (import as `@/features/<m>`; today: `orders`, `purchases`, `customers`). Never import another feature's `components` or `screens` directly. Known exceptions are listed in `.claude/rules/20-frontend-structure.md`; check with `node docs/refactor/tools/check-structure.js --strict`.

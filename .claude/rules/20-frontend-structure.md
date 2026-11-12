@@ -45,7 +45,7 @@ page.tsx → components/layout/LazyAppLayout (next/dynamic, ssr:false)
          → switch (activeScreen) → features/<module>/screens/<Module>Screen
 ```
 1. Trang danh sách: `'use client'` + `<LazyAppLayout initialScreen="<mã màn hình>" />`. Không tự viết lại `next/dynamic` cho AppLayout. Cần làm mới khi quay lại thì truyền `key` (vd `key={bfcacheId}` ở `purchase-orders`).
-2. Trang chi tiết `orders/[id]` và trang `pos` cũng dùng `LazyAppLayout`, truyền màn hình qua `children` (`pos` bọc `PosScreen` trong `FeatureGuard`). Trang tạo (`*/create`) nạp màn hình riêng bằng `next/dynamic`, không qua AppLayout (`transfers/create` là server component có `metadata` nên không dùng `ssr:false`).
+2. Trang chi tiết `orders/[id]` cũng dùng `LazyAppLayout`, truyền `OrderDetailScreen` qua `children`. Trang tạo (`*/create`) và `pos` (form toàn màn hình, bọc `FeatureGuard`) nạp màn hình riêng bằng `next/dynamic`, không qua AppLayout (`transfers/create` là server component có `metadata` nên không dùng `ssr:false`).
 3. Thêm màn hình mới: thêm `case` trong `AppLayout`, khai mục menu trong cấu hình navbar, rồi tạo `page.tsx` theo mục 1.
 
 ## Quy ước

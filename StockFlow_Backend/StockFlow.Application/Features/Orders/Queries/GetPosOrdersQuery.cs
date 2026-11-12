@@ -49,7 +49,7 @@ public class GetPosOrdersQueryHandler : IRequestHandler<GetPosOrdersQuery, Resul
             .AsQueryable();
 
         // 1. Phân quyền truy cập kho (Data Isolation)
-        if (_currentUserService.IsAuthenticated && !_currentUserService.IsAdmin)
+        if (_currentUserService.IsAuthenticated)
         {
             var authorizedWarehouseIds = await _currentUserService.GetAuthorizedWarehouseIdsAsync(cancellationToken);
             // Chưa được gán kho nào → không thấy hóa đơn nào (trước đây bỏ qua lọc → thấy toàn bộ)
