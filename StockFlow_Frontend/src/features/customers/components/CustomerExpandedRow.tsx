@@ -7,7 +7,7 @@ import React, { useMemo, useState } from 'react';
 import { ChevronDown, CircleDollarSign, FileUp, Loader2, Lock, Pencil, Trash2, Unlock, UserRound } from 'lucide-react';
 import CustomerPaymentModal from './CustomerPaymentModal';
 import CustomerReceiptModal from './CustomerReceiptModal';
-import InvoicePreviewModal from '@/features/orders/components/InvoicePreviewModal';
+import { InvoicePreviewModal } from '@/features/orders';
 import { Customer, CustomerDebtLedgerEntry, CustomerDetail } from '../types';
 import { exportCustomerBookingsToXLSX, exportCustomerLedgerToXLSX, exportCustomerOrdersToXLSX, GENDER_LABEL } from '../utils/exportExcel';
 import { BOOKING_STATUS } from '@/features/sales-bookings/utils/salesBookingUtils';

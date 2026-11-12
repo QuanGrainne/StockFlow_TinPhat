@@ -456,8 +456,13 @@ export const StaffAccountsScreen: React.FC<StaffAccountsScreenProps> = ({
 
   const handleResetPassword = async (staff: StaffAccount) => {
     if (confirm(`Bạn có chắc chắn muốn đặt lại mật khẩu cho ${staff.name} (${staff.code})?`)) {
-      const defaultPass = await adminService.resetStaffPassword(staff.id);
-      showToast(`Mật khẩu của ${staff.name} đã được reset thành "${defaultPass}"`);
+      try {
+        const defaultPass = await adminService.resetStaffPassword(staff.id);
+        showToast(`Mật khẩu của ${staff.name} đã được reset thành "${defaultPass}"`);
+      } catch {
+        // T18: không còn trả mật khẩu giả khi API lỗi
+        alert('Có lỗi xảy ra khi đặt lại mật khẩu');
+      }
     }
   };
 

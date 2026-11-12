@@ -1,58 +1,4 @@
 // src/features/products/screens/GoodsCatalogScreen.tsx
-// ─── Hàm Tính Toán Thời Gian Dự Kiến Hết Hàng (Days Until Out Of Stock) ──────────
-export interface DaysUntilOutOfStockResult {
-  days: number | null;
-  label: string;
-  status: 'OUT_OF_STOCK' | 'CRITICAL' | 'WARNING' | 'NORMAL' | 'UNKNOWN';
-}
-
-export function calculateDaysUntilOutOfStock(
-  actualStock: number,
-  minSafeStock: number = 0,
-  stockCardRecent?: { type: string; qtyChange: number; date?: string }[]
-): DaysUntilOutOfStockResult {
-  // 1. Phân tích tốc độ tiêu thụ/xuất kho thực tế
-  let dailyBurnRate = 0;
-  if (stockCardRecent && stockCardRecent.length > 0) {
-    const outbounds = stockCardRecent.filter((tx) => tx.type === 'XUAT' || tx.qtyChange < 0);
-    if (outbounds.length > 0) {
-      const totalOutQty = outbounds.reduce((sum, tx) => sum + Math.abs(tx.qtyChange), 0);
-      dailyBurnRate = totalOutQty / 30; // chu kỳ 30 ngày gần nhất
-    }
-  }
-
-  // 2. Nếu chưa có lịch sử xuất kho nhưng có định mức tồn tối thiểu (> 0)
-  if (dailyBurnRate <= 0 && minSafeStock > 0) {
-    dailyBurnRate = minSafeStock / 14; // chu kỳ dự phòng 14 ngày
-  }
-
-  // 3. Nếu không có căn cứ tốc độ tiêu thụ (chưa bán bao giờ): hiển thị '---'
-  if (dailyBurnRate <= 0) {
-    return {
-      days: null,
-      label: '---',
-      status: 'UNKNOWN',
-    };
-  }
-
-  // 4. Nếu có tốc độ tiêu thụ nhưng tồn kho = 0: hiển thị '0 ngày' (chuẩn theo ảnh mẫu KiotViet)
-  if (actualStock <= 0) {
-    return {
-      days: 0,
-      label: '0 ngày',
-      status: 'OUT_OF_STOCK',
-    };
-  }
-
-  // 5. Nếu còn hàng: tính số ngày = Tồn kho / Tốc độ tiêu thụ ngày
-  const calculatedDays = Math.max(1, Math.round(actualStock / dailyBurnRate));
-  return {
-    days: calculatedDays,
-    label: `${calculatedDays} ngày`,
-    status: calculatedDays <= 3 ? 'CRITICAL' : calculatedDays <= 7 ? 'WARNING' : 'NORMAL',
-  };
-}
-
 // Màn hình Danh mục Hàng hóa & Tồn kho Master Data cho toàn bộ các Role trong hệ thống
 // Hỗ trợ thiết kế Tạo hàng hóa StockFlow chuẩn với Đơn vị tính, Thuộc tính và Ma trận biến thể
 // Hỗ trợ cả TỰ NHẬP (free text) và TỰ CHỌN (dropdown suggestions) cho tất cả các trường dữ liệu
@@ -73,17 +19,13 @@ import {
   Trash2,
   Plus,
   ArrowUpRight,
-  Building,
   Layers,
   FileSpreadsheet,
   Printer,
   X,
-  Sparkles,
   ShieldCheck,
-  Tag,
   Warehouse,
   Clock,
-  ChevronRight,
   ChevronDown,
   ChevronUp,
   TrendingUp,
@@ -100,14 +42,9 @@ import {
   Minus,
   MoreHorizontal,
   ExternalLink,
-  MapPin,
   Store,
   ArrowDownToLine,
-  Globe,
   Inbox,
-  ChevronLeft,
-  ChevronsLeft,
-  ChevronsRight,
 } from 'lucide-react';
 import { productService } from '../services/goodsCatalogService';
 import { adminService } from '@/features/admin/services/adminService';
@@ -126,796 +63,45 @@ import ProductFilterSidebar, {
   INITIAL_FILTER_STATE,
 } from '@/features/products/components/ProductFilterSidebar';
 import { SlidersHorizontal, RotateCcw, Lock, Unlock } from 'lucide-react';
+import type { GoodsItem, GoodsVariantItem, GoodsUnitConversion, GoodsAttributeDef } from '../types/goodsCatalog';
+import {
+  calculateDaysUntilOutOfStock,
+  STOCKFLOW_GOODS_STORAGE_KEY,
+  getNextProductCode,
+  formatRealDateTime,
+  formatNumberWithCommas,
+  parseCleanNumber,
+  getItemCreatedTime,
+  parseDateToComparable,
+} from '../components/catalog/goodsCatalogUtils';
+import {
+  INITIAL_GOODS_LIST,
+  DEFAULT_SUBCATEGORY_OPTIONS,
+  DEFAULT_BRAND_OPTIONS,
+  DEFAULT_UOM_OPTIONS,
+  DEFAULT_ATTR_TYPE_OPTIONS,
+  DEFAULT_LOCATION_OPTIONS,
+} from '../components/catalog/goodsCatalogDefaults';
+import { CustomCombobox } from '../components/catalog/CustomCombobox';
+import { KiotSelectWithSearch } from '../components/catalog/KiotSelectWithSearch';
+import { QuickCreateCategoryModal } from '../components/catalog/QuickCreateCategoryModal';
+import { QuickCreateLocationModal } from '../components/catalog/QuickCreateLocationModal';
+import { QuickCreateBrandModal } from '../components/catalog/QuickCreateBrandModal';
+import { GoodsCatalogPagination } from '../components/catalog/GoodsCatalogPagination';
+import { CostScopeConfirmModal } from '../components/catalog/CostScopeConfirmModal';
 
-// ─── Component Combobox Đa Năng (Vừa Tự Nhập Vừa Tự Chọn) ──────────────────────
-interface CustomComboboxProps {
-  value: string;
-  onChange: (val: string) => void;
-  options: string[];
-  placeholder?: string;
-  className?: string;
-}
-
-const CustomCombobox: React.FC<CustomComboboxProps> = ({
-  value,
-  onChange,
-  options,
-  placeholder = 'Nhập hoặc chọn...',
-  className = '',
-}) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setIsOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  const filtered = options.filter((opt) =>
-    opt.toLowerCase().includes((value || '').toLowerCase())
-  );
-
-  return (
-    <div ref={containerRef} className="relative w-full">
-      <div className="relative">
-        <input
-          type="text"
-          value={value}
-          onChange={(e) => {
-            onChange(e.target.value);
-            setIsOpen(true);
-          }}
-          onFocus={() => setIsOpen(true)}
-          placeholder={placeholder}
-          className={`w-full h-9 pl-3 pr-8 rounded-lg border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500 font-medium bg-white transition ${className}`}
-        />
-        <button
-          type="button"
-          tabIndex={-1}
-          onClick={() => setIsOpen(!isOpen)}
-          className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 cursor-pointer transition"
-        >
-          <ChevronDown size={14} className={`transform transition-transform ${isOpen ? 'rotate-180 text-blue-600' : ''}`} />
-        </button>
-      </div>
-
-      {isOpen && (
-        <div className="absolute z-50 left-0 right-0 mt-1 max-h-52 overflow-y-auto bg-white border border-slate-200 rounded-lg shadow-xl py-1 text-xs animate-in fade-in">
-          {filtered.length > 0 ? (
-            filtered.map((opt, idx) => (
-              <div
-                key={idx}
-                onClick={() => {
-                  onChange(opt);
-                  setIsOpen(false);
-                }}
-                className={`px-3 py-2 cursor-pointer hover:bg-blue-50 hover:text-blue-700 transition flex items-center justify-between ${
-                  value === opt ? 'bg-blue-50/70 text-blue-700 font-bold' : 'text-slate-700'
-                }`}
-              >
-                <span>{opt}</span>
-                {value === opt && <Check size={13} className="text-blue-600" />}
-              </div>
-            ))
-          ) : (
-            <div className="px-3 py-2 text-slate-400 italic text-[11px]">
-              Gõ tự do để sử dụng: &ldquo;{value}&rdquo;
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-};
-
-// ─── Component Dropdown Nhóm hàng / Thương hiệu Chuẩn KiotViet (Kính lúp & Tạo mới) ───────────
-interface KiotSelectWithSearchProps {
-  label: string;
-  required?: boolean;
-  onCreateNew?: () => void;
-  createButtonText?: string;
-  value: string;
-  onChange: (val: string) => void;
-  options: string[];
-  placeholder?: string;
-  searchPlaceholder?: string;
-  allowClear?: boolean;
-  onQuickCreate?: (val: string) => void;
-  className?: string;
-}
-
-const KiotSelectWithSearch: React.FC<KiotSelectWithSearchProps> = ({
-  label,
-  required = false,
-  onCreateNew,
-  createButtonText = 'Tạo mới',
-  value,
-  onChange,
-  options,
-  placeholder = 'Chọn...',
-  searchPlaceholder = 'Tìm kiếm...',
-  allowClear = true,
-  onQuickCreate,
-  className = '',
-}) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const containerRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setIsOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  useEffect(() => {
-    if (isOpen) {
-      setTimeout(() => inputRef.current?.focus(), 60);
-    } else {
-      setSearchQuery('');
-    }
-  }, [isOpen]);
-
-  const filteredOptions = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
-    if (!q) return options;
-    return options.filter((opt) => opt.toLowerCase().includes(q));
-  }, [options, searchQuery]);
-
-  return (
-    <div ref={containerRef} className={`relative w-full ${className}`}>
-      {/* Header dòng trên: Nhãn & Nút 'Tạo mới' màu xanh chuẩn KiotViet */}
-      <div className="flex items-center justify-between mb-1">
-        <label className="block text-xs font-semibold text-slate-700">
-          {label} {required && <span className="text-red-500">*</span>}
-        </label>
-        {onCreateNew && (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onCreateNew();
-            }}
-            className="text-xs text-[#0070F3] hover:text-blue-700 font-normal hover:underline cursor-pointer transition select-none"
-          >
-            {createButtonText}
-          </button>
-        )}
-      </div>
-
-      {/* Hộp chọn Trigger chuẩn KiotViet */}
-      <div
-        onClick={() => setIsOpen(!isOpen)}
-        className={`w-full h-9 px-3 rounded-lg border text-xs flex items-center justify-between cursor-pointer bg-white transition select-none ${
-          isOpen ? 'border-blue-500 ring-2 ring-blue-500/15' : 'border-slate-200 hover:border-slate-300'
-        }`}
-      >
-        <span className={`truncate ${value ? 'text-slate-800 font-medium' : 'text-slate-400'}`}>
-          {value || placeholder}
-        </span>
-        <ChevronDown
-          size={14}
-          className={`text-slate-400 transition-transform duration-200 ${isOpen ? 'rotate-180 text-blue-600' : ''}`}
-        />
-      </div>
-
-      {/* Dropdown Menu nổi (Nổi bật - Không bị đè / không bị cắt) */}
-      {isOpen && (
-        <div className="absolute z-[999] left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl overflow-hidden py-1.5 text-xs animate-in fade-in zoom-in-95 duration-100 ring-1 ring-black/10 min-w-[280px]">
-          {/* Thanh tìm kiếm bên trong dropdown có icon kính lúp 🔍 */}
-          <div className="p-2.5 border-b border-slate-100 bg-slate-50/70">
-            <div className="relative">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={13} />
-              <input
-                ref={inputRef}
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder={searchPlaceholder}
-                className="w-full h-8 pl-8 pr-3 text-xs bg-white rounded-md border border-slate-300 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition text-slate-800 placeholder-slate-400"
-                onClick={(e) => e.stopPropagation()}
-              />
-            </div>
-          </div>
-
-          {/* Danh sách lựa chọn cuộn (Chiều cao thoải mái, hiển thị rõ ràng) */}
-          <div className="max-h-60 min-h-[100px] overflow-y-auto divide-y divide-slate-50">
-            {/* Lựa chọn xóa / mặc định: Chọn nhóm hàng (Bắt buộc) */}
-            {allowClear && (
-              <div
-                onClick={() => {
-                  onChange('');
-                  setIsOpen(false);
-                }}
-                className={`px-3 py-2 cursor-pointer transition flex items-center justify-between ${
-                  !value ? 'bg-blue-50/70 text-blue-700 font-medium' : 'text-slate-500 hover:bg-slate-50'
-                }`}
-              >
-                <span>{placeholder}</span>
-                {!value && <Check size={13} className="text-blue-600" />}
-              </div>
-            )}
-
-            {/* Các tùy chọn lọc theo từ khóa */}
-            {filteredOptions.length > 0 ? (
-              filteredOptions.map((opt, idx) => {
-                const isSelected = value === opt;
-                return (
-                  <div
-                    key={idx}
-                    onClick={() => {
-                      onChange(opt);
-                      setIsOpen(false);
-                    }}
-                    className={`px-3 py-2 cursor-pointer transition flex items-center justify-between ${
-                      isSelected ? 'bg-blue-50/70 text-blue-700 font-bold' : 'text-slate-700 hover:bg-blue-50 hover:text-blue-700'
-                    }`}
-                  >
-                    <span className="truncate">{opt}</span>
-                    {isSelected && <Check size={13} className="text-blue-600 flex-shrink-0" />}
-                  </div>
-                );
-              })
-            ) : (
-              <div className="p-3 text-center text-slate-400 text-xs">
-                <div className="mb-1 text-slate-500">Không tìm thấy kết quả</div>
-                {searchQuery.trim() && onQuickCreate && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onQuickCreate(searchQuery.trim());
-                      setIsOpen(false);
-                    }}
-                    className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-700 font-medium hover:underline mt-1 cursor-pointer"
-                  >
-                    <Plus size={12} />
-                    <span>Tạo mới &ldquo;{searchQuery.trim()}&rdquo;</span>
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
-
-export interface GoodsVariantItem {
-  id: string;
-  attributeValue?: string;
-  unitName: string;
-  conversionRate: number;
-  code: string;
-  barcode: string;
-  costPrice: number;
-  salePrice: number;
-  stock: number;
-}
-
-export interface GoodsUnitConversion {
-  name: string;
-  conversionRate: number;
-  isBase: boolean;
-  isDirectSale: boolean;
-}
-
-export interface GoodsAttributeDef {
-  name: string;
-  values: string[];
-}
-
-export interface GoodsItem {
-  id: string;
-  productId?: number;
-  code: string;
-  name: string;
-  category: 'Thành phẩm' | 'Nguyên vật liệu';
-  subCategory: string;
-  brand?: string;
-  uom: string;
-  specification: string;
-  warehouse: string;
-  stockQuantity: number;
-  reservedQuantity: number;
-  availableQuantity: number;
-  minSafeStock: number;
-  maxSafeStock: number;
-  standardPrice: number;
-  costPrice: number;
-  barcode: string;
-  status: 'ACTIVE' | 'DISCONTINUED';
-  createdAt?: string;
-  isStarred?: boolean;
-  supplier?: string;
-  weight?: number;
-  dimensions?: { width: number; length: number; unit: string };
-  locationName?: string;
-  isDirectSale?: boolean;
-  hasRewardPoints?: boolean;
-  imageUrl?: string;
-  description?: string;
-  units?: GoodsUnitConversion[];
-  attributes?: GoodsAttributeDef[];
-  variants?: GoodsVariantItem[];
-  stockByWarehouse: {
-    warehouseName: string;
-    warehouseCode?: string;
-    actualStock: number;
-    availableStock: number;
-    costPrice?: number;
-    standardPrice?: number;
-    minSafeStock?: number;
-    maxSafeStock?: number;
-  }[];
-  stockCardRecent: {
-    date: string;
-    docCode: string;
-    type: 'NHAP' | 'XUAT' | 'CHUYEN';
-    typeName: string;
-    qtyChange: number;
-    balance: number;
-    partnerOrDept: string;
-  }[];
-}
-
-const INITIAL_GOODS_LIST: GoodsItem[] = [
-  {
-    id: 'G-00',
-    code: 'SP652365',
-    name: 'Sữa tươi Ba Vì',
-    category: 'Thành phẩm',
-    subCategory: 'Sữa',
-    brand: 'Ba Vì Milk',
-    supplier: 'xưởng sỉ',
-    uom: 'Hộp',
-    specification: 'Hộp tiệt trùng 180ml hương vị tự nhiên',
-    warehouse: 'Kho Tổng Gia Lâm',
-    stockQuantity: 200,
-    reservedQuantity: 0,
-    availableQuantity: 200,
-    minSafeStock: 0,
-    maxSafeStock: 999999999,
-    standardPrice: 7000,
-    costPrice: 5000,
-    barcode: '8936001239999',
-    status: 'ACTIVE',
-    weight: 180,
-    dimensions: { width: 5, length: 12, unit: 'cm' },
-    locationName: 'Kệ A-01-T2',
-    isDirectSale: true,
-    hasRewardPoints: true,
-    imageUrl: 'https://images.unsplash.com/photo-1550583724-b2692b85b150?w=400&auto=format&fit=crop&q=80',
-    description: 'Sữa tươi Ba Vì tiệt trùng nguyên chất thơm ngon bổ dưỡng, bổ sung vitamin D & Canxi.',
-    units: [
-      { name: 'Hộp', conversionRate: 1, isBase: true, isDirectSale: true },
-      { name: 'Lốc', conversionRate: 4, isBase: false, isDirectSale: true },
-      { name: 'Thùng', conversionRate: 48, isBase: false, isDirectSale: true },
-    ],
-    attributes: [
-      { name: 'HƯƠNG VỊ', values: ['Dâu', 'Vani'] },
-    ],
-    variants: [
-      { id: 'V-01', attributeValue: 'Dâu', unitName: 'Hộp', conversionRate: 1, code: 'SP652365', barcode: '893600123901', costPrice: 5000, salePrice: 7000, stock: 100 },
-      { id: 'V-02', attributeValue: 'Vani', unitName: 'Hộp', conversionRate: 1, code: 'SP652366', barcode: '893600123902', costPrice: 5000, salePrice: 7000, stock: 100 },
-      { id: 'V-03', attributeValue: 'Dâu', unitName: 'Lốc', conversionRate: 4, code: 'SP652365-LOC', barcode: '893600123903', costPrice: 20000, salePrice: 27000, stock: 25 },
-      { id: 'V-04', attributeValue: 'Vani', unitName: 'Lốc', conversionRate: 4, code: 'SP652366-LOC', barcode: '893600123904', costPrice: 20000, salePrice: 27000, stock: 25 },
-      { id: 'V-05', attributeValue: 'Dâu', unitName: 'Thùng', conversionRate: 48, code: 'SP652365-THUNG', barcode: '893600123905', costPrice: 240000, salePrice: 320000, stock: 10 },
-      { id: 'V-06', attributeValue: 'Vani', unitName: 'Thùng', conversionRate: 48, code: 'SP652366-THUNG', barcode: '893600123906', costPrice: 240000, salePrice: 320000, stock: 10 },
-    ],
-    stockByWarehouse: [
-      { warehouseName: 'Kho Tổng Gia Lâm', warehouseCode: 'K001', actualStock: 120, availableStock: 120 },
-      { warehouseName: 'Kho Đông Anh', warehouseCode: 'K002', actualStock: 50, availableStock: 50 },
-      { warehouseName: 'Kho Hà Đông', warehouseCode: 'K003', actualStock: 20, availableStock: 20 },
-      { warehouseName: 'Kho Hoàn Kiếm', warehouseCode: 'K004', actualStock: 10, availableStock: 10 },
-    ],
-    stockCardRecent: [
-      { date: '23/09/2026 10:28', docCode: 'NK-2026-099', type: 'NHAP', typeName: 'Nhập kho sản xuất', qtyChange: 120, balance: 200, partnerOrDept: 'Kho Tổng Gia Lâm' },
-    ],
-  },
-  {
-    id: 'G-01',
-    code: 'TP-SP01',
-    name: 'Tấm ốp Nano PVC vân đá 9mm',
-    category: 'Thành phẩm',
-    subCategory: 'Tấm ốp Nano PVC',
-    brand: 'Tín Phát Premium',
-    uom: 'Tấm',
-    specification: '9mm × 400mm × 3000mm (Vân đá Carrara trắng)',
-    warehouse: 'Kho Tổng Gia Lâm',
-    stockQuantity: 1250,
-    reservedQuantity: 200,
-    availableQuantity: 1050,
-    minSafeStock: 500,
-    maxSafeStock: 3000,
-    standardPrice: 145000,
-    costPrice: 112000,
-    barcode: '8936001230012',
-    status: 'ACTIVE',
-    weight: 4500,
-    dimensions: { width: 0.4, length: 3, unit: 'm' },
-    locationName: 'Khu A - Dãy 3',
-    isDirectSale: true,
-    hasRewardPoints: true,
-    imageUrl: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=400&auto=format&fit=crop&q=80',
-    units: [
-      { name: 'Tấm', conversionRate: 1, isBase: true, isDirectSale: true },
-      { name: 'Kiện (10 Tấm)', conversionRate: 10, isBase: false, isDirectSale: true },
-    ],
-    attributes: [
-      { name: 'MÀU SẮC', values: ['Trắng Vân Mây', 'Đá Carrara', 'Xám Bê Tông'] },
-    ],
-    stockByWarehouse: [
-      { warehouseName: 'Kho Tổng Gia Lâm', warehouseCode: 'K001', actualStock: 950, availableStock: 850 },
-      { warehouseName: 'Kho Đông Anh', warehouseCode: 'K002', actualStock: 180, availableStock: 120 },
-      { warehouseName: 'Kho Hà Đông', warehouseCode: 'K003', actualStock: 80, availableStock: 50 },
-      { warehouseName: 'Kho Hoàn Kiếm', warehouseCode: 'K004', actualStock: 40, availableStock: 30 },
-    ],
-    stockCardRecent: [
-      { date: '15/10/2026', docCode: 'NK-2026-042', type: 'NHAP', typeName: 'Nhập kho sản xuất (Xưởng)', qtyChange: 500, balance: 1250, partnerOrDept: 'Xưởng đùn tấm K3' },
-      { date: '10/10/2026', docCode: 'XK-2026-089', type: 'XUAT', typeName: 'Xuất kho bán hàng B2B', qtyChange: -200, balance: 750, partnerOrDept: 'Công ty Cổ phần Nội thất An Phát' },
-      { date: '02/10/2026', docCode: 'NK-2026-031', type: 'NHAP', typeName: 'Nhập kho thành phẩm đợt 1', qtyChange: 950, balance: 950, partnerOrDept: 'Lệnh sản xuất MO-2026-001' },
-    ],
-  },
-  {
-    id: 'G-02',
-    code: 'TP-SP02',
-    name: 'Phào chỉ cổ trần PU dát vàng 8cm',
-    category: 'Thành phẩm',
-    subCategory: 'Phào chỉ PU',
-    brand: 'Tín Phát Classic',
-    uom: 'Cây 2.4m',
-    specification: 'Bản rộng 8cm, dài 2.4m hoa văn dát vàng hoàng gia',
-    warehouse: 'Kho Tổng Gia Lâm',
-    stockQuantity: 280,
-    reservedQuantity: 40,
-    availableQuantity: 240,
-    minSafeStock: 100,
-    maxSafeStock: 800,
-    standardPrice: 85000,
-    costPrice: 58000,
-    barcode: '8936001230029',
-    status: 'ACTIVE',
-    weight: 850,
-    locationName: 'Khu B - Kệ 02',
-    isDirectSale: true,
-    hasRewardPoints: true,
-    imageUrl: 'https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?w=400&auto=format&fit=crop&q=80',
-    stockByWarehouse: [
-      { warehouseName: 'Kho Tổng Gia Lâm', warehouseCode: 'K001', actualStock: 180, availableStock: 150 },
-      { warehouseName: 'Kho Đông Anh', warehouseCode: 'K002', actualStock: 60, availableStock: 50 },
-      { warehouseName: 'Kho Hà Đông', warehouseCode: 'K003', actualStock: 25, availableStock: 25 },
-      { warehouseName: 'Kho Hoàn Kiếm', warehouseCode: 'K004', actualStock: 15, availableStock: 15 },
-    ],
-    stockCardRecent: [
-      { date: '12/10/2026', docCode: 'PN-2026-082', type: 'NHAP', typeName: 'Nhập kho hàng nhập khẩu', qtyChange: 150, balance: 280, partnerOrDept: 'NCC Vật liệu Đài Loan' },
-      { date: '05/10/2026', docCode: 'XK-2026-075', type: 'XUAT', typeName: 'Xuất kho công trình', qtyChange: -50, balance: 130, partnerOrDept: 'Biệt thự Starlake Tây Hồ' },
-    ],
-  },
-  {
-    id: 'G-03',
-    code: 'TP-SP03',
-    name: 'Nẹp nhôm chữ T mạ Anode',
-    category: 'Thành phẩm',
-    subCategory: 'Nẹp trang trí',
-    brand: 'Tân Á',
-    uom: 'Thanh 2.5m',
-    specification: 'Bản rộng 20mm, dài 2.5m mạ anode vàng bóng chống xước',
-    warehouse: 'Kho Đông Anh',
-    stockQuantity: 640,
-    reservedQuantity: 80,
-    availableQuantity: 560,
-    minSafeStock: 300,
-    maxSafeStock: 1500,
-    standardPrice: 38000,
-    costPrice: 26000,
-    barcode: '8936001230036',
-    status: 'ACTIVE',
-    imageUrl: 'https://images.unsplash.com/photo-1513694203232-719a280e022f?w=400&auto=format&fit=crop&q=80',
-    stockByWarehouse: [
-      { warehouseName: 'Kho Tổng Gia Lâm', warehouseCode: 'K001', actualStock: 180, availableStock: 150 },
-      { warehouseName: 'Kho Đông Anh', warehouseCode: 'K002', actualStock: 360, availableStock: 320 },
-      { warehouseName: 'Kho Hà Đông', warehouseCode: 'K003', actualStock: 60, availableStock: 50 },
-      { warehouseName: 'Kho Hoàn Kiếm', warehouseCode: 'K004', actualStock: 40, availableStock: 40 },
-    ],
-    stockCardRecent: [
-      { date: '14/10/2026', docCode: 'PN-2026-086', type: 'NHAP', typeName: 'Nhập mua hàng NCC Tân Á', qtyChange: 300, balance: 640, partnerOrDept: 'Công ty Nhôm Tân Á' },
-    ],
-  },
-  {
-    id: 'G-04',
-    code: 'TP-SP04',
-    name: 'Tấm ốp Lam sóng PVC 4 sóng thấp',
-    category: 'Thành phẩm',
-    subCategory: 'Lam sóng PVC',
-    brand: 'Tín Phát Eco',
-    uom: 'Thanh 3m',
-    specification: '15mm × 150mm × 3000mm (Màu vân gỗ sồi tự nhiên)',
-    warehouse: 'Kho Tổng Gia Lâm',
-    stockQuantity: 420,
-    reservedQuantity: 50,
-    availableQuantity: 370,
-    minSafeStock: 200,
-    maxSafeStock: 1200,
-    standardPrice: 125000,
-    costPrice: 92000,
-    barcode: '8936001230043',
-    status: 'ACTIVE',
-    imageUrl: 'https://images.unsplash.com/photo-1513519245088-0e12902e5a38?w=400&auto=format&fit=crop&q=80',
-    stockByWarehouse: [
-      { warehouseName: 'Kho Tổng Gia Lâm', warehouseCode: 'K001', actualStock: 280, availableStock: 250 },
-      { warehouseName: 'Kho Đông Anh', warehouseCode: 'K002', actualStock: 90, availableStock: 80 },
-      { warehouseName: 'Kho Hà Đông', warehouseCode: 'K003', actualStock: 30, availableStock: 25 },
-      { warehouseName: 'Kho Hoàn Kiếm', warehouseCode: 'K004', actualStock: 20, availableStock: 15 },
-    ],
-    stockCardRecent: [
-      { date: '08/10/2026', docCode: 'NK-2026-038', type: 'NHAP', typeName: 'Nhập kho thành phẩm sản xuất', qtyChange: 200, balance: 420, partnerOrDept: 'Phân xưởng định hình số 2' },
-    ],
-  },
-  {
-    id: 'G-05',
-    code: 'TP-KE001',
-    name: 'Keo dán chuyên dụng Tín Phát 300ml',
-    category: 'Thành phẩm',
-    subCategory: 'Keo dán & Phụ liệu',
-    brand: 'Tín Phát Bond',
-    uom: 'Tuýp',
-    specification: 'Tuýp 300ml keo dán đa năng siêu dính cho tấm ốp và phào chỉ',
-    warehouse: 'Kho Tổng Gia Lâm',
-    stockQuantity: 280,
-    reservedQuantity: 0,
-    availableQuantity: 280,
-    minSafeStock: 30,
-    maxSafeStock: 999999999,
-    standardPrice: 51300,
-    costPrice: 38000,
-    barcode: '8936009682245',
-    status: 'ACTIVE',
-    weight: 350,
-    locationName: 'Kệ A-02-T1',
-    isDirectSale: true,
-    hasRewardPoints: true,
-    imageUrl: 'https://images.unsplash.com/photo-1581244277943-fe4a9c777189?w=400&auto=format&fit=crop&q=80',
-    stockByWarehouse: [
-      { warehouseName: 'Kho Tổng Gia Lâm', warehouseCode: 'K001', actualStock: 150, availableStock: 150 },
-      { warehouseName: 'Kho Đông Anh', warehouseCode: 'K002', actualStock: 80, availableStock: 80 },
-      { warehouseName: 'Kho Hà Đông', warehouseCode: 'K003', actualStock: 30, availableStock: 30 },
-      { warehouseName: 'Kho Hoàn Kiếm', warehouseCode: 'K004', actualStock: 20, availableStock: 20 },
-    ],
-    stockCardRecent: [
-      { date: '23/09/2026 10:28', docCode: 'NK-2026-099', type: 'NHAP', typeName: 'Nhập kho từ NCC', qtyChange: 80, balance: 280, partnerOrDept: 'Kho Đông Anh' },
-      { date: '15/09/2026 14:10', docCode: 'NK-2026-054', type: 'NHAP', typeName: 'Nhập kho lô đầu', qtyChange: 200, balance: 200, partnerOrDept: 'Kho Tổng Gia Lâm' },
-    ],
-  },
-  {
-    id: 'G-06',
-    code: 'TP-NV01',
-    name: 'Hạt nhựa PVC nguyên sinh SG5',
-    category: 'Nguyên vật liệu',
-    subCategory: 'Hạt nhựa công nghiệp',
-    brand: 'Formosa Plastics',
-    uom: 'Kg',
-    specification: 'Bao 25kg, độ tinh khiết 99.8%, xuất xứ Formosa',
-    warehouse: 'Kho Tổng Gia Lâm',
-    stockQuantity: 18500,
-    reservedQuantity: 5000,
-    availableQuantity: 13500,
-    minSafeStock: 5000,
-    maxSafeStock: 30000,
-    standardPrice: 0,
-    costPrice: 28500,
-    barcode: '8936001230104',
-    status: 'ACTIVE',
-    imageUrl: 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=400&auto=format&fit=crop&q=80',
-    stockByWarehouse: [
-      { warehouseName: 'Kho Tổng Gia Lâm', warehouseCode: 'K001', actualStock: 12000, availableStock: 9000 },
-      { warehouseName: 'Kho Đông Anh', warehouseCode: 'K002', actualStock: 4500, availableStock: 3500 },
-      { warehouseName: 'Kho Hà Đông', warehouseCode: 'K003', actualStock: 1500, availableStock: 800 },
-      { warehouseName: 'Kho Hoàn Kiếm', warehouseCode: 'K004', actualStock: 500, availableStock: 200 },
-    ],
-    stockCardRecent: [
-      { date: '16/10/2026', docCode: 'PN-2026-088', type: 'NHAP', typeName: 'Nhập khẩu hạt nhựa nguyên sinh', qtyChange: 10000, balance: 18500, partnerOrDept: 'Tập đoàn Formosa' },
-    ],
-  },
-];
-
-// Danh sách gợi ý mặc định (người dùng vừa có thể chọn, vừa có thể gõ tự do bất kỳ chữ gì)
-const DEFAULT_SUBCATEGORY_OPTIONS = [
-  'Sữa',
-  'Tấm ốp Nano PVC',
-  'Phào chỉ PU',
-  'Nẹp trang trí',
-  'Lam sóng PVC',
-  'Tấm than tre cao cấp',
-  'Hạt nhựa công nghiệp',
-  'Keo dán & Phụ kiện',
-  'Vật tư xây dựng',
-  'Bánh kẹo & Nước ngọt',
-];
-
-const DEFAULT_BRAND_OPTIONS = [
-  'Ba Vì Milk',
-  'Tín Phát Premium',
-  'Tín Phát Classic',
-  'Tân Á',
-  'Formosa Plastics',
-  'Vinamilk',
-  'TH True Milk',
-  'Hòa Phát',
-  'Vật Liệu Xanh',
-];
-
-const DEFAULT_UOM_OPTIONS = [
-  'Hộp',
-  'Tấm',
-  'Cái',
-  'Cây 2.4m',
-  'Thanh 3m',
-  'Kg',
-  'Tấn',
-  'Bao 25kg',
-  'Lon',
-  'Chai',
-  'Lít',
-  'Cuộn',
-  'Kiện',
-  'Bộ',
-];
-
-const DEFAULT_ATTR_TYPE_OPTIONS = [
-  'HƯƠNG VỊ',
-  'MÀU SẮC',
-  'SIZE',
-  'CHẤT LIỆU',
-  'LOẠI',
-  'DUNG TÍCH',
-  'TRỌNG LƯỢNG',
-  'ĐỘ DÀY',
-  'QUY CÁCH',
-  'XUẤT XỨ',
-];
-
-const DEFAULT_LOCATION_OPTIONS = [
-  'Kệ A-01-T2',
-  'Kệ A-02-T1',
-  'Khu B - Kệ 02',
-  'Khu A - Dãy 3',
-  'Kho Tổng Gia Lâm - Tầng 1',
-  'Kho Đông Anh - Kệ 02',
-  'Xưởng sản xuất số 1',
-];
-
-// Khóa lưu trữ LocalStorage cho Danh mục Hàng hóa
-export const STOCKFLOW_GOODS_STORAGE_KEY = 'stockflow_goods_catalog_v1';
-
-// Quy tắc sinh mã hàng hóa tự động chuẩn SP + 6 chữ số tuần tự (SP000001, SP000002, ...)
-export const getNextProductCode = (items: GoodsItem[]): string => {
-  let maxNum = 0;
-  for (const item of items) {
-    if (!item.code) continue;
-    const match = item.code.trim().match(/^SP(\d+)$/i);
-    if (match) {
-      const num = parseInt(match[1], 10);
-      if (!isNaN(num) && num > maxNum) {
-        maxNum = num;
-      }
-    }
-  }
-  const nextNum = maxNum > 0 ? maxNum + 1 : 1;
-  let code = `SP${String(nextNum).padStart(6, '0')}`;
-  let counter = nextNum;
-  while (items.some((i) => i.code?.toUpperCase() === code.toUpperCase())) {
-    counter++;
-    code = `SP${String(counter).padStart(6, '0')}`;
-  }
-  return code;
-};
-
-// Định dạng ngày giờ tạo sản phẩm theo thời gian thực chuẩn Việt Nam (DD/MM/YYYY HH:mm)
-export const formatRealDateTime = (dateInput?: string | Date | null): string => {
-  if (!dateInput) {
-    const d = new Date();
-    return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-  }
-  if (typeof dateInput === 'string' && /^\d{2}\/\d{2}\/\d{4}\s+\d{2}:\d{2}/.test(dateInput)) {
-    return dateInput;
-  }
-  try {
-    let d: Date;
-    if (typeof dateInput === 'string') {
-      let isoStr = dateInput.trim();
-      // Nếu là ISO string (e.g. "2026-10-22T20:48:04.69192") từ C# UTC nhưng không có 'Z',
-      // bổ sung 'Z' để Date() chuyển đổi chính xác sang múi giờ địa phương của client (GMT+7 Việt Nam).
-      if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(isoStr) && !isoStr.endsWith('Z') && !/[+-]\d{2}(:\d{2})?$/.test(isoStr)) {
-        isoStr += 'Z';
-      }
-      d = new Date(isoStr);
-      if (isNaN(d.getTime())) {
-        d = new Date(dateInput);
-      }
-    } else {
-      d = dateInput;
-    }
-    if (isNaN(d.getTime())) return String(dateInput);
-    return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-  } catch {
-    return String(dateInput);
-  }
-};
-
-// Định dạng hiển thị số với dấu phẩy ngăn cách hàng nghìn (VD: 50,000; 500,000; 999,999,999)
-export const formatNumberWithCommas = (val: number | string | undefined | null): string => {
-  if (val === undefined || val === null || val === '') return '';
-  // Số thực (VD giá vốn bình quân 74285.72) phải làm tròn trước, nếu không dấu "." bị xóa → 7,428,572
-  const str = toIntegerString(val);
-  if (!str) return '';
-  return str.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-};
-
-// Chuẩn hóa về chuỗi số nguyên: số / chuỗi số thập phân ("74285.72") thì làm tròn, chuỗi đã định dạng ("1,234") thì bỏ ký tự thừa
-const toIntegerString = (val: number | string): string => {
-  if (typeof val === 'number') return Number.isFinite(val) ? String(Math.max(0, Math.round(val))) : '';
-  const trimmed = val.trim();
-  if (/^\d+\.\d+$/.test(trimmed)) return String(Math.round(Number(trimmed)));
-  return trimmed.replace(/\D/g, '');
-};
-
-// Chuyển chuỗi định dạng có dấu phẩy về số nguyên an toàn
-export const parseCleanNumber = (val: string | number | undefined | null): number => {
-  if (val === undefined || val === null || val === '') return 0;
-  const str = toIntegerString(val);
-  return str ? Number(str) : 0;
-};
-
-// Lấy thời gian tạo chuẩn: từ item.createdAt, hoặc suy từ timestamp của ID, hoặc thời gian thực hiện tại
-export const getItemCreatedTime = (item: GoodsItem): string => {
-  if (item.createdAt && item.createdAt !== '23/09/2026 10:28') {
-    return formatRealDateTime(item.createdAt);
-  }
-  if (item.id && /^G-\d{10,}$/.test(item.id)) {
-    const ts = parseInt(item.id.replace('G-', ''), 10);
-    if (!isNaN(ts)) {
-      const formatted = formatRealDateTime(new Date(ts));
-      item.createdAt = formatted;
-      return formatted;
-    }
-  }
-  // Nếu là mặt hàng mới tạo hoặc chưa lưu thời gian tạo, gán thời gian thực ngay tại thời điểm này
-  const nowTime = formatRealDateTime(new Date());
-  item.createdAt = nowTime;
-  return nowTime;
-};
-
-// Chuyển chuỗi ngày (DD/MM/YYYY hoặc ISO YYYY-MM-DD) sang Date để so sánh khoảng thời gian
-const parseDateToComparable = (str?: string): Date | null => {
-  if (!str) return null;
-  const dmyMatch = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
-  if (dmyMatch) {
-    const day = parseInt(dmyMatch[1], 10);
-    const month = parseInt(dmyMatch[2], 10) - 1;
-    const year = parseInt(dmyMatch[3], 10);
-    return new Date(year, month, day);
-  }
-  const ymdMatch = str.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
-  if (ymdMatch) {
-    const year = parseInt(ymdMatch[1], 10);
-    const month = parseInt(ymdMatch[2], 10) - 1;
-    const day = parseInt(ymdMatch[3], 10);
-    return new Date(year, month, day);
-  }
-  const d = new Date(str);
-  return isNaN(d.getTime()) ? null : d;
-};
+// T19 lát 1: re-export để các file đang import từ màn hình này (GoodsItem...) không phải sửa.
+export type { GoodsItem, GoodsVariantItem, GoodsUnitConversion, GoodsAttributeDef } from '../types/goodsCatalog';
+export type { DaysUntilOutOfStockResult } from '../components/catalog/goodsCatalogUtils';
+export {
+  calculateDaysUntilOutOfStock,
+  STOCKFLOW_GOODS_STORAGE_KEY,
+  getNextProductCode,
+  formatRealDateTime,
+  formatNumberWithCommas,
+  parseCleanNumber,
+  getItemCreatedTime,
+} from '../components/catalog/goodsCatalogUtils';
 
 interface GoodsCatalogScreenProps {
   onNavigate?: (screenId: string) => void;
@@ -4257,110 +3443,20 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
         </div>
 
         {/* ─── Thanh Phân Trang Chuẩn Mẫu ─── */}
-        <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2 bg-white/82 backdrop-blur-[2px] border-t border-slate-200 text-xs text-slate-600 select-none shrink-0">
-          {/* Khối Trái: Chọn số dòng hiển thị */}
-          <div className="flex items-center gap-2">
-            <span className="text-[#677484] font-normal">Hiển thị</span>
-            <select
-              value={pageSize}
-              onChange={(e) => {
-                const newSize = Number(e.target.value);
-                setPageSize(newSize);
-                setCurrentPage(1);
-              }}
-              className="h-7 px-2 border border-slate-300 rounded bg-white text-xs font-medium text-slate-700 focus:outline-none focus:border-[#0070f4] cursor-pointer shadow-2xs"
-            >
-              <option value={10}>10 dòng</option>
-              <option value={15}>15 dòng</option>
-              <option value={20}>20 dòng</option>
-              <option value={30}>30 dòng</option>
-              <option value={50}>50 dòng</option>
-              <option value={100}>100 dòng</option>
-            </select>
-          </div>
-
-          {/* Khối Giữa: Điều hướng trang |<<  <  [ 1 ]  >  >>| */}
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
-              disabled={currentPage <= 1}
-              onClick={() => setCurrentPage(1)}
-              title="Trang đầu tiên"
-              className="w-7 h-7 flex items-center justify-center rounded border border-slate-200 bg-white text-slate-500 hover:text-[#0070f4] hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
-            >
-              <ChevronsLeft size={14} />
-            </button>
-            <button
-              type="button"
-              disabled={currentPage <= 1}
-              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-              title="Trang trước"
-              className="w-7 h-7 flex items-center justify-center rounded border border-slate-200 bg-white text-slate-500 hover:text-[#0070f4] hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
-            >
-              <ChevronLeft size={14} />
-            </button>
-            <input
-              type="number"
-              min={1}
-              max={totalPages}
-              value={pageInput}
-              onChange={(e) => setPageInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  const val = parseInt(pageInput, 10);
-                  if (!isNaN(val) && val >= 1 && val <= totalPages) {
-                    setCurrentPage(val);
-                  } else {
-                    setPageInput(String(currentPage));
-                  }
-                }
-              }}
-              onBlur={() => {
-                const val = parseInt(pageInput, 10);
-                if (!isNaN(val) && val >= 1 && val <= totalPages) {
-                  setCurrentPage(val);
-                } else {
-                  setPageInput(String(currentPage));
-                }
-              }}
-              className="w-10 h-7 border border-slate-300 rounded text-center text-xs font-bold text-slate-800 bg-white focus:outline-none focus:border-[#0070f4] focus:ring-1 focus:ring-[#0070f4] shadow-2xs [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-            />
-            <button
-              type="button"
-              disabled={currentPage >= totalPages}
-              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-              title="Trang tiếp theo"
-              className="w-7 h-7 flex items-center justify-center rounded border border-slate-200 bg-white text-slate-500 hover:text-[#0070f4] hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
-            >
-              <ChevronRight size={14} />
-            </button>
-            <button
-              type="button"
-              disabled={currentPage >= totalPages}
-              onClick={() => setCurrentPage(totalPages)}
-              title="Trang cuối cùng"
-              className="w-7 h-7 flex items-center justify-center rounded border border-slate-200 bg-white text-slate-500 hover:text-[#0070f4] hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
-            >
-              <ChevronsRight size={14} />
-            </button>
-          </div>
-
-          {/* Khối Phải: Thống kê số lượng hàng hóa và mã hàng */}
-          <div className="text-[#677484] text-xs flex items-center gap-1.5">
-            {totalItems > 0 ? (
-              <>
-                <span className="font-semibold text-[#15171a]">{startIndex + 1} - {endIndex}</span> trong{' '}
-                <span className="font-semibold text-[#15171a]">{totalItems.toLocaleString('vi-VN')}</span> hàng hóa{' '}
-                <span className="text-[#677484]">({totalSkuCount.toLocaleString('vi-VN')} mã hàng)</span>
-              </>
-            ) : (
-              <span>0 - 0 trong 0 hàng hóa (0 mã hàng)</span>
-            )}
-            {selectedItemIds.length > 0 && (
-              <span className="ml-1 text-[#0070f4] font-semibold">(Đã chọn {selectedItemIds.length})</span>
-            )}
-          </div>
-        </div>
+        <GoodsCatalogPagination
+          pageSize={pageSize}
+          setPageSize={setPageSize}
+          currentPage={currentPage}
+          setCurrentPage={setCurrentPage}
+          pageInput={pageInput}
+          setPageInput={setPageInput}
+          selectedItemIds={selectedItemIds}
+          totalItems={totalItems}
+          totalPages={totalPages}
+          startIndex={startIndex}
+          endIndex={endIndex}
+          totalSkuCount={totalSkuCount}
+        />
       </div>
     </div>
 
@@ -5118,279 +4214,24 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
       )}
 
       {/* 5b. MODAL XÁC NHẬN PHẠM VI ÁP DỤNG GIÁ VỐN (PHIÊN BẢN MỚI RỘNG RÃI & CHUYÊN NGHIỆP) */}
-      {costConfirmModalOpen && (() => {
-        const allFacilitiesList = permittedFacilities.length > 0
-          ? permittedFacilities
-          : (facilities.length > 0
-            ? facilities
-            : [
-                { code: 'K001', name: 'Kho Tổng Gia Lâm', address: 'Số 18 Đường Dệt May, Gia Lâm' },
-                { code: 'K002', name: 'Kho Đông Anh', address: 'CCN Nguyên Khê, Đông Anh' },
-                { code: 'K003', name: 'Kho Ninh Bình', address: 'KCN Gián Khẩu, Ninh Bình' },
-              ]);
-
-        const filteredFacilities = allFacilitiesList.filter(
-          (fac) =>
-            fac.name.toLowerCase().includes(costBranchSearch.toLowerCase()) ||
-            (fac.code && fac.code.toLowerCase().includes(costBranchSearch.toLowerCase()))
-        );
-
-        return (
-          <div className="fixed inset-0 z-70 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 sm:p-6 animate-in fade-in overflow-y-auto">
-            <div className="bg-white rounded-3xl shadow-2xl border border-slate-200/90 w-full max-w-2xl flex flex-col my-auto animate-in zoom-in-95 duration-150">
-              {/* Header Modal */}
-              <div className="flex items-center justify-between px-6 py-5 border-b border-slate-100 bg-linear-to-r from-blue-50/50 via-white to-slate-50/50 rounded-t-3xl">
-                <div className="flex items-center gap-3.5">
-                  <div className="w-11 h-11 rounded-2xl bg-blue-100/70 text-blue-600 flex items-center justify-center shrink-0 border border-blue-200/70 shadow-2xs">
-                    <Building size={22} />
-                  </div>
-                  <div>
-                    <h3 className="text-base font-bold text-slate-900">
-                      Xác nhận áp dụng Giá vốn
-                    </h3>
-                    <p className="text-xs text-slate-500 mt-0.5">
-                      Bạn muốn áp dụng giá vốn cho sản phẩm này trên phạm vi nào?
-                    </p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setCostConfirmModalOpen(false)}
-                  className="text-slate-400 hover:text-slate-600 transition p-2 rounded-xl hover:bg-slate-100 cursor-pointer"
-                >
-                  <X size={18} />
-                </button>
-              </div>
-
-              {/* Body Modal */}
-              <div className="p-6 space-y-5 flex-1 overflow-y-auto max-h-[70vh]">
-                {/* 2 Thẻ tùy chọn lớn: Toàn hệ thống vs Tùy chọn chi nhánh */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                  {/* Thẻ 1: Toàn hệ thống */}
-                  <div
-                    onClick={() => setCostScope('ALL')}
-                    className={`p-4.5 rounded-2xl border-2 cursor-pointer transition flex flex-col justify-between gap-3 select-none ${
-                      costScope === 'ALL'
-                        ? 'border-blue-600 bg-blue-50/60 ring-4 ring-blue-500/10 shadow-sm'
-                        : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/70'
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 transition ${
-                        costScope === 'ALL' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'
-                      }`}>
-                        <Globe size={18} />
-                      </div>
-                      <input
-                        type="radio"
-                        name="costScopeRadio"
-                        checked={costScope === 'ALL'}
-                        onChange={() => setCostScope('ALL')}
-                        className="w-4 h-4 text-blue-600 border-slate-300 focus:ring-blue-500 cursor-pointer mt-1"
-                      />
-                    </div>
-                    <div>
-                      <div className="font-bold text-slate-900 text-sm">Toàn hệ thống</div>
-                      <div className="text-xs text-slate-500 mt-1 leading-relaxed">
-                        Áp dụng mức giá vốn đồng bộ cho toàn bộ tất cả chi nhánh kho trong hệ thống
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Thẻ 2: Tùy chọn chi nhánh kho */}
-                  <div
-                    onClick={() => {
-                      setCostScope('BRANCH');
-                      if (costSelectedBranches.length === 0) {
-                        setCostSelectedBranches([formWarehouse || warehouseFilter || 'Kho Tổng Gia Lâm']);
-                      }
-                    }}
-                    className={`p-4.5 rounded-2xl border-2 cursor-pointer transition flex flex-col justify-between gap-3 select-none ${
-                      costScope === 'BRANCH'
-                        ? 'border-blue-600 bg-blue-50/60 ring-4 ring-blue-500/10 shadow-sm'
-                        : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/70'
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 transition ${
-                        costScope === 'BRANCH' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'
-                      }`}>
-                        <Warehouse size={18} />
-                      </div>
-                      <input
-                        type="radio"
-                        name="costScopeRadio"
-                        checked={costScope === 'BRANCH'}
-                        onChange={() => {
-                          setCostScope('BRANCH');
-                          if (costSelectedBranches.length === 0) {
-                            setCostSelectedBranches([formWarehouse || warehouseFilter || 'Kho Tổng Gia Lâm']);
-                          }
-                        }}
-                        className="w-4 h-4 text-blue-600 border-slate-300 focus:ring-blue-500 cursor-pointer mt-1"
-                      />
-                    </div>
-                    <div>
-                      <div className="font-bold text-slate-900 text-sm">Theo chi nhánh kho</div>
-                      <div className="text-xs text-slate-500 mt-1 leading-relaxed">
-                        Chọn một hoặc nhiều kho riêng biệt để cập nhật giá vốn, các kho khác giữ nguyên
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Danh sách chọn kho khi chọn Chi nhánh: Rộng rãi, hiển thị dạng Grid 2 cột */}
-                {costScope === 'BRANCH' && (
-                  <div className="border border-slate-200 rounded-2xl p-4.5 bg-slate-50/60 space-y-3.5 animate-in fade-in slide-in-from-top-2 duration-150">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-2.5 border-b border-slate-200/80">
-                      {/* Ô tìm kiếm kho */}
-                      <div className="relative flex-1 max-w-xs">
-                        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                        <input
-                          type="text"
-                          value={costBranchSearch}
-                          onChange={(e) => setCostBranchSearch(e.target.value)}
-                          placeholder="Tìm nhanh kho / chi nhánh..."
-                          className="w-full h-8.5 pl-8 pr-7 rounded-lg border border-slate-200 bg-white text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition"
-                        />
-                        {costBranchSearch && (
-                          <button
-                            type="button"
-                            onClick={() => setCostBranchSearch('')}
-                            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
-                          >
-                            <X size={12} />
-                          </button>
-                        )}
-                      </div>
-
-                      {/* Toolbar Thao tác nhanh */}
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-slate-700 bg-white border border-slate-200 px-2.5 py-1 rounded-lg text-xs shadow-2xs">
-                          Đã chọn: <b className="text-blue-600 font-bold">{costSelectedBranches.length}</b>/{allFacilitiesList.length} kho
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => setCostSelectedBranches(allFacilitiesList.map((f) => f.name))}
-                          className="px-2.5 py-1 text-xs font-bold text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition cursor-pointer"
-                        >
-                          Chọn tất cả
-                        </button>
-                        <span className="text-slate-300">|</span>
-                        <button
-                          type="button"
-                          onClick={() => setCostSelectedBranches([])}
-                          className="px-2 py-1 text-xs font-medium text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition cursor-pointer"
-                        >
-                          Bỏ chọn
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Lưới các kho: 2 CỘT RỘNG RÃI */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-60 overflow-y-auto pr-1">
-                      {filteredFacilities.map((fac) => {
-                        const isChecked = costSelectedBranches.some(
-                          (b) => b.trim().toLowerCase() === fac.name.trim().toLowerCase()
-                        );
-                        return (
-                          <div
-                            key={fac.code || fac.name}
-                            onClick={() => {
-                              if (isChecked) {
-                                setCostSelectedBranches(
-                                  costSelectedBranches.filter(
-                                    (b) => b.trim().toLowerCase() !== fac.name.trim().toLowerCase()
-                                  )
-                                );
-                              } else {
-                                setCostSelectedBranches([...costSelectedBranches, fac.name]);
-                              }
-                            }}
-                            className={`p-3 rounded-xl border-2 transition cursor-pointer flex items-center justify-between gap-3 select-none ${
-                              isChecked
-                                ? 'border-blue-500 bg-white ring-2 ring-blue-500/15 shadow-xs'
-                                : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/70'
-                            }`}
-                          >
-                            <div className="flex items-center gap-3 min-w-0">
-                              <div
-                                className={`w-5 h-5 rounded-md border flex items-center justify-center shrink-0 transition ${
-                                  isChecked
-                                    ? 'bg-blue-600 border-blue-600 text-white'
-                                    : 'border-slate-300 bg-white'
-                                }`}
-                              >
-                                {isChecked && <Check size={13} strokeWidth={3} />}
-                              </div>
-                              <div className="min-w-0">
-                                <div className={`text-xs truncate ${isChecked ? 'font-bold text-slate-900' : 'font-medium text-slate-700'}`}>
-                                  {fac.name}
-                                </div>
-                                <div className="text-[10px] text-slate-400 font-mono mt-0.5 truncate">
-                                  {fac.code || 'KHO'} {fac.address ? `• ${fac.address}` : ''}
-                                </div>
-                              </div>
-                            </div>
-
-                            {isChecked && (
-                              <span className="shrink-0 text-[10px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200">
-                                Đã chọn
-                              </span>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-
-                    {filteredFacilities.length === 0 && (
-                      <div className="text-center py-6 text-slate-400 text-xs italic">
-                        Không tìm thấy chi nhánh kho phù hợp với từ khóa &ldquo;{costBranchSearch}&rdquo;
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* Footer Buttons */}
-              <div className="flex items-center justify-between px-6 py-4 bg-slate-50/90 border-t border-slate-100 rounded-b-3xl">
-                <div className="text-xs text-slate-500">
-                  {costScope === 'ALL' ? (
-                    <span>Phạm vi: <b className="text-slate-800">Toàn bộ chi nhánh trong hệ thống</b></span>
-                  ) : (
-                    <span>Phạm vi: <b className="text-blue-600">{costSelectedBranches.length} chi nhánh đã chọn</b></span>
-                  )}
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setCostConfirmModalOpen(false)}
-                    className="px-5 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-100 transition cursor-pointer shadow-2xs"
-                  >
-                    Bỏ qua
-                  </button>
-                  <button
-                    type="button"
-                    disabled={isSaving}
-                    onClick={() => {
-                      if (costScope === 'BRANCH' && costSelectedBranches.length === 0) {
-                        alert('Vui lòng chọn ít nhất 1 chi nhánh kho để áp dụng giá vốn!');
-                        return;
-                      }
-                      executeSaveItem(costScope, costSelectedBranches, pendingKeepOpen);
-                    }}
-                    className="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-xs font-bold text-white transition cursor-pointer shadow-md shadow-blue-500/20 disabled:opacity-50 flex items-center gap-2"
-                  >
-                    {isSaving && <RefreshCw size={14} className="animate-spin" />}
-                    <span>Đồng ý & Áp dụng</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
+      {costConfirmModalOpen && (
+        <CostScopeConfirmModal
+          warehouseFilter={warehouseFilter}
+          facilities={facilities}
+          setCostConfirmModalOpen={setCostConfirmModalOpen}
+          costScope={costScope}
+          setCostScope={setCostScope}
+          costSelectedBranches={costSelectedBranches}
+          setCostSelectedBranches={setCostSelectedBranches}
+          pendingKeepOpen={pendingKeepOpen}
+          costBranchSearch={costBranchSearch}
+          setCostBranchSearch={setCostBranchSearch}
+          formWarehouse={formWarehouse}
+          isSaving={isSaving}
+          permittedFacilities={permittedFacilities}
+          executeSaveItem={executeSaveItem}
+        />
+      )}
 
       {/* 6. MODAL 2: THIẾT LẬP ĐƠN VỊ TÍNH VÀ THUỘC TÍNH (CHÍNH XÁC THEO ẢNH 2, 3, 4 - HỖ TRỢ TỰ NHẬP TỰ DO) */}
       {configModalOpen && (
@@ -5840,219 +4681,40 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
 
       {/* QUICK MODAL: TẠO MỚI NHÓM HÀNG CHUẨN KIOTVIET (ẢNH 2) */}
       {isQuickCategoryModalOpen && (
-        <div className="fixed inset-0 z-[1000] bg-black/40 backdrop-blur-[2px] flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-            <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-200 bg-slate-50/60">
-              <div className="flex items-center gap-2">
-                <Tag size={16} className="text-blue-600" />
-                <h3 className="text-sm font-bold text-slate-800">Tạo mới nhóm hàng</h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsQuickCategoryModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600 p-1 rounded-md transition cursor-pointer"
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveQuickCategory} className="p-5 space-y-4 text-xs">
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1.5">
-                  Tên nhóm hàng <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  autoFocus
-                  value={newCategoryName}
-                  onChange={(e) => setNewCategoryName(e.target.value)}
-                  placeholder="VD: Phào chỉ trang trí, Tấm PVC cao cấp, Sữa..."
-                  required
-                  className="w-full h-9 px-3 rounded-lg border border-slate-300 text-xs text-slate-800 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 font-medium"
-                />
-              </div>
-
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1.5">
-                  Nhóm cha (Tùy chọn)
-                </label>
-                <select
-                  value={newCategoryParent}
-                  onChange={(e) => setNewCategoryParent(e.target.value)}
-                  className="w-full h-9 px-3 rounded-lg border border-slate-300 text-xs text-slate-800 focus:outline-none focus:border-blue-500 font-medium bg-white"
-                >
-                  <option value="">-- Là nhóm gốc (Không có nhóm cha) --</option>
-                  {categoriesList.map((c, i) => (
-                    <option key={i} value={c}>{c}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1.5">
-                  Ghi chú / Mô tả
-                </label>
-                <textarea
-                  rows={2}
-                  value={newCategoryDesc}
-                  onChange={(e) => setNewCategoryDesc(e.target.value)}
-                  placeholder="Mô tả tóm tắt về nhóm hàng này..."
-                  className="w-full p-2.5 rounded-lg border border-slate-300 text-xs text-slate-800 focus:outline-none focus:border-blue-500 font-normal resize-none"
-                />
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setIsQuickCategoryModalOpen(false)}
-                  className="h-9 px-4 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 font-medium transition cursor-pointer"
-                >
-                  Bỏ qua
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSavingCategory}
-                  className="h-9 px-4 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium shadow-sm transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                >
-                  {isSavingCategory ? (
-                    <>
-                      <RefreshCw size={13} className="animate-spin" />
-                      <span>Đang lưu...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Check size={13} />
-                      <span>Lưu nhóm hàng</span>
-                    </>
-                  )}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+        <QuickCreateCategoryModal
+          setIsQuickCategoryModalOpen={setIsQuickCategoryModalOpen}
+          newCategoryName={newCategoryName}
+          setNewCategoryName={setNewCategoryName}
+          newCategoryParent={newCategoryParent}
+          setNewCategoryParent={setNewCategoryParent}
+          newCategoryDesc={newCategoryDesc}
+          setNewCategoryDesc={setNewCategoryDesc}
+          isSavingCategory={isSavingCategory}
+          categoriesList={categoriesList}
+          handleSaveQuickCategory={handleSaveQuickCategory}
+        />
       )}
 
       {/* QUICK MODAL: TẠO MỚI VỊ TRÍ KHO (ẢNH 2) */}
       {isQuickLocationModalOpen && (
-        <div className="fixed inset-0 z-[1000] bg-black/40 backdrop-blur-[2px] flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-            <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-200 bg-slate-50/60">
-              <div className="flex items-center gap-2">
-                <MapPin size={16} className="text-blue-600" />
-                <h3 className="text-sm font-bold text-slate-800">Tạo mới vị trí</h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsQuickLocationModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600 p-1 rounded-md transition cursor-pointer"
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveQuickLocation} className="p-5 space-y-4 text-xs">
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1.5">
-                  Tên vị trí <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  autoFocus
-                  value={newLocationName}
-                  onChange={(e) => setNewLocationName(e.target.value)}
-                  placeholder="VD: Kệ A-01-T2, Khu Vực B, Dãy C..."
-                  required
-                  className="w-full h-9 px-3 rounded-lg border border-slate-300 text-xs text-slate-800 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 font-medium"
-                />
-              </div>
-
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1.5">
-                  Ghi chú / Mô tả vị trí
-                </label>
-                <textarea
-                  rows={2}
-                  value={newLocationDesc}
-                  onChange={(e) => setNewLocationDesc(e.target.value)}
-                  placeholder="Mô tả chi tiết về vị trí này..."
-                  className="w-full p-2.5 rounded-lg border border-slate-300 text-xs text-slate-800 focus:outline-none focus:border-blue-500 font-normal resize-none"
-                />
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setIsQuickLocationModalOpen(false)}
-                  className="h-9 px-4 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 font-medium transition cursor-pointer"
-                >
-                  Bỏ qua
-                </button>
-                <button
-                  type="submit"
-                  className="h-9 px-4 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium shadow-sm transition flex items-center gap-1.5 cursor-pointer"
-                >
-                  <Check size={13} />
-                  <span>Lưu vị trí</span>
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+        <QuickCreateLocationModal
+          setIsQuickLocationModalOpen={setIsQuickLocationModalOpen}
+          newLocationName={newLocationName}
+          setNewLocationName={setNewLocationName}
+          newLocationDesc={newLocationDesc}
+          setNewLocationDesc={setNewLocationDesc}
+          handleSaveQuickLocation={handleSaveQuickLocation}
+        />
       )}
 
       {/* QUICK MODAL: TẠO MỚI THƯƠNG HIỆU (ẢNH 2) */}
       {isQuickBrandModalOpen && (
-        <div className="fixed inset-0 z-[1000] bg-black/40 backdrop-blur-[2px] flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-            <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-200 bg-slate-50/60">
-              <div className="flex items-center gap-2">
-                <Sparkles size={16} className="text-blue-600" />
-                <h3 className="text-sm font-bold text-slate-800">Tạo mới thương hiệu</h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsQuickBrandModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600 p-1 rounded-md transition cursor-pointer"
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveQuickBrand} className="p-5 space-y-4 text-xs">
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1.5">
-                  Tên thương hiệu <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  autoFocus
-                  value={newBrandName}
-                  onChange={(e) => setNewBrandName(e.target.value)}
-                  placeholder="VD: Vinamilk, Ba Vì Milk, Tín Phát..."
-                  required
-                  className="w-full h-9 px-3 rounded-lg border border-slate-300 text-xs text-slate-800 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 font-medium"
-                />
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setIsQuickBrandModalOpen(false)}
-                  className="h-9 px-4 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 font-medium transition cursor-pointer"
-                >
-                  Bỏ qua
-                </button>
-                <button
-                  type="submit"
-                  className="h-9 px-4 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium shadow-sm transition flex items-center gap-1.5 cursor-pointer"
-                >
-                  <Check size={13} />
-                  <span>Lưu thương hiệu</span>
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+        <QuickCreateBrandModal
+          setIsQuickBrandModalOpen={setIsQuickBrandModalOpen}
+          newBrandName={newBrandName}
+          setNewBrandName={setNewBrandName}
+          handleSaveQuickBrand={handleSaveQuickBrand}
+        />
       )}
     </div>
   );

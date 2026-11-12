@@ -21,7 +21,7 @@ import {
   formatDateOnlyVN,
   parseISODate,
   toISODate,
-} from '@/features/transfers/utils/dateUtils';
+} from '@/lib/utils/date';
 
 export type StockCriteriaType =
   | 'all'

@@ -8,7 +8,7 @@ import React, { useMemo, useState } from 'react';
 import { message } from 'antd';
 import { Loader2, X } from 'lucide-react';
 import { NumberInput } from '@/components/inputs/NumberInput';
-import { formatDateTimeVN, toLocalDatetimeInputString } from '@/features/transfers/utils/dateUtils';
+import { formatDateTimeVN, toLocalDatetimeInputString } from '@/lib/utils/date';
 import { customerService } from '../services/customerService';
 import type { Customer, CustomerPaymentResult, CustomerRecentOrder } from '../types';
 

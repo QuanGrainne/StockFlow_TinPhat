@@ -23,8 +23,8 @@ import {
   X,
 } from 'lucide-react';
 import { useActiveWarehouse, type WarehouseItem } from '@/lib/warehouse/useActiveWarehouse';
-import { FormHeaderUserBar } from '@/components/FormHeaderUserBar';
-import { AddFromCategoryPopover } from '@/features/purchases/components/AddFromCategoryPopover';
+import { FormHeaderUserBar } from '@/components/layout/FormHeaderUserBar';
+import { AddFromCategoryPopover } from '@/features/purchases';
 import type { BackendProduct } from '@/features/products/services/productService';
 import { transferService } from '@/features/transfers/services/transferService';
 import { stocktakeService } from '@/features/stocktakes/services/stocktakeService';

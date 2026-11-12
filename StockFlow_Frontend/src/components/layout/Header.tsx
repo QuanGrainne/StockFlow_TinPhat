@@ -156,7 +156,7 @@ export const Header: React.FC<HeaderProps> = ({
           }
         }
       }
-    });
+    }).catch(() => undefined); // T18: getStaffList ném lỗi khi API lỗi; ở đây chỉ để lấy avatar nên bỏ qua.
 
     // Tải danh sách cơ sở kho thực tế từ DB/Cache
     adminService.getWarehouseFacilities().then((facs) => {

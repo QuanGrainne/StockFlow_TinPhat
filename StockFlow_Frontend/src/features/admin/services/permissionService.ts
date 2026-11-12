@@ -11,18 +11,14 @@ import {
   RoleDefinition,
   PermissionMatrixModule,
 } from '../types';
-import {
-  INITIAL_WAREHOUSE_FACILITIES,
-  INITIAL_ROLE_DEFINITIONS,
-  INITIAL_PERMISSION_MODULES,
-  INITIAL_STAFF_ACCOUNTS,
-} from '../data/mockData';
+// CÒN DỰ PHÒNG MOCK KHI API LỖI – chỉ dùng cho getPermissionMatrix (chưa có màn hình gọi).
+import { INITIAL_PERMISSION_MODULES } from '../data/mockData';
 
 const WAREHOUSE_STORAGE_KEY = 'stockflow_warehouses_cache';
 
-let staffAccounts = [...INITIAL_STAFF_ACCOUNTS];
-let warehouseFacilities = [...INITIAL_WAREHOUSE_FACILITIES];
-let roleDefinitions = [...INITIAL_ROLE_DEFINITIONS];
+// T18: kho và vai trò không còn khởi tạo từ dữ liệu giả; mảng chỉ giữ dữ liệu thật đã tải từ server.
+let warehouseFacilities: WarehouseFacility[] = [];
+let roleDefinitions: RoleDefinition[] = [];
 
 let permissionMatrices: Record<string, PermissionMatrixModule[]> = {
   ROLE_ADMIN: JSON.parse(JSON.stringify(INITIAL_PERMISSION_MODULES)),
@@ -88,7 +84,7 @@ export const permissionService = {
         return mapped;
       }
     } catch (err) {
-      console.warn('API getWarehouseFacilities failed, falling back to cache/mock:', err);
+      console.warn('API getWarehouseFacilities failed, falling back to cache:', err);
     }
 
     // Fallback: check localStorage cache
@@ -107,9 +103,11 @@ export const permissionService = {
       }
     }
 
+    // Không có cache: trả dữ liệu thật đã tải trong phiên này (rỗng nếu chưa tải được), không dùng kho giả.
     return [...warehouseFacilities];
   },
 
+  // CÒN DỰ PHÒNG KHI API LỖI (trả toàn bộ kho) – chưa có màn hình gọi.
   async getMyWarehouseFacilities(): Promise<WarehouseFacility[]> {
     try {
       const token = typeof window !== 'undefined' ? tabSession.get('stockflow_token') ?? undefined : undefined;
@@ -307,14 +305,7 @@ export const permissionService = {
       }
     }
 
-    const idx = staffAccounts.findIndex((s) => s.id === staffId);
-    if (idx !== -1) {
-      staffAccounts[idx] = {
-        ...staffAccounts[idx],
-        assignedWarehouses,
-      };
-      return staffAccounts[idx];
-    }
+    // Màn hình không dùng giá trị trả về (tải lại danh sách từ server); giữ kiểu StaffAccount.
     return {
       id: staffId,
       code: staffId,
@@ -332,15 +323,12 @@ export const permissionService = {
 
   // ─── 2. Roles & RBAC Matrix (Danh mục vai trò & Ma trận quyền) ───────────
   async getRoleDefinitions(): Promise<RoleDefinition[]> {
-    try {
-      const token = typeof window !== 'undefined' ? tabSession.get('stockflow_token') ?? undefined : undefined;
-      const data = await apiClient.get<RoleDefinition[]>('/api/Roles', token);
-      if (Array.isArray(data) && data.length > 0) {
-        roleDefinitions = data;
-        return data;
-      }
-    } catch (e) {
-      console.warn('API getRoleDefinitions failed, fallback to local data:', e);
+    // API lỗi thì ném lỗi (các màn gọi đều có try/catch), không trả vai trò giả.
+    const token = typeof window !== 'undefined' ? tabSession.get('stockflow_token') ?? undefined : undefined;
+    const data = await apiClient.get<RoleDefinition[]>('/api/Roles', token);
+    if (Array.isArray(data) && data.length > 0) {
+      roleDefinitions = data;
+      return data;
     }
     return [...roleDefinitions];
   },
@@ -384,6 +372,7 @@ export const permissionService = {
     }
   },
 
+  // CÒN DỰ PHÒNG MOCK KHI API LỖI – getPermissionMatrix / savePermissionMatrix / getAllowedModuleKeys chưa có màn hình gọi.
   async getPermissionMatrix(roleCode: string): Promise<PermissionMatrixModule[]> {
     try {
       const token = typeof window !== 'undefined' ? tabSession.get('stockflow_token') ?? undefined : undefined;

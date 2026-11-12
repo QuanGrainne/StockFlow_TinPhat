@@ -32,7 +32,7 @@ import {
   X,
 } from 'lucide-react';
 import { ProductThumb } from '@/components/ProductThumb';
-import { CustomerFormModal } from '@/features/customers/components/CustomerFormModal';
+import { CustomerFormModal } from '@/features/customers';
 import { customerService } from '@/features/customers/services/customerService';
 import type { CreateCustomerPayload } from '@/features/customers/types';
 import { orderSettingsService } from '@/features/settings/services/orderSettingsService';
