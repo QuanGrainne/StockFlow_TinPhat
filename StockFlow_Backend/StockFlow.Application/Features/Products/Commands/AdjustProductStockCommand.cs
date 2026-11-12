@@ -3,8 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using StockFlow.Application.Common;
 using StockFlow.Application.Common.Interfaces;
 using StockFlow.Application.Features.Products.DTOs;
-using StockFlow.Application.Features.Stocktakes.DTOs;
-using StockFlow.Application.Features.Stocktakes.Helpers;
+using StockFlow.Application.Features.Purchases.Helpers;
 using StockFlow.Domain.Entities;
 
 namespace StockFlow.Application.Features.Products.Commands;
@@ -13,13 +12,14 @@ namespace StockFlow.Application.Features.Products.Commands;
 /// Nhập thêm / cân chỉnh tồn kho của 1 hàng hóa tại 1 kho.
 /// - ADD: cộng thêm Quantity vào tồn hiện tại.
 /// - SET: đặt tồn thực tế của kho = Quantity (chênh lệch được ghi nhận).
-/// Mỗi lần thay đổi sinh 1 phiếu kiểm kho "Đã cân bằng kho" (thẻ kho STOCKTAKE_IN / STOCKTAKE_OUT), giá vốn giữ nguyên.
+/// Ghi thẻ kho (ADJUSTMENT_IN / ADJUSTMENT_OUT), giá vốn giữ nguyên theo giá vốn hiện tại của kho.
 /// </summary>
 public record AdjustProductStockCommand(int ProductId, AdjustProductStockRequest Request)
     : IRequest<Result<ProductStockAdjustmentDto>>;
 
 public class AdjustProductStockHandler : IRequestHandler<AdjustProductStockCommand, Result<ProductStockAdjustmentDto>>
 {
+    public const string ReferenceType = "STOCK_ADJUSTMENT";
 
     private readonly IStockFlowDbContext _context;
     private readonly ICurrentUserService _currentUser;
@@ -62,38 +62,37 @@ public class AdjustProductStockHandler : IRequestHandler<AdjustProductStockComma
         var unitCost = CurrentCost(balances, product);
         var delta = mode == "ADD" ? req.Quantity : req.Quantity - previousQty;
 
-        string? stocktakeCode = null;
         if (delta != 0)
         {
-            // Mọi thay đổi tồn kho từ Danh mục hàng hóa đều sinh 1 phiếu kiểm kho "Đã cân bằng kho" (giống KiotViet):
-            // thực tế = tồn mới, cân bằng ngay → ghi thẻ kho STOCKTAKE_IN / STOCKTAKE_OUT, giá vốn giữ nguyên.
+            var products = new Dictionary<int, MstProduct> { [product.ProductId] = product };
             var userId = _currentUser.UserId.Value;
-            var code = await StocktakeLogic.ResolveCodeAsync(_context, null, null, ct);
-            if (!code.IsSuccess)
-                return Result.Failure<ProductStockAdjustmentDto>(code.Error!);
+            var defaultKey = new PurchaseStockOps.StockKey(req.WarehouseId, product.ProductId, null, null);
 
-            var autoNote = $"Phiếu kiểm kho được tạo tự động khi cập nhật Hàng hóa {product.ProductCode}";
-            var stocktake = new TrxStocktake
+            if (delta > 0)
             {
-                StocktakeCode = code.Value,
-                WarehouseId = req.WarehouseId,
-                ConductedBy = userId,
-                StocktakeDate = VietnamTime.Now,
-                Status = StocktakeLogic.Draft,
-                Notes = string.IsNullOrWhiteSpace(req.Note) ? autoNote : $"{autoNote} | {req.Note.Trim()}",
-            };
+                var inRef = new PurchaseStockOps.StockRef("ADJUSTMENT_IN", ReferenceType, product.ProductId, userId);
+                await PurchaseStockOps.InboundAsync(_context, defaultKey, delta, unitCost, products, inRef, ct);
+            }
+            else
+            {
+                // Trừ lần lượt vào các dòng tồn còn hàng (vị trí / lô), phần còn lại vào dòng mặc định
+                var outRef = new PurchaseStockOps.StockRef("ADJUSTMENT_OUT", ReferenceType, product.ProductId, userId);
+                var remaining = -delta;
+                foreach (var b in balances.Where(b => (b.Quantity ?? 0) > 0).OrderByDescending(b => b.Quantity))
+                {
+                    if (remaining <= 0) break;
+                    var take = Math.Min(remaining, b.Quantity ?? 0);
+                    var key = new PurchaseStockOps.StockKey(b.WarehouseId, b.ProductId, b.LocationId, b.LotId);
+                    await PurchaseStockOps.OutboundAsync(_context, key, take, b.UnitCost ?? unitCost, products, outRef, ct);
+                    remaining -= take;
+                }
+                if (remaining > 0)
+                {
+                    await PurchaseStockOps.OutboundAsync(_context, defaultKey, remaining, unitCost, products, outRef, ct);
+                }
+            }
 
-            await using var transaction = await _context.BeginTransactionAsync(ct);
-            _context.TrxStocktakes.Add(stocktake);
-            var items = await StocktakeLogic.ReplaceItemsAsync(_context, stocktake,
-                new[] { new StocktakeItemRequest { ProductId = product.ProductId, ActualQty = previousQty + delta } }, userId, ct);
-            if (!items.IsSuccess)
-                return Result.Failure<ProductStockAdjustmentDto>(items.Error!);
             await _context.SaveChangesAsync(ct);
-            await StocktakeLogic.BalanceAsync(_context, stocktake, userId, ct);
-            await _context.SaveChangesAsync(ct);
-            if (transaction != null) await transaction.CommitAsync(ct);
-            stocktakeCode = stocktake.StocktakeCode;
         }
 
         return Result.Success(new ProductStockAdjustmentDto(
@@ -104,8 +103,7 @@ public class AdjustProductStockHandler : IRequestHandler<AdjustProductStockComma
             PreviousQuantity: previousQty,
             NewQuantity: previousQty + delta,
             Delta: delta,
-            UnitCost: unitCost,
-            StocktakeCode: stocktakeCode));
+            UnitCost: unitCost));
     }
 
     /// <summary>Giá vốn hiện tại của kho: bình quân theo SL các dòng còn hàng, nếu không có thì giá vốn chung của hàng hóa.</summary>

@@ -3,8 +3,6 @@ using Microsoft.EntityFrameworkCore;
 using StockFlow.Application.Common;
 using StockFlow.Application.Common.Interfaces;
 using StockFlow.Application.Features.Products.DTOs;
-using StockFlow.Application.Features.SalesBookings.Common;
-using StockFlow.Application.Features.Products.Helpers;
 
 namespace StockFlow.Application.Features.Products.Queries;
 
@@ -88,12 +86,6 @@ public class GetProductsQueryHandler : IRequestHandler<GetProductsQuery, Result<
             authorizedWarehouseIds = await _currentUserService.GetAuthorizedWarehouseIdsAsync(cancellationToken);
         }
 
-        var supplierMap = await ProductSupplierLookup.GetSupplierNamesAsync(
-            _context, products.Select(p => p.ProductId).ToList(), cancellationToken);
-
-        // Khách đặt theo kho (đơn đặt hàng còn mở, chưa giao)
-        var reservedMap = await SalesBookingOps.ReservedByWarehouseAsync(_context, products.Select(p => p.ProductId).ToList(), cancellationToken);
-
         var result = products.Select(p =>
         {
             decimal stockQty;
@@ -118,8 +110,19 @@ public class GetProductsQueryHandler : IRequestHandler<GetProductsQuery, Result<
             var costPrice = p.MovingAverageCost ?? 0;
             var standardPrice = p.StandardPrice ?? (costPrice > 0 ? Math.Round(costPrice * 1.35m, 0) : 0);
 
-            // Nhà cung cấp: tính từ các phiếu nhập đã hoàn thành (chỉ đọc)
-            var supplier = supplierMap.GetValueOrDefault(p.ProductId);
+            string? supplier = null;
+            if (!string.IsNullOrEmpty(p.VariantsJson) && p.VariantsJson.Contains("supplier", StringComparison.OrdinalIgnoreCase))
+            {
+                try
+                {
+                    using var doc = System.Text.Json.JsonDocument.Parse(p.VariantsJson);
+                    if (doc.RootElement.TryGetProperty("supplier", out var supEl))
+                    {
+                        supplier = supEl.GetString();
+                    }
+                }
+                catch {}
+            }
 
             var warehouseStocks = p.TrxInventoryBalances
                 .GroupBy(b => b.WarehouseId)
@@ -131,8 +134,7 @@ public class GetProductsQueryHandler : IRequestHandler<GetProductsQuery, Result<
                         WarehouseCode: first.Warehouse?.WarehouseCode ?? $"WH-{g.Key}",
                         WarehouseName: first.Warehouse?.WarehouseName ?? $"Kho #{g.Key}",
                         Quantity: g.Sum(x => x.Quantity ?? 0),
-                        UnitCost: g.Average(x => x.UnitCost ?? costPrice),
-                        ReservedQuantity: reservedMap.GetValueOrDefault((g.Key, p.ProductId))
+                        UnitCost: g.Average(x => x.UnitCost ?? costPrice)
                     );
                 }).ToList();
 

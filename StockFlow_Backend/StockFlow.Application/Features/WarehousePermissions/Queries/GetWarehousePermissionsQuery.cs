@@ -54,14 +54,13 @@ public class GetWarehousePermissionsQueryHandler
             var primaryRole = u.JncUserRoles.FirstOrDefault()?.Role?.RoleName ?? "WarehouseStaff";
             var (roleCode, roleTitle, defaultDept) = roleMap.GetValueOrDefault(primaryRole, ("WAREHOUSE", "Nhân viên", "Kho vận & Logistics"));
 
-            // Chỉ hiển thị kho đang hoạt động: bỏ các dòng phân quyền trỏ tới kho đã ngừng (VD KTP-01, KNVL-01)
             var assignedWarehouseCodes = u.JncUserWarehouseAccesses
-                .Where(w => w.Warehouse?.WarehouseCode != null && w.Warehouse.IsActive != false)
+                .Where(w => w.Warehouse?.WarehouseCode != null)
                 .Select(w => w.Warehouse!.WarehouseCode!)
                 .ToList();
 
             var assignedDetails = u.JncUserWarehouseAccesses
-                .Where(w => w.Warehouse != null && w.Warehouse.IsActive != false)
+                .Where(w => w.Warehouse != null)
                 .Select(w => new WarehouseSimpleDto(
                     WarehouseId: w.Warehouse.WarehouseId,
                     Code: w.Warehouse.WarehouseCode ?? "",

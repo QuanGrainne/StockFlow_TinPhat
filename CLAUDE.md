@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 StockFlow (OIMS) is an order and inventory management system for Công ty TNHH Tín Phát (capstone SEP490-G82). The backend is ASP.NET Core 9 and the frontend is Next.js. They talk only over HTTP. All UI text and most code comments are in Vietnamese.
 
-**Required reading before feature work:** [AI_CODING_RULES.md](AI_CODING_RULES.md) (mandatory architecture and UI rules; `.cursorrules` points to it) and the business specs in `docs/Report1.docx` (scope FE-01..FE-09) and Report 3 (SRS: use cases UC-xx, screen specs, business rules BR-xx). The current Report 3 is the team's Google Doc; the old `docs/Report3.docx` has been removed. Python is not installed. To read a `.docx`, extract `word/document.xml` with PowerShell `System.IO.Compression.ZipFile` into the scratchpad.
+**Required reading before feature work:** [AI_CODING_RULES.md](AI_CODING_RULES.md) (mandatory architecture and UI rules; `.cursorrules` points to it) and the business specs in `docs/Report1.docx` (scope FE-01..FE-09) and `docs/Report3.docx` (SRS: use cases UC-xx, screen specs, business rules BR-01..BR-56). Python is not installed. To read a `.docx`, extract `word/document.xml` with PowerShell `System.IO.Compression.ZipFile` into the scratchpad.
 
 ## Commands
 
@@ -31,7 +31,7 @@ There is no automated test project in either backend or frontend. Verify changes
 
 ## Version note
 
-The project uses **Next.js 16**, React 19.3, **antd 6**, and Tailwind 4 (via `@tailwindcss/turbopack`, with `cacheComponents` enabled in `next.config.ts`). Per `StockFlow_Frontend/AGENTS.md`, this Next.js has breaking changes. Read the guides in `node_modules/next/dist/docs/` before using Next APIs. Backend NuGet packages must stay on 9.x (the machine may have a .NET 10 SDK that pulls 10.x packages). Do not upgrade dependencies without team approval.
+Docs say "Next.js 15", but `package.json` actually pins **Next.js 16**, React 19.3, **antd 6**, and Tailwind 4 (via `@tailwindcss/turbopack`, with `cacheComponents` enabled in `next.config.ts`). Per `StockFlow_Frontend/AGENTS.md`, this Next.js has breaking changes. Read the guides in `node_modules/next/dist/docs/` before using Next APIs. Backend NuGet packages must stay on 9.x (the machine may have a .NET 10 SDK that pulls 10.x packages). Do not upgrade dependencies without team approval.
 
 ## Backend architecture
 
@@ -46,14 +46,13 @@ Clean Architecture with four projects. Dependency direction: API → Application
 - **Application/Features/<Module>/** holds `Commands/`, `Queries/`, `DTOs/`, and sometimes `Helpers/`. A command or query `record` and its `IRequestHandler` live in the same file.
   - Handlers return `Result<T>` (`Application/Common/Result.cs`).
   - FluentValidation validators run automatically via `ValidationBehavior`.
-- **Data access pattern:** handlers inject `IStockFlowDbContext` (`Application/Common/Interfaces`) and use EF Core directly.
+- **Data access pattern:** handlers inject `IStockFlowDbContext` (`Application/Common/Interfaces`) and use EF directly. The generic `IRepository<T>`/`IUnitOfWork` exist but are effectively unused.
   - A new entity must be added in three places: as a `DbSet` on `IStockFlowDbContext`, on `StockFlowDbContext`, and in a migration.
 - **StockFlowDbContext** (Infrastructure/Persistence) is a large scaffold-style file. All tables are in schema `stockflow`. Column mapping is snake_case via explicit `HasColumnName` in `OnModelCreating`. Follow that pattern for new columns.
 - **Document codes** come from Postgres sequences (`GetNextSequenceValueAsync("stockflow.seq_...")`). They are formatted by `ITransactionCodeGenerator` or per-module helpers, using prefixes and rules (SEQUENTIAL/DATETIME/RANDOM) from the `MstOrderSetting` row with id 1.
 - **Inventory model:**
   - Stock on hand lives in `TrxInventoryBalances`, keyed by warehouse, location, product, and lot.
   - Every stock movement must also append a `TrxInventoryTransactions` row (type, reference_type/reference_id, created_by).
-  - Use the shared ledger for both: `IInventoryLedger` (`Application/Common/Interfaces`, implemented by `Application/Common/Inventory/InventoryLedger.cs`, moving-average cost). New handlers inject it; older code calls it through `PurchaseStockOps` / `TransferStockOps`.
 - **Timestamps** are `timestamp without time zone`, with `Npgsql.EnableLegacyTimestampBehavior` on. Modules store Vietnam local time (see `TransferHelper.GetVietnamTime`).
 - **Controllers** are thin: build a command or query, call `_mediator.Send`, then map `IsSuccess` to `Ok` or `BadRequest(new { message })`.
 - **Authorization** (`StockFlow.API/Authorization/RequirePermissionAttribute.cs`):
@@ -68,14 +67,9 @@ Clean Architecture with four projects. Dependency direction: API → Application
 
 ## Frontend architecture
 
-- Pages use a "shell + screen switch" pattern: `page.tsx` → `LazyAppLayout` → `AppLayout` → `src/features/<module>/screens/<Module>Screen.tsx`.
-  - A list page (`src/app/(dashboard)/<route>/page.tsx`) is `'use client'` and only renders `<LazyAppLayout initialScreen="..." />` (`src/components/layout/LazyAppLayout.tsx`, `next/dynamic` with `ssr: false`). Do not re-declare `next/dynamic` for AppLayout in a page.
-  - `AppLayout` renders Header + Sidebar, checks feature permissions, and picks the screen with `switch (activeScreen)`.
-  - `orders/[id]` also uses `LazyAppLayout` but passes `OrderDetailScreen` as `children` (AppLayout renders children instead of the switch).
-  - Create pages (`*/create`) and `pos` load their own screen via `next/dynamic`, without AppLayout. `transfers/create` is a server component (it exports `metadata`), so it does not use `ssr: false`.
-- Feature code lives in `src/features/<module>/{components,screens,services,types,utils}`.
-- Feature-specific sidebars and modals live in `src/features/<module>/components/`. Shared components live in `src/components/`. The shell lives in `src/components/layout/` (`AppLayout`, `LazyAppLayout`, `Header`, `Sidebar`, `FeatureGuard`). Menu items and screen↔path mapping are `NAV_GROUPS` / `SCREEN_PATH_MAP` in `src/lib/navigation/navbar.ts`; the stored role is in `src/lib/navigation/currentRole.ts`.
-- Admin screens (staff, roles, permission matrix, warehouse access) are in `src/features/admin/`; the goods catalog screen is `src/features/products/screens/GoodsCatalogScreen.tsx`. `src/features/admin/data/mockData.ts` is fake fallback data used only by `staffService` / `permissionService`.
+- Each route is `src/app/(dashboard)/<module>/page.tsx`. It lazy-loads `<Module>Client.tsx` via `next/dynamic` with `ssr: false`.
+- Feature code lives in `src/features/<module>/{components,services,types,utils}`.
+- Shared sidebars and modals live in `src/components/`. Top navigation is the `NAV_ITEMS` array in `src/components/Navbar.tsx`.
 - `src/lib/api/client.ts` is the only HTTP client. It reads the JWT from `localStorage` (`stockflow_token`).
   - Under `npm run dev` it **auto-logs in as `admin` / `TinPhat@2026`** only if this browser has never logged in. Disable with `NEXT_PUBLIC_DEV_AUTO_LOGIN=false`.
   - A 401 on an existing session clears the session and redirects to `/login`.
@@ -83,7 +77,7 @@ Clean Architecture with four projects. Dependency direction: API → Application
   - Default passwords differ by source: `TinPhat@2026` is used by the seeder and staff-creation code paths, and `database/seed.sql` uses `StockFlow@123`.
 - `src/lib/warehouse/useActiveWarehouse.ts` holds the globally selected warehouse, KiotViet "branch" style, stored in localStorage.
   - Active warehouses are hard-coded there as ids 3–6 (K001 Gia Lâm, K002 Đông Anh, K003 Hà Đông, K004 Hoàn Kiếm). They match `DatabaseSeeder`, where ids 1–2 are inactive.
-- UI must match the Goods Catalog module (`GoodsCatalogScreen.tsx`, `ProductFilterSidebar.tsx`). [AI_CODING_RULES.md](AI_CODING_RULES.md) §5 is the spec:
+- UI must match the Products module (`products/ProductsClient.tsx`, `ProductFilterSidebar.tsx`, `CreateProductModal.tsx`). [AI_CODING_RULES.md](AI_CODING_RULES.md) §5 is the spec:
   - Colors: brand `#0071BA`, table header `#e8f2ff`.
   - Use antd `Table`/`Button`/`Pagination`/`Tag`, plus a per-module `.stockflow-<module>-table` CSS block in `globals.css`.
   - Modals are custom-built; do not use antd `Modal`.
@@ -93,7 +87,7 @@ Clean Architecture with four projects. Dependency direction: API → Application
 ## Database files
 
 - `database/stockflow.sql` is the full ERD as SQL and `database/@startuml StockFlow_Full_ERD.txt` is the PlantUML source. Use them for reference only. The live schema is owned by EF migrations; never hand-edit the schema.
-- `database/seed.sql` and `database/seed_pos_products.sql` are ad-hoc data scripts. Order settings (`mst_order_settings`) and `trx_orders.order_type` are created by EF migrations.
+- `database/seed.sql`, `seed_pos_products.sql`, and `create_order_settings.sql` are ad-hoc data scripts.
 - Roles: Admin, Manager, SalesStaff, WarehouseStaff, ProductionStaff.
 
 ## Domain notes
@@ -109,8 +103,13 @@ Clean Architecture with four projects. Dependency direction: API → Application
 
 Feature branches are named `feature/<module>` (e.g. `feature/chuyen-hang`) and merge into `dev`, then `main` via PR. Commit messages are short and often Vietnamese (`feat: ...`, `Suppliers: ...`).
 
-## Structure standard
+## graphify
 
-The team's structure rules live in `.claude/rules/` and override older wording elsewhere:
-- `00-principles.md` (scope, ask when unsure, self-check block), `10-backend-structure.md`, `20-frontend-structure.md`, `30-definition-of-done.md`, `40-refactor-safety.md`, `50-ai-usage-log.md`.
-- Refactor progress is tracked in `docs/refactor/CHECKLIST.md`; every AI-assisted task adds a row to `docs/ai-log/AI_LOG.md`.
+This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.
+
+Rules:
+- When graphify-out/graph.json exists, run `graphify query "<question>"` before your first grep, search or source-file read for a codebase question, and put this rule in every subagent prompt that explores code. Read raw files only for lines the graph or an earlier read already located. Use `graphify path "<A>" "<B>"` for relationships and `graphify explain "<concept>"` for focused concepts. These return a scoped subgraph, usually much smaller than GRAPH_REPORT.md or raw grep output.
+- If graphify-out/wiki/index.md exists, use it for broad navigation instead of raw source browsing.
+- Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain do not surface enough context.
+- After modifying code, run `graphify update .` to keep the graph current (AST-only, no API cost).
+- A committed graphify-out/graph.json is rewritten whole on every build, so a large diff to it in a pull request is expected. Do not flag it as churn or suggest skipping the graph rebuild or its hooks.

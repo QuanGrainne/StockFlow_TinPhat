@@ -1,10 +1,9 @@
 // src/features/transfers/components/TransferFilterSidebar.tsx
 // Sidebar bộ lọc chuẩn giao diện KiotViet cho Màn hình 1 (Danh sách chuyển hàng)
 
-import { clampPopoverLeft, DATE_POPOVER_WIDTH, PRESET_POPOVER_WIDTH } from '@/lib/ui/popover';
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { WarehouseFacility } from '@/features/admin/types';
+import { WarehouseFacility } from '@/features/roles/types';
 import { TransferFilterState, TransferStatus } from '../types';
 import { ChevronDown, Calendar, X, ChevronRight, ChevronLeft, Check } from 'lucide-react';
 import { useActiveWarehouse } from '@/lib/warehouse/useActiveWarehouse';
@@ -242,7 +241,7 @@ export const TransferFilterSidebar: React.FC<Props> = ({
       const arrowTop = Math.max(16, rect.top - top + rect.height / 2 - 8);
       setPresetCoords({
         top,
-        left: clampPopoverLeft(rect.right + 10, PRESET_POPOVER_WIDTH),
+        left: rect.right + 10,
         arrowTop,
       });
     }
@@ -280,7 +279,7 @@ export const TransferFilterSidebar: React.FC<Props> = ({
       const arrowTop = Math.max(16, rect.top - top + rect.height / 2 - 8);
       setCustomCoords({
         top,
-        left: clampPopoverLeft(rect.right + 10, DATE_POPOVER_WIDTH),
+        left: rect.right + 10,
         arrowTop,
       });
     }
@@ -428,7 +427,7 @@ export const TransferFilterSidebar: React.FC<Props> = ({
     <aside
       className={`relative ${
         isCollapsed ? 'w-0 border-r-0' : 'w-60 border-r border-slate-200'
-      } h-full min-h-0 bg-white/75 backdrop-blur-[2px] flex flex-col shrink-0 transition-all duration-200 text-[13px] text-[#15171a] select-none font-sans`}
+      } h-full min-h-0 bg-white flex flex-col shrink-0 transition-all duration-200 text-[13px] text-[#15171a] select-none font-sans`}
     >
       {/* Nút thu gọn / mở rộng bộ lọc theo chuẩn giao diện Ảnh 3 */}
       <button
@@ -819,7 +818,7 @@ export const TransferFilterSidebar: React.FC<Props> = ({
               left: customCoords.left,
               zIndex: 9999,
             }}
-            className="bg-white rounded-[8px] shadow-[rgba(169,180,203,0.32)_0px_8px_20px_0px] border border-slate-200 p-4 select-none animate-in fade-in zoom-in-95 duration-100 w-[580px] max-w-[calc(100vw-16px)] max-h-[calc(100vh-16px)] overflow-auto"
+            className="bg-white rounded-[8px] shadow-[rgba(169,180,203,0.32)_0px_8px_20px_0px] border border-slate-200 p-4 select-none animate-in fade-in zoom-in-95 duration-100 w-[580px]"
           >
             {/* Mũi tên chỉ sang nút trigger ở sidebar */}
             <div

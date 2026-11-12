@@ -1,7 +1,19 @@
 'use client';
 
-import { LazyAppLayout } from '@/components/layout/LazyAppLayout';
+import dynamic from 'next/dynamic';
+
+const AppLayout = dynamic(
+  () => import('@/features/roles/components/AppLayout').then((mod) => mod.AppLayout),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex h-screen items-center justify-center bg-[#f7f9fa] text-sm text-slate-400">
+        Đang tải danh sách trả hàng nhập...
+      </div>
+    ),
+  }
+);
 
 export default function PurchaseReturnsPage() {
-  return <LazyAppLayout initialScreen="purchase-returns" />;
+  return <AppLayout initialScreen="purchase-returns" />;
 }

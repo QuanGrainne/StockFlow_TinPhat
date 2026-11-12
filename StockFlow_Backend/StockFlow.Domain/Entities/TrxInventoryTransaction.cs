@@ -27,15 +27,6 @@ public partial class TrxInventoryTransaction
 
     public int CreatedBy { get; set; }
 
-    /// <summary>Thẻ kho – Giá GD: đơn giá trên chứng từ (giá nhập / giá bán / giá trả...). Null nếu chỉ sửa giá vốn / kiểm kho.</summary>
-    public decimal? TransactionPrice { get; set; }
-
-    /// <summary>Thẻ kho – Giá vốn của hàng tại kho ngay sau giao dịch.</summary>
-    public decimal? UnitCost { get; set; }
-
-    /// <summary>Thẻ kho – Tồn cuối tại kho ngay sau giao dịch.</summary>
-    public decimal? BalanceAfter { get; set; }
-
     public virtual SecUser CreatedByNavigation { get; set; } = null!;
 
     public virtual MstWarehouseLocation? Location { get; set; }

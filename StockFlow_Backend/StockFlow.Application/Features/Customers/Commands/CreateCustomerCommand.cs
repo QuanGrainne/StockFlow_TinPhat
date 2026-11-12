@@ -4,7 +4,6 @@ using Microsoft.EntityFrameworkCore;
 using StockFlow.Application.Common;
 using StockFlow.Application.Common.Interfaces;
 using StockFlow.Application.Features.Customers.DTOs;
-using StockFlow.Application.Features.Customers.Helpers;
 using StockFlow.Domain.Entities;
 using System.Text.RegularExpressions;
 
@@ -91,12 +90,10 @@ public class CreateCustomerCommandValidator : AbstractValidator<CreateCustomerCo
 public class CreateCustomerCommandHandler : IRequestHandler<CreateCustomerCommand, Result<CustomerDto>>
 {
     private readonly IStockFlowDbContext _context;
-    private readonly ICurrentUserService _currentUser;
 
-    public CreateCustomerCommandHandler(IStockFlowDbContext context, ICurrentUserService currentUser)
+    public CreateCustomerCommandHandler(IStockFlowDbContext context)
     {
         _context = context;
-        _currentUser = currentUser;
     }
 
     public async Task<Result<CustomerDto>> Handle(CreateCustomerCommand command, CancellationToken cancellationToken)
@@ -173,16 +170,7 @@ public class CreateCustomerCommandHandler : IRequestHandler<CreateCustomerComman
             CreditLimit = req.CreditLimit ?? 0,
             CurrentDebt = 0,
             CurrentPayable = 0,
-            IsActive = isActive,
-            Phone2 = CustomerProfileHelper.Clean(req.Phone2, 20),
-            Gender = CustomerProfileHelper.NormalizeGender(req.Gender),
-            BirthDate = req.BirthDate?.Date,
-            Facebook = CustomerProfileHelper.Clean(req.Facebook, 255),
-            Notes = CustomerProfileHelper.Clean(req.Notes, 500),
-            // Người tạo / ngày tạo / chi nhánh tạo (bộ lọc "Chi nhánh tạo", "Ngày tạo")
-            CreatedAt = VietnamTime.Now,
-            CreatedBy = _currentUser.UserId,
-            CreatedWarehouseId = req.CreatedWarehouseId is > 0 ? req.CreatedWarehouseId : null,
+            IsActive = isActive
         };
 
         try
@@ -201,8 +189,21 @@ public class CreateCustomerCommandHandler : IRequestHandler<CreateCustomerComman
             throw;
         }
 
-        var lookups = await CustomerProfileHelper.LoadLookupsAsync(_context, new[] { partner }, null, null, cancellationToken);
-        var dto = CustomerProfileHelper.ToDto(partner, lookups);
+        var dto = new CustomerDto(
+            Id: partner.PartnerId.ToString(),
+            PartnerId: partner.PartnerId,
+            Code: partner.PartnerCode,
+            Name: partner.PartnerName,
+            Type: partner.PartnerType,
+            Phone: partner.Phone,
+            Email: partner.Email,
+            Address: partner.Address,
+            CreditLimit: partner.CreditLimit ?? 0,
+            CurrentDebt: 0,
+            CurrentPayable: 0,
+            Status: isActive ? "ACTIVE" : "INACTIVE",
+            IsOverCreditLimit: false
+        );
 
         return Result<CustomerDto>.Success(dto);
     }

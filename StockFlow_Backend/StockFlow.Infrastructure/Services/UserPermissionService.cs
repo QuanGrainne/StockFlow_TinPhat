@@ -12,7 +12,7 @@ public class UserPermissionService : IUserPermissionService
     private static readonly IReadOnlySet<string> Empty = new HashSet<string>();
 
     private readonly IStockFlowDbContext _context;
-    private readonly Dictionary<int, (bool IsAdmin, IReadOnlySet<string> Codes, IReadOnlySet<string> Features)> _cache = new();
+    private readonly Dictionary<int, (bool IsAdmin, IReadOnlySet<string> Codes)> _cache = new();
 
     public UserPermissionService(IStockFlowDbContext context)
     {
@@ -22,13 +22,10 @@ public class UserPermissionService : IUserPermissionService
     public async Task<IReadOnlySet<string>> GetPermissionCodesAsync(int userId, CancellationToken cancellationToken = default)
         => (await LoadAsync(userId, cancellationToken)).Codes;
 
-    public async Task<IReadOnlySet<string>> GetFeatureCodesAsync(int userId, CancellationToken cancellationToken = default)
-        => (await LoadAsync(userId, cancellationToken)).Features;
-
     public async Task<bool> IsAdminAsync(int userId, CancellationToken cancellationToken = default)
         => (await LoadAsync(userId, cancellationToken)).IsAdmin;
 
-    private async Task<(bool IsAdmin, IReadOnlySet<string> Codes, IReadOnlySet<string> Features)> LoadAsync(int userId, CancellationToken cancellationToken)
+    private async Task<(bool IsAdmin, IReadOnlySet<string> Codes)> LoadAsync(int userId, CancellationToken cancellationToken)
     {
         if (_cache.TryGetValue(userId, out var cached)) return cached;
 
@@ -52,12 +49,12 @@ public class UserPermissionService : IUserPermissionService
             })
             .FirstOrDefaultAsync(cancellationToken);
 
-        (bool, IReadOnlySet<string>, IReadOnlySet<string>) result;
+        (bool, IReadOnlySet<string>) result;
 
         if (user == null || user.IsActive == false)
         {
             // Tài khoản không tồn tại hoặc đã bị khóa: token cũ không còn quyền gì.
-            result = (false, Empty, Empty);
+            result = (false, Empty);
         }
         else
         {
@@ -66,44 +63,24 @@ public class UserPermissionService : IUserPermissionService
                 PermissionConstants.ToRoleCode(r.RoleName) == "ROLE_ADMIN");
 
             var codes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            var features = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-            foreach (var role in user.Roles)
+            if (isAdmin)
             {
-                var moduleCodes = role.Codes.Where(c => !FeatureConstants.IsFeatureCode(c)).ToList();
-                var featureCodes = role.Codes.Where(FeatureConstants.IsFeatureCode).ToList();
-
-                // Vai trò chưa được cấu hình ma trận quyền thì dùng quyền mặc định theo loại vai trò.
-                if (!isAdmin)
+                // Admin luôn có toàn quyền, kể cả khi ma trận quyền của vai trò Admin bị sửa nhầm.
+                codes.UnionWith(PermissionConstants.GetDefaultPermissionCodes("ROLE_ADMIN"));
+            }
+            else
+            {
+                foreach (var role in user.Roles)
                 {
-                    if (moduleCodes.Count > 0)
-                        codes.UnionWith(moduleCodes.Select(c => c.ToUpperInvariant()));
+                    // Vai trò chưa được cấu hình ma trận quyền thì dùng quyền mặc định theo loại vai trò.
+                    if (role.Codes.Count > 0)
+                        codes.UnionWith(role.Codes.Select(c => c.ToUpperInvariant()));
                     else if (!string.IsNullOrEmpty(role.RoleName))
                         codes.UnionWith(PermissionConstants.GetDefaultPermissionCodes(role.RoleName));
                 }
-
-                // Chức năng navbar: đã cấu hình (có mã đánh dấu) thì dùng đúng các mục được tick, chưa thì dùng mặc định.
-                if (featureCodes.Any(c => c.Equals(FeatureConstants.ConfiguredMarker, StringComparison.OrdinalIgnoreCase)))
-                {
-                    features.UnionWith(featureCodes
-                        .Where(c => !c.Equals(FeatureConstants.ConfiguredMarker, StringComparison.OrdinalIgnoreCase))
-                        .Select(c => c.ToUpperInvariant()));
-                }
-                else if (!string.IsNullOrEmpty(role.RoleName))
-                {
-                    features.UnionWith(FeatureConstants.GetDefaultFeatureIds(role.RoleName).Select(FeatureConstants.ToCode));
-                }
             }
 
-            if (isAdmin)
-            {
-                // Admin luôn có toàn quyền phân hệ, kể cả khi ma trận quyền của vai trò Admin bị sửa nhầm.
-                // Chức năng navbar của Admin vẫn theo ma trận (bỏ tick là không vào được), trừ màn phân quyền.
-                codes.UnionWith(PermissionConstants.GetDefaultPermissionCodes("ROLE_ADMIN"));
-                features.UnionWith(FeatureConstants.AdminLockedFeatureIds.Select(FeatureConstants.ToCode));
-            }
-
-            result = (isAdmin, codes, features);
+            result = (isAdmin, codes);
         }
 
         _cache[userId] = result;

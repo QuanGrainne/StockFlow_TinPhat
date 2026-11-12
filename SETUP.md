@@ -8,8 +8,8 @@ installing dependencies or changing project configuration.
 
 -   Frontend: Next.js, React, TypeScript, App Router
 -   Backend: ASP.NET Core Web API, C#
--   Architecture: Clean Architecture (4 layers, feature-organized
-    CQRS via MediatR)
+-   Architecture: Modular Monolith + Layered Architecture, applying
+    Clean Architecture principles where appropriate
 -   ORM: Entity Framework Core
 -   Database: PostgreSQL
 -   Database GUI: pgAdmin 4

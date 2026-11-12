@@ -1,4 +1,3 @@
-import { tabSession } from '@/lib/auth/tabSession';
 import { DEV_AUTO_LOGIN_ENABLED } from '@/lib/auth/flags';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5000';
@@ -6,9 +5,9 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5000';
 /** Xóa phiên hiện tại và đưa người dùng về màn đăng nhập. */
 function redirectToLogin(): void {
   if (typeof window === 'undefined') return;
-  tabSession.remove('stockflow_token');
-  tabSession.remove('stockflow_user');
-  tabSession.remove('stockflow_current_role');
+  localStorage.removeItem('stockflow_token');
+  localStorage.removeItem('stockflow_user');
+  localStorage.removeItem('stockflow_current_role');
   if (!window.location.pathname.includes('/login')) {
     // client.ts không phải component nên không dùng được useRouter; điều hướng cứng để xóa sạch state cũ.
     // eslint-disable-next-line @next/next/no-location-assign-relative-destination
@@ -23,7 +22,7 @@ async function resolveAuthToken(providedToken?: string): Promise<string | undefi
   if (providedToken) return providedToken;
   if (typeof window === 'undefined') return undefined;
 
-  let token = tabSession.get('stockflow_token');
+  let token = localStorage.getItem('stockflow_token');
   if (token) return token;
 
   // Nếu đang ở màn hình login thì không tự ý lấy token admin ngầm
@@ -33,7 +32,7 @@ async function resolveAuthToken(providedToken?: string): Promise<string | undefi
 
   // Chỉ tự đăng nhập admin khi chạy dev và người dùng CHƯA từng đăng nhập trên trình duyệt này.
   // Nếu đã có phiên của một nhân viên (stockflow_user), tuyệt đối không âm thầm nâng lên admin.
-  if (!DEV_AUTO_LOGIN_ENABLED || tabSession.get('stockflow_user')) {
+  if (!DEV_AUTO_LOGIN_ENABLED || localStorage.getItem('stockflow_user')) {
     return undefined;
   }
 
@@ -47,8 +46,8 @@ async function resolveAuthToken(providedToken?: string): Promise<string | undefi
     if (res.ok) {
       const data = await res.json();
       if (data.token) {
-        tabSession.set('stockflow_token', data.token);
-        tabSession.set('stockflow_user', JSON.stringify(data));
+        localStorage.setItem('stockflow_token', data.token);
+        localStorage.setItem('stockflow_user', JSON.stringify(data));
         return data.token;
       }
     }
@@ -127,8 +126,8 @@ async function handleResponse<T>(res: Response, retryFn?: () => Promise<T>): Pro
   if (!res.ok) {
     // Xử lý riêng mã lỗi 401 Unauthorized (hết hạn token hoặc token không hợp lệ)
     if (res.status === 401 && typeof window !== 'undefined') {
-      const hadSession = !!tabSession.get('stockflow_user');
-      tabSession.remove('stockflow_token');
+      const hadSession = !!localStorage.getItem('stockflow_user');
+      localStorage.removeItem('stockflow_token');
 
       // Chưa từng đăng nhập + đang dev: thử tự đăng nhập admin và retry 1 lần
       if (!hadSession && retryFn) {

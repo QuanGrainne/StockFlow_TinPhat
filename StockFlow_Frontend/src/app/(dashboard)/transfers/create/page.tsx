@@ -1,16 +1,5 @@
 import { Suspense } from 'react';
-import dynamic from 'next/dynamic';
-
-const FreshCreateTransferScreen = dynamic(
-  () => import('@/features/transfers/screens/FreshCreateTransferScreen'),
-  {
-    loading: () => (
-      <div className="h-[calc(100vh-56px)] flex items-center justify-center bg-transparent text-[#677484]">
-        Đang tải dữ liệu phiếu chuyển...
-      </div>
-    ),
-  }
-);
+import CreateTransferClient from './CreateTransferClient';
 
 export const metadata = {
   title: 'Tạo phiếu chuyển hàng | StockFlow Tín Phát',
@@ -21,12 +10,12 @@ export default function CreateTransferPage() {
   return (
     <Suspense
       fallback={
-        <div className="h-[calc(100vh-56px)] flex items-center justify-center bg-transparent text-[#677484]">
+        <div className="h-[calc(100vh-56px)] flex items-center justify-center bg-[#f5f5f5] text-[#677484]">
           Đang tải dữ liệu phiếu chuyển...
         </div>
       }
     >
-      <FreshCreateTransferScreen />
+      <CreateTransferClient />
     </Suspense>
   );
 }

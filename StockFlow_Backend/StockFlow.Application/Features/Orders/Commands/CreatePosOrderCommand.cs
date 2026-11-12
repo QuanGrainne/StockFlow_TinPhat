@@ -9,7 +9,6 @@ using Microsoft.EntityFrameworkCore;
 using StockFlow.Application.Common;
 using StockFlow.Application.Common.Interfaces;
 using StockFlow.Application.Features.Orders.DTOs;
-using StockFlow.Application.Features.SalesBookings.Common;
 using StockFlow.Domain.Entities;
 
 namespace StockFlow.Application.Features.Orders.Commands;
@@ -18,20 +17,19 @@ public record CreatePosOrderCommand(CreatePosOrderRequest Request) : IRequest<Re
 
 public class CreatePosOrderCommandValidator : AbstractValidator<CreatePosOrderCommand>
 {
-    private static readonly string[] AllowedPaymentMethods = { "CASH", "VIETQR", "DEBT" };
+    private static readonly string[] AllowedPaymentMethods = { "CASH", "VIETQR", "POS_CARD", "DEBT", "WALLET" };
 
     public CreatePosOrderCommandValidator()
     {
-        // PartnerId = 0 (không chọn khách) → bán cho "Khách lẻ" (KH00000), xử lý trong handler
         RuleFor(x => x.Request.PartnerId)
-            .GreaterThanOrEqualTo(0).WithMessage("Khách hàng không hợp lệ (CUS-001).");
+            .GreaterThan(0).WithMessage("Vui lòng chọn khách hàng hợp lệ (CUS-001).");
 
         RuleFor(x => x.Request.WarehouseId)
             .GreaterThan(0).WithMessage("Vui lòng chọn kho xuất hàng hợp lệ (INV-001).");
 
         RuleFor(x => x.Request.PaymentMethod)
             .Must(m => AllowedPaymentMethods.Contains(m?.ToUpper()))
-            .WithMessage("Phương thức thanh toán không hợp lệ (PAY-001). Chỉ chấp nhận: Tiền mặt, Chuyển khoản (VietQR) hoặc Ghi công nợ.");
+            .WithMessage("Phương thức thanh toán không hợp lệ (PAY-001). Chỉ chấp nhận: Tiền mặt, VietQR, Quẹt thẻ POS, Ví hoặc Ghi công nợ.");
 
         RuleFor(x => x.Request.Items)
             .NotEmpty().WithMessage("Đơn hàng phải có ít nhất 1 sản phẩm (AMT-001).");
@@ -88,15 +86,6 @@ public class CreatePosOrderCommandHandler : IRequestHandler<CreatePosOrderComman
             return Result<PosOrderResultDto>.Failure("Hệ thống hiện đang tạm ngừng tiếp nhận đơn đặt hàng mới theo chính sách cài đặt (A1).");
         }
 
-        // Thời gian bán người dùng chọn không được ở tương lai (kiểm tra trước khi sinh mã để không bỏ số hóa đơn)
-        if (!settings.LockTransactionTime && req.OrderDate.HasValue)
-        {
-            // DB lưu giờ Việt Nam (timestamp without time zone) — so sánh theo giờ Việt Nam
-            var requested = VietnamTime.From(req.OrderDate);
-            if (requested > VietnamTime.Now.AddMinutes(1))
-                return Result<PosOrderResultDto>.Failure("Không được bán hàng với thời gian trong tương lai.");
-        }
-
         // 1. Chống gửi trùng đơn (Idempotency - AMT-015, PAY-016)
         if (!string.IsNullOrWhiteSpace(req.ClientRequestId))
         {
@@ -123,7 +112,7 @@ public class CreatePosOrderCommandHandler : IRequestHandler<CreatePosOrderComman
                     OutstandingAmount = existingWithReq.OutstandingAmount ?? 0,
                     PaymentStatus = existingWithReq.PaymentStatus ?? "",
                     Status = existingWithReq.Status ?? "",
-                    OrderDate = existingWithReq.OrderDate ?? VietnamTime.Now,
+                    OrderDate = existingWithReq.OrderDate ?? DateTime.UtcNow,
                     Message = "Đơn hàng đã được ghi nhận trước đó (Idempotent response)."
                 });
             }
@@ -131,9 +120,9 @@ public class CreatePosOrderCommandHandler : IRequestHandler<CreatePosOrderComman
 
         // Chống nhấp đúp tạo đơn trùng trong vòng 3 giây
         var duplicateRecent = await _context.TrxOrders
-            .Where(o => (req.PartnerId <= 0 || o.PartnerId == req.PartnerId)
+            .Where(o => o.PartnerId == req.PartnerId
                      && o.TotalAmount == req.TotalAmount
-                     && o.OrderDate >= VietnamTime.Now.AddSeconds(-3))
+                     && o.OrderDate >= DateTime.UtcNow.AddSeconds(-3))
             .FirstOrDefaultAsync(cancellationToken);
 
         if (duplicateRecent != null)
@@ -168,10 +157,8 @@ public class CreatePosOrderCommandHandler : IRequestHandler<CreatePosOrderComman
         var currentUserId = _currentUserService.UserId.Value;
 
         // 3. Kiểm tra khách hàng (CUS-001 -> CUS-003)
-        // Không chọn khách → dùng hồ sơ "Khách lẻ" (KH00000), tự tạo nếu chưa có
-        var customer = req.PartnerId > 0
-            ? await _context.MstBusinessPartners.FirstOrDefaultAsync(p => p.PartnerId == req.PartnerId, cancellationToken)
-            : await GetOrCreateWalkInCustomerAsync(cancellationToken);
+        var customer = await _context.MstBusinessPartners
+            .FirstOrDefaultAsync(p => p.PartnerId == req.PartnerId, cancellationToken);
 
         if (customer == null)
         {
@@ -181,22 +168,6 @@ public class CreatePosOrderCommandHandler : IRequestHandler<CreatePosOrderComman
         if (customer.IsActive == false)
         {
             return Result<PosOrderResultDto>.Failure($"Khách hàng '{customer.PartnerName}' đang trong trạng thái ngừng hoạt động, từ chối giao dịch (CUS-003).");
-        }
-
-        // 3b. Tạo hóa đơn từ đơn đặt hàng: cùng khách, cùng chi nhánh, đơn còn đang giao
-        TrxOrder? booking = null;
-        if (req.BookingOrderId is > 0)
-        {
-            booking = await _context.TrxOrders
-                .FirstOrDefaultAsync(o => o.OrderId == req.BookingOrderId.Value && o.OrderType == SalesBookingOps.OrderType, cancellationToken);
-            if (booking == null)
-                return Result<PosOrderResultDto>.Failure("Không tìm thấy đơn đặt hàng để tạo hóa đơn.");
-            if (!SalesBookingOps.IsOpen(booking.Status))
-                return Result<PosOrderResultDto>.Failure($"Đơn đặt hàng {booking.OrderCode} đã hoàn thành hoặc đã hủy.");
-            if (booking.PartnerId != customer.PartnerId)
-                return Result<PosOrderResultDto>.Failure($"Hóa đơn phải cùng khách hàng với đơn đặt hàng {booking.OrderCode}.");
-            if (booking.WarehouseId.HasValue && booking.WarehouseId.Value != req.WarehouseId)
-                return Result<PosOrderResultDto>.Failure($"Đơn đặt hàng {booking.OrderCode} thuộc chi nhánh khác — hóa đơn phải xuất từ chi nhánh xử lý của đơn.");
         }
 
         // 4. Kiểm tra sản phẩm và trạng thái kinh doanh (POS-001 -> POS-008, POS-011)
@@ -300,10 +271,7 @@ public class CreatePosOrderCommandHandler : IRequestHandler<CreatePosOrderComman
             .Where(b => productIds.Contains(b.ProductId) && b.WarehouseId == req.WarehouseId)
             .ToListAsync(cancellationToken);
 
-        // Một hàng có thể có nhiều dòng tồn (vị trí / lô) → dùng dòng tồn chung (không vị trí, không lô) nếu có
-        balanceMap = balances
-            .GroupBy(b => b.ProductId)
-            .ToDictionary(g => g.Key, g => g.FirstOrDefault(b => b.LocationId == null && b.LotId == null) ?? g.First());
+        balanceMap = balances.ToDictionary(b => b.ProductId);
 
         // Gom số lượng yêu cầu theo từng sản phẩm (xử lý tình huống quét nhiều dòng cùng mã - POS-004)
         var productQuantitySummary = req.Items
@@ -327,11 +295,24 @@ public class CreatePosOrderCommandHandler : IRequestHandler<CreatePosOrderComman
         }
 
         // Group A3: Tính toán lượng hàng đang tạm giữ cho các đơn đặt hàng khác
-        // (hàng khách đặt ở các đơn đặt hàng còn mở của chi nhánh, trừ chính đơn đang giao)
         Dictionary<int, decimal> reservedMap = new();
         if (!settings.AllowSellingReservedStock && req.IssueStockNow && isCompleted)
         {
-            reservedMap = await SalesBookingOps.ReservedQtyAsync(_context, req.WarehouseId, productIds, booking?.OrderId, cancellationToken);
+            var pendingOrderIds = await _context.TrxOrders
+                .Where(o => o.Status == "PENDING")
+                .Select(o => o.OrderId)
+                .ToListAsync(cancellationToken);
+
+            if (pendingOrderIds.Count > 0)
+            {
+                var reservedList = await _context.DtlOrderItems
+                    .Where(d => pendingOrderIds.Contains(d.OrderId) && productIds.Contains(d.ProductId))
+                    .GroupBy(d => d.ProductId)
+                    .Select(g => new { ProductId = g.Key, ReservedQty = g.Sum(x => x.Quantity) })
+                    .ToListAsync(cancellationToken);
+
+                reservedMap = reservedList.ToDictionary(r => r.ProductId, r => r.ReservedQty ?? 0m);
+            }
         }
 
         // Group B1 & A3: Kiểm tra khi xuất kho ngay
@@ -368,19 +349,13 @@ public class CreatePosOrderCommandHandler : IRequestHandler<CreatePosOrderComman
         bool isWalkIn = customer.PartnerCode == "KH00000"
                      || (customer.PartnerName != null && customer.PartnerName.Contains("Khách lẻ"));
 
-        // Hóa đơn từ đơn đặt hàng: tiền khách đã trả trước (còn dư) được trừ vào hóa đơn
-        decimal depositApplied = booking != null
-            ? Math.Min(finalTotal, await SalesBookingOps.RemainingDepositAsync(_context, booking, cancellationToken))
-            : 0;
-        decimal dueNow = finalTotal - depositApplied;
-
         bool isRecordDebtExcess = !isWalkIn && string.Equals(req.ExcessAction, "RECORD_DEBT", StringComparison.OrdinalIgnoreCase);
-        decimal rawChangeAmount = Math.Max(0, req.PaidAmount - dueNow);
+        decimal rawChangeAmount = Math.Max(0, req.PaidAmount - finalTotal);
         decimal actualReceived;
         decimal changeAmount;
         decimal outstanding;
 
-        if (req.PaidAmount >= dueNow)
+        if (req.PaidAmount >= finalTotal)
         {
             if (isRecordDebtExcess && rawChangeAmount > 0)
             {
@@ -390,7 +365,7 @@ public class CreatePosOrderCommandHandler : IRequestHandler<CreatePosOrderComman
             }
             else
             {
-                actualReceived = dueNow;
+                actualReceived = finalTotal;
                 changeAmount = rawChangeAmount; // Thối tiền thừa cho khách tại quầy
                 outstanding = 0;
             }
@@ -399,7 +374,7 @@ public class CreatePosOrderCommandHandler : IRequestHandler<CreatePosOrderComman
         {
             actualReceived = req.PaidAmount;
             changeAmount = 0;
-            outstanding = dueNow - actualReceived;
+            outstanding = finalTotal - actualReceived;
         }
 
         if (isWalkIn && outstanding > 0)
@@ -420,8 +395,6 @@ public class CreatePosOrderCommandHandler : IRequestHandler<CreatePosOrderComman
                     $"Khách hàng '{customer.PartnerName}' không có hạn mức tín dụng (Hạn mức: 0 đ). Không thể thực hiện ghi công nợ (CUS-007).");
             }
 
-            // Tiền trả trước của đơn đặt đã giảm dư nợ từ trước → cộng lại khi so hạn mức (BR-10)
-            currentDebt += depositApplied;
             decimal remainingCredit = Math.Max(0, creditLimit - currentDebt);
 
             if (currentDebt >= creditLimit)
@@ -446,52 +419,43 @@ public class CreatePosOrderCommandHandler : IRequestHandler<CreatePosOrderComman
         DateTime finalOrderDate;
         if (settings.LockTransactionTime || !req.OrderDate.HasValue)
         {
-            finalOrderDate = VietnamTime.Now;
+            finalOrderDate = DateTime.UtcNow;
         }
         else
         {
-            // Giờ người dùng chọn (ISO UTC từ trình duyệt) → giờ Việt Nam để lưu DB
-            finalOrderDate = VietnamTime.From(req.OrderDate);
-
-            // Không cho bán với thời gian trong tương lai (cho lệch 1 phút do đồng hồ máy khách)
-            if (finalOrderDate > VietnamTime.Now.AddMinutes(1))
-            {
-                return Result<PosOrderResultDto>.Failure("Không được bán hàng với thời gian trong tương lai.");
-            }
+            finalOrderDate = req.OrderDate.Value.Kind == DateTimeKind.Utc
+                ? req.OrderDate.Value
+                : req.OrderDate.Value.ToUniversalTime();
         }
 
-        decimal totalPaid = actualReceived + depositApplied;
         string paymentStatus = finalTotal == 0
             ? "PAID"
-            : (totalPaid >= finalTotal ? "PAID" : (totalPaid > 0 ? "PARTIAL" : "DEBT"));
+            : (actualReceived >= finalTotal ? "PAID" : (actualReceived > 0 ? "PARTIAL" : "DEBT"));
 
         string clientReqTag = !string.IsNullOrWhiteSpace(req.ClientRequestId) ? $" [REQ:{req.ClientRequestId}]" : "";
         string finalNotes = $"{req.Notes ?? ""}{clientReqTag}".Trim();
 
-        using var transaction = await _context.BeginTransactionAsync(cancellationToken);
+var dbContext = _context as DbContext;
+        using var transaction = dbContext != null ? await dbContext.Database.BeginTransactionAsync(cancellationToken) : null;
 
         try
         {
             var order = new TrxOrder
             {
                 OrderCode = orderCode,
-                PartnerId = customer.PartnerId,
-                Status = isCompleted ? "COMPLETED" : (isPendingBooking ? SalesBookingOps.Draft : "DRAFT"),
+                PartnerId = req.PartnerId,
+                Status = isCompleted ? "COMPLETED" : (isPendingBooking ? "PENDING" : "DRAFT"),
                 SubTotal = serverSubTotal,
                 DiscountType = orderDiscountType,
                 DiscountValue = orderDiscountValue,
                 DiscountAmount = orderDiscountAmount,
                 TotalAmount = finalTotal,
-                PaidAmount = totalPaid,
+                PaidAmount = actualReceived,
                 OutstandingAmount = outstanding,
                 PaymentStatus = paymentStatus,
                 CreatedBy = currentUserId,
                 OrderDate = finalOrderDate,
-                Notes = string.IsNullOrWhiteSpace(finalNotes) ? null : finalNotes,
-                OrderType = isPendingBooking ? SalesBookingOps.OrderType : SalesBookingOps.InvoiceType,
-                WarehouseId = req.WarehouseId,
-                BookingOrderId = booking?.OrderId,
-                DepositAmount = depositApplied,
+                Notes = string.IsNullOrWhiteSpace(finalNotes) ? null : finalNotes
             };
 
             _context.TrxOrders.Add(order);
@@ -533,8 +497,8 @@ public class CreatePosOrderCommandHandler : IRequestHandler<CreatePosOrderComman
                     IssueType = "SALES",
                     SalesOrderId = order.OrderId,
                     WarehouseId = req.WarehouseId,
-                    RequestedBy = currentUserId,
-                    ProcessedBy = currentUserId,
+                    RequestedBy = 1,
+                    ProcessedBy = 1,
                     RequestedDate = finalOrderDate,
                     ProcessedDate = finalOrderDate,
                     Status = "COMPLETED"
@@ -573,8 +537,6 @@ public class CreatePosOrderCommandHandler : IRequestHandler<CreatePosOrderComman
                     }
 
                     // Ghi lịch sử biến động thẻ kho trỏ tới phiếu xuất kho
-                    // (thời gian thẻ kho theo giờ Việt Nam như các nghiệp vụ kho khác; bán hàng không đổi giá vốn)
-                    var issuedBalance = balanceMap[item.ProductId];
                     _context.TrxInventoryTransactions.Add(new TrxInventoryTransaction
                     {
                         WarehouseId = req.WarehouseId,
@@ -583,42 +545,35 @@ public class CreatePosOrderCommandHandler : IRequestHandler<CreatePosOrderComman
                         Quantity = -item.Quantity,
                         ReferenceType = "STOCK_ISSUE",
                         ReferenceId = stockIssue.StockIssueId,
-                        TransactionDate = VietnamTime.From(finalOrderDate),
-                        CreatedBy = currentUserId,
-                        TransactionPrice = orderItem.UnitPrice,
-                        UnitCost = issuedBalance.UnitCost ?? prod.MovingAverageCost,
-                        BalanceAfter = issuedBalance.Quantity
+                        TransactionDate = finalOrderDate,
+                        CreatedBy = 1
                     });
                 }
             }
 
             // 11. Cập nhật dư nợ khách hàng
-            if (isCompleted)
+            if (outstanding > 0 && isCompleted)
             {
-                // Tiền trả trước của đơn đặt đã giảm nợ lúc thu → nay trừ vào hóa đơn thì cộng lại phần đó
-                decimal debtDelta = depositApplied;
-                if (outstanding > 0)
-                {
-                    // Khách trả thiếu -> Ghi nợ phát sinh
-                    debtDelta += outstanding;
-                }
-                else if (isRecordDebtExcess && rawChangeAmount > 0)
-                {
-                    // Khách trả thừa và chọn "Tính vào công nợ" -> Ghi có giảm nợ cũ hoặc cọc đơn sau
-                    debtDelta -= rawChangeAmount;
-                }
-                if (debtDelta != 0) customer.CurrentDebt = (customer.CurrentDebt ?? 0) + debtDelta;
+                // Khách trả thiếu -> Ghi nợ phát sinh
+                customer.CurrentDebt = (customer.CurrentDebt ?? 0) + outstanding;
+            }
+            else if (isRecordDebtExcess && rawChangeAmount > 0 && isCompleted)
+            {
+                // Khách trả thừa và chọn "Tính vào công nợ" -> Ghi có giảm nợ cũ hoặc cọc đơn sau
+                customer.CurrentDebt = (customer.CurrentDebt ?? 0) - rawChangeAmount;
             }
 
             // 12. Ghi nhận giao dịch tài chính (Phiếu thu)
             if (actualReceived > 0 && isCompleted)
             {
+                string desc = isRecordDebtExcess && rawChangeAmount > 0
+                    ? $"Thu tiền bán hàng hóa đơn POS {order.OrderCode} ({req.PaymentMethod}) - Cấn trừ {rawChangeAmount:N0} đ vào công nợ"
+                    : $"Thu tiền bán hàng hóa đơn POS {order.OrderCode} ({req.PaymentMethod})";
+
                 _context.TrxFinancialTransactions.Add(new TrxFinancialTransaction
                 {
                     PartnerId = customer.PartnerId,
                     TxType = "RECEIPT",
-                    // Mã phiếu thu theo hóa đơn: TTHD000085 (lần thu sau: TTHD000085-1, -2...)
-                    TxCode = $"TT{order.OrderCode}",
                     Amount = actualReceived,
                     PaymentMethod = req.PaymentMethod,
                     ReferenceType = "SALES_ORDER",
@@ -626,19 +581,11 @@ public class CreatePosOrderCommandHandler : IRequestHandler<CreatePosOrderComman
                     TransactionDate = finalOrderDate,
 CreatedBy = currentUserId,
                     Status = "COMPLETED",
-                    // Ghi chú phiếu thu để trống: người dùng tự nhập khi sửa phiếu thu
-                    Description = null
+                    Description = desc
                 });
             }
 
             await _context.SaveChangesAsync(cancellationToken);
-
-            // Đơn đặt hàng: cập nhật SL đã giao → Đang giao hàng / Hoàn thành
-            if (booking != null && isCompleted)
-            {
-                await SalesBookingOps.RecomputeStatusAsync(_context, booking.OrderId, currentUserId, cancellationToken);
-                await _context.SaveChangesAsync(cancellationToken);
-            }
 
             if (transaction != null)
             {
@@ -661,13 +608,12 @@ CreatedBy = currentUserId,
                 DiscountValue = orderDiscountValue,
                 DiscountAmount = orderDiscountAmount,
                 TotalAmount = finalTotal,
-                PaidAmount = totalPaid,
-                DepositAmount = depositApplied,
+                PaidAmount = actualReceived,
                 ChangeAmount = changeAmount,
                 OutstandingAmount = outstanding,
                 PaymentStatus = paymentStatus,
                 Status = order.Status,
-                OrderDate = order.OrderDate ?? VietnamTime.Now,
+                OrderDate = order.OrderDate ?? DateTime.UtcNow,
                 StockIssueId = stockIssue?.StockIssueId,
                 StockIssueCode = stockIssue?.IssueCode,
                 CustomerCurrentDebt = customer.CurrentDebt ?? 0,
@@ -683,28 +629,4 @@ CreatedBy = currentUserId,
             throw;
         }
     }
-
-    /// <summary>Hồ sơ "Khách lẻ" dùng cho đơn POS không chọn khách (mã KH00000, chỉ thanh toán đủ, không ghi nợ).</summary>
-    private async Task<MstBusinessPartner> GetOrCreateWalkInCustomerAsync(CancellationToken ct)
-    {
-        var walkIn = await _context.MstBusinessPartners.FirstOrDefaultAsync(p => p.PartnerCode == WalkInCustomerCode, ct);
-        if (walkIn != null) return walkIn;
-        walkIn = new MstBusinessPartner
-        {
-            PartnerCode = WalkInCustomerCode,
-            PartnerName = "Khách lẻ",
-            PartnerType = "CUSTOMER",
-            CreditLimit = 0,
-            CurrentDebt = 0,
-            CurrentPayable = 0,
-            IsActive = true,
-            CreatedAt = VietnamTime.Now,
-            CreatedBy = _currentUserService.UserId,
-        };
-        _context.MstBusinessPartners.Add(walkIn);
-        await _context.SaveChangesAsync(ct);
-        return walkIn;
-    }
-
-    public const string WalkInCustomerCode = "KH00000";
 }

@@ -2,7 +2,6 @@
 // Định nghĩa kiểu dữ liệu cho module Quản lý Nhập hàng (Purchase Inbound)
 
 export * from './formTypes';
-export * from './filterTypes';
 
 export interface PurchaseItem {
   id?: string;
@@ -99,8 +98,6 @@ export interface CreatePurchasePayload {
   warehouseId?: number;
   partnerId: number;
   purchaseCode?: string | null;
-  /** Nhập hàng theo phiếu đặt hàng nhập */
-  purchaseOrderId?: number;
   externalPoNumber?: string | null;
   receivedDate?: string | null;
   status: 'DRAFT' | 'COMPLETED';

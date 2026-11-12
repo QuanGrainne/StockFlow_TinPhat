@@ -40,9 +40,6 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# Nhật ký build .NET (dotnet build -fl)
-msbuild.log
-
 # ==========================================
 # IDEs & Editors
 # ==========================================

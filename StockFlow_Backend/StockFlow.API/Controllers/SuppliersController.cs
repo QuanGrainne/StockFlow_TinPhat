@@ -28,7 +28,6 @@ public class SuppliersController : ControllerBase
     [HttpGet]
     [ProducesResponseType(typeof(List<SupplierDto>), StatusCodes.Status200OK)]
     [RequirePermission("PARTNER_READ")]
-    [RequireFeature("feat-suppliers", "feat-purchase", "feat-purchase-orders", "feat-purchase-returns")]
     public async Task<IActionResult> GetSuppliers(
         [FromQuery] string? search,
         [FromQuery] string? debtStatus,
@@ -66,7 +65,6 @@ public class SuppliersController : ControllerBase
     [ProducesResponseType(typeof(SupplierDetailDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [RequirePermission("PARTNER_READ")]
-    [RequireFeature("feat-suppliers")]
     public async Task<IActionResult> GetSupplierById(int id)
     {
         var result = await _mediator.Send(new GetSupplierByIdQuery(id));
@@ -84,7 +82,6 @@ public class SuppliersController : ControllerBase
     [ProducesResponseType(typeof(SupplierDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [RequirePermission("PARTNER_CREATE")]
-    [RequireFeature("feat-suppliers", "feat-purchase", "feat-purchase-orders")]
     public async Task<IActionResult> CreateSupplier([FromBody] CreateSupplierRequest request)
     {
         var result = await _mediator.Send(new CreateSupplierCommand(request));
@@ -103,7 +100,6 @@ public class SuppliersController : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [RequirePermission("PARTNER_UPDATE")]
-    [RequireFeature("feat-suppliers")]
     public async Task<IActionResult> UpdateSupplier(int id, [FromBody] UpdateSupplierRequest request)
     {
         var result = await _mediator.Send(new UpdateSupplierCommand(id, request));
@@ -125,7 +121,6 @@ public class SuppliersController : ControllerBase
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [RequirePermission("PARTNER_UPDATE")]
-    [RequireFeature("feat-suppliers")]
     public async Task<IActionResult> ToggleSupplierStatus(int id)
     {
         var result = await _mediator.Send(new ToggleSupplierStatusCommand(id));
@@ -146,7 +141,6 @@ public class SuppliersController : ControllerBase
     [ProducesResponseType(typeof(SupplierPaymentResultDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [RequirePermission("FIN_CREATE")]
-    [RequireFeature("feat-suppliers")]
     public async Task<IActionResult> CreateSupplierPayment(int id, [FromBody] CreateSupplierPaymentRequest request)
     {
         var result = await _mediator.Send(new CreateSupplierPaymentCommand(id, request));
@@ -161,7 +155,6 @@ public class SuppliersController : ControllerBase
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [RequirePermission("PARTNER_DELETE")]
-    [RequireFeature("feat-suppliers")]
     public async Task<IActionResult> DeleteSupplier(int id)
     {
         var result = await _mediator.Send(new DeleteSupplierCommand(id));

@@ -17,65 +17,7 @@ export interface OrderFilterParams {
   pageSize?: number;
 }
 
-/** Dữ liệu gửi khi thanh toán 1 hóa đơn POS (POST /api/orders/pos) */
-export interface PosSaleRequest {
-  /** 0 = Khách lẻ */
-  partnerId: number;
-  warehouseId: number;
-  paymentMethod: 'CASH' | 'VIETQR';
-  subTotal: number;
-  discountType: 'AMOUNT' | 'PERCENT';
-  discountValue: number;
-  discountAmount: number;
-  totalAmount: number;
-  paidAmount: number;
-  notes?: string;
-  clientRequestId: string;
-  /** Thời gian bán (ISO); bỏ trống = giờ hiện tại. Không được ở tương lai. */
-  orderDate?: string;
-  /** Hóa đơn giao hàng tạo từ đơn đặt hàng: server trừ tiền khách đã trả trước của đơn */
-  bookingOrderId?: number;
-  items: {
-    productId: number;
-    quantity: number;
-    unitId: number;
-    /** Đơn giá (theo bảng giá) */
-    originalPrice: number;
-    /** Giá bán sau giảm giá dòng */
-    unitPrice: number;
-    discountType: 'AMOUNT' | 'PERCENT';
-    /** Giảm trên 1 đơn vị: VNĐ hoặc % */
-    discountValue: number;
-    discountAmount: number;
-  }[];
-}
-
-export interface PosSaleResult {
-  orderId: number;
-  orderCode: string;
-  totalAmount: number;
-  paidAmount: number;
-  changeAmount: number;
-  outstandingAmount: number;
-  /** Tiền trả trước của đơn đặt hàng đã trừ vào hóa đơn */
-  depositAmount?: number;
-  message?: string;
-}
-
 export const posService = {
-  /** Thanh toán hóa đơn POS: trừ tồn, ghi thẻ kho, công nợ, phiếu thu */
-  submitSale(req: PosSaleRequest): Promise<PosSaleResult> {
-    return apiClient.post<PosSaleResult>('/api/orders/pos', {
-      ...req,
-      excessAction: 'RETURN_CASH',
-      vatAmount: 0,
-      deliveryFee: 0,
-      deliveryType: 'COUNTER',
-      status: 'COMPLETED',
-      issueStockNow: true,
-    });
-  },
-
   /**
    * Lấy danh sách sản phẩm từ backend theo kho cụ thể (đồng bộ tồn kho chuẩn POS-014)
    */
@@ -174,32 +116,24 @@ export const posService = {
   },
 
   /**
-   * Ma trận giá bán: productId → { priceBookId: giá } của mọi bảng giá đang chọn (mặc định: mọi bảng giá đang hoạt động).
-   * allProducts=true: lấy cả hàng chưa thêm vào bảng giá tự tạo; tải đủ các trang (API tối đa 100 hàng/trang).
+   * Lấy ma trận giá bán của các sản phẩm theo từng bảng giá (ProductId -> { PriceBookId: Price })
    */
   async getPriceMatrix(priceBookIds?: number[]): Promise<Record<number, Record<number, number>>> {
-    type MatrixPage = { items?: { productId: number; prices?: Record<string, number | null> }[]; totalCount?: number };
     try {
-      const ids = priceBookIds && priceBookIds.length > 0
-        ? priceBookIds
-        : (await this.getPriceBooks()).filter((b) => b.isActive).map((b) => b.priceBookId);
-      const pageSize = 100;
-      const fetchPage = (page: number) => {
-        const qs = new URLSearchParams({ pageSize: String(pageSize), page: String(page), allProducts: 'true' });
-        if (ids.length > 0) qs.set('priceBookIds', ids.join(','));
-        return apiClient.get<MatrixPage>(`/api/price-books/matrix?${qs.toString()}`);
-      };
-      const first = await fetchPage(1);
-      const pages = Math.ceil((first.totalCount ?? 0) / pageSize);
-      const rest = pages > 1 ? await Promise.all(Array.from({ length: pages - 1 }, (_, i) => fetchPage(i + 2))) : [];
-
+      const qs = priceBookIds && priceBookIds.length > 0 ? `?priceBookIds=${priceBookIds.join(',')}&pageSize=100` : '?pageSize=100';
+      const data = await apiClient.get<any>(`/api/price-books/matrix${qs}`);
       const priceMap: Record<number, Record<number, number>> = {};
-      for (const data of [first, ...rest]) {
-        for (const item of data.items ?? []) {
+
+      if (data?.items && Array.isArray(data.items)) {
+        for (const item of data.items) {
           const pId = Number(item.productId);
-          priceMap[pId] = priceMap[pId] ?? {};
-          for (const [pbIdStr, priceVal] of Object.entries(item.prices ?? {})) {
-            if (priceVal !== null && priceVal !== undefined) priceMap[pId][Number(pbIdStr)] = Number(priceVal);
+          priceMap[pId] = {};
+          if (item.prices) {
+            for (const [pbIdStr, priceVal] of Object.entries(item.prices)) {
+              if (priceVal !== null && priceVal !== undefined) {
+                priceMap[pId][Number(pbIdStr)] = Number(priceVal);
+              }
+            }
           }
         }
       }
@@ -311,8 +245,7 @@ export const posService = {
     const finalTotal = Math.max(0, itemsSubTotal - orderDiscountAmount);
 
     const payload = {
-      // 0 = không chọn khách → backend tự dùng hồ sơ "Khách lẻ" (KH00000)
-      partnerId: order.selectedCustomer?.id || 0,
+      partnerId: order.selectedCustomer?.id || 9,
       warehouseId: order.warehouseId || 3,
       paymentMethod: order.paymentMethod,
       subTotal: itemsSubTotal,

@@ -78,7 +78,7 @@ export const ReceiveTransferScreen: React.FC<Props> = ({
     if (draft?.itemNotes) return draft.itemNotes;
     const init: Record<number, string> = {};
     (transfer.items || []).forEach((it) => {
-      if (it.receiveNotes) init[it.productId] = it.receiveNotes;
+      if (it.notes) init[it.productId] = it.notes;
     });
     return init;
   });
@@ -99,10 +99,7 @@ export const ReceiveTransferScreen: React.FC<Props> = ({
     if (isNaN(t.getTime())) return undefined;
     return toLocalDatetimeInputString(new Date(t.getTime() + 60 * 1000));
   }, [transfer.transferDate]);
-  // Ghi chú nhận: bản lưu tạm trên máy → ghi chú nhận đã lưu ở chi tiết phiếu (lúc đang chuyển) → trống
-  const [receiveNotes, setReceiveNotes] = useState(
-    () => loadReceiveDraft(transfer.id)?.receiveNotes ?? transfer.receiveNotes ?? ''
-  );
+  const [receiveNotes, setReceiveNotes] = useState(() => loadReceiveDraft(transfer.id)?.receiveNotes ?? '');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
 
@@ -243,7 +240,6 @@ export const ReceiveTransferScreen: React.FC<Props> = ({
         transferItemId: it.id,
         productId: it.productId,
         receivedQuantity: receivedQtys[it.productId] ?? it.transferQuantity,
-        notes: itemNotes[it.productId]?.trim() || undefined,
       }));
 
       await transferService.receiveTransfer(transfer.id, {
@@ -276,9 +272,9 @@ export const ReceiveTransferScreen: React.FC<Props> = ({
   const formattedTransferDate = formatDateTimeVN(transfer.transferDate);
 
   return (
-    <div className="fixed inset-0 z-50 stockflow-brand-bg flex flex-col text-[13px] text-[#15171a] select-none animate-in fade-in duration-200 font-sans">
+    <div className="fixed inset-0 z-50 bg-[#f5f5f5] flex flex-col text-[13px] text-[#15171a] select-none animate-in fade-in duration-200 font-sans">
       {/* 1. Thanh Topbar Navigation */}
-      <header className="h-12 bg-white/85 backdrop-blur-[2px] border-b border-slate-200 px-4 flex items-center relative shrink-0 shadow-2xs">
+      <header className="h-12 bg-white border-b border-slate-200 px-4 flex items-center relative shrink-0 shadow-2xs">
         {/* Nút quay lại & Tiêu đề */}
         <div className="flex items-center gap-3 z-10">
           <button
@@ -333,9 +329,9 @@ export const ReceiveTransferScreen: React.FC<Props> = ({
       {/* 2. Thân màn hình: 2 Cột (Trái: Bảng kiểm đếm | Phải: Thông tin phiếu & Nút Nhận hàng) */}
       <div className="flex-1 flex overflow-hidden">
         {/* CỘT TRÁI: Tabs & Bảng sản phẩm kiểm đếm */}
-        <main className="flex-1 flex flex-col bg-white/65 overflow-hidden border-r border-slate-200">
+        <main className="flex-1 flex flex-col bg-white overflow-hidden border-r border-slate-200">
           {/* Tabs: Tất cả | Khớp | Lệch | Chưa nhận */}
-          <div className="h-10 border-b border-slate-200 px-4 flex items-center gap-6 bg-white/80 shrink-0">
+          <div className="h-10 border-b border-slate-200 px-4 flex items-center gap-6 bg-white shrink-0">
             <button
               type="button"
               onClick={() => setActiveTab('ALL')}
@@ -451,11 +447,6 @@ export const ReceiveTransferScreen: React.FC<Props> = ({
                             <span>{it.productName}</span>
                             <Info size={12} className="text-[#677484] cursor-pointer" />
                           </div>
-                          {it.notes && (
-                            <div className="text-[11px] italic text-[#677484] mt-0.5" title="Ghi chú của chi nhánh chuyển">
-                              ({it.notes})
-                            </div>
-                          )}
                           <div className="flex items-center gap-1 text-[11px] text-[#677484] mt-0.5">
                             <input
                               type="text"
@@ -520,7 +511,7 @@ export const ReceiveTransferScreen: React.FC<Props> = ({
         </main>
 
         {/* CỘT PHẢI: Sidebar Thông tin phiếu & Nút Nhận hàng */}
-        <aside className="w-80 bg-white/80 backdrop-blur-[2px] flex flex-col justify-between shrink-0 shadow-xs border-l border-slate-200">
+        <aside className="w-80 bg-white flex flex-col justify-between shrink-0 shadow-xs border-l border-slate-200">
           <div className="p-4 space-y-3.5 overflow-y-auto">
             {/* User & Date picker */}
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
@@ -566,8 +557,8 @@ export const ReceiveTransferScreen: React.FC<Props> = ({
               </div>
 
               <div className="flex items-center justify-between">
-                <span className="text-[#677484] shrink-0">Ghi chú chuyển</span>
-                <span className="text-[#15171a] text-right ml-3">{transfer.notes || '—'}</span>
+                <span className="text-[#677484]">Ghi chú</span>
+                <span className="text-[#677484]">{transfer.notes || '—'}</span>
               </div>
 
               <div className="flex items-center justify-between pt-1 border-t border-slate-100">
@@ -586,7 +577,7 @@ export const ReceiveTransferScreen: React.FC<Props> = ({
               <div className="flex items-center justify-between mb-1.5">
                 <div className="flex items-center gap-1.5 text-xs text-[#15171a] font-medium">
                   <Pencil size={12} className="text-[#677484]" />
-                  <span>Ghi chú nhận</span>
+                  <span>Ghi chú</span>
                 </div>
                 {hasShortage && (
                   <span className="text-[10px] font-bold text-[#fb2c36] bg-[#fef2f2] px-1.5 py-0.5 rounded border border-[#fecaca] animate-pulse">

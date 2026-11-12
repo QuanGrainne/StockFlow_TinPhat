@@ -31,9 +31,6 @@ public partial class DtlStocktakeItem
 
     public DateTime? ApprovalDate { get; set; }
 
-    /// <summary>Giá vốn tại kho lúc kiểm (tính giá trị lệch)</summary>
-    public decimal? UnitCost { get; set; }
-
     public virtual SecUser? ApprovedByNavigation { get; set; }
 
     public virtual MstWarehouseLocation? Location { get; set; }

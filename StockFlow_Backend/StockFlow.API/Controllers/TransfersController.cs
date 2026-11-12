@@ -43,7 +43,6 @@ public class TransfersController : ControllerBase
     [ProducesResponseType(typeof(List<TransferListDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [RequirePermission("STOCK_READ")]
-    [RequireFeature("feat-transfers")]
     public async Task<IActionResult> GetTransfers(
         [FromQuery] int? sourceWarehouseId,
         [FromQuery] int? destWarehouseId,
@@ -90,7 +89,6 @@ public class TransfersController : ControllerBase
     [ProducesResponseType(typeof(List<ProductWithStockDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [RequirePermission("STOCK_READ")]
-    [RequireFeature("feat-transfers", "feat-stocktake")]
     public async Task<IActionResult> GetProductsForTransfer(
         [FromQuery] int sourceWarehouseId,
         [FromQuery] int? destWarehouseId,
@@ -117,7 +115,6 @@ public class TransfersController : ControllerBase
     [ProducesResponseType(typeof(TransferDetailDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [RequirePermission("STOCK_READ")]
-    [RequireFeature("feat-transfers", "feat-goods")]
     public async Task<IActionResult> GetTransferById(int id)
     {
         var result = await _mediator.Send(new GetTransferByIdQuery(id));
@@ -135,7 +132,6 @@ public class TransfersController : ControllerBase
     [ProducesResponseType(typeof(TransferDetailDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [RequirePermission("STOCK_CREATE")]
-    [RequireFeature("feat-transfers")]
     public async Task<IActionResult> CreateTransfer([FromBody] CreateTransferRequest request)
     {
         var userId = GetCurrentUserId();
@@ -155,30 +151,11 @@ public class TransfersController : ControllerBase
     [ProducesResponseType(typeof(TransferDetailDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [RequirePermission("STOCK_UPDATE")]
-    [RequireFeature("feat-transfers")]
     public async Task<IActionResult> UpdateTransfer(int id, [FromBody] UpdateTransferRequest request)
     {
         var userId = GetCurrentUserId();
         var command = new UpdateTransferCommand(id, request, userId);
         var result = await _mediator.Send(command);
-        if (!result.IsSuccess)
-        {
-            return BadRequest(new { message = result.Error });
-        }
-        return Ok(result.Value);
-    }
-
-    /// <summary>
-    /// Sửa ghi chú chuyển / ghi chú nhận (mọi trạng thái, không đổi tồn kho).
-    /// </summary>
-    [HttpPut("{id}/notes")]
-    [ProducesResponseType(typeof(TransferDetailDto), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    [RequirePermission("STOCK_UPDATE")]
-    [RequireFeature("feat-transfers")]
-    public async Task<IActionResult> UpdateTransferNotes(int id, [FromBody] UpdateTransferNotesRequest request)
-    {
-        var result = await _mediator.Send(new UpdateTransferNotesCommand(id, request));
         if (!result.IsSuccess)
         {
             return BadRequest(new { message = result.Error });
@@ -193,7 +170,6 @@ public class TransfersController : ControllerBase
     [ProducesResponseType(typeof(TransferDetailDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [RequirePermission("STOCK_UPDATE")]
-    [RequireFeature("feat-transfers")]
     public async Task<IActionResult> CompleteTransfer(int id)
     {
         var userId = GetCurrentUserId();
@@ -213,7 +189,6 @@ public class TransfersController : ControllerBase
     [ProducesResponseType(typeof(TransferDetailDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [RequirePermission("STOCK_UPDATE")]
-    [RequireFeature("feat-transfers")]
     public async Task<IActionResult> ReceiveTransfer(int id, [FromBody] ReceiveTransferRequest request)
     {
         var userId = GetCurrentUserId();
@@ -233,7 +208,6 @@ public class TransfersController : ControllerBase
     [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [RequirePermission("STOCK_UPDATE")]
-    [RequireFeature("feat-transfers")]
     public async Task<IActionResult> CancelTransfer(int id, [FromBody] CancelTransferRequest? request)
     {
         var userId = GetCurrentUserId();

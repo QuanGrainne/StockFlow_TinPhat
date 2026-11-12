@@ -1,0 +1,228 @@
+using MediatR;
+using Microsoft.EntityFrameworkCore;
+using StockFlow.Application.Common;
+using StockFlow.Application.Common.Interfaces;
+using StockFlow.Application.Features.WarehousePermissions.DTOs;
+using StockFlow.Domain.Entities;
+
+namespace StockFlow.Application.Features.WarehousePermissions.Commands;
+
+public record CreateWarehouseCommand(CreateWarehouseRequest Request) : IRequest<Result<WarehouseFacilityDto>>;
+
+public class CreateWarehouseCommandHandler : IRequestHandler<CreateWarehouseCommand, Result<WarehouseFacilityDto>>
+{
+    private readonly IStockFlowDbContext _context;
+
+    public CreateWarehouseCommandHandler(IStockFlowDbContext context)
+    {
+        _context = context;
+    }
+
+    public async Task<Result<WarehouseFacilityDto>> Handle(CreateWarehouseCommand command, CancellationToken cancellationToken)
+    {
+        var req = command.Request;
+        var rawCode = (!string.IsNullOrWhiteSpace(req.WarehouseCode) ? req.WarehouseCode : req.Code)?.Trim();
+        string finalCode;
+
+        if (string.IsNullOrWhiteSpace(rawCode) || rawCode.Equals("Tự động", StringComparison.OrdinalIgnoreCase) || rawCode.Equals("AUTO", StringComparison.OrdinalIgnoreCase))
+        {
+            var existingCodes = await _context.MstWarehouses
+                .Where(w => w.WarehouseCode != null)
+                .Select(w => w.WarehouseCode!)
+                .ToListAsync(cancellationToken);
+
+            int maxNum = 0;
+            foreach (var c in existingCodes)
+            {
+                var kMatch = System.Text.RegularExpressions.Regex.Match(c, @"^K(\d+)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                if (kMatch.Success && int.TryParse(kMatch.Groups[1].Value, out var n1))
+                {
+                    if (n1 > maxNum) maxNum = n1;
+                }
+                else
+                {
+                    var anyMatch = System.Text.RegularExpressions.Regex.Match(c, @"(\d+)");
+                    if (anyMatch.Success && int.TryParse(anyMatch.Groups[1].Value, out var n2))
+                    {
+                        if (n2 > maxNum) maxNum = n2;
+                    }
+                }
+            }
+
+            finalCode = $"K{maxNum + 1:D3}";
+            while (await _context.MstWarehouses.AnyAsync(w => w.WarehouseCode == finalCode, cancellationToken))
+            {
+                maxNum++;
+                finalCode = $"K{maxNum + 1:D3}";
+            }
+        }
+        else
+        {
+            finalCode = rawCode.ToUpper();
+            var codeExists = await _context.MstWarehouses
+                .AnyAsync(w => w.WarehouseCode == finalCode, cancellationToken);
+
+            if (codeExists)
+            {
+                return Result.Failure<WarehouseFacilityDto>($"Mã kho '{finalCode}' đã tồn tại trong hệ thống.");
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(req.WarehouseName))
+        {
+            return Result.Failure<WarehouseFacilityDto>("Tên kho không được để trống.");
+        }
+
+        var warehouse = new MstWarehouse
+        {
+            WarehouseCode = finalCode,
+            WarehouseName = req.WarehouseName.Trim(),
+            Address = req.Address?.Trim(),
+            Description = req.Description?.Trim(),
+            IsActive = req.IsActive ?? true
+        };
+
+        await _context.MstWarehouses.AddAsync(warehouse, cancellationToken);
+        await _context.SaveChangesAsync(cancellationToken);
+
+        var dto = new WarehouseFacilityDto(
+            Id: warehouse.WarehouseCode,
+            WarehouseId: warehouse.WarehouseId,
+            Code: warehouse.WarehouseCode,
+            Name: warehouse.WarehouseName,
+            Address: warehouse.Address ?? "Hà Nội, Việt Nam",
+            StaffCount: 0,
+            Area: !string.IsNullOrWhiteSpace(warehouse.Description) ? warehouse.Description : "3,500 m²",
+            Status: warehouse.IsActive != false ? "ACTIVE" : "INACTIVE",
+            Description: warehouse.Description
+        );
+
+        return Result.Success(dto);
+    }
+}
+
+public record UpdateWarehouseCommand(int WarehouseId, UpdateWarehouseRequest Request) : IRequest<Result<WarehouseFacilityDto>>;
+
+public class UpdateWarehouseCommandHandler : IRequestHandler<UpdateWarehouseCommand, Result<WarehouseFacilityDto>>
+{
+    private readonly IStockFlowDbContext _context;
+
+    public UpdateWarehouseCommandHandler(IStockFlowDbContext context)
+    {
+        _context = context;
+    }
+
+    public async Task<Result<WarehouseFacilityDto>> Handle(UpdateWarehouseCommand command, CancellationToken cancellationToken)
+    {
+        var warehouse = await _context.MstWarehouses
+            .Include(w => w.JncUserWarehouseAccesses)
+            .FirstOrDefaultAsync(w => w.WarehouseId == command.WarehouseId, cancellationToken);
+
+        if (warehouse == null)
+        {
+            return Result.Failure<WarehouseFacilityDto>("Không tìm thấy kho.");
+        }
+
+        var req = command.Request;
+        if (string.IsNullOrWhiteSpace(req.WarehouseName))
+        {
+            return Result.Failure<WarehouseFacilityDto>("Tên kho không được để trống.");
+        }
+
+        warehouse.WarehouseName = req.WarehouseName.Trim();
+        if (req.Address != null) warehouse.Address = req.Address.Trim();
+        if (req.Description != null) warehouse.Description = req.Description.Trim();
+        if (req.IsActive.HasValue) warehouse.IsActive = req.IsActive.Value;
+
+        await _context.SaveChangesAsync(cancellationToken);
+
+        var dto = new WarehouseFacilityDto(
+            Id: warehouse.WarehouseCode ?? $"FAC-{warehouse.WarehouseId:D2}",
+            WarehouseId: warehouse.WarehouseId,
+            Code: warehouse.WarehouseCode ?? $"WH-{warehouse.WarehouseId:D2}",
+            Name: warehouse.WarehouseName,
+            Address: warehouse.Address ?? "Hà Nội, Việt Nam",
+            StaffCount: warehouse.JncUserWarehouseAccesses.Count,
+            Area: !string.IsNullOrWhiteSpace(warehouse.Description) ? warehouse.Description : "3,500 m²",
+            Status: warehouse.IsActive != false ? "ACTIVE" : "INACTIVE",
+            Description: warehouse.Description
+        );
+
+        return Result.Success(dto);
+    }
+}
+
+public record ToggleWarehouseStatusCommand(int WarehouseId) : IRequest<Result<bool>>;
+
+public class ToggleWarehouseStatusCommandHandler : IRequestHandler<ToggleWarehouseStatusCommand, Result<bool>>
+{
+    private readonly IStockFlowDbContext _context;
+
+    public ToggleWarehouseStatusCommandHandler(IStockFlowDbContext context)
+    {
+        _context = context;
+    }
+
+    public async Task<Result<bool>> Handle(ToggleWarehouseStatusCommand command, CancellationToken cancellationToken)
+    {
+        var warehouse = await _context.MstWarehouses.FirstOrDefaultAsync(w => w.WarehouseId == command.WarehouseId, cancellationToken);
+        if (warehouse == null)
+        {
+            return Result.Failure<bool>("Không tìm thấy kho.");
+        }
+
+        warehouse.IsActive = warehouse.IsActive != true;
+        await _context.SaveChangesAsync(cancellationToken);
+
+        return Result.Success(warehouse.IsActive.Value);
+    }
+}
+
+public record DeleteWarehouseCommand(int WarehouseId) : IRequest<Result<bool>>;
+
+public class DeleteWarehouseCommandHandler : IRequestHandler<DeleteWarehouseCommand, Result<bool>>
+{
+    private readonly IStockFlowDbContext _context;
+
+    public DeleteWarehouseCommandHandler(IStockFlowDbContext context)
+    {
+        _context = context;
+    }
+
+    public async Task<Result<bool>> Handle(DeleteWarehouseCommand command, CancellationToken cancellationToken)
+    {
+        var warehouse = await _context.MstWarehouses
+            .Include(w => w.TrxInventoryBalances)
+            .Include(w => w.JncUserWarehouseAccesses)
+            .FirstOrDefaultAsync(w => w.WarehouseId == command.WarehouseId, cancellationToken);
+
+        if (warehouse == null)
+        {
+            return Result.Failure<bool>("Không tìm thấy kho.");
+        }
+
+        // Kiểm tra nếu kho đang có nhân sự trực thuộc thì không cho xóa
+        if (warehouse.JncUserWarehouseAccesses.Any())
+        {
+            return Result.Failure<bool>($"Không thể xóa cơ sở kho '{warehouse.WarehouseName}' vì đang có {warehouse.JncUserWarehouseAccesses.Count} nhân sự được phân quyền trực thuộc. Vui lòng gỡ hoặc chuyển hết nhân sự sang kho khác trước khi xóa.");
+        }
+
+        var hasInventory = warehouse.TrxInventoryBalances.Any(b => (b.Quantity ?? 0) > 0);
+        if (hasInventory)
+        {
+            return Result.Failure<bool>($"Không thể xóa cơ sở kho '{warehouse.WarehouseName}' vì kho đang có hàng tồn kho. Vui lòng điều chuyển hoặc xuất toàn bộ tồn kho trước khi xóa.");
+        }
+
+        try
+        {
+            _context.MstWarehouses.Remove(warehouse);
+            await _context.SaveChangesAsync(cancellationToken);
+            return Result.Success(true);
+        }
+        catch (Exception ex)
+        {
+            return Result.Failure<bool>($"Không thể xóa kho do có dữ liệu liên kết trong hệ thống ({ex.Message}).");
+        }
+    }
+}
+

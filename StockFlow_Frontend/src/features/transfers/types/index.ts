@@ -16,8 +16,6 @@ export interface TransferRecord {
   destWarehouseName: string;
   createdBy: string;
   receivedBy?: string | null;
-  /** Ghi chú của chi nhánh nhận */
-  receiveNotes?: string | null;
   status: TransferStatus;
   totalQuantity: number;
   totalReceivedQuantity?: number | null;
@@ -40,8 +38,6 @@ export interface TransferItem {
   transferPrice: number;
   lineTotal: number;
   notes?: string;
-  /** Ghi chú dòng hàng của chi nhánh nhận */
-  receiveNotes?: string;
 }
 
 export interface TransferDetail extends TransferRecord {
@@ -69,5 +65,4 @@ export interface ProductForTransfer {
   standardPrice: number;
   sourceStock: number;
   destStock: number;
-  imageUrl?: string | null;
 }

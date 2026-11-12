@@ -2,8 +2,6 @@ using FluentValidation;
 using MediatR;
 using Microsoft.Extensions.DependencyInjection;
 using StockFlow.Application.Behaviors;
-using StockFlow.Application.Common.Interfaces;
-using StockFlow.Application.Common.Inventory;
 
 namespace StockFlow.Application;
 
@@ -23,9 +21,6 @@ public static class DependencyInjection
         });
 
         services.AddValidatorsFromAssembly(assembly);
-
-        // Sổ tồn kho dùng chung (cập nhật tồn + ghi thẻ kho); dùng chung DbContext scoped của request
-        services.AddScoped<IInventoryLedger, InventoryLedger>();
 
         return services;
     }

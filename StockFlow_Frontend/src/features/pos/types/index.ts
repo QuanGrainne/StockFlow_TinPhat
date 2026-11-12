@@ -74,7 +74,7 @@ export interface PosWarehouse {
   status: string;
 }
 
-export type PaymentMethod = 'CASH' | 'VIETQR' | 'DEBT';
+export type PaymentMethod = 'CASH' | 'VIETQR' | 'POS_CARD' | 'DEBT' | 'WALLET';
 
 export interface PosOrderTab {
   id: string; // e.g. 'order-1', 'order-2'

@@ -25,13 +25,9 @@ public class GetCustomerStatsQueryHandler : IRequestHandler<GetCustomerStatsQuer
         var customers = await _context.MstBusinessPartners
             .Where(p => p.PartnerType != null && 
                        (p.PartnerType.ToUpper() == "CUSTOMER" || p.PartnerType.ToUpper() == "BOTH"))
-            // Ẩn hồ sơ "Khách lẻ" dùng nội bộ cho đơn POS không chọn khách
-            .Where(p => p.PartnerCode != "KH00000")
             .AsNoTracking()
             .ToListAsync(cancellationToken);
 
-        var now = VietnamTime.Now;
-        var monthStart = new DateTime(now.Year, now.Month, 1);
         var total = customers.Count;
         var activeCount = customers.Count(c => c.IsActive != false);
         var inactiveCount = customers.Count(c => c.IsActive == false);
@@ -46,7 +42,7 @@ public class GetCustomerStatsQueryHandler : IRequestHandler<GetCustomerStatsQuer
 
         var stats = new CustomerStatsDto(
             TotalCustomers: total,
-            NewThisMonth: customers.Count(c => c.CreatedAt.HasValue && c.CreatedAt.Value >= monthStart), // khách tạo trong tháng này
+            NewThisMonth: 12, // Số hồ sơ khách hàng mới tăng trưởng
             ActiveCustomers: activeCount,
             ActivePercentage: activePercent,
             InactiveCustomers: inactiveCount,

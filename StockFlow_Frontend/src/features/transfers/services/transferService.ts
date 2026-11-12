@@ -49,13 +49,10 @@ interface ApiTransferItem {
   transferPrice: number;
   lineTotal: number;
   notes?: string | null;
-  receiveNotes?: string | null;
 }
 
 interface ApiTransferDetail extends ApiTransferList {
   items: ApiTransferItem[];
-  receivedByName?: string | null;
-  receiveNotes?: string | null;
 }
 
 interface ApiProductWithStock {
@@ -67,7 +64,6 @@ interface ApiProductWithStock {
   standardPrice: number;
   sourceStock: number;
   destStock: number;
-  imageUrl?: string | null;
 }
 
 export interface SaveTransferPayload {
@@ -137,12 +133,11 @@ function mapItem(it: ApiTransferItem): TransferItem {
     transferPrice: it.transferPrice ?? 0,
     lineTotal: it.lineTotal ?? 0,
     notes: it.notes ?? undefined,
-    receiveNotes: it.receiveNotes ?? undefined,
   };
 }
 
 function mapDetail(d: ApiTransferDetail): TransferDetail {
-  return { ...mapRecord(d, readStarred()), receivedBy: d.receivedByName ?? null, receiveNotes: d.receiveNotes ?? null, items: (d.items ?? []).map(mapItem) };
+  return { ...mapRecord(d, readStarred()), items: (d.items ?? []).map(mapItem) };
 }
 
 export const transferService = {
@@ -198,7 +193,6 @@ export const transferService = {
       standardPrice: p.standardPrice ?? 0,
       sourceStock: p.sourceStock ?? 0,
       destStock: p.destStock ?? 0,
-      imageUrl: p.imageUrl ?? null,
     }));
   },
 
@@ -234,16 +228,10 @@ export const transferService = {
     payload: {
       receivedDate?: string;
       notes?: string;
-      items?: { productId: number; receivedQuantity: number; transferItemId?: number; notes?: string }[];
+      items?: { productId: number; receivedQuantity: number; transferItemId?: number }[];
     }
   ): Promise<TransferDetail> {
     const data = await apiClient.post<ApiTransferDetail>(`/api/transfers/${id}/receive`, payload);
-    return mapDetail(data);
-  },
-
-  /** Sửa ghi chú chuyển / ghi chú nhận (undefined = giữ nguyên, '' = xóa) */
-  async updateNotes(id: number, payload: { notes?: string; receiveNotes?: string }): Promise<TransferDetail> {
-    const data = await apiClient.put<ApiTransferDetail>(`/api/transfers/${id}/notes`, payload);
     return mapDetail(data);
   },
 

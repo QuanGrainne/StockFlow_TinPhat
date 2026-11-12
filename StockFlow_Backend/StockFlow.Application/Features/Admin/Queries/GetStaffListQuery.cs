@@ -74,9 +74,8 @@ public class GetStaffListQueryHandler : IRequestHandler<GetStaffListQuery, Resul
                 ? roleMap[primaryRole].Department 
                 : "Khối Nghiệp vụ";
 
-            // Chỉ kho đang hoạt động (bỏ dòng phân quyền trỏ tới kho đã ngừng)
             var warehouses = u.JncUserWarehouseAccesses
-                .Where(w => w.Warehouse?.WarehouseCode != null && w.Warehouse.IsActive != false)
+                .Where(w => w.Warehouse?.WarehouseCode != null)
                 .Select(w => w.Warehouse!.WarehouseCode!)
                 .ToList();
 

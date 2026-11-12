@@ -26,7 +26,7 @@ export default function SupplierToolbar({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   return (
-    <header className="h-12 bg-white/84 backdrop-blur-[2px] border-b border-slate-200 px-4 flex items-center justify-between gap-3 shrink-0">
+    <header className="h-12 bg-white border-b border-slate-200 px-4 flex items-center justify-between gap-3 shrink-0">
       {/* Left: Title & Search bar */}
       <div className="flex items-center gap-4 flex-1 max-w-xl">
         <h1 className="text-[20px] font-bold text-[#15171a] leading-7 tracking-tight whitespace-nowrap">

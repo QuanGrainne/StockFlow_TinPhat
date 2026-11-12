@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
 
 export default function ProductPricingPage() {
-  redirect('/price-books');
+  redirect('/products/price-books');
 }

@@ -82,8 +82,7 @@ public class GetPurchaseByIdQueryHandler : IRequestHandler<GetPurchaseByIdQuery,
             decimal debtAmount = Math.Max(0, openAmount - returnOffset);
 
             var receiptCode = receipt.GrCode ?? $"PN{receipt.GrId:D6}";
-            // Lịch sử thanh toán: phiếu mới nhất lên đầu
-            var paymentDtos = payments.OrderByDescending(t => t.TransactionDate).ThenByDescending(t => t.TxId).Select(t => new PurchasePaymentDto(
+            var paymentDtos = payments.Select(t => new PurchasePaymentDto(
                 Code: string.IsNullOrEmpty(t.TxCode) ? $"TT{receiptCode}" : t.TxCode!,
                 PaymentDate: t.TransactionDate,
                 CreatedByName: t.CreatedByNavigation?.FullName ?? t.CreatedByNavigation?.Username ?? $"NV #{t.CreatedBy}",

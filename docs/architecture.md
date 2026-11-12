@@ -2,63 +2,41 @@
 
 ## System Overview
 
-StockFlow is an Order & Inventory Management System for Tin Phát Company.
-The backend is **Clean Architecture with 4 projects, organized by feature, CQRS with MediatR**.
-The frontend is **Next.js App Router, feature-based**. They talk only over HTTP (JWT bearer).
-Detailed rules: [`.claude/rules/10-backend-structure.md`](../.claude/rules/10-backend-structure.md) and [`.claude/rules/20-frontend-structure.md`](../.claude/rules/20-frontend-structure.md).
+StockFlow is an Order & Inventory Management System for Tin Phát Company.  
+It follows a **Modular Monolith** backend architecture with a **Next.js App Router** frontend.
 
 ---
 
-## Backend Architecture (Clean Architecture)
+## Backend Architecture (Clean Architecture / Modular Monolith)
 
 ```
 ┌────────────────────────────────────────────────────────┐
 │                   StockFlow.API                        │
-│  (Controllers, Authorization, Middleware, DI, Swagger) │
+│  (HTTP, Middleware, DI Bootstrap, Swagger)             │
 └────────────┬───────────────────────┬───────────────────┘
              │                       │
              ▼                       ▼
 ┌────────────────────┐   ┌──────────────────────────────┐
-│ StockFlow.         │   │  StockFlow.Infrastructure     │
-│ Application        │◄──│  (EF Core DbContext, Npgsql,  │
-│ (MediatR CQRS,     │   │   Migrations, Seeder,         │
-│  FluentValidation, │   │   Jwt/CurrentUser/Permission/ │
-│  DTOs, Behaviors,  │   │   document-code services)     │
-│  Inventory ledger) │   └──────────────┬───────────────┘
-└────────────┬───────┘                  │
-             │                          │
-             ▼                          ▼
-┌─────────────────────────────────────────────┐
-│               StockFlow.Domain              │
-│  (Entities only: Mst*, Trx*, Dtl*, Sec*,    │
-│   Jnc* — zero external dependencies)        │
-└─────────────────────────────────────────────┘
-```
-
-### Folder layout
-```
-StockFlow_Backend/
-├── StockFlow.Domain/Entities                one class per table
-├── StockFlow.Application/
-│   ├── Common/                              Result<T>, PaginatedResult, VietnamTime
-│   │   ├── Interfaces/                      IStockFlowDbContext, ICurrentUserService, IInventoryLedger, ...
-│   │   └── Inventory/                       InventoryLedger, StockKey, StockRef
-│   ├── Behaviors/                           ValidationBehavior
-│   ├── Features/<Module>/                   Commands/  Queries/  DTOs/  Helpers/
-│   └── DependencyInjection.cs
-├── StockFlow.Infrastructure/
-│   ├── Persistence/                         StockFlowDbContext, Migrations/, DatabaseSeeder
-│   ├── Services/                            CurrentUserService, JwtTokenGenerator, BcryptPasswordHasher,
-│   │                                        TransactionCodeGenerator, UserPermissionService
-│   └── DependencyInjection.cs
-└── StockFlow.API/                           Controllers/  Authorization/  Middleware/  Program.cs
+│ StockFlow.          │   │  StockFlow.Infrastructure     │
+│ Application         │   │  (EF Core, Npgsql, Repos,    │
+│ (MediatR CQRS,      │◄──│   UnitOfWork, Migrations)    │
+│  FluentValidation,  │   └──────────────────────────────┘
+│  DTOs, Behaviors)   │
+└────────────┬────────┘
+             │
+             ▼
+┌─────────────────────────────────────┐
+│         StockFlow.Domain             │
+│  (Entities, Interfaces, Exceptions,  │
+│   Enums — zero external dependencies)│
+└─────────────────────────────────────┘
 ```
 
 ### Layer Rules
 | Layer | Depends On | Key Packages |
 |-------|-----------|--------------|
 | Domain | *nothing* | — |
-| Application | Domain | MediatR, FluentValidation, EF Core (via `IStockFlowDbContext`) |
+| Application | Domain | MediatR, FluentValidation |
 | Infrastructure | Application, Domain | Npgsql.EF, EF.Design |
 | API | Application, Infrastructure | Swashbuckle, JwtBearer |
 
@@ -66,13 +44,12 @@ StockFlow_Backend/
 ```
 HTTP Request
   → ExceptionHandlingMiddleware
-  → Authorization (FallbackPolicy + [RequirePermission])
-  → Controller (thin)
+  → Controller
   → MediatR.Send(Command/Query)
   → ValidationBehavior (FluentValidation)
-  → Handler (IStockFlowDbContext, transactions via BeginTransactionAsync)
-      └─ stock movements → IInventoryLedger (balance + stock-card row)
-  → Result<T> → Ok / BadRequest(new { message })
+  → Handler
+  → Repository / DbContext (PostgreSQL)
+  → Response DTO
 ```
 
 ---
@@ -81,30 +58,25 @@ HTTP Request
 
 ```
 src/
-├── app/                      # Routing only (page.tsx files)
-│   ├── (auth)/login/
-│   ├── (dashboard)/<route>/  # list pages render <LazyAppLayout initialScreen="..." />
-│   └── pos/
+├── app/            # Next.js routing (App Router)
+│   ├── (auth)/     # Login — no sidebar layout
+│   └── (dashboard)/# Protected pages — sidebar layout
 │
-├── features/<module>/        # admin, bom, customers, orders, pos, price-books, production,
-│   ├── screens/              #   products, purchase-orders, purchase-returns, purchases,
-│   ├── components/           #   sales-bookings, sales-returns, settings, stocktakes,
-│   ├── services/             #   suppliers, transfers
-│   └── types/  utils/  hooks/
+├── features/       # Business domain modules
+│   └── {feature}/
+│       ├── components/  # Feature-specific React components
+│       └── hooks/       # Feature-specific data hooks (SWR/React Query)
 │
-├── components/               # Shared only
-│   ├── layout/               # AppLayout, LazyAppLayout, Header, Sidebar, FeatureGuard
-│   ├── filters/  inputs/  links/
-│   └── ProductThumb, ImageLightbox, FormHeaderUserBar
+├── shared/         # Cross-cutting UI concerns
+│   ├── components/ui/        # Reusable base components
+│   ├── components/layout/    # Sidebar, Navbar
+│   └── hooks/               # Global hooks (useDebounce, useLocalStorage, etc.)
 │
-└── lib/
-    ├── api/                  # client.ts — the only HTTP client
-    ├── auth/  navigation/    # navbar.ts (NAV_GROUPS), currentRole.ts
-    ├── warehouse/  print/  ui/
+└── lib/            # Infrastructure
+    ├── api/        # Fetch-based API client
+    ├── auth/       # AuthContext (JWT, localStorage)
+    └── types/      # Global TypeScript types
 ```
-
-Page loading path: `page.tsx → LazyAppLayout → AppLayout (Header + Sidebar + permission check) → switch (activeScreen) → features/<module>/screens/<Module>Screen`.
-Create pages (`*/create`) and `pos` load their own screen with `next/dynamic`.
 
 ---
 
@@ -112,8 +84,8 @@ Create pages (`*/create`) and `pos` load their own screen with `next/dynamic`.
 
 - **Engine**: PostgreSQL 15+
 - **Provider**: Npgsql Entity Framework Core
-- **Database name**: `stockflow_dev` (development), schema `stockflow`
-- **Migrations**: Managed by EF Core, stored in `StockFlow.Infrastructure/Persistence/Migrations/`; applied automatically at API startup together with `DatabaseSeeder`.
+- **Database name**: `stockflow_dev` (development)
+- **Migrations**: Managed by EF Core, stored in `StockFlow.Infrastructure/Persistence/Migrations/`
 
 ---
 
@@ -121,25 +93,23 @@ Create pages (`*/create`) and `pos` load their own screen with `next/dynamic`.
 
 | Technology | Version |
 |-----------|---------|
-| .NET / ASP.NET Core | 9.0 |
+| .NET | 9.0 |
+| ASP.NET Core | 9.0 |
 | EF Core | 9.0.x |
 | Npgsql.EF | 9.0.x |
 | MediatR | 14.x |
-| FluentValidation | 11.x |
+| FluentValidation | 12.x |
 | Swashbuckle | 6.x |
-| Next.js | 16.x |
+| Next.js | 15.x |
 | React | 19.x |
-| antd | 6.x |
-| Tailwind CSS | 4.x |
 | TypeScript | 5.x |
 
 ---
 
 ## Key Design Decisions
 
-1. **No repositories / unit of work** — handlers use `IStockFlowDbContext` (EF Core) directly; transactions only via `IStockFlowDbContext.BeginTransactionAsync`.
-2. **Railway-oriented results** — Handlers return `Result<T>` instead of throwing exceptions for expected failures.
-3. **MediatR pipeline** — `ValidationBehavior` runs FluentValidation before every handler, no manual validator calls.
-4. **CQRS** — Commands mutate state, Queries read state; separation enforced by MediatR.
-5. **Shared inventory ledger** — every stock movement updates `trx_inventory_balances` and appends one `trx_inventory_transactions` row through `IInventoryLedger` (moving-average cost).
-6. **Warehouse isolation** — handlers check `ICurrentUserService.HasWarehouseAccessAsync`; permissions are resolved from the DB per request.
+1. **No Tailwind at this stage** — Vanilla CSS modules / global CSS until the design system is defined.
+2. **Soft delete** — Entities have `IsDeleted` flag; `GenericRepository` filters deleted records automatically.
+3. **Railway-oriented results** — Handlers return `Result<T>` instead of throwing exceptions for expected failures.
+4. **MediatR pipeline** — `ValidationBehavior` runs FluentValidation before every handler, no manual validator calls.
+5. **CQRS** — Commands mutate state, Queries read state; separation enforced by MediatR.

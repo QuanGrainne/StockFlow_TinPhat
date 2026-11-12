@@ -26,25 +26,12 @@ public class CustomersController : ControllerBase
     [HttpGet]
     [ProducesResponseType(typeof(List<CustomerDto>), StatusCodes.Status200OK)]
     [RequirePermission("PARTNER_READ")]
-    [RequireFeature("feat-customers", "feat-pos", "feat-invoices")]
     public async Task<IActionResult> GetCustomers(
         [FromQuery] string? search,
         [FromQuery] string? debtStatus,
-        [FromQuery] string? status,
-        [FromQuery] int? createdWarehouseId,
-        [FromQuery] DateTime? createdFrom,
-        [FromQuery] DateTime? createdTo,
-        [FromQuery] string? gender,
-        [FromQuery] decimal? minSales,
-        [FromQuery] decimal? maxSales,
-        [FromQuery] DateTime? salesFrom,
-        [FromQuery] DateTime? salesTo,
-        [FromQuery] decimal? minDebt,
-        [FromQuery] decimal? maxDebt)
+        [FromQuery] string? status)
     {
-        var result = await _mediator.Send(new GetCustomersQuery(
-            search, debtStatus, status, createdWarehouseId, createdFrom, createdTo, gender,
-            minSales, maxSales, salesFrom, salesTo, minDebt, maxDebt));
+        var result = await _mediator.Send(new GetCustomersQuery(search, debtStatus, status));
         if (!result.IsSuccess)
         {
             return BadRequest(new { message = result.Error });
@@ -58,7 +45,6 @@ public class CustomersController : ControllerBase
     [HttpGet("stats")]
     [ProducesResponseType(typeof(CustomerStatsDto), StatusCodes.Status200OK)]
     [RequirePermission("PARTNER_READ")]
-    [RequireFeature("feat-customers")]
     public async Task<IActionResult> GetCustomerStats()
     {
         var result = await _mediator.Send(new GetCustomerStatsQuery());
@@ -76,7 +62,6 @@ public class CustomersController : ControllerBase
     [ProducesResponseType(typeof(CustomerDetailDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [RequirePermission("PARTNER_READ")]
-    [RequireFeature("feat-customers", "feat-invoices")]
     public async Task<IActionResult> GetCustomerById(int id)
     {
         var result = await _mediator.Send(new GetCustomerByIdQuery(id));
@@ -88,60 +73,6 @@ public class CustomersController : ControllerBase
     }
 
     /// <summary>
-    /// Chi tiết 1 phiếu thu của khách hàng theo mã (TTHD000085, TTHD000085-1, PT000001...).
-    /// </summary>
-    [HttpGet("{id}/receipts/{code}")]
-    [ProducesResponseType(typeof(CustomerReceiptDetailDto), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    [RequirePermission("PARTNER_READ")]
-    [RequireFeature("feat-customers")]
-    public async Task<IActionResult> GetCustomerReceipt(int id, string code)
-    {
-        var result = await _mediator.Send(new GetCustomerReceiptQuery(id, code));
-        if (!result.IsSuccess)
-        {
-            return NotFound(new { message = result.Error });
-        }
-        return Ok(result.Value);
-    }
-
-    /// <summary>
-    /// Sửa phiếu thu của khách: thời gian, phương thức thanh toán, ghi chú.
-    /// </summary>
-    [HttpPut("{id}/receipts/{code}")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    [RequirePermission("FIN_UPDATE")]
-    [RequireFeature("feat-customers")]
-    public async Task<IActionResult> UpdateCustomerReceipt(int id, string code, [FromBody] UpdateCustomerReceiptRequest request)
-    {
-        var result = await _mediator.Send(new UpdateCustomerReceiptCommand(id, code, request));
-        if (!result.IsSuccess)
-        {
-            return BadRequest(new { message = result.Error });
-        }
-        return Ok(new { message = $"Đã lưu phiếu thu {code}" });
-    }
-
-    /// <summary>
-    /// Hủy phiếu thu của khách: hoàn lại số đã trả của hóa đơn và cộng lại nợ khách.
-    /// </summary>
-    [HttpPost("{id}/receipts/{code}/cancel")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    [RequirePermission("FIN_UPDATE")]
-    [RequireFeature("feat-customers")]
-    public async Task<IActionResult> CancelCustomerReceipt(int id, string code)
-    {
-        var result = await _mediator.Send(new CancelCustomerReceiptCommand(id, code));
-        if (!result.IsSuccess)
-        {
-            return BadRequest(new { message = result.Error });
-        }
-        return Ok(new { message = $"Đã hủy phiếu thu {code}" });
-    }
-
-    /// <summary>
     /// Thêm mới một Khách hàng (tự động gán partner_type = 'CUSTOMER').
     /// </summary>
     [HttpPost]
@@ -149,7 +80,6 @@ public class CustomersController : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     [RequirePermission("PARTNER_CREATE")]
-    [RequireFeature("feat-customers", "feat-pos")]
     public async Task<IActionResult> CreateCustomer([FromBody] CreateCustomerRequest request)
     {
         var result = await _mediator.Send(new CreateCustomerCommand(request));
@@ -177,31 +107,12 @@ public class CustomersController : ControllerBase
     }
 
     /// <summary>
-    /// Tạo phiếu thu nợ khách hàng (PT000001...), có thể phân bổ vào các hóa đơn còn nợ.
-    /// </summary>
-    [HttpPost("{id}/payments")]
-    [ProducesResponseType(typeof(CustomerPaymentResultDto), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    [RequirePermission("FIN_CREATE")]
-    [RequireFeature("feat-customers")]
-    public async Task<IActionResult> CreateCustomerPayment(int id, [FromBody] CreateCustomerPaymentRequest request)
-    {
-        var result = await _mediator.Send(new CreateCustomerPaymentCommand(id, request));
-        if (!result.IsSuccess)
-        {
-            return BadRequest(new { message = result.Error });
-        }
-        return Ok(result.Value);
-    }
-
-    /// <summary>
     /// Cập nhật thông tin Khách hàng.
     /// </summary>
     [HttpPut("{id}")]
     [ProducesResponseType(typeof(CustomerDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [RequirePermission("PARTNER_UPDATE")]
-    [RequireFeature("feat-customers")]
     public async Task<IActionResult> UpdateCustomer(int id, [FromBody] UpdateCustomerRequest request)
     {
         var result = await _mediator.Send(new UpdateCustomerCommand(id, request));
@@ -217,7 +128,6 @@ public class CustomersController : ControllerBase
     /// </summary>
     [HttpPatch("{id}/toggle-status")]
     [RequirePermission("PARTNER_UPDATE")]
-    [RequireFeature("feat-customers")]
     public async Task<IActionResult> ToggleCustomerStatus(int id)
     {
         var result = await _mediator.Send(new ToggleCustomerStatusCommand(id));
@@ -233,7 +143,6 @@ public class CustomersController : ControllerBase
     /// </summary>
     [HttpPatch("batch-status")]
     [RequirePermission("PARTNER_UPDATE")]
-    [RequireFeature("feat-customers")]
     public async Task<IActionResult> BatchUpdateCustomerStatus([FromBody] BatchCustomerStatusRequest request)
     {
         var result = await _mediator.Send(new BatchCustomerStatusCommand(request));
@@ -249,7 +158,6 @@ public class CustomersController : ControllerBase
     /// </summary>
     [HttpDelete("{id}")]
     [RequirePermission("PARTNER_DELETE")]
-    [RequireFeature("feat-customers")]
     public async Task<IActionResult> DeleteCustomer(int id)
     {
         var result = await _mediator.Send(new DeleteCustomerCommand(id));

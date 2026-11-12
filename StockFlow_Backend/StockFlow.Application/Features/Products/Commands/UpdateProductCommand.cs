@@ -12,12 +12,10 @@ public record UpdateProductCommand(int ProductId, UpdateProductRequest Request) 
 public class UpdateProductCommandHandler : IRequestHandler<UpdateProductCommand, Result<ProductDto>>
 {
     private readonly IStockFlowDbContext _context;
-    private readonly ICurrentUserService _currentUser;
 
-    public UpdateProductCommandHandler(IStockFlowDbContext context, ICurrentUserService currentUser)
+    public UpdateProductCommandHandler(IStockFlowDbContext context)
     {
         _context = context;
-        _currentUser = currentUser;
     }
 
     public async Task<Result<ProductDto>> Handle(UpdateProductCommand command, CancellationToken cancellationToken)
@@ -118,37 +116,12 @@ public class UpdateProductCommandHandler : IRequestHandler<UpdateProductCommand,
             var scopeIds = req.CostWarehouseIds?.Where(id => id > 0).Distinct().ToList();
             var applyAll = scopeIds == null || scopeIds.Count == 0;
 
-            // Thẻ kho: mỗi kho có giá vốn thay đổi ghi 1 dòng "Cập nhật giá vốn" (SL 0), dùng chung 1 mã CB cho lần sửa này
-            int? costUpdateRef = null;
-            var now = VietnamTime.Now;
-
             foreach (var balance in product.TrxInventoryBalances)
             {
                 if (applyAll || scopeIds!.Contains(balance.WarehouseId))
                 {
-                    var changed = Math.Round(balance.UnitCost ?? 0, 2) != Math.Round(newCost, 2);
                     balance.UnitCost = newCost;
-                    balance.LastUpdated = now;
-
-                    if (changed && _currentUser.UserId.HasValue)
-                    {
-                        costUpdateRef ??= (int)await _context.GetNextSequenceValueAsync("stockflow.seq_cost_update", cancellationToken);
-                        _context.TrxInventoryTransactions.Add(new TrxInventoryTransaction
-                        {
-                            WarehouseId = balance.WarehouseId,
-                            ProductId = product.ProductId,
-                            LocationId = balance.LocationId,
-                            LotId = balance.LotId,
-                            TransactionType = "COST_UPDATE",
-                            Quantity = 0,
-                            ReferenceType = "COST_UPDATE",
-                            ReferenceId = costUpdateRef,
-                            TransactionDate = now,
-                            CreatedBy = _currentUser.UserId.Value,
-                            UnitCost = newCost,
-                            BalanceAfter = balance.Quantity ?? 0,
-                        });
-                    }
+                    balance.LastUpdated = DateTime.UtcNow;
                 }
             }
 

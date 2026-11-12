@@ -68,8 +68,7 @@ public class ReceiveTransferCommandHandler : IRequestHandler<ReceiveTransferComm
         }
 
         // Bắt buộc nhập ghi chú khi phát hiện nhận thiếu hàng
-        // Ghi chú nhận: lấy ghi chú gửi kèm lúc nhận, nếu không có thì dùng ghi chú nhận đã lưu trước (lúc đang chuyển)
-        if (hasDiscrepancy && string.IsNullOrWhiteSpace(command.Request.Notes) && string.IsNullOrWhiteSpace(transfer.ReceiveNotes))
+        if (hasDiscrepancy && string.IsNullOrWhiteSpace(command.Request.Notes))
         {
             return Result.Failure<TransferDetailDto>("Phát hiện nhận thiếu hàng! Bắt buộc phải nhập ghi chú lý do thiếu hàng trước khi xác nhận Nhận hàng.");
         }
@@ -98,10 +97,6 @@ public class ReceiveTransferCommandHandler : IRequestHandler<ReceiveTransferComm
 
             decimal actualReceived = reqItem != null ? Math.Max(0, reqItem.ReceivedQuantity) : (item.Quantity ?? 0);
             item.ReceivedQuantity = actualReceived;
-            if (reqItem != null)
-            {
-                item.ReceiveNotes = string.IsNullOrWhiteSpace(reqItem.Notes) ? null : reqItem.Notes.Trim();
-            }
 
             var product = products[item.ProductId];
             var unitCost = item.UnitCost
@@ -115,10 +110,11 @@ public class ReceiveTransferCommandHandler : IRequestHandler<ReceiveTransferComm
 
         transfer.Status = "RECEIVED";
         transfer.ReceivedDate = receivedDate;
-        // Ghi chú nhận lưu riêng (không nối vào ghi chú chuyển như trước)
         if (!string.IsNullOrWhiteSpace(command.Request.Notes))
         {
-            transfer.ReceiveNotes = command.Request.Notes.Trim();
+            transfer.Notes = string.IsNullOrWhiteSpace(transfer.Notes)
+                ? $"[Nhận hàng]: {command.Request.Notes.Trim()}"
+                : $"{transfer.Notes} | [Nhận hàng]: {command.Request.Notes.Trim()}";
         }
 
         await _context.SaveChangesAsync(cancellationToken);

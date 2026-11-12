@@ -4,7 +4,6 @@ using Microsoft.EntityFrameworkCore;
 using StockFlow.Application.Common;
 using StockFlow.Application.Common.Interfaces;
 using StockFlow.Application.Features.Customers.DTOs;
-using StockFlow.Application.Features.Customers.Helpers;
 
 namespace StockFlow.Application.Features.Customers.Commands;
 
@@ -59,11 +58,6 @@ public class UpdateCustomerCommandHandler : IRequestHandler<UpdateCustomerComman
         partner.Phone = req.Phone?.Trim();
         partner.Email = req.Email?.Trim();
         partner.Address = req.Address?.Trim();
-        partner.Phone2 = CustomerProfileHelper.Clean(req.Phone2, 20);
-        partner.Gender = CustomerProfileHelper.NormalizeGender(req.Gender);
-        partner.BirthDate = req.BirthDate?.Date;
-        partner.Facebook = CustomerProfileHelper.Clean(req.Facebook, 255);
-        partner.Notes = CustomerProfileHelper.Clean(req.Notes, 500);
 
         if (req.CreditLimit.HasValue)
         {
@@ -82,8 +76,27 @@ public class UpdateCustomerCommandHandler : IRequestHandler<UpdateCustomerComman
 
         await _context.SaveChangesAsync(cancellationToken);
 
-        var lookups = await CustomerProfileHelper.LoadLookupsAsync(_context, new[] { partner }, null, null, cancellationToken);
-        var dto = CustomerProfileHelper.ToDto(partner, lookups);
+        var creditLimit = partner.CreditLimit ?? 0;
+        var currentDebt = partner.CurrentDebt ?? 0;
+        var isOverLimit = creditLimit > 0 && currentDebt > creditLimit;
+        var status = (partner.IsActive != false) ? "ACTIVE" : "INACTIVE";
+
+        var dto = new CustomerDto(
+            Id: partner.PartnerId.ToString(),
+            PartnerId: partner.PartnerId,
+            Code: partner.PartnerCode ?? $"KH{partner.PartnerId.ToString().PadLeft(5, '0')}",
+            Name: partner.PartnerName,
+            Type: partner.PartnerType ?? "CUSTOMER",
+            Phone: partner.Phone,
+            Email: partner.Email,
+            Address: partner.Address,
+            CreditLimit: creditLimit,
+            CurrentDebt: currentDebt,
+            CurrentPayable: partner.CurrentPayable ?? 0,
+            Status: status,
+            IsOverCreditLimit: isOverLimit
+        );
+
         return Result<CustomerDto>.Success(dto);
     }
 }

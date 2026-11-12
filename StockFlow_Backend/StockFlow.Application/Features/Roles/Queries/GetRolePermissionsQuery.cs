@@ -31,7 +31,7 @@ public class GetRolePermissionsQueryHandler : IRequestHandler<GetRolePermissions
             PermissionConstants.ToRoleCode(r.RoleName ?? "").Equals(targetNormalized, StringComparison.OrdinalIgnoreCase) ||
             (r.RoleName != null && r.RoleName.Equals(request.RoleCode, StringComparison.OrdinalIgnoreCase)));
 
-        var hasAssignedPermissions = role != null && role.Permissions.Any(p => !FeatureConstants.IsFeatureCode(p.PermissionCode));
+        var hasAssignedPermissions = role != null && role.Permissions.Any();
         var grantedCodes = role?.Permissions
             .Where(p => !string.IsNullOrEmpty(p.PermissionCode))
             .Select(p => p.PermissionCode!.ToUpperInvariant())

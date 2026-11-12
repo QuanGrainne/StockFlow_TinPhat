@@ -26,12 +26,6 @@ public partial class DtlStockTransferItem
     /// <summary>Giá vốn kho xuất tại thời điểm xuất chuyển (giá trị chuyển / giá nhập vào kho nhận)</summary>
     public decimal? UnitCost { get; set; }
 
-    /// <summary>Ghi chú dòng hàng của chi nhánh chuyển</summary>
-    public string? Notes { get; set; }
-
-    /// <summary>Ghi chú dòng hàng của chi nhánh nhận (VD: "thiếu 1", "vỡ")</summary>
-    public string? ReceiveNotes { get; set; }
-
     public virtual MstWarehouseLocation? DestLocation { get; set; }
 
     public virtual MstInventoryLot? Lot { get; set; }

@@ -71,10 +71,7 @@ public class CreateTransferCommandHandler : IRequestHandler<CreateTransferComman
 
         // 2. Sinh mã phiếu chuyển
         string finalCode;
-        // Mã trống / placeholder / "Copy_CK..." (phiếu sao chép) → tự sinh mã mới
-        if (string.IsNullOrWhiteSpace(req.TransferCode)
-            || req.TransferCode.Trim().Equals("Mã phiếu tự động", StringComparison.OrdinalIgnoreCase)
-            || req.TransferCode.Trim().StartsWith("Copy_", StringComparison.OrdinalIgnoreCase))
+        if (string.IsNullOrWhiteSpace(req.TransferCode) || req.TransferCode.Trim().Equals("Mã phiếu tự động", StringComparison.OrdinalIgnoreCase))
         {
             finalCode = await TransferHelper.GenerateNextTransferCodeAsync(_context, cancellationToken);
         }
@@ -96,7 +93,8 @@ public class CreateTransferCommandHandler : IRequestHandler<CreateTransferComman
 
         // 3. Luôn lưu phiếu ở trạng thái Phiếu tạm trước; nếu chọn Hoàn thành thì xuất chuyển bằng đúng logic
         //    của bước "Xuất hàng" (kiểm tra đủ tồn, trừ tồn theo giá vốn, ghi thẻ kho) trong cùng 1 giao dịch.
-        await using var dbTransaction = await _context.BeginTransactionAsync(cancellationToken);
+        var dbContext = _context as DbContext;
+        await using var dbTransaction = dbContext != null ? await dbContext.Database.BeginTransactionAsync(cancellationToken) : null;
 
         var transfer = new TrxStockTransfer
         {
@@ -120,8 +118,7 @@ public class CreateTransferCommandHandler : IRequestHandler<CreateTransferComman
                 ProductId = it.ProductId,
                 Quantity = it.Quantity,
                 IssuedQuantity = 0,
-                ReceivedQuantity = null,
-                Notes = string.IsNullOrWhiteSpace(it.Notes) ? null : it.Notes.Trim(),
+                ReceivedQuantity = null
             }, cancellationToken);
         }
         await _context.SaveChangesAsync(cancellationToken);

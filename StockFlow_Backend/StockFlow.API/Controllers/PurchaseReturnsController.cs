@@ -30,7 +30,6 @@ public class PurchaseReturnsController : ControllerBase
     [HttpGet]
     [ProducesResponseType(typeof(List<PurchaseReturnListDto>), StatusCodes.Status200OK)]
     [RequirePermission("PURCHASE_READ")]
-    [RequireFeature("feat-purchase-returns")]
     public async Task<IActionResult> GetList(
         [FromQuery] string? warehouseIds,
         [FromQuery] string? statuses,
@@ -51,7 +50,6 @@ public class PurchaseReturnsController : ControllerBase
     [HttpGet("{id:int}")]
     [ProducesResponseType(typeof(PurchaseReturnDetailDto), StatusCodes.Status200OK)]
     [RequirePermission("PURCHASE_READ")]
-    [RequireFeature("feat-purchase-returns", "feat-purchase", "feat-suppliers", "feat-goods")]
     public async Task<IActionResult> GetById(int id)
     {
         var result = await _mediator.Send(new GetPurchaseReturnByIdQuery(id));
@@ -62,7 +60,6 @@ public class PurchaseReturnsController : ControllerBase
     [HttpGet("source/{grId:int}")]
     [ProducesResponseType(typeof(ReturnSourceDto), StatusCodes.Status200OK)]
     [RequirePermission("PURCHASE_READ")]
-    [RequireFeature("feat-purchase-returns")]
     public async Task<IActionResult> GetSource(int grId, [FromQuery] int? excludeReturnId)
     {
         var result = await _mediator.Send(new GetPurchaseReturnSourceQuery(grId, excludeReturnId));
@@ -72,7 +69,6 @@ public class PurchaseReturnsController : ControllerBase
     [HttpPost]
     [ProducesResponseType(typeof(PurchaseReturnDetailDto), StatusCodes.Status200OK)]
     [RequirePermission("PURCHASE_CREATE")]
-    [RequireFeature("feat-purchase-returns")]
     public async Task<IActionResult> Create([FromBody] SavePurchaseReturnRequest request)
     {
         var result = await _mediator.Send(new CreatePurchaseReturnCommand(request));
@@ -83,7 +79,6 @@ public class PurchaseReturnsController : ControllerBase
     [HttpPut("{id:int}")]
     [ProducesResponseType(typeof(PurchaseReturnDetailDto), StatusCodes.Status200OK)]
     [RequirePermission("PURCHASE_UPDATE")]
-    [RequireFeature("feat-purchase-returns")]
     public async Task<IActionResult> Update(int id, [FromBody] SavePurchaseReturnRequest request)
     {
         var result = await _mediator.Send(new UpdatePurchaseReturnCommand(id, request));
@@ -94,7 +89,6 @@ public class PurchaseReturnsController : ControllerBase
     [HttpPost("{id:int}/refunds")]
     [ProducesResponseType(typeof(PurchaseReturnDetailDto), StatusCodes.Status200OK)]
     [RequirePermission("FIN_CREATE")]
-    [RequireFeature("feat-purchase-returns")]
     public async Task<IActionResult> CreateRefund(int id, [FromBody] CreateSupplierRefundRequest request)
     {
         var result = await _mediator.Send(new CreateSupplierRefundCommand(id, request));
@@ -103,7 +97,6 @@ public class PurchaseReturnsController : ControllerBase
 
     [HttpPatch("{id:int}/cancel")]
     [RequirePermission("PURCHASE_UPDATE")]
-    [RequireFeature("feat-purchase-returns")]
     public async Task<IActionResult> Cancel(int id)
     {
         var result = await _mediator.Send(new CancelPurchaseReturnCommand(id));

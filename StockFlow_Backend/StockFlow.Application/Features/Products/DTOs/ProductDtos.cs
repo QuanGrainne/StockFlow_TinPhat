@@ -63,9 +63,7 @@ public record ProductWarehouseStockDto(
     string WarehouseCode,
     string WarehouseName,
     decimal Quantity,
-    decimal UnitCost,
-    // Khách đặt: SL của đơn đặt hàng còn mở chưa giao (giữ hàng, chưa trừ tồn thực tế)
-    decimal ReservedQuantity = 0
+    decimal UnitCost
 );
 
 public record ProductDetailDto(
@@ -243,5 +241,4 @@ public record ProductStockAdjustmentDto(
     decimal PreviousQuantity,
     decimal NewQuantity,
     decimal Delta,
-    decimal UnitCost,
-    string? StocktakeCode = null);
+    decimal UnitCost);

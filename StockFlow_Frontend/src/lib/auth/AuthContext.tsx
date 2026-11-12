@@ -1,6 +1,5 @@
 'use client';
 
-import { tabSession } from '@/lib/auth/tabSession';
 import React, { createContext, useContext, useState, useCallback } from 'react';
 
 interface User {
@@ -26,21 +25,21 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<AuthState>(() => {
     if (typeof window === 'undefined') return { user: null, token: null, isAuthenticated: false };
-    const token = tabSession.get('stockflow_token');
-    const userStr = tabSession.get('stockflow_user');
+    const token = localStorage.getItem('stockflow_token');
+    const userStr = localStorage.getItem('stockflow_user');
     const user = userStr ? (JSON.parse(userStr) as User) : null;
     return { user, token, isAuthenticated: !!token };
   });
 
   const login = useCallback((token: string, user: User) => {
-    tabSession.set('stockflow_token', token);
-    tabSession.set('stockflow_user', JSON.stringify(user));
+    localStorage.setItem('stockflow_token', token);
+    localStorage.setItem('stockflow_user', JSON.stringify(user));
     setState({ user, token, isAuthenticated: true });
   }, []);
 
   const logout = useCallback(() => {
-    tabSession.remove('stockflow_token');
-    tabSession.remove('stockflow_user');
+    localStorage.removeItem('stockflow_token');
+    localStorage.removeItem('stockflow_user');
     setState({ user: null, token: null, isAuthenticated: false });
   }, []);
 
