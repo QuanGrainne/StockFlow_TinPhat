@@ -93,18 +93,18 @@ src/
 │   └── types/  utils/  hooks/
 │
 ├── components/               # Shared only
-│   ├── layout/               # AppLayout, LazyAppLayout, Header, Sidebar, FeatureGuard
+│   ├── layout/               # AppLayout, LazyAppLayout, Header, Sidebar, FeatureGuard, FormHeaderUserBar
 │   ├── filters/  inputs/  links/
-│   └── ProductThumb, ImageLightbox, FormHeaderUserBar
+│   └── ProductThumb, ImageLightbox, brand/
 │
 └── lib/
     ├── api/                  # client.ts — the only HTTP client
     ├── auth/  navigation/    # navbar.ts (NAV_GROUPS), currentRole.ts
-    ├── warehouse/  print/  ui/
+    ├── warehouse/  print/  ui/  utils/   # utils/date.ts (hàm ngày dùng chung)
 ```
 
 Page loading path: `page.tsx → LazyAppLayout → AppLayout (Header + Sidebar + permission check) → switch (activeScreen) → features/<module>/screens/<Module>Screen`.
-Create pages (`*/create`) and `pos` load their own screen with `next/dynamic`.
+`orders/[id]` and `pos` pass their screen to `LazyAppLayout` as `children`; create pages (`*/create`) load their own screen with `next/dynamic`.
 
 ---
 

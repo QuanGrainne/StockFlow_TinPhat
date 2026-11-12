@@ -43,10 +43,15 @@ Clean Architecture with four projects. Dependency direction: API → Application
   - `Dtl*`: line items.
   - `Sec*`: security.
   - `Jnc*`: junction tables.
+- **What else belongs in Domain** (pure code, no DB, no clock, no EF):
+  - Status constants, e.g. `Domain/Entities/TransferStatus.cs`.
+  - State-transition methods on entities, kept in a separate `partial` file so the scaffold-style entity file stays untouched, e.g. `TrxStockTransfer.Status.cs` (`CanIssue/CanReceive/CanCancel/...`, `MarkInTransit/MarkReceived/MarkCancelled`). Handlers call `Can*()` and return the error message, then call `Mark*()`.
+  - Pure policies in `Domain/Services/`, e.g. `CostingPolicy.CalculateMovingAverageCost` (MAC). `GoodsReceiptHelper.CalculateMovingAverageCost` keeps its signature and delegates to it.
+  - Rules that need the DB (stock checks, ledger writes, warehouse access, document codes, timestamps) stay in handlers, helpers, or `IInventoryLedger`.
 - **Application/Features/<Module>/** holds `Commands/`, `Queries/`, `DTOs/`, and sometimes `Helpers/`. A command or query `record` and its `IRequestHandler` live in the same file.
   - Handlers return `Result<T>` (`Application/Common/Result.cs`).
   - FluentValidation validators run automatically via `ValidationBehavior`.
-- **Data access pattern:** handlers inject `IStockFlowDbContext` (`Application/Common/Interfaces`) and use EF Core directly.
+- **Data access pattern:** handlers inject `IStockFlowDbContext` (`Application/Common/Interfaces`) and use EF Core directly. `IStockFlowDbContext` is the repository and unit of work (`DbSet`s + `SaveChangesAsync` + `BeginTransactionAsync`). Do not write separate repository or unit-of-work classes.
   - A new entity must be added in three places: as a `DbSet` on `IStockFlowDbContext`, on `StockFlowDbContext`, and in a migration.
 - **StockFlowDbContext** (Infrastructure/Persistence) is a large scaffold-style file. All tables are in schema `stockflow`. Column mapping is snake_case via explicit `HasColumnName` in `OnModelCreating`. Follow that pattern for new columns.
 - **Document codes** come from Postgres sequences (`GetNextSequenceValueAsync("stockflow.seq_...")`). They are formatted by `ITransactionCodeGenerator` or per-module helpers, using prefixes and rules (SEQUENTIAL/DATETIME/RANDOM) from the `MstOrderSetting` row with id 1.
@@ -54,6 +59,7 @@ Clean Architecture with four projects. Dependency direction: API → Application
   - Stock on hand lives in `TrxInventoryBalances`, keyed by warehouse, location, product, and lot.
   - Every stock movement must also append a `TrxInventoryTransactions` row (type, reference_type/reference_id, created_by).
   - Use the shared ledger for both: `IInventoryLedger` (`Application/Common/Interfaces`, implemented by `Application/Common/Inventory/InventoryLedger.cs`, moving-average cost). New handlers inject it; older code calls it through `PurchaseStockOps` / `TransferStockOps`.
+  - The ledger lives in Application (not Domain) because it reads and writes the DB; the cost formula it uses is `Domain/Services/CostingPolicy`.
 - **Timestamps** are `timestamp without time zone`, with `Npgsql.EnableLegacyTimestampBehavior` on. Modules store Vietnam local time (see `TransferHelper.GetVietnamTime`).
 - **Controllers** are thin: build a command or query, call `_mediator.Send`, then map `IsSuccess` to `Ok` or `BadRequest(new { message })`.
 - **Authorization** (`StockFlow.API/Authorization/RequirePermissionAttribute.cs`):
@@ -71,11 +77,15 @@ Clean Architecture with four projects. Dependency direction: API → Application
 - Pages use a "shell + screen switch" pattern: `page.tsx` → `LazyAppLayout` → `AppLayout` → `src/features/<module>/screens/<Module>Screen.tsx`.
   - A list page (`src/app/(dashboard)/<route>/page.tsx`) is `'use client'` and only renders `<LazyAppLayout initialScreen="..." />` (`src/components/layout/LazyAppLayout.tsx`, `next/dynamic` with `ssr: false`). Do not re-declare `next/dynamic` for AppLayout in a page.
   - `AppLayout` renders Header + Sidebar, checks feature permissions, and picks the screen with `switch (activeScreen)`.
-  - `orders/[id]` also uses `LazyAppLayout` but passes `OrderDetailScreen` as `children` (AppLayout renders children instead of the switch).
-  - Create pages (`*/create`) and `pos` load their own screen via `next/dynamic`, without AppLayout. `transfers/create` is a server component (it exports `metadata`), so it does not use `ssr: false`.
+  - `orders/[id]` and `pos` also use `LazyAppLayout` but pass their screen as `children` (AppLayout renders children instead of the switch). `pos` wraps `PosScreen` in `FeatureGuard`.
+  - Create pages (`*/create`) load their own screen via `next/dynamic`, without AppLayout. `transfers/create` is a server component (it exports `metadata`), so it does not use `ssr: false`.
+- **Dependency direction:** `app` → `components/layout` → `features` → `components` (shared) + `lib`.
+  - `components/layout/` (the shell) may import `features`. The rest of `components/` and all of `lib/` must not import `features` (and `lib/` must not import `components`).
+  - A feature may import another feature's `types` and `services`, or what that feature exports from its public entry `features/<m>/index.ts` (import as `@/features/<m>`; today: `orders`, `purchases`, `customers`). Never import another feature's `components` or `screens` directly. Known exceptions are listed in `.claude/rules/20-frontend-structure.md`; check with `node docs/refactor/tools/check-structure.js --strict`.
+  - Shared helpers live in `lib/` (e.g. `lib/utils/date.ts`, `lib/auth/roles.ts`).
 - Feature code lives in `src/features/<module>/{components,screens,services,types,utils}`.
 - Feature-specific sidebars and modals live in `src/features/<module>/components/`. Shared components live in `src/components/`. The shell lives in `src/components/layout/` (`AppLayout`, `LazyAppLayout`, `Header`, `Sidebar`, `FeatureGuard`). Menu items and screen↔path mapping are `NAV_GROUPS` / `SCREEN_PATH_MAP` in `src/lib/navigation/navbar.ts`; the stored role is in `src/lib/navigation/currentRole.ts`.
-- Admin screens (staff, roles, permission matrix, warehouse access) are in `src/features/admin/`; the goods catalog screen is `src/features/products/screens/GoodsCatalogScreen.tsx`. `src/features/admin/data/mockData.ts` is fake fallback data used only by `staffService` / `permissionService`.
+- Admin screens (staff, roles, permission matrix, warehouse access) are in `src/features/admin/`; the goods catalog screen is `src/features/products/screens/GoodsCatalogScreen.tsx`. `src/features/admin/data/mockData.ts` is fake data; only `permissionService` still imports it (`INITIAL_PERMISSION_MODULES`, fallback for `getPermissionMatrix`, which no screen calls). Staff, role and warehouse functions throw on API errors instead of returning mock data.
 - `src/lib/api/client.ts` is the only HTTP client. It reads the JWT from `localStorage` (`stockflow_token`).
   - Under `npm run dev` it **auto-logs in as `admin` / `TinPhat@2026`** only if this browser has never logged in. Disable with `NEXT_PUBLIC_DEV_AUTO_LOGIN=false`.
   - A 401 on an existing session clears the session and redirects to `/login`.
