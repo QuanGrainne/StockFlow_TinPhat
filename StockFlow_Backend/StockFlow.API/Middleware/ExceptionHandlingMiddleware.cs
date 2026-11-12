@@ -42,6 +42,19 @@ public class ExceptionHandlingMiddleware(RequestDelegate next, ILogger<Exception
                 PropertyNamingPolicy = JsonNamingPolicy.CamelCase
             }));
         }
+        catch (Microsoft.EntityFrameworkCore.DbUpdateConcurrencyException ex)
+        {
+            // Đã thử lại mà dòng tồn kho vẫn bị giao dịch khác sửa (token xmin)
+            logger.LogWarning(ex, "Concurrency conflict on {Path}", context.Request.Path);
+            context.Response.StatusCode = (int)HttpStatusCode.Conflict;
+            context.Response.ContentType = "application/json";
+            await context.Response.WriteAsync(JsonSerializer.Serialize(new
+            {
+                status = 409,
+                code = "CONCURRENCY_CONFLICT",
+                message = "Tồn kho vừa được người khác cập nhật, vui lòng thử lại."
+            }));
+        }
         catch (Exception ex)
         {
             logger.LogError(ex, "Unhandled exception on {Path}", context.Request.Path);

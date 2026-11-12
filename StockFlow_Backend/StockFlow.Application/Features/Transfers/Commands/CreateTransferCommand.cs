@@ -17,7 +17,7 @@ namespace StockFlow.Application.Features.Transfers.Commands;
 public record CreateTransferCommand(
     CreateTransferRequest Request,
     int UserId
-) : IRequest<Result<TransferDetailDto>>;
+) : IRequest<Result<TransferDetailDto>>, IRetryOnConcurrencyConflict;
 
 public class CreateTransferCommandHandler : IRequestHandler<CreateTransferCommand, Result<TransferDetailDto>>
 {

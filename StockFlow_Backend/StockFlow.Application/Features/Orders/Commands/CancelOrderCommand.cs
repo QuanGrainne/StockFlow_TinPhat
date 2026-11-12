@@ -15,7 +15,7 @@ namespace StockFlow.Application.Features.Orders.Commands;
 ///   (tiền khách đã trả coi như trả lại khách).
 /// - Hóa đơn chuyển sang CANCELLED. Hóa đơn đã hủy không hủy lại được.
 /// </summary>
-public record CancelOrderCommand(int OrderId) : IRequest<Result<bool>>;
+public record CancelOrderCommand(int OrderId) : IRequest<Result<bool>>, IRetryOnConcurrencyConflict;
 
 public class CancelOrderCommandHandler : IRequestHandler<CancelOrderCommand, Result<bool>>
 {

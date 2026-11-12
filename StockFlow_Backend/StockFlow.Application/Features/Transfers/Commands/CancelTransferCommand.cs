@@ -11,7 +11,7 @@ using StockFlow.Domain.Entities;
 
 namespace StockFlow.Application.Features.Transfers.Commands;
 
-public record CancelTransferCommand(int Id, string? Reason, int UserId) : IRequest<Result<bool>>;
+public record CancelTransferCommand(int Id, string? Reason, int UserId) : IRequest<Result<bool>>, IRetryOnConcurrencyConflict;
 
 public class CancelTransferCommandHandler : IRequestHandler<CancelTransferCommand, Result<bool>>
 {

@@ -45,4 +45,7 @@ public interface IStockFlowDbContext
 
     /// <summary>Mở transaction trên DbContext; handler dùng hàm này thay cho việc ép kiểu về DbContext.</summary>
     Task<IDbContextTransaction> BeginTransactionAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>Bỏ theo dõi mọi entity đã nạp (dùng trước khi chạy lại handler sau xung đột đồng thời).</summary>
+    void ClearChangeTracker();
 }

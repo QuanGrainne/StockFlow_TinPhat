@@ -13,7 +13,7 @@ using StockFlow.Domain.Entities;
 
 namespace StockFlow.Application.Features.Transfers.Commands;
 
-public record CompleteTransferCommand(int Id, int UserId) : IRequest<Result<TransferDetailDto>>;
+public record CompleteTransferCommand(int Id, int UserId) : IRequest<Result<TransferDetailDto>>, IRetryOnConcurrencyConflict;
 
 public class CompleteTransferCommandHandler : IRequestHandler<CompleteTransferCommand, Result<TransferDetailDto>>
 {

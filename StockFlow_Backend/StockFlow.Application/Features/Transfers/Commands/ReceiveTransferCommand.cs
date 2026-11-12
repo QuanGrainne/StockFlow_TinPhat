@@ -17,7 +17,7 @@ public record ReceiveTransferCommand(
     int Id,
     ReceiveTransferRequest Request,
     int UserId
-) : IRequest<Result<TransferDetailDto>>;
+) : IRequest<Result<TransferDetailDto>>, IRetryOnConcurrencyConflict;
 
 public class ReceiveTransferCommandHandler : IRequestHandler<ReceiveTransferCommand, Result<TransferDetailDto>>
 {

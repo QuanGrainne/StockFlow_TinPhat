@@ -9,10 +9,10 @@ using StockFlow.Domain.Entities;
 namespace StockFlow.Application.Features.PurchaseReturns.Commands;
 
 /// <summary>Tạo phiếu trả hàng nhập (lưu tạm hoặc hoàn thành ngay).</summary>
-public record CreatePurchaseReturnCommand(SavePurchaseReturnRequest Request) : IRequest<Result<PurchaseReturnDetailDto>>;
+public record CreatePurchaseReturnCommand(SavePurchaseReturnRequest Request) : IRequest<Result<PurchaseReturnDetailDto>>, IRetryOnConcurrencyConflict;
 
 /// <summary>Sửa phiếu trả hàng nhập đang ở trạng thái Phiếu tạm (có thể hoàn thành luôn).</summary>
-public record UpdatePurchaseReturnCommand(int Id, SavePurchaseReturnRequest Request) : IRequest<Result<PurchaseReturnDetailDto>>;
+public record UpdatePurchaseReturnCommand(int Id, SavePurchaseReturnRequest Request) : IRequest<Result<PurchaseReturnDetailDto>>, IRetryOnConcurrencyConflict;
 
 public class SavePurchaseReturnHandler :
     IRequestHandler<CreatePurchaseReturnCommand, Result<PurchaseReturnDetailDto>>,
@@ -103,7 +103,7 @@ public class SavePurchaseReturnHandler :
 
             if (transaction != null) await transaction.CommitAsync(ct);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not DbUpdateConcurrencyException)
         {
             if (transaction != null) await transaction.RollbackAsync(ct);
             return Result.Failure<PurchaseReturnDetailDto>($"Lỗi khi lưu phiếu trả hàng nhập: {ex.InnerException?.Message ?? ex.Message}");
