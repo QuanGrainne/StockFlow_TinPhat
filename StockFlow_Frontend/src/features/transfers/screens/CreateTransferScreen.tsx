@@ -3,6 +3,7 @@
 
 'use client';
 
+import { tabSession } from '@/lib/auth/tabSession';
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -75,7 +76,7 @@ export default function CreateTransferScreen() {
 
   useEffect(() => {
     try {
-      const raw = localStorage.getItem('stockflow_user');
+      const raw = tabSession.get('stockflow_user');
       let u: any = null;
       if (raw) {
         u = JSON.parse(raw);
@@ -567,10 +568,13 @@ export default function CreateTransferScreen() {
     return items.reduce((acc, it) => acc + (Number(it.lineTotal) || 0), 0);
   }, [items]);
 
-  // Destination Warehouses list (excluding source warehouse)
+  // Kho nhận: MỌI kho đang hoạt động trong hệ thống trừ kho xuất (UC-33: chuyển sang chi nhánh khác).
+  // Kho xuất (chọn ở "Kho làm việc") chỉ gồm kho được phân quyền — allWarehouses.
   const availableDestWarehouses = useMemo(() => {
-    return allWarehouses.filter((w) => w.warehouseId !== sourceWarehouseId);
-  }, [allWarehouses, sourceWarehouseId]);
+    return facilities
+      .filter((f) => f.status === 'ACTIVE' && typeof f.warehouseId === 'number' && f.warehouseId !== sourceWarehouseId)
+      .map((f) => ({ warehouseId: f.warehouseId as number, code: f.code, name: f.name }));
+  }, [facilities, sourceWarehouseId]);
 
   // Validation Before Save
   const validateForm = (): boolean => {
@@ -697,7 +701,7 @@ export default function CreateTransferScreen() {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-56px)] bg-[#f5f5f5] text-[13px] text-[#15171a] select-none overflow-hidden font-sans">
+    <div className="flex flex-col h-[calc(100vh-56px)] bg-transparent text-[13px] text-[#15171a] select-none overflow-hidden font-sans">
       {/* Toast Alert */}
       {toastMessage && (
         <div
@@ -750,7 +754,7 @@ export default function CreateTransferScreen() {
       )}
 
       {/* ─── 1. Header Toolbar Bar (Theo đúng thiết kế) ─── */}
-      <header className="h-12 bg-white border-b border-slate-200 px-4 flex items-center justify-between gap-3 shrink-0 relative z-30">
+      <header className="h-12 bg-white/85 backdrop-blur-[2px] border-b border-slate-200 px-4 flex items-center justify-between gap-3 shrink-0 relative z-30">
         {/* Left: Back Arrow + Chuyển hàng title */}
         <div className="flex items-center gap-3">
           <Link
@@ -957,7 +961,7 @@ export default function CreateTransferScreen() {
       {/* ─── 2. Main Content Split View (Left Table + Right Sidebar) ─── */}
       <div className="flex-1 flex overflow-hidden relative">
         {/* LEFT COLUMN: Products Table or Empty Excel State */}
-        <div className="flex-1 flex flex-col bg-white overflow-hidden">
+        <div className="flex-1 flex flex-col bg-white/65 overflow-hidden">
           {/* Bảng hàng hóa — cùng bố cục / style với màn Nhập hàng */}
           <div className="flex-1 overflow-auto">
             <div style={{ minWidth: TRANSFER_TABLE_MIN_WIDTH }}>
@@ -1144,7 +1148,7 @@ export default function CreateTransferScreen() {
 
         {/* ─── 3. RIGHT SIDEBAR: Transfer Header & Actions ─── */}
         {!isSidebarCollapsed && (
-          <aside className="w-[380px] bg-white border-l border-slate-200 flex flex-col shrink-0 text-[13px] text-[#15171a]">
+          <aside className="w-[380px] bg-white/80 backdrop-blur-[2px] border-l border-slate-200 flex flex-col shrink-0 text-[13px] text-[#15171a]">
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
               {/* Người chuyển + Thời gian chuyển */}
               <div className="flex items-center justify-between gap-3">

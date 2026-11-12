@@ -3,6 +3,7 @@
 // Modal "Thanh toán" nợ của khách hàng (theo mẫu KiotViet): tạo phiếu thu PT..., phân bổ vào các hóa đơn còn nợ.
 // Đối xứng với SupplierPaymentModal (phiếu chi trả nợ nhà cung cấp).
 
+import { tabSession } from '@/lib/auth/tabSession';
 import React, { useMemo, useState } from 'react';
 import { message } from 'antd';
 import { Loader2, X } from 'lucide-react';
@@ -40,7 +41,7 @@ function allocateFifo(amount: number, orders: CustomerRecentOrder[]): Record<num
 function currentUserName(): string {
   if (typeof window === 'undefined') return '';
   try {
-    const raw = localStorage.getItem('stockflow_user');
+    const raw = tabSession.get('stockflow_user');
     const u = raw ? (JSON.parse(raw) as { fullName?: string; username?: string }) : null;
     return u?.fullName || u?.username || '';
   } catch {

@@ -24,6 +24,23 @@ body {
   box-sizing: border-box;
 }
 
+/* Nền các trang sau đăng nhập: màu sáng trơn như thiết kế gốc (ảnh nhà xưởng chỉ dùng ở trang đăng nhập) */
+.stockflow-brand-bg {
+  background-color: #f8fafc;
+}
+
+/* Nền trang đăng nhập: ảnh toàn cảnh công ty, phủ rất nhạt để nhìn rõ nhà xưởng phía sau thẻ đăng nhập */
+.stockflow-login-bg {
+  background-color: #f0f2f7;
+  background-image:
+    linear-gradient(rgba(241, 245, 249, 0.16), rgba(241, 245, 249, 0.28)),
+    url('/brand/bg-login-nha-xuong.jpg');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+}
+
 .stockflow-products-table .ant-table-thead > tr > th {
   background: #e8f2ff;
   color: #334155;
@@ -50,8 +67,32 @@ body {
   display: none;
 }
 
+.ant-table-wrapper.stockflow-pricebooks-table .ant-table {
+  background: transparent;
+}
+
 .ant-table-wrapper.stockflow-pricebooks-table .ant-table-tbody > tr > td {
   font-size: 13px;
+}
+
+.ant-table-wrapper.stockflow-pricebooks-table .ant-table-tbody > tr > td:not(.ant-table-cell-fix-left):not(.ant-table-cell-fix-right),
+.ant-table-wrapper.stockflow-pricebooks-table .ant-table-placeholder,
+.ant-table-wrapper.stockflow-pricebooks-table .ant-table-placeholder > td {
+  background: transparent;
+}
+
+.ant-table-wrapper.stockflow-pricebooks-table .ant-table-tbody > tr > td.ant-table-cell-fix-left,
+.ant-table-wrapper.stockflow-pricebooks-table .ant-table-tbody > tr > td.ant-table-cell-fix-right {
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.ant-table-wrapper.stockflow-pricebooks-table .ant-table-tbody > tr:hover > td {
+  background: rgba(239, 246, 255, 0.78);
+}
+
+.ant-table-wrapper.stockflow-pricebooks-table .ant-table-tbody > tr:hover > td.ant-table-cell-fix-left,
+.ant-table-wrapper.stockflow-pricebooks-table .ant-table-tbody > tr:hover > td.ant-table-cell-fix-right {
+  background: rgba(239, 246, 255, 0.94);
 }
 
 .stockflow-purchases-table .ant-table-thead > tr > th {

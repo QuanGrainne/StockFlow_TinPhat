@@ -188,7 +188,7 @@ export const ProductionReferenceLogsScreen: React.FC<ProductionReferenceLogsScre
   });
 
   return (
-    <div className="p-6 bg-slate-50/60 min-h-screen text-slate-800 space-y-6">
+    <div className="p-6 bg-transparent min-h-full text-slate-800 space-y-6">
       {/* Toast Alert */}
       {successToast && (
         <div className="fixed top-20 right-8 z-50 bg-emerald-600 text-white px-5 py-3 rounded-xl shadow-lg flex items-center gap-3 animate-bounce">

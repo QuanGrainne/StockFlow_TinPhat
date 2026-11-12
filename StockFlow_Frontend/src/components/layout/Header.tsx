@@ -1,6 +1,7 @@
 // src/components/layout/Header.tsx
-// Header giao diện: Topbar chuẩn theo thiết kế AI Studio (Logo SF, Badge Role, Search input, User profile avatar & Switch Role dropdown khớp Ảnh 4)
+// Header giao diện: Topbar chuẩn theo thiết kế AI Studio (Logo Tín Phát, Badge Role, Search input, User profile avatar & Switch Role dropdown khớp Ảnh 4)
 
+import { tabSession } from '@/lib/auth/tabSession';
 import React, { useState, useEffect, useMemo } from 'react';
 import { UserRole, StaffAccount, WarehouseFacility } from '@/features/admin/types';
 import {
@@ -22,8 +23,9 @@ import {
 } from 'lucide-react';
 import { adminService } from '@/features/admin/services/adminService';
 import { useRouter } from 'next/navigation';
-import { TIN_PHAT_WAREHOUSES, setActiveWarehouseGlobal } from '@/lib/warehouse/useActiveWarehouse';
+import { setActiveWarehouseGlobal, useAuthorizedWarehouses } from '@/lib/warehouse/useActiveWarehouse';
 import { ROLE_SWITCHER_ENABLED } from '@/lib/auth/flags';
+import { BrandLogo } from '@/components/brand/BrandLogo';
 
 interface HeaderProps {
   currentRole: UserRole;
@@ -40,10 +42,11 @@ export const Header: React.FC<HeaderProps> = ({
   const router = useRouter();
   const [roleDropdownOpen, setRoleDropdownOpen] = useState(false);
   const [facilities, setFacilities] = useState<WarehouseFacility[]>([]);
-  const [userWarehouseAccess, setUserWarehouseAccess] = useState<string[]>([]);
+  // Kho được phân quyền lấy từ server (GET /api/warehouses/my-warehouses), Admin: tất cả kho đang hoạt động
+  const { warehouses: authorizedWarehouses, loaded: authorizedLoaded } = useAuthorizedWarehouses();
   const [selectedBranch, setSelectedBranch] = useState<string>(() => {
     if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('stockflow_selected_branch');
+      const stored = tabSession.get('stockflow_selected_branch');
       if (stored && stored !== 'ALL') return stored;
     }
     return 'Kho Tổng Gia Lâm';
@@ -69,43 +72,9 @@ export const Header: React.FC<HeaderProps> = ({
   });
   const [staffList, setStaffList] = useState<StaffAccount[]>([]);
 
-  // Helper chuẩn hóa mã kho về chuẩn K00X
-  const normalizeToKCode = (str: string): string => {
-    if (!str) return '';
-    const upper = str.trim().toUpperCase();
-    if (upper === 'K001' || upper === 'K01' || upper === 'WH-HN-01' || upper === 'KTP-01' || upper.includes('GIA LÂM')) return 'K001';
-    if (upper === 'K002' || upper === 'K02' || upper === 'WH-HN-02' || upper === 'KNVL-01' || upper.includes('ĐÔNG ANH')) return 'K002';
-    if (upper === 'K003' || upper === 'K03' || upper === 'WH-HN-03' || upper.includes('HÀ ĐÔNG')) return 'K003';
-    if (upper === 'K004' || upper === 'K04' || upper === 'WH-HN-04' || upper.includes('HOÀN KIẾM')) return 'K004';
-    return upper;
-  };
-
-  // Helper trích xuất danh sách mã/tên kho được phân quyền từ user storage hoặc staff
-  const extractUserWarehouses = (userObj: any): string[] => {
-    if (!userObj) return [];
-    if (Array.isArray(userObj.assignedWarehouses) && userObj.assignedWarehouses.length > 0) {
-      return Array.from(new Set(userObj.assignedWarehouses.map((w: any) => normalizeToKCode(String(w))).filter(Boolean)));
-    }
-    if (Array.isArray(userObj.warehouses)) {
-      const list: string[] = [];
-      userObj.warehouses.forEach((w: any) => {
-        if (typeof w === 'string') list.push(normalizeToKCode(w));
-        else {
-          if (w.warehouseCode) list.push(normalizeToKCode(w.warehouseCode));
-          else if (w.code) list.push(normalizeToKCode(w.code));
-          else if (w.warehouseName) list.push(normalizeToKCode(w.warehouseName));
-          else if (w.name) list.push(normalizeToKCode(w.name));
-          else if (w.warehouseId) list.push(normalizeToKCode(`K00${w.warehouseId}`));
-        }
-      });
-      return Array.from(new Set(list.filter(Boolean)));
-    }
-    return [];
-  };
-
   // Đọc thông tin user đăng nhập thực tế từ localStorage và đồng bộ avatar
   useEffect(() => {
-    const rawUser = typeof window !== 'undefined' ? localStorage.getItem('stockflow_user') : null;
+    const rawUser = typeof window !== 'undefined' ? tabSession.get('stockflow_user') : null;
     let u: any = null;
     if (rawUser) {
       try {
@@ -156,10 +125,6 @@ export const Header: React.FC<HeaderProps> = ({
         avatarColor: color,
         avatar: u.avatar || null,
       });
-
-      // Lấy quyền kho ban đầu từ stockflow_user
-      const initialWhs = extractUserWarehouses(u);
-      setUserWarehouseAccess(initialWhs);
     }
 
     // Tải danh sách nhân viên để phục vụ đổi nhanh và bổ sung avatar/kho nếu user thiếu.
@@ -188,14 +153,6 @@ export const Header: React.FC<HeaderProps> = ({
               code: prev.code || matched.code,
               title: prev.title || matched.title || matched.roleTitle,
             }));
-
-            // Gán danh sách kho được gán từ staff profile nếu có
-            if (matched.assignedWarehouses && matched.assignedWarehouses.length > 0) {
-              const normalizedStaffWhs = Array.from(
-                new Set(matched.assignedWarehouses.map(normalizeToKCode).filter(Boolean))
-              );
-              setUserWarehouseAccess(normalizedStaffWhs);
-            }
           }
         }
       }
@@ -208,7 +165,7 @@ export const Header: React.FC<HeaderProps> = ({
       }
     });
 
-    const storedBranch = typeof window !== 'undefined' ? localStorage.getItem('stockflow_selected_branch') : null;
+    const storedBranch = typeof window !== 'undefined' ? tabSession.get('stockflow_selected_branch') : null;
     if (storedBranch && storedBranch !== 'ALL') {
       setSelectedBranch(storedBranch);
     }
@@ -216,14 +173,6 @@ export const Header: React.FC<HeaderProps> = ({
     const handleBranchSync = (e: any) => {
       if (e.detail?.branch && e.detail.branch !== 'ALL') {
         setSelectedBranch(e.detail.branch);
-      }
-    };
-    const handleUserSync = (e: any) => {
-      if (e.detail?.assignedWarehouses) {
-        const normalized = Array.from(
-          new Set((e.detail.assignedWarehouses as string[]).map(normalizeToKCode).filter(Boolean))
-        );
-        setUserWarehouseAccess(normalized);
       }
     };
     const handleActiveWarehouseSync = (e: any) => {
@@ -234,11 +183,9 @@ export const Header: React.FC<HeaderProps> = ({
     };
     window.addEventListener('stockflow_branch_changed', handleBranchSync);
     window.addEventListener('stockflow:warehouse-changed', handleActiveWarehouseSync);
-    window.addEventListener('stockflow_user_updated', handleUserSync);
     return () => {
       window.removeEventListener('stockflow_branch_changed', handleBranchSync);
       window.removeEventListener('stockflow:warehouse-changed', handleActiveWarehouseSync);
-      window.removeEventListener('stockflow_user_updated', handleUserSync);
     };
   }, [currentRole, selectedBranch]);
 
@@ -255,9 +202,9 @@ export const Header: React.FC<HeaderProps> = ({
       return true;
     }
     if (typeof window !== 'undefined') {
-      if (localStorage.getItem('stockflow_current_role') === 'ADMIN') return true;
+      if (tabSession.get('stockflow_current_role') === 'ADMIN') return true;
       try {
-        const raw = localStorage.getItem('stockflow_user');
+        const raw = tabSession.get('stockflow_user');
         if (raw) {
           const parsed = JSON.parse(raw);
           if (
@@ -275,44 +222,35 @@ export const Header: React.FC<HeaderProps> = ({
     return false;
   }, [currentUser.code, currentUser.name, currentRole]);
 
-  // Danh sách kho ĐƯỢC PHÂN QUYỀN (Data Isolation)
-  // Quản trị viên hệ thống có quyền truy cập 100% các kho kể cả kho mới tạo.
-  const permittedFacilities = useMemo(() => {
-    if (facilities.length === 0) return [];
-
-    // Nếu là Quản trị viên -> luôn luôn hiển thị đầy đủ tất cả các kho
-    if (isSystemAdminUser) return facilities;
-
-    const normalizedAllowed = new Set(userWarehouseAccess.map((w) => w.trim().toUpperCase()).filter(Boolean));
-    if (normalizedAllowed.size > 0) {
-      return facilities.filter((fac) => {
-        const facCode = (fac.code || '').trim().toUpperCase();
-        const facName = (fac.name || '').trim().toUpperCase();
-        const kCode = normalizeToKCode(fac.code);
-        const kName = normalizeToKCode(fac.name);
-        return (
-          normalizedAllowed.has(facCode) ||
-          normalizedAllowed.has(facName) ||
-          normalizedAllowed.has(kCode) ||
-          normalizedAllowed.has(kName) ||
-          userWarehouseAccess.some((u) => u.toLowerCase() === fac.name.toLowerCase() || u.toUpperCase() === fac.code.toUpperCase())
-        );
-      });
-    }
-
-    return facilities;
-  }, [facilities, isSystemAdminUser, userWarehouseAccess]);
+  // Danh sách kho ĐƯỢC PHÂN QUYỀN (Data Isolation): lấy đúng theo server, kể cả kho mới tạo.
+  // Thông tin chi tiết (địa chỉ...) bổ sung từ danh mục kho nếu có.
+  const permittedFacilities = useMemo<WarehouseFacility[]>(() => {
+    if (!authorizedLoaded) return [];
+    return authorizedWarehouses.map(
+      (w) =>
+        facilities.find((f) => f.warehouseId === w.warehouseId) ?? {
+          id: w.code,
+          warehouseId: w.warehouseId,
+          code: w.code,
+          name: w.name,
+          address: '',
+          staffCount: 0,
+          area: '',
+          status: 'ACTIVE',
+        }
+    );
+  }, [authorizedLoaded, authorizedWarehouses, facilities]);
 
   // Auto-validate và tự động đồng bộ stockflow_selected_branch theo quyền kho
   useEffect(() => {
-    if (facilities.length === 0) return;
+    if (!authorizedLoaded) return;
 
     if (permittedFacilities.length === 0) {
       // Trường hợp tài khoản chưa được gán kho nào
       if (selectedBranch !== '') {
         setSelectedBranch('');
         if (typeof window !== 'undefined') {
-          localStorage.removeItem('stockflow_selected_branch');
+          tabSession.remove('stockflow_selected_branch');
           window.dispatchEvent(
             new CustomEvent('stockflow_branch_changed', {
               detail: { branch: '', branchName: '' },
@@ -347,7 +285,7 @@ export const Header: React.FC<HeaderProps> = ({
       const firstBranch = permittedFacilities[0].name;
       setSelectedBranch(firstBranch);
       if (typeof window !== 'undefined') {
-        localStorage.setItem('stockflow_selected_branch', firstBranch);
+        tabSession.set('stockflow_selected_branch', firstBranch);
         window.dispatchEvent(
           new CustomEvent('stockflow_branch_changed', {
             detail: { branch: firstBranch, branchName: firstBranch },
@@ -355,14 +293,14 @@ export const Header: React.FC<HeaderProps> = ({
         );
       }
     }
-  }, [permittedFacilities, facilities.length, selectedBranch, isSystemAdminUser]);
+  }, [permittedFacilities, facilities, authorizedLoaded, selectedBranch, isSystemAdminUser]);
 
   const handleSelectBranch = (codeOrName: string) => {
     const fac = permittedFacilities.find((f) => f.code === codeOrName || f.name === codeOrName);
     const branchName = fac ? fac.name : codeOrName;
     setSelectedBranch(branchName);
     if (typeof window !== 'undefined') {
-      localStorage.setItem('stockflow_selected_branch', branchName);
+      tabSession.set('stockflow_selected_branch', branchName);
       window.dispatchEvent(
         new CustomEvent('stockflow_branch_changed', {
           detail: {
@@ -371,11 +309,9 @@ export const Header: React.FC<HeaderProps> = ({
           },
         })
       );
-      const matchingWh = TIN_PHAT_WAREHOUSES.find(
-        (w) =>
-          w.name.toLowerCase() === branchName.toLowerCase() ||
-          (fac?.code && w.code.toLowerCase() === fac.code.toLowerCase()) ||
-          (fac?.name && w.name.toLowerCase() === fac.name.toLowerCase())
+      // Đổi kho làm việc toàn hệ thống (mọi kho được phân quyền, kể cả kho mới tạo)
+      const matchingWh = authorizedWarehouses.find(
+        (w) => w.warehouseId === fac?.warehouseId || w.name.toLowerCase() === branchName.toLowerCase()
       );
       if (matchingWh) {
         setActiveWarehouseGlobal(matchingWh);
@@ -448,7 +384,7 @@ export const Header: React.FC<HeaderProps> = ({
     const color = roleTitleMap[staff.role]?.color || 'from-blue-600 to-indigo-700';
 
     const numericId = parseInt(staff.id.replace(/\D/g, ''), 10) || 1;
-    const staffWarehouses = (staff.assignedWarehouses || []).map(normalizeToKCode).filter(Boolean);
+    const staffWarehouses = (staff.assignedWarehouses || []).map((w) => String(w).trim().toUpperCase()).filter(Boolean);
     const updatedStorage = {
       userId: numericId,
       username: staff.username || (staff.email ? staff.email.split('@')[0] : ''),
@@ -464,11 +400,10 @@ export const Header: React.FC<HeaderProps> = ({
         warehouseName: w,
       })),
     };
-    localStorage.setItem('stockflow_user', JSON.stringify(updatedStorage));
-    localStorage.setItem('stockflow_current_role', staff.role);
+    tabSession.set('stockflow_user', JSON.stringify(updatedStorage));
+    tabSession.set('stockflow_current_role', staff.role);
 
-    // Cập nhật ngay danh sách quyền kho cho nhân viên vừa chọn
-    setUserWarehouseAccess(staffWarehouses);
+    // Bộ đổi vai trò chỉ đổi giao diện; danh sách kho vẫn theo tài khoản đăng nhập thật (JWT)
 
     setCurrentUser({
       name: staff.name,
@@ -485,20 +420,18 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('stockflow_token');
-    localStorage.removeItem('stockflow_user');
-    localStorage.removeItem('stockflow_current_role');
-    localStorage.removeItem('stockflow_active_screen');
+    tabSession.remove('stockflow_token');
+    tabSession.remove('stockflow_user');
+    tabSession.remove('stockflow_current_role');
+    tabSession.remove('stockflow_active_screen');
     router.push('/login');
   };
 
   return (
-    <header className="min-h-16 bg-white border-b border-slate-200 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-3 sm:px-6 py-2 sticky top-0 z-40 select-none">
+    <header className="min-h-16 bg-white/85 border-b border-slate-200 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-3 sm:px-6 py-2 sticky top-0 z-40 select-none">
       {/* Left: Logo & Role Badge */}
       <div className="flex items-center gap-3 min-w-0">
-        <div className="w-9 h-9 rounded-[8px] bg-[#1E56A0] text-white flex items-center justify-center font-bold text-sm tracking-tight shadow-xs">
-          SF
-        </div>
+        <BrandLogo width={56} className="shrink-0" priority />
         <div>
           <div className="flex items-center gap-2">
             <span className="text-base font-bold text-slate-900 tracking-tight">StockFlow</span>
@@ -515,7 +448,7 @@ export const Header: React.FC<HeaderProps> = ({
       {/* Right: Branch Selector (Khớp Ảnh 1 KiotViet) & User Profile */}
       <div className="flex flex-wrap items-center gap-3 relative ml-auto">
         {/* Bộ chọn Chi Nhánh Kho theo Phân Quyền (Data Isolation) */}
-        {permittedFacilities.length === 0 ? (
+        {!authorizedLoaded ? null : permittedFacilities.length === 0 ? (
           <div
             className="h-9 px-3 rounded-lg border border-amber-300 bg-amber-50 text-xs text-amber-800 flex items-center gap-2 shadow-2xs select-none cursor-not-allowed"
             title="Tài khoản chưa được phân quyền kho làm việc. Vui lòng liên hệ Quản trị viên."

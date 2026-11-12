@@ -13,7 +13,7 @@ import CustomerExpandedRow from '@/features/customers/components/CustomerExpande
 import { CustomerFormModal } from '@/features/customers/components/CustomerFormModal';
 import { customerService } from '@/features/customers/services/customerService';
 import { exportCustomersToXLSX } from '@/features/customers/utils/exportExcel';
-import { supplierService } from '@/features/suppliers/services/supplierService';
+import { useAuthorizedWarehouses } from '@/lib/warehouse/useActiveWarehouse';
 import type { CreateCustomerPayload, Customer, CustomerDetail, CustomerFilterState } from '@/features/customers/types';
 import { readDocumentLink, scrollToWhenReady } from '@/lib/navigation/documentLink';
 
@@ -38,13 +38,6 @@ const DEFAULT_FILTER: CustomerFilterState = {
   maxDebt: '',
 };
 
-const DEFAULT_WAREHOUSES = [
-  { warehouseId: 3, code: 'K001', name: 'Kho Tổng Gia Lâm' },
-  { warehouseId: 4, code: 'K002', name: 'Kho Đông Anh' },
-  { warehouseId: 5, code: 'K003', name: 'Kho Hà Đông' },
-  { warehouseId: 6, code: 'K004', name: 'Kho Hoàn Kiếm' },
-];
-
 interface CustomersScreenProps {
   /** Điều hướng màn hình trong AppLayout (giữ tương thích, màn này chưa dùng) */
   onNavigate?: (screenId: string) => void;
@@ -59,7 +52,8 @@ export default function CustomersScreen({ }: CustomersScreenProps = {}) {
     custLink ? { ...DEFAULT_FILTER, search: custLink.code, status: 'ALL' } : DEFAULT_FILTER
   );
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [warehouses, setWarehouses] = useState(DEFAULT_WAREHOUSES);
+  // Bộ lọc "Chi nhánh tạo" chỉ gồm các kho tài khoản được phân quyền (Admin: tất cả)
+  const { warehouses } = useAuthorizedWarehouses();
   const [reloadTick, setReloadTick] = useState(0);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(15);
@@ -97,16 +91,6 @@ export default function CustomersScreen({ }: CustomersScreenProps = {}) {
       stale = true;
     };
   }, [requestKey]);
-
-  // Danh sách chi nhánh cho bộ lọc "Chi nhánh tạo"
-  useEffect(() => {
-    supplierService
-      .getWarehouses()
-      .then((whs) => {
-        if (Array.isArray(whs) && whs.length > 0) setWarehouses(whs);
-      })
-      .catch(() => { });
-  }, []);
 
   // Mở thẳng khách theo link: tải chi tiết + cuộn tới dòng
   useEffect(() => {
@@ -241,9 +225,9 @@ export default function CustomersScreen({ }: CustomersScreenProps = {}) {
   const allPageSelected = paged.length > 0 && paged.every((c) => selectedIds.includes(c.id));
 
   return (
-    <div className="flex-1 h-full min-h-0 flex flex-col bg-[#f5f5f5] overflow-hidden select-none text-[13px] text-[#15171a] font-sans">
+    <div className="flex-1 h-full min-h-0 flex flex-col bg-transparent overflow-hidden select-none text-[13px] text-[#15171a] font-sans">
       {/* 1. Header */}
-      <header className="min-h-12 bg-white border-b border-slate-200 px-3 sm:px-4 py-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 shrink-0">
+      <header className="min-h-12 bg-white/84 backdrop-blur-[2px] border-b border-slate-200 px-3 sm:px-4 py-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 shrink-0">
         <div className="flex items-center gap-4 flex-1 basis-[320px] min-w-[260px] max-w-xl">
           <h1 className="text-[20px] font-bold text-[#15171a] leading-7 tracking-tight whitespace-nowrap">Khách hàng</h1>
           <div className="relative flex-1">
@@ -301,7 +285,7 @@ export default function CustomersScreen({ }: CustomersScreenProps = {}) {
           onToggleCollapse={() => setSidebarCollapsed((v) => !v)}
         />
 
-        <div className="flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden bg-white">
+        <div className="flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden bg-white/62">
           <div className="flex-1 min-h-0 overflow-auto">
             <table className="w-full text-left border-collapse min-w-[860px]">
               <thead className="bg-[#f7f8f9] sticky top-0 z-20 border-b border-slate-200 text-[12px] font-semibold text-[#677484] shadow-xs">
@@ -332,7 +316,7 @@ export default function CustomersScreen({ }: CustomersScreenProps = {}) {
               <tbody className="divide-y divide-slate-100">
                 {/* Dòng tổng */}
                 {!showLoading && paged.length > 0 && (
-                  <tr className="bg-white border-b border-slate-200 font-bold text-[13px]">
+                  <tr className="bg-white/75 border-b border-slate-200 font-bold text-[13px]">
                     <td colSpan={4}></td>
                     <td className={`py-2.5 px-3 text-right font-mono ${totals.debt !== 0 ? 'text-[#fb2c36]' : ''}`}>
                       {money.format(totals.debt)}
@@ -462,7 +446,7 @@ export default function CustomersScreen({ }: CustomersScreenProps = {}) {
           </div>
 
           {/* Footer phân trang */}
-          <footer className="min-h-10 bg-white border-t border-slate-200 px-3 sm:px-4 py-1.5 flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5 text-[12px] text-[#677484] shrink-0">
+          <footer className="min-h-10 bg-white/82 backdrop-blur-[2px] border-t border-slate-200 px-3 sm:px-4 py-1.5 flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5 text-[12px] text-[#677484] shrink-0">
             <div className="flex items-center gap-3">
               <span>
                 Hiển thị{' '}

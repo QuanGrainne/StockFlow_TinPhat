@@ -36,7 +36,7 @@ export default function SuppliersScreen({}: SuppliersScreenProps = {}) {
   );
 
   return (
-    <div className="flex-1 h-full min-h-0 flex flex-col bg-[#f5f5f5] overflow-hidden select-none text-[13px] text-[#15171a] font-sans">
+    <div className="flex-1 h-full min-h-0 flex flex-col bg-transparent overflow-hidden select-none text-[13px] text-[#15171a] font-sans">
       {/* 1. Header Toolbar */}
       <SupplierToolbar
         search={s.filterState.search}

@@ -1,6 +1,7 @@
 // src/features/admin/screens/AdminDashboard.tsx
 // Màn hình Tổng quan Quản trị viên (Admin Dashboard)
 
+import { tabSession } from '@/lib/auth/tabSession';
 import React, { useState, useEffect } from 'react';
 import {
   Users,
@@ -97,7 +98,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
   }, []);
 
   useEffect(() => {
-    const rawUser = typeof window !== 'undefined' ? localStorage.getItem('stockflow_user') : null;
+    const rawUser = typeof window !== 'undefined' ? tabSession.get('stockflow_user') : null;
     if (rawUser) {
       try {
         const u = JSON.parse(rawUser);

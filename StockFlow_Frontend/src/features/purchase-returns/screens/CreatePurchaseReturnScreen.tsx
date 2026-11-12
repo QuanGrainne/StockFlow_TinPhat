@@ -5,6 +5,7 @@
 // - ?edit=<id>  : mở lại phiếu tạm để sửa / hoàn thành
 // - không tham số: trả hàng tự do (chọn NCC + tìm hàng hóa trong kho làm việc)
 
+import { tabSession } from '@/lib/auth/tabSession';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -66,7 +67,7 @@ const lineTotal = (r: ReturnRow) => Math.round(r.quantity * r.returnPrice);
 
 function getUserDisplay(): string {
   try {
-    const raw = localStorage.getItem('stockflow_user');
+    const raw = tabSession.get('stockflow_user');
     if (!raw) return 'Người dùng';
     const u = JSON.parse(raw) as { fullName?: string; username?: string };
     return u.fullName || u.username || 'Người dùng';
@@ -438,7 +439,7 @@ export default function CreatePurchaseReturnScreen() {
   const gridTemplate = '36px 44px 48px 110px minmax(180px,1fr) 70px 120px 110px 120px 120px';
 
   return (
-    <div className="flex flex-col h-[calc(100vh-56px)] bg-[#f5f5f5] text-[13px] text-[#15171a] select-none overflow-hidden font-sans">
+    <div className="flex flex-col h-[calc(100vh-56px)] bg-transparent text-[13px] text-[#15171a] select-none overflow-hidden font-sans">
       {/* Toast */}
       {toast && (
         <div
@@ -494,7 +495,7 @@ export default function CreatePurchaseReturnScreen() {
       )}
 
       {/* ─── 1. Header ─── */}
-      <header className="h-12 bg-white border-b border-slate-200 px-4 flex items-center justify-between gap-3 shrink-0 relative z-30">
+      <header className="h-12 bg-white/85 backdrop-blur-[2px] border-b border-slate-200 px-4 flex items-center justify-between gap-3 shrink-0 relative z-30">
         <div className="flex items-center gap-3">
           <Link
             href="/purchase-returns"
@@ -596,7 +597,7 @@ export default function CreatePurchaseReturnScreen() {
 
       {/* ─── 2. Bảng hàng + sidebar ─── */}
       <div className="flex-1 flex overflow-hidden relative">
-        <div className="flex-1 flex flex-col bg-white overflow-hidden">
+        <div className="flex-1 flex flex-col bg-white/65 overflow-hidden">
           <div className="flex-1 overflow-auto">
             <div style={{ minWidth: 980 }}>
               <div
@@ -713,7 +714,7 @@ export default function CreatePurchaseReturnScreen() {
 
         {/* ─── 3. Sidebar thông tin phiếu ─── */}
         {!isSidebarCollapsed && (
-          <aside className="w-[380px] bg-white border-l border-slate-200 flex flex-col shrink-0">
+          <aside className="w-[380px] bg-white/80 backdrop-blur-[2px] border-l border-slate-200 flex flex-col shrink-0">
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
               {/* Người tạo + thời gian */}
               <div className="flex items-center justify-between gap-3">

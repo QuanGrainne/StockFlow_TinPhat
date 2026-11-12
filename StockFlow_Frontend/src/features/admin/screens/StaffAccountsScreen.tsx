@@ -1,6 +1,7 @@
 // src/features/admin/screens/StaffAccountsScreen.tsx
 // Màn hình 3.2.1.3: Danh sách tài khoản nhân viên (User Accounts) theo giao diện AI Studio Ảnh 2
 
+import { tabSession } from '@/lib/auth/tabSession';
 import React, { useState, useEffect } from 'react';
 import {
   Search,
@@ -370,7 +371,7 @@ export const StaffAccountsScreen: React.FC<StaffAccountsScreenProps> = ({
 
         // Nếu cập nhật chính tài khoản đang đăng nhập, đồng bộ ngay lập tức vào localStorage & Header
         if (typeof window !== 'undefined') {
-          const rawUser = localStorage.getItem('stockflow_user');
+          const rawUser = tabSession.get('stockflow_user');
           if (rawUser) {
             try {
               const uObj = JSON.parse(rawUser);
@@ -386,7 +387,7 @@ export const StaffAccountsScreen: React.FC<StaffAccountsScreenProps> = ({
                   warehouseCode: w,
                   warehouseName: w,
                 }));
-                localStorage.setItem('stockflow_user', JSON.stringify(uObj));
+                tabSession.set('stockflow_user', JSON.stringify(uObj));
                 window.dispatchEvent(
                   new CustomEvent('stockflow_user_updated', {
                     detail: { assignedWarehouses: finalWarehousesToSave },

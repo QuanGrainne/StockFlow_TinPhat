@@ -5,7 +5,7 @@ import React from 'react';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-screen bg-[#F7FAFC] flex flex-col text-slate-800 font-sans">
+    <div className="min-h-screen stockflow-brand-bg flex flex-col text-slate-800 font-sans">
       <main className="flex-1 w-full flex flex-col">
         {children}
       </main>
