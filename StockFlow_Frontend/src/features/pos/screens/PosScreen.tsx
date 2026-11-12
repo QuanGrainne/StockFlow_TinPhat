@@ -11,7 +11,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { message } from 'antd';
-import { FormHeaderUserBar } from '@/components/FormHeaderUserBar';
+import { FormHeaderUserBar } from '@/components/layout/FormHeaderUserBar';
 import {
   ArrowLeft,
   ArrowLeftRight,
@@ -34,7 +34,7 @@ import {
   X,
 } from 'lucide-react';
 import { ProductThumb } from '@/components/ProductThumb';
-import { CustomerFormModal } from '@/features/customers/components/CustomerFormModal';
+import { CustomerFormModal } from '@/features/customers';
 import { customerService } from '@/features/customers/services/customerService';
 import type { CreateCustomerPayload } from '@/features/customers/types';
 import { orderSettingsService } from '@/features/settings/services/orderSettingsService';

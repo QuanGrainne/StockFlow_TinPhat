@@ -8,7 +8,7 @@ import { createPortal } from 'react-dom';
 import { Loader2, Search, X } from 'lucide-react';
 import { orderService } from '@/features/orders/services/orderService';
 import type { OrderListItem } from '@/features/orders/types';
-import { formatDateTimeVN } from '@/features/transfers/utils/dateUtils';
+import { formatDateTimeVN } from '@/lib/utils/date';
 import { formatVnd } from '../utils/salesReturnUtils';
 
 interface Props {

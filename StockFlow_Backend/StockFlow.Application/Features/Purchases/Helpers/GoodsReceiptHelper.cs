@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using StockFlow.Application.Common.Interfaces;
+using StockFlow.Domain.Services;
 
 namespace StockFlow.Application.Features.Purchases.Helpers;
 
@@ -25,35 +26,13 @@ public static class GoodsReceiptHelper
     /// <param name="incomingQty">Số lượng hàng nhập mới thực tế</param>
     /// <param name="incomingUnitPrice">Đơn giá nhập thực tế (sau chiết khấu)</param>
     /// <returns>Giá vốn bình quân mới đã làm tròn 2 chữ số thập phân</returns>
+    /// <remarks>T21: thân hàm đã chuyển nguyên văn sang <see cref="CostingPolicy"/> (Domain); giữ chữ ký để nơi gọi không đổi.</remarks>
     public static decimal CalculateMovingAverageCost(
         decimal currentQty,
         decimal currentUnitCost,
         decimal incomingQty,
         decimal incomingUnitPrice)
-    {
-        if (incomingQty <= 0)
-        {
-            return currentUnitCost;
-        }
-
-        // Nếu kho chưa có hàng hoặc đang bị âm tồn (do xuất kho trước khi nhập):
-        // Giá vốn mới sẽ được chốt bằng chính đơn giá của lô hàng mới nhập này
-        if (currentQty <= 0 || currentUnitCost <= 0)
-        {
-            return Math.Round(incomingUnitPrice, 2, MidpointRounding.AwayFromZero);
-        }
-
-        decimal totalQty = currentQty + incomingQty;
-        if (totalQty <= 0)
-        {
-            return Math.Round(incomingUnitPrice, 2, MidpointRounding.AwayFromZero);
-        }
-
-        decimal totalValue = (currentQty * currentUnitCost) + (incomingQty * incomingUnitPrice);
-        decimal newAverageCost = totalValue / totalQty;
-
-        return Math.Round(newAverageCost, 2, MidpointRounding.AwayFromZero);
-    }
+        => CostingPolicy.CalculateMovingAverageCost(currentQty, currentUnitCost, incomingQty, incomingUnitPrice);
 
     /// <summary>
     /// Tự động sinh mã phiếu nhập hàng tiếp theo theo định dạng chuẩn KiotViet: PN000001, PN000002...

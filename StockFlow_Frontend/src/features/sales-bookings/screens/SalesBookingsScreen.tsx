@@ -24,7 +24,7 @@ import {
   BOOKING_STATUS_OPTIONS,
   exportBookingsToXLSX,
 } from '@/features/sales-bookings/utils/salesBookingUtils';
-import { formatDateTimeVN } from '@/features/transfers/utils/dateUtils';
+import { formatDateTimeVN } from '@/lib/utils/date';
 import { getTimeRangeForPreset } from '@/components/filters/TimeRangeFilter';
 import { PartnerLink } from '@/components/links/EntityLinks';
 import { readDocumentLink, scrollToWhenReady } from '@/lib/navigation/documentLink';

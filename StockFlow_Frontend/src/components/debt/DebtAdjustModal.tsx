@@ -12,7 +12,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { message } from 'antd';
 import { Info, Loader2, X } from 'lucide-react';
-import { toLocalDatetimeInputString } from '@/features/transfers/utils/dateUtils';
+import { toLocalDatetimeInputString } from '@/lib/utils/date';
 import type { DebtAdjustApi, DebtAdjustmentDetail, DebtAdjustPayload } from './types';
 
 /** Khách hàng: nợ cần thu; Nhà cung cấp: nợ cần trả */

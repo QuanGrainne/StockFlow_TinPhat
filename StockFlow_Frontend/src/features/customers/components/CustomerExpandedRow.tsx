@@ -9,7 +9,7 @@ import CustomerPaymentModal from './CustomerPaymentModal';
 import CustomerReceiptModal from './CustomerReceiptModal';
 import DebtAdjustModal from '@/components/debt/DebtAdjustModal';
 import { customerService } from '../services/customerService';
-import InvoicePreviewModal from '@/features/orders/components/InvoicePreviewModal';
+import { InvoicePreviewModal } from '@/features/orders';
 import { Customer, CustomerDebtLedgerEntry, CustomerDetail } from '../types';
 import { exportCustomerBookingsToXLSX, exportCustomerLedgerToXLSX, exportCustomerOrdersToXLSX, GENDER_LABEL } from '../utils/exportExcel';
 import { BOOKING_STATUS } from '@/features/sales-bookings/utils/salesBookingUtils';

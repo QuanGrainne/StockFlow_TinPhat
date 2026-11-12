@@ -12,7 +12,7 @@ import { supplierService } from '../services/supplierService';
 import { Supplier, SupplierDetail, SupplierRecentReceipt, SupplierDebtLedgerEntry } from '../types';
 import { getSupplierStatusBadge } from '../utils/status';
 import { exportSupplierLedgerToXLSX, exportSupplierReceiptsToXLSX } from '../utils/exportExcel';
-import { formatDateOnlyVN, formatDateTimeVN } from '@/features/transfers/utils/dateUtils';
+import { formatDateOnlyVN, formatDateTimeVN } from '@/lib/utils/date';
 import { DocumentCodeLink } from '@/components/links/EntityLinks';
 import { toLinkDate } from '@/lib/navigation/documentLink';
 

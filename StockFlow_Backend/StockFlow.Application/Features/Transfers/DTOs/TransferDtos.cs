@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using StockFlow.Domain.Entities;
 
 namespace StockFlow.Application.Features.Transfers.DTOs;
 
@@ -89,7 +90,7 @@ public class CreateTransferRequest
     public int DestWarehouseId { get; set; }
     public DateTime? TransferDate { get; set; }
     public string? Notes { get; set; }
-    public string? Status { get; set; } = "DRAFT";
+    public string? Status { get; set; } = TransferStatus.Draft;
     public List<CreateTransferItemRequest> Items { get; set; } = new();
 }
 

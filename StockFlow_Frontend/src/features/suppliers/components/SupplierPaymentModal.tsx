@@ -6,7 +6,7 @@ import { tabSession } from '@/lib/auth/tabSession';
 import React, { useMemo, useState } from 'react';
 import { Info, Loader2, X } from 'lucide-react';
 import { NumberInput } from '@/components/inputs/NumberInput';
-import { formatDateTimeVN, toLocalDatetimeInputString } from '@/features/transfers/utils/dateUtils';
+import { formatDateTimeVN, toLocalDatetimeInputString } from '@/lib/utils/date';
 import { supplierService } from '../services/supplierService';
 import { Supplier, SupplierOpenReceipt, SupplierPaymentResult } from '../types';
 

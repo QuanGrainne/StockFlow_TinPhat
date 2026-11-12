@@ -2,7 +2,7 @@
 // Vai trò hiện tại của người dùng (đọc từ kết quả đăng nhập lưu trong localStorage).
 
 import { tabSession } from '@/lib/auth/tabSession';
-import type { UserRole } from '@/features/admin/types';
+import type { UserRole } from '@/lib/auth/roles';
 import { ROLE_SWITCHER_ENABLED } from '@/lib/auth/flags';
 
 const KNOWN_ROLES = ['ADMIN', 'MANAGER', 'SALES', 'WAREHOUSE', 'PRODUCTION'];

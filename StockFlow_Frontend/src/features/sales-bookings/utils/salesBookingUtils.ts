@@ -2,7 +2,7 @@
 // Nhãn trạng thái và xuất Excel Đơn đặt hàng
 
 import * as XLSX from 'xlsx';
-import { formatDateTimeVN } from '@/features/transfers/utils/dateUtils';
+import { formatDateTimeVN } from '@/lib/utils/date';
 import type { SalesBookingDetail, SalesBookingListItem, SalesBookingStatus } from '../types';
 
 export const BOOKING_STATUS: Record<SalesBookingStatus, { label: string; cls: string }> = {
