@@ -189,39 +189,6 @@ export const Header: React.FC<HeaderProps> = ({
     };
   }, [currentRole, selectedBranch]);
 
-  // Kiểm tra quyền Admin (Tài khoản Quản trị viên hệ thống hoặc đang giữ vai trò Admin)
-  const isSystemAdminUser = useMemo(() => {
-    if (
-      currentUser.code === 'NV-ADMIN' ||
-      currentUser.code === 'TP-AD001' ||
-      currentUser.name.toLowerCase() === 'quản trị viên' ||
-      currentUser.name.toLowerCase().includes('quản trị viên') ||
-      currentUser.name.toLowerCase() === 'nguyễn văn a' ||
-      currentRole === 'ADMIN'
-    ) {
-      return true;
-    }
-    if (typeof window !== 'undefined') {
-      if (tabSession.get('stockflow_current_role') === 'ADMIN') return true;
-      try {
-        const raw = tabSession.get('stockflow_user');
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          if (
-            parsed.username?.toLowerCase() === 'admin' ||
-            parsed.code === 'NV-ADMIN' ||
-            parsed.code === 'TP-AD001' ||
-            parsed.email === 'admin@tinphat.com' ||
-            (Array.isArray(parsed.roles) && parsed.roles.some((r: any) => String(r).toUpperCase().includes('ADMIN')))
-          ) {
-            return true;
-          }
-        }
-      } catch {}
-    }
-    return false;
-  }, [currentUser.code, currentUser.name, currentRole]);
-
   // Danh sách kho ĐƯỢC PHÂN QUYỀN (Data Isolation): lấy đúng theo server, kể cả kho mới tạo.
   // Thông tin chi tiết (địa chỉ...) bổ sung từ danh mục kho nếu có.
   const permittedFacilities = useMemo<WarehouseFacility[]>(() => {
@@ -269,14 +236,8 @@ export const Header: React.FC<HeaderProps> = ({
         (selectedBranch && (selectedBranch.includes(f.name) || selectedBranch.includes(f.code)))
     );
 
-    const isValidInAll = facilities.some(
-      (f) =>
-        f.name === selectedBranch ||
-        f.code === selectedBranch ||
-        (selectedBranch && (selectedBranch.includes(f.name) || selectedBranch.includes(f.code)))
-    );
-
-    if (isValidInPermitted || (isSystemAdminUser && isValidInAll)) {
+    // Mọi vai trò (kể cả Admin) chỉ được chọn kho trong danh sách được phân quyền
+    if (isValidInPermitted) {
       return;
     }
 
@@ -293,7 +254,7 @@ export const Header: React.FC<HeaderProps> = ({
         );
       }
     }
-  }, [permittedFacilities, facilities, authorizedLoaded, selectedBranch, isSystemAdminUser]);
+  }, [permittedFacilities, facilities, authorizedLoaded, selectedBranch]);
 
   const handleSelectBranch = (codeOrName: string) => {
     const fac = permittedFacilities.find((f) => f.code === codeOrName || f.name === codeOrName);
