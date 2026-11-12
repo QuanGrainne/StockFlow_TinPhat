@@ -2,6 +2,7 @@ using MediatR;
 using Microsoft.EntityFrameworkCore;
 using StockFlow.Application.Common;
 using StockFlow.Application.Common.Interfaces;
+using StockFlow.Application.Features.Orders.Helpers;
 using StockFlow.Application.Features.SalesBookings.Common;
 using StockFlow.Application.Features.Transfers.Helpers;
 
@@ -23,11 +24,16 @@ public class CancelOrderCommandHandler : IRequestHandler<CancelOrderCommand, Res
 
     private readonly IStockFlowDbContext _context;
     private readonly ICurrentUserService _currentUser;
+    private readonly IUserPermissionService _permissionService;
 
-    public CancelOrderCommandHandler(IStockFlowDbContext context, ICurrentUserService currentUser)
+    public CancelOrderCommandHandler(
+        IStockFlowDbContext context,
+        ICurrentUserService currentUser,
+        IUserPermissionService permissionService)
     {
         _context = context;
         _currentUser = currentUser;
+        _permissionService = permissionService;
     }
 
     public async Task<Result<bool>> Handle(CancelOrderCommand request, CancellationToken ct)
@@ -43,6 +49,10 @@ public class CancelOrderCommandHandler : IRequestHandler<CancelOrderCommand, Res
             .FirstOrDefaultAsync(o => o.OrderId == request.OrderId, ct);
         if (order == null)
             return Result.Failure<bool>("Không tìm thấy hóa đơn.");
+        // Phân quyền kho (BR-04): kiểm tra trước mọi thông tin khác của hóa đơn.
+        // Dựa trên kho của hóa đơn và mọi phiếu xuất, nên hóa đơn chưa có phiếu xuất cũng được kiểm tra.
+        if (!await OrderWarehouseAccess.CanAccessAsync(_context, _currentUser, _permissionService, order, ct))
+            return Result.Failure<bool>("Bạn không có quyền hủy hóa đơn của chi nhánh này.");
         if (order.OrderType == SalesBookingOps.OrderType)
             return Result.Failure<bool>("Đây là đơn đặt hàng — hủy ở màn Đặt hàng.");
         if (string.Equals(order.Status, "CANCELLED", StringComparison.OrdinalIgnoreCase))
@@ -52,12 +62,6 @@ public class CancelOrderCommandHandler : IRequestHandler<CancelOrderCommand, Res
             .Select(r => r.ReturnCode).FirstOrDefaultAsync(ct);
         if (activeReturn != null)
             return Result.Failure<bool>($"Hóa đơn {order.OrderCode} đã có phiếu trả hàng {activeReturn} — hủy phiếu trả hàng trước.");
-
-        foreach (var issue in order.TrxStockIssues)
-        {
-            if (!await _currentUser.HasWarehouseAccessAsync(issue.WarehouseId, ct))
-                return Result.Failure<bool>("Bạn không có quyền hủy hóa đơn của chi nhánh này.");
-        }
 
         var productIds = order.DtlOrderItems.Select(i => i.ProductId).Distinct().ToList();
         var products = await _context.MstProducts.Where(p => productIds.Contains(p.ProductId)).ToDictionaryAsync(p => p.ProductId, ct);
