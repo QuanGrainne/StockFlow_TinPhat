@@ -8,12 +8,14 @@ import {
   Building2,
   ClipboardCheck,
   ClipboardList,
+  ClipboardPlus,
   DollarSign,
-  FileText,
+  Factory,
   LayoutGrid,
   Layers,
   Package,
-  RefreshCw,
+  PackageMinus,
+  PackagePlus,
   Repeat,
   RotateCcw,
   ShieldCheck,
@@ -281,35 +283,47 @@ export const NAV_GROUPS: NavGroup[] = [
   },
   {
     id: 'production-group',
-    label: 'Quản trị sản xuất',
-    icon: Layers,
+    label: 'Sản xuất',
+    icon: Factory,
     items: [
       {
+        // UC-44 / UC-58–61: xem lệnh, NVL, thành phẩm (Manager + Kế toán sản xuất)
         screen: 'production-orders',
         path: '/production',
         featureId: 'feat-prod',
-        title: 'Theo dõi lệnh sản xuất',
-        desc: 'Giám sát tiến độ gia công xưởng',
+        title: 'Lệnh sản xuất',
+        desc: 'Theo dõi lệnh, nhu cầu NVL và tiến độ nhập thành phẩm',
         icon: Layers,
         backendModule: 'PROD',
-        aliases: ['production-open-report-modal'],
       },
       {
-        screen: 'production-import',
-        path: '/production/import',
-        featureId: 'feat-prod-import',
-        title: 'Nhận kế hoạch (Import File)',
-        desc: 'Nhập kế hoạch sản xuất từ Excel',
-        icon: RefreshCw,
+        // UC-59 / BR-51: lập, sửa, hủy, đóng lệnh, điều chỉnh định mức (Manager)
+        screen: 'production-create',
+        path: '/production/create',
+        featureId: 'feat-prod-plan',
+        title: 'Lập lệnh sản xuất',
+        desc: 'Lập lệnh từ BOM đang áp dụng, điều hành lệnh',
+        icon: ClipboardPlus,
         backendModule: 'PROD',
       },
       {
-        screen: 'production-logs',
-        path: '/production/logs',
-        featureId: 'feat-prod-logs',
-        title: 'Sổ nhật ký phiếu tham chiếu',
-        desc: 'Lịch sử nhật ký sản xuất',
-        icon: FileText,
+        // UC-46/47/48: ghi nhận NVL thực xuất cho lệnh (Kế toán sản xuất)
+        screen: 'production-material-issues',
+        path: '/production/material-issues',
+        featureId: 'feat-prod-issue',
+        title: 'Xuất NVL sản xuất',
+        desc: 'Phiếu xuất nguyên vật liệu cho lệnh sản xuất',
+        icon: PackageMinus,
+        backendModule: 'PROD',
+      },
+      {
+        // UC-49/50: ghi nhận thành phẩm đã kiểm đếm vào kho (Kế toán sản xuất)
+        screen: 'production-finished-goods',
+        path: '/production/finished-goods',
+        featureId: 'feat-prod-receipt',
+        title: 'Nhập thành phẩm',
+        desc: 'Phiếu nhập thành phẩm và hàng lỗi',
+        icon: PackagePlus,
         backendModule: 'PROD',
       },
     ],
@@ -357,8 +371,6 @@ export const EXTRA_SCREENS: Record<string, { path: string; anyOf: string[] }> = 
 export const SCREEN_PATH_MAP: Record<string, string> = {
   ...Object.fromEntries(NAV_ITEMS_FLAT.flatMap((i) => [i.screen, ...(i.aliases ?? [])].map((s) => [s, i.path]))),
   ...Object.fromEntries(Object.entries(EXTRA_SCREENS).map(([s, e]) => [s, e.path])),
-  // Theo dõi lệnh sản xuất, mở sẵn form Nhập báo cáo giấy
-  'production-open-report-modal': '/production?report=1',
 };
 
 /** Vai trò có được mở màn hình này không (theo các chức năng được tick) */

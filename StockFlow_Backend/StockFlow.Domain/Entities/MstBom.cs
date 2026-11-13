@@ -17,6 +17,9 @@ public partial class MstBom
 
     public DateTime? CreatedAt { get; set; }
 
+    /// <summary>Ghi chú kỹ thuật / hướng dẫn sản xuất của BOM (màn 3.2.2.6–3.2.2.8)</summary>
+    public string? Description { get; set; }
+
     public virtual ICollection<DtlBomItem> DtlBomItems { get; set; } = new List<DtlBomItem>();
 
     public virtual MstProduct Product { get; set; } = null!;

@@ -786,6 +786,11 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp without time zone")
                         .HasColumnName("created_at");
 
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("description");
+
                     b.Property<bool?>("IsActive")
                         .HasColumnType("boolean")
                         .HasColumnName("is_active");
@@ -802,7 +807,9 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                     b.HasKey("BomId")
                         .HasName("mst_boms_pkey");
 
-                    b.HasIndex("ProductId");
+                    b.HasIndex(new[] { "ProductId" }, "uq_mst_boms_active_product")
+                        .IsUnique()
+                        .HasFilter("is_active");
 
                     b.ToTable("mst_boms", "stockflow");
                 });
@@ -1773,6 +1780,10 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("lot_id");
 
+                    b.Property<bool>("NeedsReview")
+                        .HasColumnType("boolean")
+                        .HasColumnName("needs_review");
+
                     b.Property<string>("Notes")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)")
@@ -1802,6 +1813,11 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                     b.Property<int>("ReportId")
                         .HasColumnType("integer")
                         .HasColumnName("report_id");
+
+                    b.Property<string>("ReviewNote")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("review_note");
 
                     b.Property<string>("Status")
                         .HasMaxLength(20)
@@ -2285,6 +2301,23 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("RequirementId"));
 
+                    b.Property<string>("AdjustReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("adjust_reason");
+
+                    b.Property<DateTime?>("AdjustedAt")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("adjusted_at");
+
+                    b.Property<int?>("AdjustedBy")
+                        .HasColumnType("integer")
+                        .HasColumnName("adjusted_by");
+
+                    b.Property<bool>("IsAdjusted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_adjusted");
+
                     b.Property<decimal?>("IssuedQty")
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)")
@@ -2293,6 +2326,11 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                     b.Property<int>("MaterialId")
                         .HasColumnType("integer")
                         .HasColumnName("material_id");
+
+                    b.Property<decimal?>("NormPerUnit")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("norm_per_unit");
 
                     b.Property<int>("ProductionOrderId")
                         .HasColumnType("integer")
@@ -2308,9 +2346,18 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                         .HasColumnType("numeric(18,2)")
                         .HasColumnName("shortage_qty");
 
+                    b.Property<int?>("SourceBomItemId")
+                        .HasColumnType("integer")
+                        .HasColumnName("source_bom_item_id");
+
                     b.Property<int>("UnitId")
                         .HasColumnType("integer")
                         .HasColumnName("unit_id");
+
+                    b.Property<decimal?>("WastageRate")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("numeric(5,2)")
+                        .HasColumnName("wastage_rate");
 
                     b.HasKey("RequirementId")
                         .HasName("trx_production_material_requirements_pkey");
@@ -2381,6 +2428,11 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)")
                         .HasColumnName("status");
+
+                    b.Property<string>("Workshop")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("workshop");
 
                     b.HasKey("ProductionOrderId")
                         .HasName("trx_production_orders_pkey");
@@ -2815,6 +2867,11 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                     b.Property<int?>("ProductionOrderId")
                         .HasColumnType("integer")
                         .HasColumnName("production_order_id");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("reason");
 
                     b.Property<int>("RequestedBy")
                         .HasColumnType("integer")

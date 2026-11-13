@@ -91,7 +91,7 @@ public static class PermissionConstants
 
             case "ROLE_PRODUCTION":
                 foreach (var m in Modules) result.Add($"{m.ModuleKey}_READ");
-                result.Add("PROD_CREATE");
+                // Ghi nhận xuất NVL / nhập thành phẩm; lập, huỷ, đóng lệnh là của Manager (PROD_CREATE/DELETE/APPROVE)
                 result.Add("PROD_UPDATE");
                 break;
 

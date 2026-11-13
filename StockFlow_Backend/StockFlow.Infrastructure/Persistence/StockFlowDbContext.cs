@@ -555,6 +555,14 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
             entity.ToTable("mst_boms", "stockflow");
 
             entity.Property(e => e.BomId).HasColumnName("bom_id");
+            // Ghi chú kỹ thuật của BOM (UC-57, màn 3.2.2.6–3.2.2.8)
+            entity.Property(e => e.Description)
+                .HasMaxLength(500)
+                .HasColumnName("description");
+            // BR-30: mỗi thành phẩm tối đa một BOM đang áp dụng
+            entity.HasIndex(e => e.ProductId, "uq_mst_boms_active_product")
+                .IsUnique()
+                .HasFilter("is_active");
             entity.Property(e => e.BomName)
                 .HasMaxLength(100)
                 .HasColumnName("bom_name");
@@ -1049,6 +1057,12 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
             entity.HasIndex(e => e.ReportId, "uq_trx_finished_goods_receipts_2").IsUnique();
 
             entity.Property(e => e.FgrId).HasColumnName("fgr_id");
+            // Cảnh báo dùng NVL cần Manager xem xét (BR-37)
+            entity.Property(e => e.NeedsReview)
+                .HasColumnName("needs_review");
+            entity.Property(e => e.ReviewNote)
+                .HasMaxLength(500)
+                .HasColumnName("review_note");
             entity.Property(e => e.FgrCode)
                 .HasMaxLength(30)
                 .HasColumnName("fgr_code");
@@ -1515,6 +1529,23 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
             entity.ToTable("trx_production_material_requirements", "stockflow");
 
             entity.Property(e => e.RequirementId).HasColumnName("requirement_id");
+            // Snapshot định mức khi lập lệnh và điều chỉnh định mức trên lệnh (BR-31, BR-51)
+            entity.Property(e => e.SourceBomItemId).HasColumnName("source_bom_item_id");
+            entity.Property(e => e.NormPerUnit)
+                .HasPrecision(18, 4)
+                .HasColumnName("norm_per_unit");
+            entity.Property(e => e.WastageRate)
+                .HasPrecision(5, 2)
+                .HasColumnName("wastage_rate");
+            entity.Property(e => e.IsAdjusted)
+                .HasColumnName("is_adjusted");
+            entity.Property(e => e.AdjustReason)
+                .HasMaxLength(500)
+                .HasColumnName("adjust_reason");
+            entity.Property(e => e.AdjustedBy).HasColumnName("adjusted_by");
+            entity.Property(e => e.AdjustedAt)
+                .HasColumnType("timestamp without time zone")
+                .HasColumnName("adjusted_at");
             entity.Property(e => e.IssuedQty)
                 .HasPrecision(18, 2)
                 .HasColumnName("issued_qty");
@@ -1553,6 +1584,10 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
             entity.HasIndex(e => e.ProductionOrderCode, "uq_trx_production_orders_1").IsUnique();
 
             entity.Property(e => e.ProductionOrderId).HasColumnName("production_order_id");
+            // Xưởng phụ trách (UC-58 A58.1)
+            entity.Property(e => e.Workshop)
+                .HasMaxLength(200)
+                .HasColumnName("workshop");
             entity.Property(e => e.ActualQuantity)
                 .HasPrecision(18, 2)
                 .HasColumnName("actual_quantity");
@@ -1740,6 +1775,10 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
             entity.HasIndex(e => e.IssueCode, "uq_trx_stock_issues_1").IsUnique();
 
             entity.Property(e => e.StockIssueId).HasColumnName("stock_issue_id");
+            // Lý do xuất bổ sung vượt nhu cầu (BR-34)
+            entity.Property(e => e.Reason)
+                .HasMaxLength(500)
+                .HasColumnName("reason");
             entity.Property(e => e.IsSupplementary).HasColumnName("is_supplementary");
             entity.Property(e => e.IssueCode)
                 .HasMaxLength(30)
