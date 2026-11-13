@@ -29,6 +29,9 @@ public partial class TrxProductionOrder
 
     public string? Notes { get; set; }
 
+    /// <summary>Xưởng phụ trách sản xuất (UC-58 A58.1)</summary>
+    public string? Workshop { get; set; }
+
     public virtual SecUser? AssignedToNavigation { get; set; }
 
     public virtual MstBom Bom { get; set; } = null!;

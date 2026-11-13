@@ -31,6 +31,12 @@ public partial class TrxFinishedGoodsReceipt
 
     public string? Notes { get; set; }
 
+    /// <summary>Phiếu cần Manager xem xét: thành phẩm cần nhiều NVL hơn số đã xuất (BR-37)</summary>
+    public bool NeedsReview { get; set; }
+
+    /// <summary>Ghi chú bắt buộc khi có cảnh báo dùng NVL (BR-37, MSG43)</summary>
+    public string? ReviewNote { get; set; }
+
     public virtual MstWarehouseLocation? Location { get; set; }
 
     public virtual MstInventoryLot? Lot { get; set; }

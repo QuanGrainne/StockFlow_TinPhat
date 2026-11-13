@@ -57,9 +57,11 @@ public static class FeatureConstants
         new("feat-purchase-returns", "Trả hàng nhập", "PURCHASE", new[] { "FIN" }),
         new("feat-suppliers", "Nhà cung cấp", "PARTNER", new[] { "FIN" }),
 
-        new("feat-prod", "Theo dõi lệnh sản xuất", "PROD", None),
-        new("feat-prod-import", "Nhận kế hoạch (Import File)", "PROD", None),
-        new("feat-prod-logs", "Sổ nhật ký phiếu tham chiếu", "PROD", None),
+        // Sản xuất (UC-44–50, UC-58–61): xem lệnh; lập / điều hành lệnh (Manager); xuất NVL, nhập thành phẩm (Production Accountant)
+        new("feat-prod", "Lệnh sản xuất", "PROD", None),
+        new("feat-prod-plan", "Lập lệnh sản xuất", "PROD", None),
+        new("feat-prod-issue", "Xuất NVL sản xuất", "PROD", None),
+        new("feat-prod-receipt", "Nhập thành phẩm", "PROD", None),
 
         new("feat-bom", "Định mức BOM", "BOM", None),
     };
@@ -71,7 +73,9 @@ public static class FeatureConstants
     private static readonly string[] StockFeats = { "feat-transfers", "feat-stocktake" };
     private static readonly string[] SalesFeats = { "feat-pos", "feat-sales-booking", "feat-invoices", "feat-sales-returns" };
     private static readonly string[] PurchaseFeats = { "feat-purchase-orders", "feat-purchase", "feat-purchase-returns", "feat-suppliers" };
-    private static readonly string[] ProdFeats = { "feat-prod", "feat-prod-import", "feat-prod-logs" };
+    private static readonly string[] ProdFeats = { "feat-prod", "feat-prod-plan", "feat-prod-issue", "feat-prod-receipt" };
+    /// <summary>Production Accountant: xem lệnh, xuất NVL, nhập thành phẩm; không lập lệnh, không sửa BOM (bảng 3.1.6)</summary>
+    private static readonly string[] ProdAccountantFeats = { "feat-prod", "feat-prod-issue", "feat-prod-receipt" };
 
     public static string ToCode(string featureId)
     {
@@ -98,8 +102,8 @@ public static class FeatureConstants
             "ROLE_MANAGER" => GoodsFeats.Concat(StockFeats).Append("feat-customers").Concat(SalesFeats)
                 .Concat(PurchaseFeats).Concat(ProdFeats).Append("feat-bom"),
             "ROLE_SALES" => new[] { "feat-goods", "feat-customers" }.Concat(SalesFeats),
-            "ROLE_WAREHOUSE" => new[] { "feat-goods" }.Concat(StockFeats).Concat(PurchaseFeats).Append("feat-bom"),
-            "ROLE_PRODUCTION" => new[] { "feat-goods" }.Concat(ProdFeats).Append("feat-bom"),
+            "ROLE_WAREHOUSE" => new[] { "feat-goods" }.Concat(StockFeats).Concat(PurchaseFeats),
+            "ROLE_PRODUCTION" => new[] { "feat-goods" }.Concat(ProdAccountantFeats),
             _ => None,
         };
         return ids.Distinct().ToList();

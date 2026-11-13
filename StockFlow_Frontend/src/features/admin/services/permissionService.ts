@@ -582,15 +582,17 @@ const GOODS_FEATS = ['feat-goods', 'feat-price-books'];
 const STOCK_FEATS = ['feat-transfers', 'feat-stocktake'];
 const SALES_FEATS = ['feat-pos', 'feat-sales-booking', 'feat-invoices', 'feat-sales-returns'];
 const PURCHASE_FEATS = ['feat-purchase-orders', 'feat-purchase', 'feat-purchase-returns', 'feat-suppliers'];
-const PROD_FEATS = ['feat-prod', 'feat-prod-import', 'feat-prod-logs'];
+const PROD_FEATS = ['feat-prod', 'feat-prod-plan', 'feat-prod-issue', 'feat-prod-receipt'];
+/** Kế toán sản xuất: xem lệnh, xuất NVL, nhập thành phẩm; không lập lệnh, không sửa BOM (SRS 3.1.6) */
+const PROD_ACCOUNTANT_FEATS = ['feat-prod', 'feat-prod-issue', 'feat-prod-receipt'];
 
 export const DEFAULT_ROLE_FEATURE_PERMS: Record<string, string[]> = {
   ROLE_ADMIN: NAVBAR_FEATURES.map((f) => f.id),
   ROLE_MANAGER: [...GOODS_FEATS, ...STOCK_FEATS, 'feat-customers', ...SALES_FEATS, ...PURCHASE_FEATS, ...PROD_FEATS, 'feat-bom'],
   ROLE_SALES: ['feat-goods', 'feat-customers', ...SALES_FEATS],
   // UC-33: nhân viên kho lập phiếu chuyển và xác nhận nhận hàng
-  ROLE_WAREHOUSE: ['feat-goods', ...STOCK_FEATS, ...PURCHASE_FEATS, 'feat-bom'],
-  ROLE_PRODUCTION: ['feat-goods', ...PROD_FEATS, 'feat-bom'],
+  ROLE_WAREHOUSE: ['feat-goods', ...STOCK_FEATS, ...PURCHASE_FEATS],
+  ROLE_PRODUCTION: ['feat-goods', ...PROD_ACCOUNTANT_FEATS],
 };
 
 /**
@@ -611,7 +613,6 @@ function migrateFeatureList(role: string, feats: string[]): string[] {
   addIf('feat-roles', ['feat-role-matrix']);
   // Phân quyền kho: gộp "Danh sách quyền kho" + "Cơ sở kho" thành 1 mục
   addIf('feat-warehouse-facilities', ['feat-warehouse-perms']);
-  addIf('feat-prod', ['feat-prod-import', 'feat-prod-logs']);
   if (role === 'ROLE_ADMIN') out.add('feat-dashboard');
   const valid = new Set(NAVBAR_FEATURES.map((f) => f.id));
   return [...out].filter((id) => valid.has(id));

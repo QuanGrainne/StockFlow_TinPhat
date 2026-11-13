@@ -4,7 +4,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { message } from 'antd';
-import { ChevronDown, FileText } from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
 import { UserRole } from '@/features/admin/types';
 import { permissionService } from '@/features/admin/services/permissionService';
 import { NAV_GROUPS, type NavGroup } from '@/lib/navigation/navbar';
@@ -197,17 +197,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentRole, activeScreen, onN
         })}
       </div>
 
-      {/* Nhân viên sản xuất: nút nhanh Nhập báo cáo giấy (khi được phân quyền Theo dõi lệnh sản xuất) */}
-      {currentRole === 'PRODUCTION' && allowedFeatures?.has('feat-prod') && (
-        <button
-          type="button"
-          onClick={() => onNavigate('production-open-report-modal')}
-          className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-[#1E56A0] hover:bg-[#16437E] text-white text-xs font-semibold shadow-2xs transition cursor-pointer shrink-0"
-        >
-          <FileText size={14} />
-          <span>Nhập báo cáo giấy</span>
-        </button>
-      )}
     </div>
   );
 };

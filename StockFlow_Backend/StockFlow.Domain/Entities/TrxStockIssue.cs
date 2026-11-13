@@ -29,6 +29,9 @@ public partial class TrxStockIssue
 
     public bool? IsSupplementary { get; set; }
 
+    /// <summary>Lý do xuất bổ sung (bắt buộc khi xuất vượt nhu cầu, BR-34)</summary>
+    public string? Reason { get; set; }
+
     public virtual ICollection<DtlStockIssueItem> DtlStockIssueItems { get; set; } = new List<DtlStockIssueItem>();
 
     public virtual SecUser? ProcessedByNavigation { get; set; }
