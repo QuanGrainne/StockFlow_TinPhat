@@ -53,6 +53,8 @@ export interface PosCustomer {
   creditLimit: number;
   currentDebt: number;
   isOverCreditLimit: boolean;
+  /** Lý do cảnh báo công nợ theo "Thiết lập cảnh báo công nợ" (null = không cảnh báo) */
+  debtWarning?: string | null;
   taxCode?: string;
   salesRep?: string;
 }

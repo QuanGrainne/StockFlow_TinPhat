@@ -36,6 +36,7 @@ public interface IStockFlowDbContext
     DbSet<DtlPriceBookItem> DtlPriceBookItems { get; }
 
     DbSet<MstOrderSetting> MstOrderSettings { get; }
+    DbSet<MstDebtWarningSetting> MstDebtWarningSettings { get; }
     DbSet<TrxOrder> TrxOrders { get; }
     DbSet<TrxReturnRequest> TrxReturnRequests { get; }
     DbSet<DtlReturnRequestItem> DtlReturnRequestItems { get; }

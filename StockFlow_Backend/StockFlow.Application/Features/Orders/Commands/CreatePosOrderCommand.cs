@@ -456,6 +456,12 @@ public class CreatePosOrderCommandHandler : IRequestHandler<CreatePosOrderComman
                     return Result<PosOrderResultDto>.Failure(
                         CreditRequestMessages.UseOverApproved(code, approvedCeiling, currentDebt + outstanding));
             }
+            else if (await _context.MstDebtWarningSettings.AsNoTracking()
+                         .AnyAsync(s => s.SettingId == 1 && s.AllowDebtOverLimit, cancellationToken))
+            {
+                // Thiết lập cảnh báo công nợ: "Cho phép khách hàng nợ thêm khi vượt quá hạn mức"
+                // → chỉ cảnh báo ở POS, không chặn CUS-008/009, không cần yêu cầu duyệt.
+            }
             else if (currentDebt >= creditLimit)
             {
                 return Result<PosOrderResultDto>.Failure(

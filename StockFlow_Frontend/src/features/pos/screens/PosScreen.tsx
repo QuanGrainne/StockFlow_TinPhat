@@ -1583,6 +1583,9 @@ export default function PosScreen() {
                           ) : (
                             <div>Khách chưa được thiết lập hạn mức</div>
                           )}
+                          {tab.customer.debtWarning && (
+                            <div className="text-[#fbbf24] font-semibold">Cảnh báo: {tab.customer.debtWarning}</div>
+                          )}
                           {tab.creditRequestCode && <div>Đang dùng ngoại lệ {tab.creditRequestCode}</div>}
                           <div className="opacity-70">Bấm để xem yêu cầu hạn mức của tôi</div>
                         </div>
@@ -1593,7 +1596,11 @@ export default function PosScreen() {
                         onClick={() => setMyCreditOpen(true)}
                         aria-label="Hạn mức còn lại"
                         className={`ml-auto shrink-0 inline-flex items-center justify-center h-6 w-6 rounded-full cursor-pointer ${
-                          tab.creditRequestCode ? 'bg-[#0071BA] text-white' : 'text-[#0071BA] hover:bg-black/5'
+                          tab.creditRequestCode
+                            ? 'bg-[#0071BA] text-white'
+                            : tab.customer.debtWarning
+                              ? 'text-[#f59e0b] hover:bg-black/5'
+                              : 'text-[#0071BA] hover:bg-black/5'
                         }`}
                       >
                         <CircleAlert size={15} />

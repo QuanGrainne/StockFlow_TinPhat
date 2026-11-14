@@ -34,7 +34,24 @@ export interface Customer {
   /** Tổng bán trừ trả hàng */
   totalSalesNetReturns?: number;
   lastTransactionDate?: string | null;
+  /** Lý do cảnh báo công nợ theo "Thiết lập cảnh báo công nợ" (null = không cảnh báo) */
+  debtWarning?: string | null;
   assignedStaff?: string;
+}
+
+/** Thiết lập cảnh báo công nợ khách hàng (GET/PUT /api/settings/debt-warning) */
+export type DebtDaysFrom = 'FIRST_DEBT' | 'LAST_TRANSACTION';
+export interface DebtWarningSettings {
+  enableDebtAmountWarning: boolean;
+  debtAmountThreshold: number;
+  enableDebtDaysWarning: boolean;
+  debtDaysThreshold: number;
+  debtDaysFrom: DebtDaysFrom;
+  allowDebtOverLimit: boolean;
+  /** Khách lẻ luôn phải thanh toán đủ — chỉ hiển thị */
+  noDebtForWalkIn?: boolean;
+  updatedAt?: string;
+  updatedByName?: string | null;
 }
 
 export interface CustomerStats {
