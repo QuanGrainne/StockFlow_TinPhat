@@ -1,0 +1,93 @@
+# StockFlow — chạy toàn bộ hệ thống bằng Docker (db, api, web, caddy).
+#
+#   cp deploy/.env.example deploy/.env        (lần đầu; sửa mật khẩu / khoá JWT nếu cần)
+#   docker compose -f deploy/compose.yml up -d --build
+#
+# Mở http://localhost:8080 (HTTP_PORT trong deploy/.env). Đăng nhập tài khoản mẫu do DatabaseSeeder tạo.
+# Không dùng Docker vẫn chạy như cũ: dotnet run (StockFlow_Backend/StockFlow.API) + npm run dev (StockFlow_Frontend).
+# Hướng dẫn chi tiết: SETUP.md, mục 13 "Run with Docker".
+#
+# KHÔNG chạy "docker compose down -v": lệnh này xoá volume pgdata (toàn bộ dữ liệu).
+name: stockflow
+
+services:
+  db:
+    image: postgres:18
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?đặt POSTGRES_DB trong deploy/.env}
+      POSTGRES_USER: ${POSTGRES_USER:?đặt POSTGRES_USER trong deploy/.env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?đặt POSTGRES_PASSWORD trong deploy/.env}
+      TZ: Asia/Ho_Chi_Minh
+    volumes:
+      # Postgres 18 lưu dữ liệu dưới /var/lib/postgresql/<major>/docker
+      - pgdata:/var/lib/postgresql
+    ports:
+      # Chỉ để xem bằng pgAdmin/psql từ máy: 127.0.0.1:5433 (khác 5432 của Postgres cài sẵn trên máy)
+      - "127.0.0.1:${DB_PORT:-5433}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+  api:
+    build:
+      context: ../StockFlow_Backend
+    init: true
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      TZ: Asia/Ho_Chi_Minh
+      # Ghi đè appsettings.json (dấu "__" = dấu ":" trong appsettings)
+      ConnectionStrings__StockFlowDb: Host=db;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD};SearchPath=stockflow,public
+      Jwt__SecretKey: ${JWT_SECRET_KEY:?đặt JWT_SECRET_KEY trong deploy/.env (ít nhất 32 ký tự)}
+      Logging__LogLevel__Microsoft.EntityFrameworkCore.Database.Command: Warning
+    healthcheck:
+      # Image ASP.NET không có curl: gọi GET /api/health bằng bash /dev/tcp
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/8080 && printf 'GET /api/health HTTP/1.0\\r\\nHost: localhost\\r\\n\\r\\n' >&3 && grep -q healthy <&3"]
+      interval: 10s
+      timeout: 5s
+      retries: 18
+      start_period: 30s
+
+  web:
+    build:
+      context: ../StockFlow_Frontend
+      args:
+        # Rỗng = trình duyệt gọi /api/... cùng địa chỉ, Caddy chuyển sang api
+        NEXT_PUBLIC_API_URL: ""
+    init: true
+    restart: unless-stopped
+    environment:
+      TZ: Asia/Ho_Chi_Minh
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('net').connect(3000,'127.0.0.1').on('connect',()=>process.exit(0)).on('error',()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 15s
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+      web:
+        condition: service_healthy
+    ports:
+      # 127.0.0.1 = chỉ máy này; HTTP_BIND=0.0.0.0 để máy khác trong mạng LAN truy cập (demo)
+      - "${HTTP_BIND:-127.0.0.1}:${HTTP_PORT:-8080}:80"
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:
