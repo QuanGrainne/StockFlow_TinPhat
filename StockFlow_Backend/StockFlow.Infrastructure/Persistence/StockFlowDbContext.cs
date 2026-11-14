@@ -981,9 +981,23 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
                 .HasPrecision(18, 2)
                 .HasColumnName("requested_limit");
             entity.Property(e => e.SalesOrderId).HasColumnName("sales_order_id");
+            // Concurrency token (chỉ cấu hình EF, không đổi DB): UPDATE kèm điều kiện giá trị cũ,
+            // nên hai Manager cùng duyệt / hai hóa đơn cùng dùng một ngoại lệ thì chỉ một bên thành công.
             entity.Property(e => e.Status)
                 .HasMaxLength(20)
-                .HasColumnName("status");
+                .HasColumnName("status")
+                .IsConcurrencyToken();
+            entity.Property(e => e.SalesOrderId).IsConcurrencyToken();
+            entity.Property(e => e.RequestCode)
+                .HasMaxLength(30)
+                .HasColumnName("request_code");
+            entity.Property(e => e.ApprovalType)
+                .HasMaxLength(20)
+                .HasColumnName("approval_type");
+            entity.Property(e => e.ApprovedLimit)
+                .HasPrecision(18, 2)
+                .HasColumnName("approved_limit");
+            entity.HasIndex(e => e.RequestCode, "uq_trx_credit_limit_requests_request_code").IsUnique();
 
             entity.HasOne(d => d.ApprovedByNavigation).WithMany(p => p.TrxCreditLimitRequestApprovedByNavigations)
                 .HasForeignKey(d => d.ApprovedBy)

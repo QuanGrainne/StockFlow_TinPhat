@@ -29,6 +29,18 @@ public partial class TrxCreditLimitRequest
 
     public string? ApprovalNotes { get; set; }
 
+    /// <summary>Mã yêu cầu (VD YCHM00001), sinh từ sequence seq_credit_request_code. Null với dữ liệu cũ.</summary>
+    public string? RequestCode { get; set; }
+
+    /// <summary>Loại duyệt: ONE_TIME / NEW_LIMIT (CreditApprovalType). Null khi chờ hoặc từ chối.</summary>
+    public string? ApprovalType { get; set; }
+
+    /// <summary>
+    /// Mức Kế toán trưởng duyệt (có thể khác số Sales đề xuất ở RequestedLimit):
+    /// ONE_TIME = dư nợ tối đa sau hóa đơn; NEW_LIMIT = hạn mức mới của khách. Null khi chờ hoặc từ chối.
+    /// </summary>
+    public decimal? ApprovedLimit { get; set; }
+
     public virtual SecUser? ApprovedByNavigation { get; set; }
 
     public virtual MstBusinessPartner Partner { get; set; } = null!;

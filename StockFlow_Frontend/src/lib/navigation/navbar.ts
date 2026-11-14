@@ -234,6 +234,16 @@ export const NAV_GROUPS: NavGroup[] = [
         icon: RotateCcw,
         backendModule: 'SALES',
       },
+      {
+        // Approval Inbox (UC-64): mặc định chỉ Kế toán trưởng / Admin
+        screen: 'credit-approvals',
+        path: '/approvals',
+        featureId: 'feat-credit-approvals',
+        title: 'Duyệt yêu cầu',
+        desc: 'Duyệt yêu cầu vượt hạn mức công nợ',
+        icon: ShieldCheck,
+        backendModule: 'SALES',
+      },
     ],
   },
   {
