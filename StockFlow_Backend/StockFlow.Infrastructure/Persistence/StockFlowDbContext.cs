@@ -93,6 +93,10 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
 
     public virtual DbSet<TrxProductionReport> TrxProductionReports { get; set; }
 
+    public virtual DbSet<TrxProductionPlan> TrxProductionPlans { get; set; }
+
+    public virtual DbSet<DtlProductionPlanItem> DtlProductionPlanItems { get; set; }
+
     public virtual DbSet<TrxReturnProcessing> TrxReturnProcessings { get; set; }
 
     public virtual DbSet<TrxReturnRequest> TrxReturnRequests { get; set; }
@@ -1632,6 +1636,91 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
                 .HasForeignKey(d => d.ProductId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("fk_trx_production_orders_product_id");
+
+            // Kế hoạch sản xuất sinh ra lệnh (tùy chọn). Không cho xóa kế hoạch còn lệnh liên kết.
+            entity.Property(e => e.ProductionPlanId).HasColumnName("production_plan_id");
+            entity.HasOne(d => d.ProductionPlan).WithMany(p => p.TrxProductionOrders)
+                .HasForeignKey(d => d.ProductionPlanId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("fk_trx_production_orders_production_plan_id");
+        });
+
+        modelBuilder.Entity<TrxProductionPlan>(entity =>
+        {
+            entity.HasKey(e => e.ProductionPlanId).HasName("trx_production_plans_pkey");
+
+            entity.ToTable("trx_production_plans", "stockflow");
+
+            entity.HasIndex(e => e.PlanCode, "uq_trx_production_plans_code").IsUnique();
+
+            entity.Property(e => e.ProductionPlanId).HasColumnName("production_plan_id");
+            entity.Property(e => e.PlanCode)
+                .HasMaxLength(30)
+                .HasColumnName("plan_code");
+            entity.Property(e => e.PlanName)
+                .HasMaxLength(150)
+                .HasColumnName("plan_name");
+            entity.Property(e => e.PlanDate)
+                .HasColumnType("timestamp without time zone")
+                .HasColumnName("plan_date");
+            entity.Property(e => e.PeriodStart).HasColumnName("period_start");
+            entity.Property(e => e.PeriodEnd).HasColumnName("period_end");
+            entity.Property(e => e.Status)
+                .HasMaxLength(20)
+                .HasColumnName("status");
+            entity.Property(e => e.CreatedBy).HasColumnName("created_by");
+            entity.Property(e => e.ApprovedBy).HasColumnName("approved_by");
+            entity.Property(e => e.ApprovalDate)
+                .HasColumnType("timestamp without time zone")
+                .HasColumnName("approval_date");
+            entity.Property(e => e.Notes)
+                .HasMaxLength(500)
+                .HasColumnName("notes");
+
+            entity.HasOne(d => d.CreatedByNavigation).WithMany()
+                .HasForeignKey(d => d.CreatedBy)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("fk_trx_production_plans_created_by");
+
+            entity.HasOne(d => d.ApprovedByNavigation).WithMany()
+                .HasForeignKey(d => d.ApprovedBy)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("fk_trx_production_plans_approved_by");
+        });
+
+        modelBuilder.Entity<DtlProductionPlanItem>(entity =>
+        {
+            entity.HasKey(e => e.ProductionPlanItemId).HasName("dtl_production_plan_items_pkey");
+
+            entity.ToTable("dtl_production_plan_items", "stockflow");
+
+            entity.Property(e => e.ProductionPlanItemId).HasColumnName("production_plan_item_id");
+            entity.Property(e => e.ProductionPlanId).HasColumnName("production_plan_id");
+            entity.Property(e => e.ProductId).HasColumnName("product_id");
+            entity.Property(e => e.PlannedQuantity)
+                .HasPrecision(18, 2)
+                .HasColumnName("planned_quantity");
+            entity.Property(e => e.PlannedStartDate).HasColumnName("planned_start_date");
+            entity.Property(e => e.PlannedEndDate).HasColumnName("planned_end_date");
+            entity.Property(e => e.WarehouseId).HasColumnName("warehouse_id");
+            entity.Property(e => e.Notes)
+                .HasMaxLength(500)
+                .HasColumnName("notes");
+
+            entity.HasOne(d => d.ProductionPlan).WithMany(p => p.DtlProductionPlanItems)
+                .HasForeignKey(d => d.ProductionPlanId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("fk_dtl_production_plan_items_production_plan_id");
+
+            entity.HasOne(d => d.Product).WithMany()
+                .HasForeignKey(d => d.ProductId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("fk_dtl_production_plan_items_product_id");
+
+            entity.HasOne(d => d.Warehouse).WithMany()
+                .HasForeignKey(d => d.WarehouseId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("fk_dtl_production_plan_items_warehouse_id");
         });
 
         modelBuilder.Entity<TrxProductionReport>(entity =>
