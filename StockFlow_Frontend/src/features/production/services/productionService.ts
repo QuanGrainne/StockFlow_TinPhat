@@ -159,9 +159,21 @@ export const productionService = {
     );
   },
 
-  checkFinishedGoodsReceipt(productionOrderId: number, acceptedQuantity: number, defectQuantity: number): Promise<FinishedGoodsCheck> {
+  checkFinishedGoodsReceipt(
+    productionOrderId: number,
+    acceptedQuantity: number,
+    defectQuantity: number,
+    productionOrderItemId?: number | null,
+    productId?: number | null
+  ): Promise<FinishedGoodsCheck> {
     return apiClient.get<FinishedGoodsCheck>(
-      `/api/production/finished-goods-receipts/check${qs({ productionOrderId, acceptedQuantity, defectQuantity })}`
+      `/api/production/finished-goods-receipts/check${qs({
+        productionOrderId,
+        acceptedQuantity,
+        defectQuantity,
+        productionOrderItemId,
+        productId,
+      })}`
     );
   },
 
