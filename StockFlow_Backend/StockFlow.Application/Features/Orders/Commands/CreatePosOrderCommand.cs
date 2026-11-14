@@ -8,6 +8,7 @@ using MediatR;
 using Microsoft.EntityFrameworkCore;
 using StockFlow.Application.Common;
 using StockFlow.Application.Common.Interfaces;
+using StockFlow.Application.Features.Customers.Helpers;
 using StockFlow.Application.Features.CreditRequests.Common;
 using StockFlow.Application.Features.Orders.DTOs;
 using StockFlow.Application.Features.SalesBookings.Common;
@@ -381,13 +382,18 @@ public class CreatePosOrderCommandHandler : IRequestHandler<CreatePosOrderComman
         decimal actualReceived;
         decimal changeAmount;
         decimal outstanding;
+        // "Tính vào công nợ": phần khách trả thừa dùng trả nợ cũ (như màn Thu nợ), tối đa bằng nợ cũ;
+        // nợ cũ tính cả tiền trả trước của đơn đặt sắp trừ vào hóa đơn này (phần đó cộng lại vào nợ ở bước 11)
+        decimal oldDebt = Math.Max(0, (customer.CurrentDebt ?? 0) + depositApplied);
+        decimal debtPayment = 0;
 
         if (req.PaidAmount >= dueNow)
         {
-            if (isRecordDebtExcess && rawChangeAmount > 0)
+            if (isRecordDebtExcess && rawChangeAmount > 0 && isCompleted)
             {
-                actualReceived = req.PaidAmount; // Thu ngân thực nhận toàn bộ tiền khách đưa để trừ công nợ
-                changeAmount = 0; // Không thối lại tiền mặt
+                debtPayment = Math.Min(rawChangeAmount, oldDebt);
+                actualReceived = dueNow; // Phiếu thu của hóa đơn này chỉ đúng số tiền hóa đơn
+                changeAmount = rawChangeAmount - debtPayment; // Thừa cả sau khi trả hết nợ cũ: vẫn thối lại
                 outstanding = 0;
             }
             else
@@ -644,11 +650,8 @@ public class CreatePosOrderCommandHandler : IRequestHandler<CreatePosOrderComman
                     // Khách trả thiếu -> Ghi nợ phát sinh
                     debtDelta += outstanding;
                 }
-                else if (isRecordDebtExcess && rawChangeAmount > 0)
-                {
-                    // Khách trả thừa và chọn "Tính vào công nợ" -> Ghi có giảm nợ cũ hoặc cọc đơn sau
-                    debtDelta -= rawChangeAmount;
-                }
+                // Khách trả thừa và chọn "Tính vào công nợ": phần trả nợ cũ làm giảm dư nợ
+                debtDelta -= debtPayment;
                 if (debtDelta != 0) customer.CurrentDebt = (customer.CurrentDebt ?? 0) + debtDelta;
             }
 
@@ -671,6 +674,15 @@ CreatedBy = currentUserId,
                     // Ghi chú phiếu thu để trống: người dùng tự nhập khi sửa phiếu thu
                     Description = null
                 });
+            }
+
+            // 12b. Tiền thừa "Tính vào công nợ": phiếu thu trả nợ cũ (hóa đơn còn nợ cũ nhất trước, phần còn lại phiếu PT)
+            var debtPaymentCodes = new List<string>();
+            if (debtPayment > 0 && isCompleted)
+            {
+                debtPaymentCodes = await CustomerDebtPaymentOps.ApplyAsync(
+                    _context, customer.PartnerId, debtPayment, order.OrderId, req.PaymentMethod, finalOrderDate,
+                    currentUserId, cancellationToken);
             }
 
             await _context.SaveChangesAsync(cancellationToken);
@@ -712,8 +724,8 @@ CreatedBy = currentUserId,
                 await transaction.CommitAsync(cancellationToken);
             }
 
-            string excessNote = isRecordDebtExcess && rawChangeAmount > 0
-                ? $" (Đã giảm {rawChangeAmount:N0} đ nợ cho khách, dư nợ mới: {customer.CurrentDebt:N0} đ)"
+            string excessNote = debtPayment > 0
+                ? $" (Tiền thừa trả nợ cũ {debtPayment:N0} đ — phiếu thu {string.Join(", ", debtPaymentCodes)}, dư nợ mới: {customer.CurrentDebt:N0} đ)"
                 : (outstanding > 0 ? $" (Ghi nợ {outstanding:N0} đ, dư nợ mới: {customer.CurrentDebt:N0} đ)" : "");
             string stockIssueMsg = stockIssue != null ? $" kèm phiếu xuất kho {stockIssue.IssueCode}" : "";
 
@@ -740,7 +752,8 @@ CreatedBy = currentUserId,
                 StockIssueId = stockIssue?.StockIssueId,
                 StockIssueCode = stockIssue?.IssueCode,
                 CustomerCurrentDebt = customer.CurrentDebt ?? 0,
-                Message = $"Tạo đơn hàng POS thành công{stockIssueMsg}!{excessNote}"
+                DebtPaymentAmount = debtPayment,
+                Message =$"Tạo đơn hàng POS thành công{stockIssueMsg}!{excessNote}"
             });
         }
         catch

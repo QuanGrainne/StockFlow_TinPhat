@@ -71,6 +71,8 @@ public class PosOrderResultDto
     public int? StockIssueId { get; set; }
     public string? StockIssueCode { get; set; }
     public decimal CustomerCurrentDebt { get; set; }
+    /// <summary>Tiền khách trả thừa đã dùng trả nợ cũ ("Tính vào công nợ")</summary>
+    public decimal DebtPaymentAmount { get; set; }
     public string Message { get; set; } = string.Empty;
 }
 
