@@ -18,6 +18,9 @@ interface CustomerFormModalProps {
   onSuccess: (payload: CreateCustomerPayload) => Promise<void> | void;
 }
 
+/** Hạn mức mặc định khách mới — khớp CustomerCreditPolicy.DefaultCreditLimit ở backend */
+const DEFAULT_CREDIT_LIMIT = 200_000_000;
+
 const labelCls = 'block text-[13px] text-[#15171a] mb-1.5';
 const inputCls =
   'w-full h-9 px-3 rounded-[8px] border border-slate-300 bg-white text-[13px] text-[#15171a] placeholder-[#677484]/70 focus:outline-none focus:border-[#0070f4] transition';
@@ -45,7 +48,9 @@ function CustomerFormBody({
   const [email, setEmail] = useState(customer?.email ?? '');
   const [facebook, setFacebook] = useState(customer?.facebook ?? '');
   const [address, setAddress] = useState(customer?.address ?? '');
-  const [creditLimit, setCreditLimit] = useState<string>(customer?.creditLimit ? String(customer.creditLimit) : '');
+  // Hạn mức chỉ xem: khách mới mặc định 200.000.000 đ (CustomerCreditPolicy ở backend);
+  // chỉ Kế toán trưởng đổi qua duyệt yêu cầu hạn mức (UC-64)
+  const creditLimit = isEditing ? customer?.creditLimit ?? 0 : DEFAULT_CREDIT_LIMIT;
   const [notes, setNotes] = useState(customer?.notes ?? '');
   const [addressOpen, setAddressOpen] = useState(true);
   const [otherOpen, setOtherOpen] = useState(true);
@@ -71,7 +76,7 @@ function CustomerFormBody({
         birthDate: birthDate || null,
         facebook: facebook.trim(),
         notes: notes.trim(),
-        creditLimit: Number(creditLimit.replace(/[^\d]/g, '')) || 0,
+        creditLimit,
         status: customer?.status ?? 'ACTIVE',
         createdWarehouseId: isEditing ? undefined : activeWarehouse?.warehouseId ?? null,
       });
@@ -220,12 +225,14 @@ function CustomerFormBody({
                 <div>
                   <label className={labelCls}>Hạn mức nợ (VNĐ)</label>
                   <input
-                    inputMode="numeric"
-                    value={creditLimit ? Number(creditLimit.replace(/[^\d]/g, '') || 0).toLocaleString('vi-VN') : ''}
-                    onChange={(e) => setCreditLimit(e.target.value.replace(/[^\d]/g, ''))}
-                    placeholder="0 = không cho ghi nợ"
-                    className={`${inputCls} text-right`}
+                    readOnly
+                    value={creditLimit.toLocaleString('vi-VN')}
+                    title="Chỉ Kế toán trưởng thay đổi hạn mức qua duyệt yêu cầu hạn mức"
+                    className={`${inputCls} text-right bg-[#f7f8f9] text-[#677484] cursor-not-allowed`}
                   />
+                  <div className="mt-1 text-[11px] text-[#677484]">
+                    {isEditing ? 'Đổi hạn mức: gửi yêu cầu duyệt từ màn Bán hàng.' : 'Mặc định cho khách mới.'}
+                  </div>
                 </div>
                 <div>
                   <label className={labelCls}>Ghi chú</label>
