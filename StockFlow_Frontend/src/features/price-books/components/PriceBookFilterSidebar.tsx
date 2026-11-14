@@ -51,18 +51,14 @@ export default function PriceBookFilterSidebar({
   const popoverRef = useRef<HTMLDivElement>(null);
   const selectorRef = useRef<HTMLDivElement>(null);
 
-  const defaultBook = useMemo(() => {
-    return priceBooks.find(b => b.isDefault) || priceBooks[0];
-  }, [priceBooks]);
-  const defaultBookId = defaultBook?.priceBookId;
-
-  // Sync tempSelectedIds when popover opens or selectedPriceBookIds changes
-  useEffect(() => {
-    if (isPopoverOpen) {
+  // Mở popover: lấy lại lựa chọn hiện tại và xóa từ khóa (trước đây làm trong useEffect → render 2 lần)
+  const togglePopover = () => {
+    if (!isPopoverOpen) {
       setTempSelectedIds(selectedPriceBookIds);
       setSearchKeyword('');
     }
-  }, [isPopoverOpen, selectedPriceBookIds]);
+    setIsPopoverOpen(!isPopoverOpen);
+  };
 
   // Click outside listener to close popover
   useEffect(() => {
@@ -141,7 +137,7 @@ export default function PriceBookFilterSidebar({
 
         <div
           ref={selectorRef}
-          onClick={() => setIsPopoverOpen(prev => !prev)}
+          onClick={togglePopover}
           className={`min-h-[38px] w-full rounded-[8px] border p-1.5 flex flex-wrap items-center gap-1.5 cursor-pointer transition ${
             isPopoverOpen ? 'border-[#0070f4] bg-white' : 'border-slate-300 bg-white hover:border-[#0070f4]'
           }`}

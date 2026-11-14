@@ -151,32 +151,37 @@ export const posService = {
   },
 
   /**
-   * Lấy danh sách bảng giá bán thực tế từ database
+   * Danh sách bảng giá từ database.
+   * forSale = true: chỉ bảng giá dùng được lúc này cho chi nhánh + khách (đang áp dụng, trong hiệu lực, đúng phạm vi);
+   * bảng giá chung luôn có. Lỗi thì trả rỗng (không dùng dữ liệu giả).
    */
-  async getPriceBooks(): Promise<PosPriceBook[]> {
+  async getPriceBooks(params?: { warehouseId?: number; customerId?: number; forSale?: boolean }): Promise<PosPriceBook[]> {
+    type PriceBookApi = {
+      priceBookId: number;
+      priceBookCode: string | null;
+      priceBookName: string | null;
+      isActive: boolean;
+      isDefault: boolean;
+      scopeCustomerType: string | null;
+      scopeCustomerIds: number[] | null;
+    };
+    const qs = new URLSearchParams();
+    if (params?.forSale) qs.set('forSale', 'true');
+    if (params?.warehouseId) qs.set('warehouseId', String(params.warehouseId));
+    if (params?.customerId) qs.set('customerId', String(params.customerId));
     try {
-      const data = await apiClient.get<any[]>('/api/price-books');
-      if (Array.isArray(data)) {
-        return data.map((pb) => ({
-          priceBookId: Number(pb.priceBookId),
-          priceBookCode: pb.priceBookCode || '',
-          priceBookName: pb.priceBookName || '',
-          isActive: Boolean(pb.isActive),
-          isDefault: Boolean(pb.isDefault),
-        }));
-      }
+      const data = await apiClient.get<PriceBookApi[]>(`/api/price-books${qs.toString() ? `?${qs.toString()}` : ''}`);
+      return (Array.isArray(data) ? data : []).map((pb) => ({
+        priceBookId: Number(pb.priceBookId),
+        priceBookCode: pb.priceBookCode || '',
+        priceBookName: pb.priceBookName || '',
+        isActive: Boolean(pb.isActive),
+        isDefault: Boolean(pb.isDefault),
+        scopeCustomerType: pb.scopeCustomerType === 'SPECIFIC' ? 'SPECIFIC' : 'ALL',
+        scopeCustomerIds: Array.isArray(pb.scopeCustomerIds) ? pb.scopeCustomerIds : [],
+      }));
+    } catch {
       return [];
-    } catch (e) {
-      console.error('Lỗi khi tải danh sách bảng giá POS:', e);
-      return [
-        {
-          priceBookId: 1,
-          priceBookCode: 'BG000001',
-          priceBookName: 'Bảng giá chung',
-          isActive: true,
-          isDefault: true,
-        },
-      ];
     }
   },
 
