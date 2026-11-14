@@ -21,11 +21,9 @@ public class UpdateProductionOrderCommandValidator : AbstractValidator<UpdatePro
 {
     public UpdateProductionOrderCommandValidator()
     {
-        RuleFor(x => x.Request.ProductId).GreaterThan(0).WithMessage("Vui lòng chọn thành phẩm.");
-        RuleFor(x => x.Request.PlannedQuantity)
-            .GreaterThan(0).WithMessage("Số lượng kế hoạch phải lớn hơn 0.")
-            .Must(q => ProductionHelper.HasMaxScale(q, ProductionPolicy.QuantityScale))
-            .WithMessage("Số lượng kế hoạch có tối đa 2 chữ số thập phân.");
+        RuleFor(x => x.Request)
+            .Must(r => (r.Items is { Count: > 0 }) || (r.ProductId > 0 && r.PlannedQuantity > 0))
+            .WithMessage("Vui lòng chọn ít nhất một thành phẩm và nhập số lượng kế hoạch lớn hơn 0.");
         RuleFor(x => x.Request.Workshop).MaximumLength(200).WithMessage("Tên xưởng tối đa 200 ký tự.");
         RuleFor(x => x.Request.Notes).MaximumLength(500).WithMessage("Ghi chú tối đa 500 ký tự.");
     }
@@ -45,7 +43,11 @@ public class UpdateProductionOrderCommandHandler : IRequestHandler<UpdateProduct
     public async Task<Result<ProductionOrderDetailDto>> Handle(UpdateProductionOrderCommand command, CancellationToken ct)
     {
         var req = command.Request;
+        if (_currentUser.UserId is not int userId)
+            return Result.Failure<ProductionOrderDetailDto>("Không xác định được người dùng đăng nhập.");
+
         var order = await _context.TrxProductionOrders
+            .Include(o => o.DtlProductionOrderItems)
             .Include(o => o.TrxProductionMaterialRequirements)
             .FirstOrDefaultAsync(o => o.ProductionOrderId == command.ProductionOrderId, ct);
         if (order == null) return Result.Failure<ProductionOrderDetailDto>(ProductionMessages.OrderNotFound);
@@ -56,25 +58,18 @@ public class UpdateProductionOrderCommandHandler : IRequestHandler<UpdateProduct
 
         await using var tx = await _context.BeginTransactionAsync(ct);
 
-        if (order.ProductId != req.ProductId)
+        if (req.Items is { Count: > 0 } || req.CustomMaterials is { Count: > 0 } || order.ProductId != req.ProductId || order.DtlProductionOrderItems.Count > 1)
         {
-            var product = await _context.MstProducts.AsNoTracking().FirstOrDefaultAsync(p => p.ProductId == req.ProductId, ct);
-            if (product == null || product.IsActive == false)
-                return Result.Failure<ProductionOrderDetailDto>("Vui lòng chọn thành phẩm đang hoạt động.");
-
-            var bom = await _context.MstBoms.AsNoTracking()
-                .Include(b => b.DtlBomItems)
-                .FirstOrDefaultAsync(b => b.ProductId == req.ProductId && b.IsActive == true, ct);
-            if (bom == null || bom.DtlBomItems.Count == 0)
-                return Result.Failure<ProductionOrderDetailDto>(ProductionMessages.NoActiveBom);
-
             _context.TrxProductionMaterialRequirements.RemoveRange(order.TrxProductionMaterialRequirements.ToList());
-            order.ProductId = req.ProductId;
-            order.BomId = bom.BomId;
-            ProductionOrderRules.AddRequirementsFromBom(_context, order, bom, req.PlannedQuantity);
+            _context.DtlProductionOrderItems.RemoveRange(order.DtlProductionOrderItems.ToList());
+            var populateError = await ProductionOrderRules.PopulateItemsAndRequirementsAsync(
+                _context, order, req, userId, VietnamTime.Now, ct);
+            if (populateError != null) return Result.Failure<ProductionOrderDetailDto>(populateError);
         }
         else
         {
+            var singleItem = order.DtlProductionOrderItems.FirstOrDefault();
+            if (singleItem != null) singleItem.PlannedQuantity = req.PlannedQuantity;
             foreach (var r in order.TrxProductionMaterialRequirements)
             {
                 // Lệnh Chưa bắt đầu chưa có phiếu xuất nên số đã xuất = 0
@@ -82,9 +77,9 @@ public class UpdateProductionOrderCommandHandler : IRequestHandler<UpdateProduct
                 r.RequiredQty = required;
                 r.ShortageQty = ProductionPolicy.CalculateShortage(required, r.IssuedQty ?? 0);
             }
+            order.PlannedQuantity = req.PlannedQuantity;
         }
 
-        order.PlannedQuantity = req.PlannedQuantity;
         order.EndDate = req.Deadline?.Date;
         order.Workshop = string.IsNullOrWhiteSpace(req.Workshop) ? null : req.Workshop.Trim();
         order.Notes = string.IsNullOrWhiteSpace(req.Notes) ? null : req.Notes.Trim();

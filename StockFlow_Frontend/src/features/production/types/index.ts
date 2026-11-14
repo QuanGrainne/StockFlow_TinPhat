@@ -48,6 +48,22 @@ export interface SaveBomPayload {
 
 export type ProductionOrderStatus = 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
 
+export interface ProductionOrderProductItem {
+  productionOrderItemId: number;
+  productId: number;
+  productCode: string;
+  productName: string;
+  unitName: string;
+  bomId: number;
+  bomCode: string;
+  bomVersion: string;
+  plannedQuantity: number;
+  receivedQuantity: number;
+  remainingQuantity: number;
+  progressPercent: number;
+  notes: string | null;
+}
+
 export interface ProductionOrderSummary {
   productionOrderId: number;
   code: string;
@@ -72,6 +88,12 @@ export interface ProductionOrderSummary {
   shortageLineCount: number;
   /** Số phiếu nhập thành phẩm cần Manager xem xét (BR-37) */
   reviewFlagCount: number;
+  /** Đã lập đủ phiếu xuất NVL */
+  isFullyIssued?: boolean;
+  /** Đã lập đủ phiếu nhập thành phẩm */
+  isFullyReceived?: boolean;
+  /** Danh sách thành phẩm trong lệnh (1..N) */
+  items?: ProductionOrderProductItem[];
 }
 
 export interface ProductionMaterial {
@@ -92,6 +114,10 @@ export interface ProductionMaterial {
   adjustedByName: string | null;
   adjustedAt: string | null;
   fromBom: boolean;
+  productionOrderItemId?: number | null;
+  finishedProductId?: number | null;
+  finishedProductCode?: string | null;
+  finishedProductName?: string | null;
 }
 
 export interface MaterialIssueItem {
@@ -101,6 +127,8 @@ export interface MaterialIssueItem {
   materialName: string;
   unitName: string;
   quantity: number;
+  finishedProductCode?: string | null;
+  finishedProductName?: string | null;
 }
 
 export interface MaterialIssue {
@@ -152,6 +180,20 @@ export interface ProductionOrderDetail {
   receipts: FinishedGoodsReceipt[];
 }
 
+export interface SaveProductionOrderMaterialInput {
+  materialId: number;
+  normPerUnit: number;
+  wastageRate: number;
+  requiredQty?: number | null;
+}
+
+export interface SaveProductionOrderItemInput {
+  productId: number;
+  plannedQuantity: number;
+  notes?: string | null;
+  customMaterials?: SaveProductionOrderMaterialInput[] | null;
+}
+
 export interface SaveProductionOrderPayload {
   productId: number;
   plannedQuantity: number;
@@ -159,6 +201,8 @@ export interface SaveProductionOrderPayload {
   deadline: string | null;
   workshop: string | null;
   notes: string | null;
+  items?: SaveProductionOrderItemInput[] | null;
+  adjustReason?: string | null;
 }
 
 export interface AdjustNormLine {
@@ -167,6 +211,7 @@ export interface AdjustNormLine {
   normPerUnit: number;
   wastageRate: number;
   remove: boolean;
+  productionOrderItemId?: number | null;
 }
 
 export interface RequirementPreviewItem {
@@ -211,6 +256,9 @@ export interface CreateFinishedGoodsReceiptPayload {
   productionDate: string | null;
   notes: string | null;
   reviewNote: string | null;
+  productionOrderItemId?: number | null;
+  productId?: number | null;
+  confirmExceedPlan?: boolean;
 }
 
 export interface MaterialUsageWarning {

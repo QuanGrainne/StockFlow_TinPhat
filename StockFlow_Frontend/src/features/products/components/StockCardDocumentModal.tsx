@@ -219,16 +219,17 @@ async function loadDocument(ref: StockCardDocumentRef): Promise<DocView> {
   if (type === 'DISPOSAL') {
     const d = await disposalService.getById(ref.documentId);
     const s = d.summary;
-    const done = s.status === 'COMPLETED';
+    const status = { DRAFT: ['Phiếu tạm', 'amber'], COMPLETED: ['Hoàn thành', 'green'], CANCELLED: ['Đã hủy', 'red'] }[s.status] ?? [s.status, 'slate'];
     return {
       title: 'Phiếu xuất hủy',
       code: s.disposalCode,
-      statusLabel: done ? 'Hoàn thành' : 'Phiếu tạm',
-      statusTone: done ? 'green' : 'amber',
+      statusLabel: status[0],
+      statusTone: status[1] as DocView['statusTone'],
       branch: s.warehouseName,
       info: [
-        { label: 'Người lập', value: s.processedByName },
-        { label: done ? 'Ngày hủy' : 'Ngày lập', value: dateTime(s.disposalDate) },
+        { label: 'Người tạo', value: s.createdByName },
+        { label: 'Người xuất hủy', value: s.processedByName },
+        { label: 'Ngày xuất hủy', value: dateTime(s.disposalDate) },
       ],
       columns: [
         ITEM_COLS.code, ITEM_COLS.name,

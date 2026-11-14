@@ -2,9 +2,16 @@
 // Kết nối API Xuất hủy (/api/Disposals)
 
 import { apiClient } from '@/lib/api/client';
-import type { DisposalDetail, DisposalSummary, SaveDisposalPayload } from '../types';
+import type {
+  DisposalDetail,
+  DisposalStaffOption,
+  DisposalSummary,
+  SaveDisposalPayload,
+  UpdateDisposalInfoPayload,
+} from '../types';
 
 export const disposalService = {
+  /** warehouseIds rỗng = mọi kho được phân quyền */
   async getList(params?: {
     warehouseIds?: number[];
     statuses?: string[];
@@ -33,5 +40,26 @@ export const disposalService = {
   /** Sửa phiếu tạm; status COMPLETED thì hoàn thành phiếu */
   update(id: number | string, payload: SaveDisposalPayload): Promise<DisposalDetail> {
     return apiClient.put<DisposalDetail>(`/api/Disposals/${id}`, payload);
+  },
+
+  /** "Lưu" ở chi tiết phiếu: người xuất hủy, ngày xuất hủy (phiếu tạm), ghi chú */
+  updateInfo(id: number | string, payload: UpdateDisposalInfoPayload): Promise<DisposalDetail> {
+    return apiClient.put<DisposalDetail>(`/api/Disposals/${id}/info`, payload);
+  },
+
+  /** Hủy phiếu: phiếu đã hoàn thành được hoàn lại tồn kho */
+  cancel(id: number | string): Promise<DisposalDetail> {
+    return apiClient.post<DisposalDetail>(`/api/Disposals/${id}/cancel`, {});
+  },
+
+  /** Xóa / hủy phiếu xuất hủy (hỗ trợ DELETE /api/Disposals/{id}) */
+  delete(id: number | string): Promise<DisposalDetail> {
+    return apiClient.delete<DisposalDetail>(`/api/Disposals/${id}`);
+  },
+
+  /** Nhân viên chọn được làm Người xuất hủy (có quyền trên kho) */
+  async getStaffOptions(warehouseId: number): Promise<DisposalStaffOption[]> {
+    const data = await apiClient.get<DisposalStaffOption[]>(`/api/Disposals/staff-options?warehouseId=${warehouseId}`);
+    return Array.isArray(data) ? data : [];
   },
 };

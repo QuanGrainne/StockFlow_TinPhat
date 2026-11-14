@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace StockFlow.Domain.Entities;
@@ -8,6 +8,8 @@ public partial class TrxProductionMaterialRequirement
     public int RequirementId { get; set; }
 
     public int ProductionOrderId { get; set; }
+
+    public int? ProductionOrderItemId { get; set; }
 
     public int MaterialId { get; set; }
 
@@ -43,6 +45,8 @@ public partial class TrxProductionMaterialRequirement
     public virtual MstProduct Material { get; set; } = null!;
 
     public virtual TrxProductionOrder ProductionOrder { get; set; } = null!;
+
+    public virtual DtlProductionOrderItem? ProductionOrderItem { get; set; }
 
     public virtual MstUnit Unit { get; set; } = null!;
 }

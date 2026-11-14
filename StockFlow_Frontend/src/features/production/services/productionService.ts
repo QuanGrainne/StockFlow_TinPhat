@@ -159,9 +159,21 @@ export const productionService = {
     );
   },
 
-  checkFinishedGoodsReceipt(productionOrderId: number, acceptedQuantity: number, defectQuantity: number): Promise<FinishedGoodsCheck> {
+  checkFinishedGoodsReceipt(
+    productionOrderId: number,
+    acceptedQuantity: number,
+    defectQuantity: number,
+    productionOrderItemId?: number | null,
+    productId?: number | null
+  ): Promise<FinishedGoodsCheck> {
     return apiClient.get<FinishedGoodsCheck>(
-      `/api/production/finished-goods-receipts/check${qs({ productionOrderId, acceptedQuantity, defectQuantity })}`
+      `/api/production/finished-goods-receipts/check${qs({
+        productionOrderId,
+        acceptedQuantity,
+        defectQuantity,
+        productionOrderItemId,
+        productId,
+      })}`
     );
   },
 
@@ -174,6 +186,7 @@ export const productionService = {
     search?: string;
     warehouseId?: number | null;
     activeBomOnly?: boolean;
+    productType?: string;
     limit?: number;
   }): Promise<ProductionProductLookup[]> {
     return asList(
@@ -182,6 +195,7 @@ export const productionService = {
           search: params.search?.trim(),
           warehouseId: params.warehouseId,
           activeBomOnly: params.activeBomOnly || undefined,
+          productType: params.productType || undefined,
           limit: params.limit,
         })}`
       )

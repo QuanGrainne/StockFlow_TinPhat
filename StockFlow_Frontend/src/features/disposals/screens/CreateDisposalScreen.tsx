@@ -3,7 +3,7 @@
 // Xuất hủy — bố cục giống form Kiểm kho / Chuyển hàng: thanh tiêu đề (tìm hàng F3 + thêm theo nhóm hàng, kho làm việc, avatar),
 // bảng hàng hủy bên trái (SL hủy × giá vốn = giá trị hủy), khung thông tin + Lưu tạm / Hoàn thành bên phải.
 // Lưu tạm = Phiếu tạm (chưa trừ tồn kho) · Hoàn thành = trừ tồn kho theo giá vốn hiện tại, ghi thẻ kho "Xuất hủy".
-// ?edit=<id>: mở lại phiếu tạm.
+// ?edit=<id>: mở lại phiếu tạm · ?copy=<id>: tạo phiếu mới từ phiếu cũ (nút "Sao chép" ở chi tiết phiếu).
 
 import { tabSession } from '@/lib/auth/tabSession';
 import React, { useEffect, useRef, useState } from 'react';
@@ -18,7 +18,10 @@ import type { BackendProduct } from '@/features/products/services/productService
 import { transferService } from '@/features/transfers/services/transferService';
 import type { ProductForTransfer } from '@/features/transfers/types';
 import { disposalService } from '@/features/disposals/services/disposalService';
-import type { DisposalStatus, SaveDisposalPayload } from '@/features/disposals/types';
+import type { SaveDisposalPayload } from '@/features/disposals/types';
+
+/** Trạng thái gửi khi lưu phiếu: Lưu tạm hoặc Hoàn thành */
+type SaveStatus = SaveDisposalPayload['status'];
 
 interface Row {
   productId: number;
@@ -43,18 +46,22 @@ function readUserName(): string {
   try {
     const raw = tabSession.get('stockflow_user');
     if (!raw) return '';
-    const u = JSON.parse(raw) as { fullName?: string; username?: string };
-    return u.fullName || u.username || '';
+    const u = JSON.parse(raw) as { fullName?: string; username?: string; phone?: string };
+    const name = u.fullName || u.username || '';
+    return u.phone ? `${name} - ${u.phone}` : name;
   } catch {
     return '';
   }
 }
 
-function nowText(): string {
-  const d = new Date();
+/** Giá trị ô datetime-local (giờ máy) của một thời điểm */
+function toInputValue(d: Date): string {
   const p = (n: number) => String(n).padStart(2, '0');
-  return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`;
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
 }
+
+/** Tiền tố mã khi sao chép phiếu (giống phiếu kiểm kho); backend bỏ qua và tự sinh mã mới */
+const COPY_CODE_PREFIX = 'Copy_';
 
 /** Tồn kho + giá vốn hiện tại của 1 hàng tại kho (theo mã hàng) */
 async function freshStock(warehouseId: number, code: string, productId: number): Promise<ProductForTransfer | undefined> {
@@ -70,6 +77,7 @@ export default function CreateDisposalScreen() {
   const router = useRouter();
   const params = useSearchParams();
   const editId = params.get('edit');
+  const copyId = params.get('copy');
   const { activeWarehouse } = useActiveWarehouse();
 
   const [rows, setRows] = useState<Row[]>([]);
@@ -86,7 +94,8 @@ export default function CreateDisposalScreen() {
   const searchRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [userName] = useState(readUserName);
-  const [createdAt] = useState(nowText);
+  /** Ngày xuất hủy (mặc định bây giờ, không chọn được thời gian tương lai) */
+  const [dateValue, setDateValue] = useState(() => toInputValue(new Date()));
 
   // Kho hủy: phiếu đang mở thì theo phiếu, tạo mới thì theo Kho làm việc
   const warehouseId = lockedWarehouse?.id ?? activeWarehouse?.warehouseId;
@@ -109,22 +118,29 @@ export default function CreateDisposalScreen() {
     });
   };
 
-  // Mở lại phiếu tạm
+  // Mở lại phiếu tạm / sao chép phiếu
   useEffect(() => {
-    if (!editId) return;
+    const sourceId = editId ?? copyId;
+    if (!sourceId) return;
     let alive = true;
     disposalService
-      .getById(editId)
+      .getById(sourceId)
       .then((d) => {
         if (!alive) return;
-        if (d.summary.status !== 'DRAFT') {
-          showToast('Chỉ mở được phiếu xuất hủy ở trạng thái Phiếu tạm.', 'error');
-          router.replace('/disposals');
-          return;
+        if (editId) {
+          if (d.summary.status !== 'DRAFT') {
+            showToast('Chỉ mở được phiếu xuất hủy ở trạng thái Phiếu tạm.', 'error');
+            router.replace('/disposals');
+            return;
+          }
+          setCode(d.summary.disposalCode);
+          setLockedWarehouse({ id: d.summary.warehouseId, name: d.summary.warehouseName });
+          if (d.summary.disposalDate) setDateValue(toInputValue(new Date(d.summary.disposalDate)));
+        } else {
+          // Sao chép: phiếu mới ở Kho làm việc, ngày = bây giờ, mã tự sinh khi lưu
+          setCode(`${COPY_CODE_PREFIX}${d.summary.disposalCode}`);
         }
-        setCode(d.summary.disposalCode);
         setReason(d.summary.reason ?? '');
-        setLockedWarehouse({ id: d.summary.warehouseId, name: d.summary.warehouseName });
         const loaded: Row[] = d.items.map((it) => ({
           productId: it.productId,
           productCode: it.productCode,
@@ -135,14 +151,15 @@ export default function CreateDisposalScreen() {
           quantity: it.quantity,
         }));
         setRows(loaded);
-        refreshRows(d.summary.warehouseId, loaded);
+        const whId = editId ? d.summary.warehouseId : activeWarehouse?.warehouseId;
+        if (whId) refreshRows(whId, loaded);
       })
       .catch((err: unknown) => showToast(err instanceof Error ? err.message : 'Không tải được phiếu xuất hủy', 'error'));
     return () => {
       alive = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editId]);
+  }, [editId, copyId]);
 
   // Tìm hàng hóa theo kho hủy (kèm tồn kho + giá vốn)
   const searchKey = `${warehouseId ?? ''}|${search.trim()}`;
@@ -251,7 +268,7 @@ export default function CreateDisposalScreen() {
   const totalValue = rows.reduce((s, r) => s + Math.round((r.quantity ?? 0) * r.unitCost), 0);
 
   /** Kiểm tra trước khi gửi (backend kiểm lại: đủ tồn, hàng đang kiểm kho, quyền kho) */
-  function validate(status: DisposalStatus): boolean {
+  function validate(status: SaveStatus): boolean {
     if (!warehouseId) {
       showToast('Chưa xác định được kho xuất hủy. Vui lòng chọn Kho làm việc.', 'error');
       return false;
@@ -263,6 +280,10 @@ export default function CreateDisposalScreen() {
     const noQty = rows.find((r) => !r.quantity || r.quantity <= 0);
     if (noQty) {
       showToast(`Hàng ${noQty.productCode} chưa nhập số lượng hủy.`, 'error');
+      return false;
+    }
+    if (dateValue && dateValue > toInputValue(new Date())) {
+      showToast('Ngày xuất hủy không được ở tương lai.', 'error');
       return false;
     }
     if (status === 'COMPLETED') {
@@ -279,14 +300,16 @@ export default function CreateDisposalScreen() {
     return true;
   }
 
-  async function save(status: DisposalStatus) {
+  async function save(status: SaveStatus) {
     if (!validate(status) || !warehouseId) return;
     const payload: SaveDisposalPayload = {
       warehouseId,
-      disposalCode: code.trim() || null,
+      // Mã "Copy_..." chỉ để nhận biết phiếu sao chép → để trống cho hệ thống tự sinh XH mới
+      disposalCode: code.trim() && !code.trim().toLowerCase().startsWith(COPY_CODE_PREFIX.toLowerCase()) ? code.trim() : null,
       reason: reason.trim() || null,
       status,
       items: rows.map((r) => ({ productId: r.productId, quantity: r.quantity ?? 0, reason: null })),
+      disposalDate: dateValue ? new Date(dateValue).toISOString() : null,
     };
     setSaving(true);
     try {
@@ -542,9 +565,14 @@ export default function CreateDisposalScreen() {
                   <CircleUserRound size={16} className="shrink-0" />
                   <span className="truncate">{userName || 'Người lập'}</span>
                 </div>
-                <div className="h-8 px-2.5 rounded-[8px] border border-slate-300 flex items-center text-[12px] text-[#677484]" title="Thời gian lập phiếu">
-                  {createdAt}
-                </div>
+                <input
+                  type="datetime-local"
+                  value={dateValue}
+                  max={toInputValue(new Date())}
+                  onChange={(e) => setDateValue(e.target.value)}
+                  className="h-8 px-2 rounded-[8px] border border-slate-300 text-[12px] text-[#677484] bg-white hover:border-[#0070f4] focus:border-[#0070f4] focus:outline-none cursor-pointer transition"
+                  title="Ngày xuất hủy"
+                />
               </div>
 
               <div className="flex items-center justify-between gap-3">
