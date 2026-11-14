@@ -44,6 +44,7 @@ public static class FeatureConstants
         new("feat-price-books", "Thiết lập giá", "GOODS", None),
         new("feat-transfers", "Chuyển hàng", "STOCK", None),
         new("feat-stocktake", "Kiểm kho", "STOCK", None),
+        new("feat-disposal", "Xuất hủy", "STOCK", None),
 
         new("feat-customers", "Khách hàng", "PARTNER", new[] { "FIN" }),
 
@@ -72,7 +73,7 @@ public static class FeatureConstants
     public static readonly string[] AdminLockedFeatureIds = { "feat-roles", "feat-role-matrix" };
 
     private static readonly string[] GoodsFeats = { "feat-goods", "feat-price-books" };
-    private static readonly string[] StockFeats = { "feat-transfers", "feat-stocktake" };
+    private static readonly string[] StockFeats = { "feat-transfers", "feat-stocktake", "feat-disposal" };
     private static readonly string[] SalesFeats = { "feat-pos", "feat-sales-booking", "feat-invoices", "feat-sales-returns" };
     private static readonly string[] PurchaseFeats = { "feat-purchase-orders", "feat-purchase", "feat-purchase-returns", "feat-suppliers" };
     private static readonly string[] ProdFeats = { "feat-prod", "feat-prod-plan", "feat-prod-issue", "feat-prod-receipt" };

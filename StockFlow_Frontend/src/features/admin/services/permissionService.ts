@@ -579,7 +579,7 @@ export const NAVBAR_FEATURES: NavFeatureConfig[] = NAV_ITEMS_FLAT.map((i) => ({
 }));
 
 const GOODS_FEATS = ['feat-goods', 'feat-price-books'];
-const STOCK_FEATS = ['feat-transfers', 'feat-stocktake'];
+const STOCK_FEATS = ['feat-transfers', 'feat-stocktake', 'feat-disposal'];
 const SALES_FEATS = ['feat-pos', 'feat-sales-booking', 'feat-invoices', 'feat-sales-returns'];
 const PURCHASE_FEATS = ['feat-purchase-orders', 'feat-purchase', 'feat-purchase-returns', 'feat-suppliers'];
 const PROD_FEATS = ['feat-prod', 'feat-prod-plan', 'feat-prod-issue', 'feat-prod-receipt'];
