@@ -114,7 +114,7 @@ public class CreateCreditRequestCommandHandler : IRequestHandler<CreateCreditReq
         return Result<CreditRequestActionResultDto>.Success(new CreditRequestActionResultDto
         {
             Request = dto,
-            Message = CreditRequestMessages.Submitted(requestCode),
+            Message = CreditRequestMessages.Submitted,
         });
     }
 }

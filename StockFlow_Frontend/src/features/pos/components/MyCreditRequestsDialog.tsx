@@ -8,7 +8,14 @@ import React, { useEffect, useState } from 'react';
 import { Check, Loader2, RefreshCw, X } from 'lucide-react';
 import { creditRequestService } from '@/features/credit-requests/services/creditRequestService';
 import type { CreditRequest } from '@/features/credit-requests/types';
-import { APPROVAL_TYPE_LABEL, CREDIT_STATUS, formatCreditVnd as fmt, isUsableOneTime } from '@/features/credit-requests';
+import {
+  APPROVAL_TYPE_LABEL,
+  CREDIT_STATUS,
+  formatCreditVnd as fmt,
+  isUsableOneTime,
+  msg24Approved,
+  msg25Rejected,
+} from '@/features/credit-requests';
 import { formatDateTimeVN } from '@/lib/utils/date';
 
 interface Props {
@@ -82,7 +89,7 @@ export function MyCreditRequestsDialog({ partnerId, customerName, selectedId, on
                   <th className="py-2 px-3">Thời gian gửi</th>
                   <th className="py-2 px-3 text-right">Hạn mức đề xuất</th>
                   <th className="py-2 px-3">Trạng thái</th>
-                  <th className="py-2 px-3">Ghi chú duyệt</th>
+                  <th className="py-2 px-3">Kết quả xử lý</th>
                   <th className="py-2 px-3 w-28" />
                 </tr>
               </thead>
@@ -111,10 +118,11 @@ export function MyCreditRequestsDialog({ partnerId, customerName, selectedId, on
                     const st = CREDIT_STATUS[r.status];
                     const usable = isUsableOneTime(r);
                     const selected = r.requestId === selectedId;
+                    const code = r.requestCode ?? `#${r.requestId}`;
                     return (
                       <tr key={r.requestId} className={selected ? 'bg-[#e8f2ff]/60' : ''}>
                         <td className="py-2.5 px-3 font-mono font-semibold text-[#0071BA] whitespace-nowrap">
-                          {r.requestCode ?? `#${r.requestId}`}
+                          {code}
                         </td>
                         <td className="py-2.5 px-3 whitespace-nowrap">{formatDateTimeVN(r.requestDate)}</td>
                         <td className="py-2.5 px-3 text-right font-mono">{fmt(r.requestedLimit)}</td>
@@ -129,7 +137,17 @@ export function MyCreditRequestsDialog({ partnerId, customerName, selectedId, on
                             </div>
                           )}
                         </td>
-                        <td className="py-2.5 px-3 text-[12px]">{r.approvalNotes ?? '—'}</td>
+                        {/* Không có chuông thông báo: Sales xem kết quả tại đây (MSG24 / MSG25) */}
+                        <td className="py-2.5 px-3 text-[12px]">
+                          {r.status === 'APPROVED'
+                            ? msg24Approved(code)
+                            : r.status === 'REJECTED'
+                              ? msg25Rejected(code, r.approvalNotes ?? '—')
+                              : 'Đang chờ Kế toán trưởng duyệt'}
+                          {r.status === 'APPROVED' && r.approvalNotes && (
+                            <div className="mt-0.5 text-[#677484]">Ghi chú: {r.approvalNotes}</div>
+                          )}
+                        </td>
                         <td className="py-2.5 px-3 text-right">
                           {usable &&
                             (selected ? (

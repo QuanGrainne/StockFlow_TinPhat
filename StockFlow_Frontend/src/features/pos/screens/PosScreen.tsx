@@ -1781,7 +1781,7 @@ export default function PosScreen() {
           onClose={() => setCreditBlock(null)}
           onSubmitted={(_, msg) => {
             setCreditBlock(null);
-            // MSG24: giữ nguyên tab để thanh toán lại sau khi được duyệt
+            // MSG23: giữ nguyên tab để thanh toán lại sau khi được duyệt
             message.success(msg, 6);
           }}
         />

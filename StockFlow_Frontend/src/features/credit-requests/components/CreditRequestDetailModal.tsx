@@ -12,7 +12,7 @@ import { Loader2, X } from 'lucide-react';
 
 import { creditRequestService } from '../services/creditRequestService';
 import type { CreditApprovalType, CreditRequest } from '../types';
-import { APPROVAL_TYPE_LABEL, CREDIT_STATUS, exceedOverLimit, formatVnd } from '../utils/creditRequestUtils';
+import { APPROVAL_TYPE_LABEL, CREDIT_STATUS, E62_1_REJECT_REASON, exceedOverLimit, formatVnd } from '../utils/creditRequestUtils';
 import { formatDateTimeVN } from '@/lib/utils/date';
 
 type Decision = CreditApprovalType | 'REJECT';
@@ -87,8 +87,8 @@ export default function CreditRequestDetailModal({ requestId, onClose, onChanged
   const submit = async () => {
     if (!req) return;
     if (rejectMissingReason) {
-      // MSG56 (tạm, khớp CreditRequestMessages.RejectReasonRequired)
-      message.warning('Vui lòng nhập lý do từ chối (MSG56).');
+      // E62.1: từ chối phải có lý do (khớp CreditRequestMessages.RejectReasonRequired)
+      message.warning(E62_1_REJECT_REASON);
       return;
     }
     setSaving(true);

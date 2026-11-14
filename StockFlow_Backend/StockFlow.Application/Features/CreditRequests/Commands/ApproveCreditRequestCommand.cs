@@ -93,7 +93,7 @@ public class ApproveCreditRequestCommandHandler : IRequestHandler<ApproveCreditR
         return Result<CreditRequestActionResultDto>.Success(new CreditRequestActionResultDto
         {
             Request = dto,
-            Message = CreditRequestMessages.Approved(dto.RequestCode ?? $"#{dto.RequestId}", approvalType),
+            Message = CreditRequestMessages.DecisionRecorded,
         });
     }
 }

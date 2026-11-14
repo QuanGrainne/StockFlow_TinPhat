@@ -70,7 +70,7 @@ public class RejectCreditRequestCommandHandler : IRequestHandler<RejectCreditReq
         return Result<CreditRequestActionResultDto>.Success(new CreditRequestActionResultDto
         {
             Request = dto,
-            Message = CreditRequestMessages.Rejected(dto.RequestCode ?? $"#{dto.RequestId}"),
+            Message = CreditRequestMessages.DecisionRecorded,
         });
     }
 }

@@ -9,7 +9,7 @@ import React, { useState } from 'react';
 import { Loader2, Send, X } from 'lucide-react';
 import { creditRequestService } from '@/features/credit-requests/services/creditRequestService';
 import type { CreditRequest } from '@/features/credit-requests/types';
-import { formatCreditVnd as fmt } from '@/features/credit-requests';
+import { formatCreditVnd as fmt, msg22CreditExceeded } from '@/features/credit-requests';
 
 /** Chỉ lấy chữ số từ chuỗi đã định dạng (1.000.000 → 1000000) */
 const parseMoney = (s: string): number => Number(s.replace(/\D/g, '')) || 0;
@@ -33,8 +33,8 @@ export function CreditRequestDialog({ customer, expectedNewDebt, blockMessage, o
 
   const submit = async () => {
     if (!reason.trim()) {
-      // MSG23 (tạm, khớp CreditRequestMessages.ReasonRequired)
-      setError('Vui lòng nhập lý do gửi yêu cầu duyệt hạn mức (MSG23).');
+      // Khớp CreditRequestMessages.ReasonRequired (SRS không có mã MSG riêng)
+      setError('Vui lòng nhập lý do gửi yêu cầu duyệt tín dụng.');
       return;
     }
     if (requestedLimit != null && requestedLimit > 0 && requestedLimit < minLimit) {
@@ -78,7 +78,11 @@ export function CreditRequestDialog({ customer, expectedNewDebt, blockMessage, o
         </div>
 
         <div className="px-6 pb-4 space-y-3">
-          <p className="rounded-[8px] bg-[#fff1f2] border border-[#fecdd3] px-3 py-2 text-[13px] text-[#be123c]">{blockMessage}</p>
+          {/* MSG22 – Popup (Warning): số vượt = dư nợ + nợ mới − hạn mức (A23.3 bước 1) */}
+          <div className="rounded-[8px] bg-[#fff1f2] border border-[#fecdd3] px-3 py-2 text-[13px] text-[#be123c]">
+            <p className="font-semibold">{msg22CreditExceeded(Math.max(0, minLimit - customer.creditLimit))}</p>
+            <p className="mt-1 text-[12px] text-[#9f1239]">{blockMessage}</p>
+          </div>
 
           <div className="rounded-[8px] border border-slate-200 overflow-hidden text-[13px]">
             <table className="w-full">
