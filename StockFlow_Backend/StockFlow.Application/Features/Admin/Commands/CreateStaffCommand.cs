@@ -30,6 +30,12 @@ public class CreateStaffCommandValidator : AbstractValidator<CreateStaffCommand>
 
         RuleFor(x => x.Request.Role)
             .NotEmpty().WithMessage("Vai trò không được để trống.");
+
+        // BR-35: Admin tự nhập mật khẩu thì phải đủ mạnh; để trống → dùng mật khẩu mặc định TinPhat@2026 (đã đạt BR-35)
+        RuleFor(x => x.Request.Password!)
+            .Cascade(CascadeMode.Stop)
+            .StrongPassword()
+            .When(x => !string.IsNullOrWhiteSpace(x.Request.Password));
     }
 }
 
