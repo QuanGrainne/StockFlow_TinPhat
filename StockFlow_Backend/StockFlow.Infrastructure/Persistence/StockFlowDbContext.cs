@@ -115,6 +115,8 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
 
     public virtual DbSet<MstOrderSetting> MstOrderSettings { get; set; }
 
+    public virtual DbSet<MstDebtWarningSetting> MstDebtWarningSettings { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema("stockflow");
@@ -2266,6 +2268,29 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
                 .HasForeignKey(d => d.UpdatedBy)
                 .OnDelete(DeleteBehavior.SetNull)
                 .HasConstraintName("fk_mst_order_settings_updated_by");
+        });
+
+        // Thiết lập cảnh báo công nợ khách hàng (một dòng, setting_id = 1)
+        modelBuilder.Entity<MstDebtWarningSetting>(entity =>
+        {
+            entity.HasKey(e => e.SettingId).HasName("mst_debt_warning_settings_pkey");
+            entity.ToTable("mst_debt_warning_settings", "stockflow");
+
+            entity.Property(e => e.SettingId).ValueGeneratedNever().HasColumnName("setting_id");
+            entity.Property(e => e.EnableDebtAmountWarning).HasColumnName("enable_debt_amount_warning");
+            entity.Property(e => e.DebtAmountThreshold).HasPrecision(18, 2).HasColumnName("debt_amount_threshold");
+            entity.Property(e => e.EnableDebtDaysWarning).HasColumnName("enable_debt_days_warning");
+            entity.Property(e => e.DebtDaysThreshold).HasColumnName("debt_days_threshold");
+            entity.Property(e => e.DebtDaysFrom).HasMaxLength(20).HasColumnName("debt_days_from");
+            entity.Property(e => e.AllowDebtOverLimit).HasColumnName("allow_debt_over_limit");
+            entity.Property(e => e.UpdatedAt).HasColumnType("timestamp with time zone").HasColumnName("updated_at");
+            entity.Property(e => e.UpdatedBy).HasColumnName("updated_by");
+
+            entity.HasOne<SecUser>()
+                .WithMany()
+                .HasForeignKey(e => e.UpdatedBy)
+                .OnDelete(DeleteBehavior.SetNull)
+                .HasConstraintName("fk_mst_debt_warning_settings_updated_by");
         });
 
         // Trả hàng nhập (trả hàng cho nhà cung cấp)

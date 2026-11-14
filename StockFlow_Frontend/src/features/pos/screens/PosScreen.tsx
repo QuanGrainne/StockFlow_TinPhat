@@ -10,13 +10,14 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { message } from 'antd';
+import { message, Tooltip } from 'antd';
 import { FormHeaderUserBar } from '@/components/layout/FormHeaderUserBar';
 import {
   ArrowLeft,
   ArrowLeftRight,
   Check,
   ChevronDown,
+  CircleAlert,
   CircleUserRound,
   Info,
   Menu,
@@ -27,7 +28,6 @@ import {
   PlusCircle,
   RefreshCw,
   Search,
-  ShieldCheck,
   ShoppingBag,
   Trash2,
   Undo2,
@@ -1568,17 +1568,44 @@ export default function PosScreen() {
                   )}
                   {/* Hóa đơn: yêu cầu vượt hạn mức đã gửi / chọn ngoại lệ một lần đã duyệt (UC-27) */}
                   {!isBooking && (
-                    <button
-                      type="button"
-                      onClick={() => setMyCreditOpen(true)}
-                      title={tab.creditRequestCode ? `Đang dùng ngoại lệ ${tab.creditRequestCode}` : 'Yêu cầu hạn mức của tôi'}
-                      className={`ml-auto shrink-0 inline-flex items-center gap-1 h-6 px-2 rounded-md text-[12px] font-semibold cursor-pointer ${
-                        tab.creditRequestCode ? 'bg-[#0071BA] text-white' : 'text-[#0071BA] hover:bg-black/5'
-                      }`}
+                    <Tooltip
+                      placement="bottom"
+                      title={
+                        <div className="text-[12px] leading-5">
+                          {tab.customer.creditLimit > 0 ? (
+                            <>
+                              <div>Hạn mức: {fmt(tab.customer.creditLimit)}</div>
+                              <div>Dư nợ: {fmt(tab.customer.currentDebt)}</div>
+                              <div className="font-semibold">
+                                Còn lại: {fmt(Math.max(0, tab.customer.creditLimit - tab.customer.currentDebt))}
+                              </div>
+                            </>
+                          ) : (
+                            <div>Khách chưa được thiết lập hạn mức</div>
+                          )}
+                          {tab.customer.debtWarning && (
+                            <div className="text-[#fbbf24] font-semibold">Cảnh báo: {tab.customer.debtWarning}</div>
+                          )}
+                          {tab.creditRequestCode && <div>Đang dùng ngoại lệ {tab.creditRequestCode}</div>}
+                          <div className="opacity-70">Bấm để xem yêu cầu hạn mức của tôi</div>
+                        </div>
+                      }
                     >
-                      <ShieldCheck size={13} />
-                      {tab.creditRequestCode ?? 'Hạn mức'}
-                    </button>
+                      <button
+                        type="button"
+                        onClick={() => setMyCreditOpen(true)}
+                        aria-label="Hạn mức còn lại"
+                        className={`ml-auto shrink-0 inline-flex items-center justify-center h-6 w-6 rounded-full cursor-pointer ${
+                          tab.creditRequestCode
+                            ? 'bg-[#0071BA] text-white'
+                            : tab.customer.debtWarning
+                              ? 'text-[#f59e0b] hover:bg-black/5'
+                              : 'text-[#0071BA] hover:bg-black/5'
+                        }`}
+                      >
+                        <CircleAlert size={15} />
+                      </button>
+                    </Tooltip>
                   )}
                   {/* Tab gắn với đơn đặt: khách hàng cố định theo đơn */}
                   {!tab.bookingId && (

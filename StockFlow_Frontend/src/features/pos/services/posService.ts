@@ -294,6 +294,7 @@ export const posService = {
           creditLimit: Number(cust.creditLimit) || 0,
           currentDebt: Number(cust.currentDebt) || 0,
           isOverCreditLimit: Boolean(cust.isOverCreditLimit),
+          debtWarning: cust.debtWarning ?? null,
           taxCode: cust.code === 'KH00892' ? '0108924192' : undefined,
           salesRep: cust.code === 'KH00892' ? 'Trần Minh Tuấn' : 'Thu ngân quầy',
         }));
