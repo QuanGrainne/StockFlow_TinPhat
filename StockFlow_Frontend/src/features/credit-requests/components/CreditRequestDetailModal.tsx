@@ -10,6 +10,7 @@ import { createPortal } from 'react-dom';
 import { Button, Tag, message } from 'antd';
 import { Loader2, X } from 'lucide-react';
 
+import CustomerCreditHistoryPanel from './CustomerCreditHistoryPanel';
 import { creditRequestService } from '../services/creditRequestService';
 import type { CreditApprovalType, CreditRequest } from '../types';
 import { APPROVAL_TYPE_LABEL, CREDIT_STATUS, E62_1_REJECT_REASON, exceedOverLimit, formatVnd } from '../utils/creditRequestUtils';
@@ -134,7 +135,7 @@ export default function CreditRequestDetailModal({ requestId, onClose, onChanged
       className="fixed inset-0 z-[900] bg-slate-900/40 flex items-start justify-center p-4 sm:p-10 overflow-y-auto"
       onMouseDown={(e) => e.target === e.currentTarget && !saving && onClose()}
     >
-      <div className="w-full max-w-[640px] bg-white rounded-xl shadow-2xl border border-slate-200 text-[13px] text-[#15171a]">
+      <div className="w-full max-w-[1180px] bg-white rounded-xl shadow-2xl border border-slate-200 text-[13px] text-[#15171a]">
         <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-slate-200">
           <div className="flex items-center gap-2">
             <h3 className="text-[16px] font-bold">Yêu cầu duyệt hạn mức {req?.requestCode ?? ''}</h3>
@@ -158,7 +159,7 @@ export default function CreditRequestDetailModal({ requestId, onClose, onChanged
           </div>
         ) : (
           <>
-            <div className="px-5 py-4 grid grid-cols-1 gap-5">
+            <div className="px-5 py-4 grid grid-cols-1 lg:grid-cols-[400px_1fr] gap-5">
             {/* Cột trái: yêu cầu + quyết định */}
             <div className="space-y-4">
               <div className="rounded-[8px] border border-slate-200 px-4 py-2">
@@ -264,6 +265,11 @@ export default function CreditRequestDetailModal({ requestId, onClose, onChanged
                   </div>
                 </div>
               )}
+            </div>
+
+            {/* Cột phải: thông tin khách để xét duyệt (A62.2) */}
+            <div className="min-w-0 lg:border-l lg:border-slate-200 lg:pl-5">
+              <CustomerCreditHistoryPanel requestId={req.requestId} />
             </div>
             </div>
 

@@ -62,7 +62,17 @@ public class CreditRequestsController : ControllerBase
         return result.IsSuccess ? Ok(result.Value) : NotFound(new { message = result.Error });
     }
 
-    /// <summary>Duyệt ngoại lệ một lần (ONE_TIME) hoặc nâng hạn mức (NEW_LIMIT) – BR-13.</summary>
+    /// <summary>Tổng quan mua hàng và lịch sử thanh toán của khách để xét duyệt (A62.2).</summary>
+    [HttpGet("{id:int}/customer-history")]
+    [RequirePermission("SALES_APPROVE")]
+    [RequireFeature("feat-credit-approvals")]
+    public async Task<IActionResult> GetCustomerHistory(int id)
+    {
+        var result = await _mediator.Send(new GetCreditRequestCustomerHistoryQuery(id));
+        return result.IsSuccess ? Ok(result.Value) : NotFound(new { message = result.Error });
+    }
+
+    /// <summary>Duyệt ngoại lệ một lần (ONE_TIME) hoặc nâng hạn mức (NEW_LIMIT) – BR-13; Manager sửa được mức duyệt.</summary>
     [HttpPost("{id:int}/approve")]
     [RequirePermission("SALES_APPROVE")]
     [RequireFeature("feat-credit-approvals")]

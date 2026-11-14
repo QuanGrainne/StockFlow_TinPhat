@@ -66,5 +66,32 @@ export interface ApproveCreditRequestPayload {
   notes?: string;
 }
 
+/** Thông tin khách để xét duyệt (A62.2): tổng quan mua hàng + lịch sử thanh toán */
+export interface CustomerCreditHistory {
+  partnerId: number;
+  partnerCode: string | null;
+  partnerName: string | null;
+  phone: string | null;
+  customerSince: string | null;
+  currentDebt: number;
+  creditLimit: number;
+  invoiceCountAll: number;
+  totalPurchaseAll: number;
+  invoiceCount12M: number;
+  totalPurchase12M: number;
+  averageInvoice12M: number;
+  firstPurchaseDate: string | null;
+  lastPurchaseDate: string | null;
+  monthlyPurchases: { month: string; invoiceCount: number; purchase: number; paid: number }[];
+  recentInvoices: { orderId: number; orderCode: string; orderDate: string | null; total: number; paid: number; outstanding: number }[];
+  totalPaidAll: number;
+  totalPaid12M: number;
+  paymentCount12M: number;
+  lastPaymentDate: string | null;
+  lastPaymentAmount: number | null;
+  totalReturns12M: number;
+  recentPayments: { code: string; date: string | null; amount: number; paymentMethod: string | null; orderCode: string | null }[];
+}
+
 /** Bộ lọc trạng thái trên Approval Inbox ('' = tất cả) */
 export type CreditRequestStatusFilter = CreditRequestStatus | '';

@@ -92,3 +92,47 @@ public class CreditRequestActionResultDto
     public CreditRequestDto Request { get; set; } = new();
     public string Message { get; set; } = string.Empty;
 }
+
+/// <summary>
+/// Thông tin khách hàng để Kế toán trưởng xét duyệt (A62.2): tổng quan mua hàng và lịch sử thanh toán.
+/// Chưa có hạn trả nợ nên chưa tính nợ quá hạn (BR-18).
+/// </summary>
+public class CustomerCreditHistoryDto
+{
+    public int PartnerId { get; set; }
+    public string? PartnerCode { get; set; }
+    public string? PartnerName { get; set; }
+    public string? Phone { get; set; }
+    /// <summary>Ngày tạo hồ sơ khách (khách từ ngày)</summary>
+    public DateTime? CustomerSince { get; set; }
+    public decimal CurrentDebt { get; set; }
+    public decimal CreditLimit { get; set; }
+
+    // ── Tổng quan mua hàng ──
+    public int InvoiceCountAll { get; set; }
+    public decimal TotalPurchaseAll { get; set; }
+    public int InvoiceCount12M { get; set; }
+    public decimal TotalPurchase12M { get; set; }
+    public decimal AverageInvoice12M { get; set; }
+    public DateTime? FirstPurchaseDate { get; set; }
+    public DateTime? LastPurchaseDate { get; set; }
+    /// <summary>12 tháng gần nhất, cũ → mới</summary>
+    public List<CreditHistoryMonthDto> MonthlyPurchases { get; set; } = new();
+    public List<CreditHistoryInvoiceDto> RecentInvoices { get; set; } = new();
+
+    // ── Lịch sử thanh toán ──
+    public decimal TotalPaidAll { get; set; }
+    public decimal TotalPaid12M { get; set; }
+    public int PaymentCount12M { get; set; }
+    public DateTime? LastPaymentDate { get; set; }
+    public decimal? LastPaymentAmount { get; set; }
+    /// <summary>Giá trị hàng khách trả lại 12 tháng (giảm nợ)</summary>
+    public decimal TotalReturns12M { get; set; }
+    public List<CreditHistoryPaymentDto> RecentPayments { get; set; } = new();
+}
+
+public record CreditHistoryMonthDto(string Month, int InvoiceCount, decimal Purchase, decimal Paid);
+
+public record CreditHistoryInvoiceDto(int OrderId, string OrderCode, DateTime? OrderDate, decimal Total, decimal Paid, decimal Outstanding);
+
+public record CreditHistoryPaymentDto(string Code, DateTime? Date, decimal Amount, string? PaymentMethod, string? OrderCode);

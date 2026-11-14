@@ -9,6 +9,7 @@ import type {
   CreditRequestActionResult,
   CreditRequestList,
   CreditRequestStatusFilter,
+  CustomerCreditHistory,
 } from '../types';
 
 export const creditRequestService = {
@@ -36,6 +37,11 @@ export const creditRequestService = {
 
   getById(id: number): Promise<CreditRequest> {
     return apiClient.get<CreditRequest>(`/api/credit-requests/${id}`);
+  },
+
+  /** Tổng quan mua hàng + lịch sử thanh toán của khách để xét duyệt (A62.2) */
+  getCustomerHistory(id: number): Promise<CustomerCreditHistory> {
+    return apiClient.get<CustomerCreditHistory>(`/api/credit-requests/${id}/customer-history`);
   },
 
   approve(id: number, payload: ApproveCreditRequestPayload): Promise<CreditRequestActionResult> {
