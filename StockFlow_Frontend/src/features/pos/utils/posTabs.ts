@@ -71,6 +71,8 @@ export interface PosTab {
   returnInvoiceDiscount?: number;
   /** Người dùng đã tự sửa Giảm giá (không còn lấy theo phân bổ) */
   returnDiscountEdited?: boolean;
+  /** Hóa đơn: khách trả thừa và còn nợ cũ → true = tính phần thừa vào công nợ (trừ nợ cũ) thay vì trả lại tiền */
+  excessToDebt?: boolean;
   /** Trả nhanh: khách quên hóa đơn — tự tìm hàng, tự chọn khách, không giới hạn theo hóa đơn */
   returnQuick?: boolean;
   /** Ngoại lệ một lần đã được Manager duyệt, gắn vào hóa đơn này khi thanh toán (UC-27/UC-64) */

@@ -39,6 +39,8 @@ export interface PosSaleRequest {
   createRemainderBooking?: boolean;
   /** Ngoại lệ một lần đã duyệt (vượt hạn mức): server kiểm đúng khách, chưa dùng, không vượt mức đã duyệt */
   creditRequestId?: number;
+  /** Tiền khách trả thừa: RETURN_CASH = trả lại khách; RECORD_DEBT = trừ vào nợ cũ của khách */
+  excessAction?: 'RETURN_CASH' | 'RECORD_DEBT';
   items: {
     productId: number;
     quantity: number;
@@ -66,6 +68,9 @@ export interface PosSaleResult {
   /** Đơn đặt mới tạo cho phần khách chưa lấy */
   remainderBookingId?: number | null;
   remainderBookingCode?: string | null;
+  /** Tiền thừa đã trừ vào nợ cũ (Tính vào công nợ) và dư nợ khách sau thanh toán */
+  debtPaymentAmount?: number;
+  customerCurrentDebt?: number;
   message?: string;
 }
 
@@ -74,7 +79,7 @@ export const posService = {
   submitSale(req: PosSaleRequest): Promise<PosSaleResult> {
     return apiClient.post<PosSaleResult>('/api/orders/pos', {
       ...req,
-      excessAction: 'RETURN_CASH',
+      excessAction: req.excessAction ?? 'RETURN_CASH',
       vatAmount: 0,
       deliveryFee: 0,
       deliveryType: 'COUNTER',
