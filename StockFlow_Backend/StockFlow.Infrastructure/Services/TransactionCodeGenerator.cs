@@ -51,6 +51,11 @@ public class TransactionCodeGenerator : ITransactionCodeGenerator
                 prefix = "NTP";
                 sequenceName = "stockflow.seq_fgr_code";
                 break;
+            case "CREDIT_REQUEST":
+                // Yêu cầu duyệt vượt hạn mức công nợ (UC-27): YCHM00001
+                prefix = "YCHM";
+                sequenceName = "stockflow.seq_credit_request_code";
+                break;
             case "ORDER":
             case "POS":
             default:

@@ -16,10 +16,10 @@ export interface PriceBook {
   warnUnlistedProducts: boolean;
   scopeBranchType: 'ALL' | 'SPECIFIC';
   scopeWarehouseIds: number[] | null;
+  /** ALL = mọi khách; SPECIFIC = chỉ các khách trong scopeCustomerIds */
   scopeCustomerType: 'ALL' | 'SPECIFIC';
-  scopeCustomerGroupCodes: string[] | null;
-  scopeUserType: 'ALL' | 'SPECIFIC';
-  scopeUserIds: number[] | null;
+  scopeCustomerIds: number[] | null;
+  scopeCustomers: PriceBookCustomerRef[];
   totalItemsCount: number;
   updatedAt: string | null;
 }
@@ -58,10 +58,26 @@ export interface CreatePriceBookPayload {
   scopeBranchType?: 'ALL' | 'SPECIFIC';
   scopeWarehouseIds?: number[] | null;
   scopeCustomerType?: 'ALL' | 'SPECIFIC';
-  scopeCustomerGroupCodes?: string[] | null;
-  scopeUserType?: 'ALL' | 'SPECIFIC';
-  scopeUserIds?: number[] | null;
+  scopeCustomerIds?: number[] | null;
   autoApplyFormula?: boolean;
+  /** true = giá tự cập nhật theo nguồn; false = chỉ dùng công thức để tính giá rồi bỏ liên kết */
+  linkFormula?: boolean;
+}
+
+/** Khách hàng trong phạm vi bảng giá (dữ liệu thật từ mst_business_partners) */
+export interface PriceBookCustomerRef {
+  partnerId: number;
+  partnerCode: string | null;
+  partnerName: string | null;
+  phone: string | null;
+}
+
+/** Chi nhánh (kho) từ /api/warehouses */
+export interface PriceBookWarehouseOption {
+  warehouseId: number;
+  code: string;
+  name: string;
+  status: string;
 }
 
 export interface UpdatePriceBookPayload extends CreatePriceBookPayload {

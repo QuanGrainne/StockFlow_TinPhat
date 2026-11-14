@@ -84,6 +84,12 @@ public partial class MstPriceBook
     /// </summary>
     public string? ScopeUserIds { get; set; }
 
+    /// <summary>
+    /// JSON danh sách PartnerId khách hàng áp dụng khi ScopeCustomerType = "SPECIFIC", ví dụ: [12, 15].
+    /// (Thay cho ScopeCustomerGroupCodes: hệ thống không có nhóm khách hàng.)
+    /// </summary>
+    public string? ScopeCustomerIds { get; set; }
+
     public DateTime? CreatedAt { get; set; } = DateTime.UtcNow;
 
     public DateTime? UpdatedAt { get; set; } = DateTime.UtcNow;

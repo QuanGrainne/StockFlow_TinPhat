@@ -51,6 +51,8 @@ public static class FeatureConstants
         new("feat-sales-booking", "Đặt hàng", "SALES", None),
         new("feat-invoices", "Hóa đơn", "SALES", new[] { "FIN" }),
         new("feat-sales-returns", "Trả hàng", "SALES", None),
+        // Approval Inbox (UC-64): duyệt yêu cầu vượt hạn mức. Mặc định chỉ Manager/Admin.
+        new("feat-credit-approvals", "Duyệt yêu cầu", "SALES", None),
 
         new("feat-purchase-orders", "Đặt hàng nhập", "PURCHASE", new[] { "PARTNER", "GOODS", "FIN" }),
         new("feat-purchase", "Nhập hàng", "PURCHASE", new[] { "PARTNER", "GOODS", "FIN" }),
@@ -100,6 +102,7 @@ public static class FeatureConstants
         {
             "ROLE_ADMIN" => Features.Select(f => f.Id),
             "ROLE_MANAGER" => GoodsFeats.Concat(StockFeats).Append("feat-customers").Concat(SalesFeats)
+                .Append("feat-credit-approvals")
                 .Concat(PurchaseFeats).Concat(ProdFeats).Append("feat-bom"),
             "ROLE_SALES" => new[] { "feat-goods", "feat-customers" }.Concat(SalesFeats),
             "ROLE_WAREHOUSE" => new[] { "feat-goods" }.Concat(StockFeats).Concat(PurchaseFeats),
