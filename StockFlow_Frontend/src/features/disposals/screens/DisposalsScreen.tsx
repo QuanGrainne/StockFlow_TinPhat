@@ -1,7 +1,7 @@
 'use client';
 
 // Danh sách phiếu xuất hủy (cùng bố cục màn Phiếu kiểm kho / Nhập hàng):
-// Header (tìm mã phiếu, + Xuất hủy, Xuất file, tùy chỉnh cột) → [Bộ lọc: Chi nhánh, Trạng thái, Thời gian | Bảng]
+// Header (tìm mã phiếu, + Xuất hủy, Xuất file) → [Bộ lọc: Chi nhánh, Trạng thái, Thời gian | Bảng]
 // Bấm 1 dòng → mở rộng chi tiết phiếu ngay dưới dòng (DisposalDetailPanel: Hủy, Sao chép, Xuất file, Lưu, In).
 
 import React, { useEffect, useMemo, useState } from 'react';
@@ -17,14 +17,8 @@ import { disposalService } from '../services/disposalService';
 import { exportDisposalListExcel } from '../utils/disposalDocs';
 import type { DisposalDetail, DisposalStatus, DisposalSummary } from '../types';
 import { DisposalDetailPanel, DisposalStatusTag } from '../components/DisposalDetailPanel';
-import {
-  DisposalColumnSettings,
-  loadDisposalColumns,
-  type DisposalColumnKey,
-} from '../components/DisposalColumnSettings';
 
 const money = new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 0 });
-const qty = (n: number) => n.toLocaleString('vi-VN', { maximumFractionDigits: 2 });
 /** Trạng thái của bộ lọc dùng chung → trạng thái phiếu xuất hủy */
 const STATUS_MAP: Record<string, DisposalStatus> = { draft: 'DRAFT', completed: 'COMPLETED', canceled: 'CANCELLED' };
 
@@ -36,7 +30,12 @@ function formatDateTimeVN(value?: string | null): string {
   return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
-/** Định nghĩa từng cột (ngoài cột Mã xuất hủy luôn hiện) */
+type DisposalColumnKey = 'totalValue' | 'time' | 'warehouse' | 'notes' | 'status';
+
+/** Các cột cố định của bảng (ngoài cột Mã xuất hủy luôn hiện), theo đúng thứ tự hiển thị */
+const COLUMNS: DisposalColumnKey[] = ['totalValue', 'time', 'warehouse', 'notes', 'status'];
+
+/** Định nghĩa từng cột */
 const COLUMN_DEFS: Record<
   DisposalColumnKey,
   { label: string; align?: 'right' | 'center'; cell: (r: DisposalSummary) => React.ReactNode; total?: (rows: DisposalSummary[]) => string }
@@ -58,15 +57,6 @@ const COLUMN_DEFS: Record<
     ),
   },
   status: { label: 'Trạng thái', align: 'center', cell: (r) => <DisposalStatusTag status={r.status} /> },
-  totalQty: {
-    label: 'Tổng SL hủy',
-    align: 'right',
-    cell: (r) => qty(r.totalQuantity),
-    total: (rows) => qty(rows.filter((r) => r.status !== 'CANCELLED').reduce((s, r) => s + r.totalQuantity, 0)),
-  },
-  itemCount: { label: 'Số mặt hàng', align: 'right', cell: (r) => r.itemCount },
-  createdBy: { label: 'Người tạo', cell: (r) => <span className="whitespace-nowrap">{r.createdByName}</span> },
-  processedBy: { label: 'Người xuất hủy', cell: (r) => <span className="whitespace-nowrap">{r.processedByName}</span> },
 };
 
 export default function DisposalsScreen() {
@@ -81,7 +71,6 @@ export default function DisposalsScreen() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [expandedId, setExpandedId] = useState<number | null>(() => docLink?.id ?? null);
   const [details, setDetails] = useState<Record<number, DisposalDetail>>({});
-  const [columns, setColumns] = useState<DisposalColumnKey[]>(loadDisposalColumns);
   const [reloadTick, setReloadTick] = useState(0);
 
   // Chi nhánh: chưa chọn = Kho làm việc; [] = tất cả kho được phân quyền
@@ -178,8 +167,8 @@ export default function DisposalsScreen() {
 
   const th = 'sticky top-0 z-20 bg-[#f7f8f9] py-2.5 px-3 border-b border-slate-200 whitespace-nowrap';
   const alignCls = (a?: 'right' | 'center') => (a === 'right' ? 'text-right' : a === 'center' ? 'text-center' : '');
-  const colSpan = columns.length + 1;
-  const hasTotals = columns.some((c) => COLUMN_DEFS[c].total);
+  const colSpan = COLUMNS.length + 1;
+  const hasTotals = COLUMNS.some((c) => COLUMN_DEFS[c].total);
 
   return (
     <div className="flex-1 h-full min-h-0 flex flex-col bg-transparent overflow-hidden select-none text-[13px] text-[#15171a] font-sans">
@@ -217,7 +206,6 @@ export default function DisposalsScreen() {
             <FileDown size={14} className="text-[#677484]" />
             <span>Xuất file</span>
           </button>
-          <DisposalColumnSettings value={columns} onChange={setColumns} />
         </div>
       </header>
 
@@ -249,7 +237,7 @@ export default function DisposalsScreen() {
               <thead className="text-[12px] font-semibold text-[#677484]">
                 <tr>
                   <th className={th}>Mã xuất hủy</th>
-                  {columns.map((c) => (
+                  {COLUMNS.map((c) => (
                     <th key={c} className={`${th} ${alignCls(COLUMN_DEFS[c].align)}`}>
                       {COLUMN_DEFS[c].label}
                     </th>
@@ -261,7 +249,7 @@ export default function DisposalsScreen() {
                 {!loading && filtered.length > 0 && hasTotals && (
                   <tr className="bg-white/75 font-bold">
                     <td />
-                    {columns.map((c) => (
+                    {COLUMNS.map((c) => (
                       <td key={c} className={`py-2.5 px-3 ${alignCls(COLUMN_DEFS[c].align)}`}>
                         {COLUMN_DEFS[c].total?.(filtered) ?? ''}
                       </td>
@@ -294,7 +282,7 @@ export default function DisposalsScreen() {
                           className={`cursor-pointer ${isExpanded ? 'bg-[#e6f1fe]/80' : 'hover:bg-[#f7f8f9]'}`}
                         >
                           <td className="py-2.5 px-3 font-mono font-medium text-[#0070f4] whitespace-nowrap">{r.disposalCode}</td>
-                          {columns.map((c) => (
+                          {COLUMNS.map((c) => (
                             <td key={c} className={`py-2.5 px-3 ${alignCls(COLUMN_DEFS[c].align)}`}>
                               {COLUMN_DEFS[c].cell(r)}
                             </td>
@@ -304,7 +292,7 @@ export default function DisposalsScreen() {
                         {isExpanded && (
                           <tr>
                             <td colSpan={colSpan} className="p-0 border-b-2 border-[#0070f4] bg-white">
-                              <div className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
+                              <div className="px-6 py-4 text-[13px] text-[#15171a]" onClick={(e) => e.stopPropagation()}>
                                 <div className="flex items-center gap-1 border-b border-slate-200 mb-4">
                                   <span className="px-4 py-2 text-sm border-b-2 -mb-px border-[#0070f4] text-[#0070f4] font-semibold">
                                     Thông tin

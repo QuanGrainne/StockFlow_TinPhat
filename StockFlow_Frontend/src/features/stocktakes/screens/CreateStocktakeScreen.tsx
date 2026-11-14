@@ -41,6 +41,8 @@ interface Row {
   unitCost: number;
   /** null = chưa kiểm */
   actualQty: number | null;
+  /** Ảnh hàng hóa (dòng nạp từ phiếu cũ được bổ sung khi lấy lại tồn kho) */
+  imageUrl?: string | null;
 }
 
 type Tab = 'all' | 'match' | 'diff' | 'unchecked';
@@ -48,8 +50,8 @@ type Tab = 'all' | 'match' | 'diff' | 'unchecked';
 /** Tiền tố mã khi sao chép phiếu (giống phiếu nhập) */
 const COPY_CODE_PREFIX = 'Copy_';
 
-const GRID ='36px 44px 120px minmax(200px,1fr) 80px 100px 120px 100px 120px';
-const MIN_WIDTH = 36 + 44 + 120 + 200 + 80 + 100 + 120 + 100 + 120 + 24;
+const GRID ='36px 44px 48px 120px minmax(200px,1fr) 80px 100px 120px 100px 120px';
+const MIN_WIDTH = 36 + 44 + 48 + 120 + 200 + 80 + 100 + 120 + 100 + 120 + 24;
 const money = new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 0 });
 const qtyFmt = (n: number) => n.toLocaleString('vi-VN', { maximumFractionDigits: 3 });
 
@@ -120,7 +122,9 @@ export default function CreateStocktakeScreen() {
       setRows((prev) =>
         prev.map((r) => {
           const f = fresh.find((p) => p?.productId === r.productId);
-          return f ? { ...r, systemQty: f.sourceStock, unitCost: f.costPrice } : { ...r, systemQty: 0 };
+          return f
+            ? { ...r, systemQty: f.sourceStock, unitCost: f.costPrice, imageUrl: f.imageUrl ?? null }
+            : { ...r, systemQty: 0 };
         })
       );
     });
@@ -221,6 +225,7 @@ export default function CreateStocktakeScreen() {
         systemQty: p.sourceStock,
         unitCost: p.costPrice,
         actualQty: null,
+        imageUrl: p.imageUrl ?? null,
       },
     ]);
     setSearch('');
@@ -243,6 +248,7 @@ export default function CreateStocktakeScreen() {
       systemQty: p.stockQuantity || 0,
       unitCost: p.costPrice || 0,
       actualQty: null,
+      imageUrl: p.imageUrl ?? null,
     }));
     addRows(newRows);
     if (warehouseId) refreshRows(warehouseId, newRows);
@@ -303,6 +309,7 @@ export default function CreateStocktakeScreen() {
           systemQty: p.sourceStock,
           unitCost: p.costPrice,
           actualQty: Number.isFinite(l.actual) && l.actual >= 0 ? l.actual : null,
+          imageUrl: p.imageUrl ?? null,
         });
       });
       addRows(newRows);
@@ -538,6 +545,7 @@ export default function CreateStocktakeScreen() {
               >
                 <span />
                 <span>STT</span>
+                <span />
                 <span>Mã hàng</span>
                 <span>Tên hàng</span>
                 <span>ĐVT</span>
@@ -588,6 +596,11 @@ export default function CreateStocktakeScreen() {
                         <Trash2 size={14} />
                       </button>
                       <span className="text-slate-400">{i + 1}</span>
+                      <ProductThumb
+                        src={r.imageUrl}
+                        alt={r.productName}
+                        size={32}
+                      />
                       <span className="font-mono text-[#0070f4] font-medium truncate">{r.productCode}</span>
                       <span className="truncate pr-2" title={r.productName}>{r.productName}</span>
                       <span className="text-[#0070f4]">{r.unit}</span>
