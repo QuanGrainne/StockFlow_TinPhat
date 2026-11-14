@@ -361,3 +361,80 @@ During initial scaffolding, prepare the repository structure and verify
 the toolchain. Do not implement business workflows, business entities,
 database schema, migrations, seed records, or integrations until
 explicitly approved.
+
+## 13. Run with Docker (optional)
+
+Docker is an **optional** second way to run StockFlow. Team members
+without Docker keep the normal workflow (local PostgreSQL +
+`dotnet run` + `npm run dev`); the Docker files are never read by
+`dotnet` or `npm`.
+
+### What runs
+
+`deploy/compose.yml` starts four containers (project name `stockflow`):
+
+| Service | Image / source | Role |
+|---|---|---|
+| `db` | `postgres:18` | Database, data kept in the `pgdata` volume |
+| `api` | `StockFlow_Backend/Dockerfile` | ASP.NET Core 9 API on port 8080 inside Docker |
+| `web` | `StockFlow_Frontend/Dockerfile` | Next.js (`next start`) on port 3000 inside Docker |
+| `caddy` | `caddy:2` + `deploy/caddy/Caddyfile` | Single entry point: `/api/*` to `api`, everything else to `web` |
+
+The browser only talks to `http://localhost:8080`, so the API and the
+web share one address and no CORS setup is needed. The web image is
+built with `NEXT_PUBLIC_API_URL=""`, which makes the browser call
+`/api/...` on the same address.
+
+### First start
+
+```bash
+cp deploy/.env.example deploy/.env      # once; deploy/.env is gitignored
+docker compose -f deploy/compose.yml up -d --build --wait
+```
+
+Open <http://localhost:8080> and sign in with a seeded account
+(`admin`, password from `DatabaseSeeder`).
+
+On first start the API applies all EF Core migrations to the empty
+database and runs `DatabaseSeeder` (roles, warehouses, users, categories,
+units, suppliers, default price book). The resulting schema was checked
+against a team development database: same tables, columns, sequences
+and unique keys.
+
+### Everyday commands
+
+```bash
+docker compose -f deploy/compose.yml up -d --build --wait   # start / rebuild after pulling code
+docker compose -f deploy/compose.yml ps                     # status
+docker compose -f deploy/compose.yml logs -f api            # follow API log
+docker compose -f deploy/compose.yml stop                   # stop, keep data
+docker compose -f deploy/compose.yml down                   # remove containers, keep data
+```
+
+`docker compose ... down -v` also deletes the `pgdata` volume, which means
+**every record in the Docker database**. Use it only to reset a test
+database on purpose.
+
+### Settings (`deploy/.env`)
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `POSTGRES_DB` / `POSTGRES_USER` / `POSTGRES_PASSWORD` | `stockflow_dev` / `stockflow` / dev value | Read only when the `pgdata` volume is created |
+| `DB_PORT` | `5433` | Host port for pgAdmin/psql (`127.0.0.1:5433`), separate from a local PostgreSQL on 5432 |
+| `JWT_SECRET_KEY` | dev value | JWT signing key, at least 32 characters |
+| `HTTP_PORT` | `8080` | Port of the site |
+| `HTTP_BIND` | `127.0.0.1` | `0.0.0.0` lets other machines on the LAN open the site (demo) |
+
+Change `POSTGRES_PASSWORD` and `JWT_SECRET_KEY` before the stack is
+reachable by anyone else. Never commit `deploy/.env`.
+
+### Notes
+
+- The Docker database is separate from your local `stockflow_dev`
+  database; the two never share data.
+- After changing backend or frontend code, rebuild with
+  `up -d --build`. For day-to-day coding, `dotnet run` / `npm run dev`
+  give faster reloads.
+- On Windows, Hyper-V reserves random port ranges above 49152. If a port
+  in `deploy/.env` fails with "access permissions", pick another one
+  (check with `netsh int ipv4 show excludedportrange protocol=tcp`).
