@@ -71,7 +71,9 @@ public class CreateFinishedGoodsReceiptCommandHandler
         if (_currentUser.UserId is not int userId)
             return Result.Failure<FinishedGoodsReceiptDto>("Không xác định được người dùng đăng nhập.");
 
-        var order = await _context.TrxProductionOrders.FirstOrDefaultAsync(o => o.ProductionOrderId == req.ProductionOrderId, ct);
+        var order = await _context.TrxProductionOrders
+            .Include(o => o.DtlProductionOrderItems)
+            .FirstOrDefaultAsync(o => o.ProductionOrderId == req.ProductionOrderId, ct);
         if (order == null) return Result.Failure<FinishedGoodsReceiptDto>(ProductionMessages.OrderNotFound);
         if (!order.CanReceiveFinishedGoods())
             return Result.Failure<FinishedGoodsReceiptDto>(
@@ -87,26 +89,36 @@ public class CreateFinishedGoodsReceiptCommandHandler
                 l => l.LocationId == req.LocationId && l.WarehouseId == req.WarehouseId && l.IsActive != false, ct))
             return Result.Failure<FinishedGoodsReceiptDto>("Vị trí lưu kho không thuộc kho thành phẩm đã chọn.");
 
-        // BR-35: luỹ kế SL đạt không vượt kế hoạch (E49.1, MSG42)
-        var planned = order.PlannedQuantity ?? 0;
-        var received = order.ActualQuantity ?? 0;
-        if (received + req.AcceptedQuantity > planned)
+        var targetItem = req.ProductionOrderItemId.HasValue
+            ? order.DtlProductionOrderItems.FirstOrDefault(i => i.ProductionOrderItemId == req.ProductionOrderItemId.Value)
+            : order.DtlProductionOrderItems.OrderBy(i => i.ProductionOrderItemId).FirstOrDefault();
+        if (req.ProductionOrderItemId.HasValue && targetItem == null)
+            return Result.Failure<FinishedGoodsReceiptDto>("Dòng thành phẩm không thuộc lệnh sản xuất.");
+
+        var targetProductId = targetItem?.ProductId ?? order.ProductId;
+        var product = await _context.MstProducts.FirstAsync(p => p.ProductId == targetProductId, ct);
+
+        // BR-35: kiểm tra vượt SL kế hoạch — nếu chưa xác nhận thì trả thông báo để FE hiện Popup [Có] / [Không]
+        var planned = targetItem?.PlannedQuantity ?? order.PlannedQuantity ?? 0;
+        var received = targetItem?.ActualQuantity ?? order.ActualQuantity ?? 0;
+        if (received + req.AcceptedQuantity > planned && !req.ConfirmExceedPlan)
             return Result.Failure<FinishedGoodsReceiptDto>(
-                $"{ProductionMessages.ExceedsPlan} (còn lại {Math.Max(0, planned - received):0.##})");
+                $"[CONFIRM_EXCEED_PLAN] Số lượng thành phẩm sản xuất nhập kho lớn hơn số lượng trên lệnh sản xuất: {product.ProductCode}, lệnh sản xuất {order.ProductionOrderCode}. Bạn có muốn lưu chứng từ không?");
 
         // BR-42: thành phẩm đang kiểm kho tại kho nhận
-        var stocktakeError = await StocktakeGuard.CheckAsync(_context, req.WarehouseId, new[] { order.ProductId }, ct);
+        var stocktakeError = await StocktakeGuard.CheckAsync(_context, req.WarehouseId, new[] { targetProductId }, ct);
         if (stocktakeError != null) return Result.Failure<FinishedGoodsReceiptDto>(stocktakeError);
 
         // BR-37: cảnh báo dùng NVL → bắt buộc ghi chú, gắn cờ cho Manager
-        var (acceptedSoFar, defectSoFar) = await FinishedGoodsRules.ProducedSoFarAsync(_context, order.ProductionOrderId, ct);
+        var (acceptedSoFar, defectSoFar) = await FinishedGoodsRules.ProducedSoFarAsync(
+            _context, order.ProductionOrderId, ct, targetItem?.ProductionOrderItemId);
         var warnings = await FinishedGoodsRules.MaterialWarningsAsync(
-            _context, order, acceptedSoFar + defectSoFar + req.AcceptedQuantity + req.DefectQuantity, ct);
+            _context, order, acceptedSoFar + defectSoFar + req.AcceptedQuantity + req.DefectQuantity, ct,
+            targetItem?.ProductionOrderItemId, planned);
         var reviewNote = string.IsNullOrWhiteSpace(req.ReviewNote) ? null : req.ReviewNote.Trim();
         if (warnings.Count > 0 && reviewNote == null)
             return Result.Failure<FinishedGoodsReceiptDto>(ProductionMessages.MaterialUsageWarning);
 
-        var product = await _context.MstProducts.FirstAsync(p => p.ProductId == order.ProductId, ct);
         var lotNumber = req.LotNumber!.Trim();
         var now = VietnamTime.Now;
 
@@ -145,6 +157,7 @@ public class CreateFinishedGoodsReceiptCommandHandler
         {
             FgrCode = code,
             ProductionOrderId = order.ProductionOrderId,
+            ProductionOrderItemId = targetItem?.ProductionOrderItemId,
             Report = report,
             WarehouseId = req.WarehouseId,
             LocationId = req.LocationId,
@@ -163,15 +176,26 @@ public class CreateFinishedGoodsReceiptCommandHandler
 
         // BR-36: chỉ SL đạt vào tồn kho, theo giá vốn từ NVL đã xuất
         var materialValue = await ProductionStockOps.IssuedMaterialValueAsync(_context, order.ProductionOrderId, ct);
-        var unitCost = ProductionPolicy.CalculateFinishedGoodsUnitCost(materialValue, planned);
+        var totalPlanned = order.PlannedQuantity ?? planned;
+        var unitCost = ProductionPolicy.CalculateFinishedGoodsUnitCost(materialValue, totalPlanned);
         await ProductionStockOps.ReceiveAsync(_ledger, req.WarehouseId, req.LocationId, lot.LotId, product,
             req.AcceptedQuantity, unitCost,
             new StockRef(ProductionStockOps.ReceiptTransactionType, ProductionStockOps.ReceiptReferenceType, receipt.FgrId, userId),
             now, ct);
 
-        // BR-38: nhận đủ kế hoạch → Hoàn thành
-        order.ActualQuantity = received + req.AcceptedQuantity;
-        if (order.ActualQuantity >= planned) order.MarkCompleted();
+        // BR-38: nhận đủ kế hoạch của mọi thành phẩm trong lệnh → Hoàn thành
+        if (targetItem != null)
+        {
+            targetItem.ActualQuantity = received + req.AcceptedQuantity;
+            order.ActualQuantity = order.DtlProductionOrderItems.Sum(i => i.ActualQuantity);
+            if (order.DtlProductionOrderItems.All(i => i.ActualQuantity >= i.PlannedQuantity))
+                order.MarkCompleted();
+        }
+        else
+        {
+            order.ActualQuantity = received + req.AcceptedQuantity;
+            if (order.ActualQuantity >= planned) order.MarkCompleted();
+        }
 
         await _context.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);

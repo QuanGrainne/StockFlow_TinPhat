@@ -22,6 +22,9 @@ interface AdjustNormModalProps {
 interface Row {
   key: string;
   requirementId: number | null;
+  productionOrderItemId: number | null;
+  finishedProductCode: string;
+  plannedQty: number;
   materialId: number;
   materialCode: string;
   materialName: string;
@@ -31,12 +34,18 @@ interface Row {
   origRate: number | null;
   norm: string;
   rate: string;
+  required: string;
   remove: boolean;
 }
 
 /** BR-31: nhu cầu = SL kế hoạch × định mức × (1 + hao hụt%), làm tròn half-up 2 chữ số */
 const calcRequired = (planned: number, norm: number, rate: number) =>
   Math.round(planned * norm * (1 + rate / 100) * 100 + Number.EPSILON) / 100;
+
+const calcNormFromRequired = (planned: number, required: number, rate: number) => {
+  const denom = planned * (1 + rate / 100);
+  return denom > 0 ? Math.round((required / denom) * 10000 + Number.EPSILON) / 10000 : 0;
+};
 
 /** Số chữ số thập phân người dùng nhập không vượt giới hạn lưu trữ */
 const maxDecimals = (value: string, digits: number) => {
@@ -45,54 +54,156 @@ const maxDecimals = (value: string, digits: number) => {
 };
 
 export function AdjustNormModal({ detail, onClose, onDone }: AdjustNormModalProps) {
-  const planned = detail.summary.plannedQuantity;
+  const orderItems = useMemo(
+    () =>
+      detail.summary.items && detail.summary.items.length > 0
+        ? detail.summary.items
+        : [
+            {
+              productionOrderItemId: 0,
+              productId: detail.summary.productId,
+              productCode: detail.summary.productCode,
+              productName: detail.summary.productName,
+              unitName: detail.summary.unitName,
+              bomId: detail.summary.bomId,
+              bomCode: detail.summary.bomCode,
+              bomVersion: detail.summary.bomVersion,
+              plannedQuantity: detail.summary.plannedQuantity,
+              receivedQuantity: detail.summary.receivedQuantity,
+              remainingQuantity: Math.max(0, detail.summary.plannedQuantity - detail.summary.receivedQuantity),
+              progressPercent: detail.summary.progressPercent,
+              notes: null,
+            },
+          ],
+    [detail.summary]
+  );
+
+  const [selectedItemId, setSelectedItemId] = useState<number>(orderItems[0]?.productionOrderItemId ?? 0);
+  const [allowAllTypes, setAllowAllTypes] = useState(false);
+
   const [rows, setRows] = useState<Row[]>(() =>
-    detail.materials.map((m) => ({
-      key: `r${m.requirementId}`,
-      requirementId: m.requirementId,
-      materialId: m.materialId,
-      materialCode: m.materialCode,
-      materialName: m.materialName,
-      unitName: m.unitName,
-      issuedQty: m.issuedQty,
-      origNorm: m.normPerUnit,
-      origRate: m.wastageRate,
-      norm: String(m.normPerUnit),
-      rate: String(m.wastageRate),
-      remove: false,
-    }))
+    detail.materials.map((m) => {
+      const matchedItem =
+        orderItems.find((oi) => oi.productionOrderItemId > 0 && oi.productionOrderItemId === m.productionOrderItemId) ??
+        orderItems[0];
+      const itemPlanned = matchedItem?.plannedQuantity ?? detail.summary.plannedQuantity;
+      return {
+        key: `r${m.requirementId}`,
+        requirementId: m.requirementId,
+        productionOrderItemId: m.productionOrderItemId ?? (matchedItem?.productionOrderItemId || null),
+        finishedProductCode: m.finishedProductCode ?? matchedItem?.productCode ?? detail.summary.productCode,
+        plannedQty: itemPlanned,
+        materialId: m.materialId,
+        materialCode: m.materialCode,
+        materialName: m.materialName,
+        unitName: m.unitName,
+        issuedQty: m.issuedQty,
+        origNorm: m.normPerUnit,
+        origRate: m.wastageRate,
+        norm: String(m.normPerUnit),
+        rate: String(m.wastageRate),
+        required: String(m.requiredQty),
+        remove: false,
+      };
+    })
   );
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
+
+  const activeOrderItem =
+    orderItems.find((oi) => oi.productionOrderItemId === selectedItemId) ?? orderItems[0];
 
   const computed = useMemo(
     () =>
       rows.map((r) => {
         const norm = parseQty(r.norm);
         const rate = r.rate.trim() === '' ? 0 : parseQty(r.rate);
+        const reqInput = parseQty(r.required);
         const normOk = !Number.isNaN(norm) && norm > 0 && maxDecimals(r.norm, 4);
         const rateOk = !Number.isNaN(rate) && rate >= 0 && rate <= 100 && maxDecimals(r.rate, 2);
-        const required = normOk && rateOk ? calcRequired(planned, norm, rate) : null;
+        const required = normOk && rateOk ? calcRequired(r.plannedQty, norm, rate) : !Number.isNaN(reqInput) && reqInput > 0 ? reqInput : null;
         const belowIssued = required !== null && required < r.issuedQty;
         const changed =
           r.remove || r.requirementId === null || (normOk && rateOk && (norm !== r.origNorm || rate !== r.origRate));
         return { r, norm, rate, normOk, rateOk, required, belowIssued, changed };
       }),
-    [rows, planned]
+    [rows]
   );
 
-  const update = (key: string, patch: Partial<Row>) => setRows((prev) => prev.map((r) => (r.key === key ? { ...r, ...patch } : r)));
+  const visibleComputed = useMemo(
+    () =>
+      orderItems.length <= 1
+        ? computed
+        : computed.filter(
+            (c) =>
+              c.r.productionOrderItemId === selectedItemId ||
+              (!c.r.productionOrderItemId && selectedItemId === orderItems[0]?.productionOrderItemId)
+          ),
+    [computed, orderItems, selectedItemId]
+  );
+
+  const update = (key: string, patch: Partial<Row>) =>
+    setRows((prev) => prev.map((r) => (r.key === key ? { ...r, ...patch } : r)));
+
+  function updateNorm(key: string, normStr: string) {
+    const n = parseQty(normStr);
+    setRows((prev) =>
+      prev.map((r) => {
+        if (r.key !== key) return r;
+        const rate = r.rate.trim() === '' ? 0 : parseQty(r.rate);
+        const nextReq =
+          !Number.isNaN(n) && n > 0 && !Number.isNaN(rate) && rate >= 0
+            ? String(calcRequired(r.plannedQty, n, rate))
+            : r.required;
+        return { ...r, norm: normStr, required: nextReq };
+      })
+    );
+  }
+
+  function updateRate(key: string, rateStr: string) {
+    const rate = rateStr.trim() === '' ? 0 : parseQty(rateStr);
+    setRows((prev) =>
+      prev.map((r) => {
+        if (r.key !== key) return r;
+        const n = parseQty(r.norm);
+        const nextReq =
+          !Number.isNaN(n) && n > 0 && !Number.isNaN(rate) && rate >= 0
+            ? String(calcRequired(r.plannedQty, n, rate))
+            : r.required;
+        return { ...r, rate: rateStr, required: nextReq };
+      })
+    );
+  }
+
+  function updateRequired(key: string, reqStr: string) {
+    const reqNum = parseQty(reqStr);
+    setRows((prev) =>
+      prev.map((r) => {
+        if (r.key !== key) return r;
+        const rate = r.rate.trim() === '' ? 0 : parseQty(r.rate);
+        const nextNorm =
+          !Number.isNaN(reqNum) && reqNum > 0 && !Number.isNaN(rate) && rate >= 0
+            ? String(calcNormFromRequired(r.plannedQty, reqNum, rate))
+            : r.norm;
+        return { ...r, required: reqStr, norm: nextNorm };
+      })
+    );
+  }
 
   function addMaterial(p: ProductionProductLookup) {
-    if (p.productId === detail.summary.productId) {
+    if (p.productId === activeOrderItem.productId) {
       message.warning('Thành phẩm không được là nguyên vật liệu của chính nó.');
       return;
     }
+    const itemPlanned = activeOrderItem.plannedQuantity || detail.summary.plannedQuantity;
     setRows((prev) => [
       ...prev,
       {
-        key: `n${p.productId}`,
+        key: `n${activeOrderItem.productionOrderItemId}_${p.productId}`,
         requirementId: null,
+        productionOrderItemId: activeOrderItem.productionOrderItemId > 0 ? activeOrderItem.productionOrderItemId : null,
+        finishedProductCode: activeOrderItem.productCode,
+        plannedQty: itemPlanned,
         materialId: p.productId,
         materialCode: p.productCode,
         materialName: p.productName,
@@ -100,8 +211,9 @@ export function AdjustNormModal({ detail, onClose, onDone }: AdjustNormModalProp
         issuedQty: 0,
         origNorm: null,
         origRate: null,
-        norm: '',
+        norm: '1',
         rate: '0',
+        required: String(calcRequired(itemPlanned, 1, 0)),
         remove: false,
       },
     ]);
@@ -135,6 +247,7 @@ export function AdjustNormModal({ detail, onClose, onDone }: AdjustNormModalProp
         normPerUnit: c.r.remove ? 0 : c.norm,
         wastageRate: c.r.remove ? 0 : c.rate,
         remove: c.r.remove,
+        productionOrderItemId: c.r.productionOrderItemId,
       }));
     setBusy(true);
     try {
@@ -174,16 +287,54 @@ export function AdjustNormModal({ detail, onClose, onDone }: AdjustNormModalProp
       }
     >
       <p className="text-xs text-[#677484] mb-3">
-        Điều chỉnh chỉ áp dụng cho lệnh này (SL kế hoạch {fmtQty(planned)} {detail.summary.unitName}), BOM gốc{' '}
-        <b className="text-[#15171a]">{detail.summary.bomCode}</b> không thay đổi.
+        Điều chỉnh chỉ áp dụng cho lệnh này (SL kế hoạch {fmtQty(activeOrderItem.plannedQuantity)} {activeOrderItem.unitName} của{' '}
+        <b className="text-[#15171a]">{activeOrderItem.productCode}</b>), BOM gốc{' '}
+        <b className="text-[#15171a]">{activeOrderItem.bomCode}</b> không thay đổi. Hỗ trợ tính 2 chiều: sửa <b>Định mức / 1 đv</b> ⇄ tự tính <b>Nhu cầu mới</b>.
       </p>
 
-      <div className="mb-3 max-w-md">
-        <ProductSearchInput
-          placeholder="Thêm nguyên vật liệu ngoài BOM (mã hoặc tên)"
-          onSelect={addMaterial}
-          excludeIds={[detail.summary.productId, ...rows.map((r) => r.materialId)]}
-        />
+      {orderItems.length > 1 && (
+        <div className="mb-3 flex flex-wrap gap-1.5 border-b border-slate-200 pb-2">
+          {orderItems.map((oi) => {
+            const active = oi.productionOrderItemId === selectedItemId;
+            return (
+              <button
+                key={oi.productionOrderItemId}
+                type="button"
+                onClick={() => setSelectedItemId(oi.productionOrderItemId)}
+                className={`px-3 py-1.5 rounded-[6px] text-xs font-semibold cursor-pointer transition ${
+                  active
+                    ? 'bg-[#0070f4] text-white'
+                    : 'bg-slate-100 text-[#677484] hover:bg-slate-200 hover:text-[#15171a]'
+                }`}
+              >
+                {oi.productCode} · {oi.productName} ({fmtQty(oi.plannedQuantity)} {oi.unitName})
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex-1 max-w-md">
+          <ProductSearchInput
+            placeholder={`Thêm nguyên vật liệu ngoài BOM cho ${activeOrderItem.productCode} (mã hoặc tên)`}
+            productType={allowAllTypes ? undefined : 'RAW_MATERIAL'}
+            onSelect={addMaterial}
+            excludeIds={[
+              activeOrderItem.productId,
+              ...visibleComputed.map((c) => c.r.materialId),
+            ]}
+          />
+        </div>
+        <label className="inline-flex items-center gap-1.5 text-xs text-[#677484] cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={allowAllTypes}
+            onChange={(e) => setAllowAllTypes(e.target.checked)}
+            className="rounded border-slate-300"
+          />
+          Hiện cả Bán thành phẩm / Thành phẩm
+        </label>
       </div>
 
       <div className="border border-slate-200 rounded-[8px] overflow-x-auto">
@@ -195,13 +346,13 @@ export function AdjustNormModal({ detail, onClose, onDone }: AdjustNormModalProp
               <th className="py-2 px-3 w-14 text-center">ĐVT</th>
               <th className="py-2 px-3 w-28 text-right">Định mức / 1 đv</th>
               <th className="py-2 px-3 w-24 text-right">Hao hụt %</th>
-              <th className="py-2 px-3 w-24 text-right">Nhu cầu mới</th>
+              <th className="py-2 px-3 w-28 text-right">Nhu cầu mới</th>
               <th className="py-2 px-3 w-24 text-right">Đã xuất</th>
               <th className="py-2 px-3 w-12" />
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {computed.map(({ r, normOk, rateOk, required, belowIssued, changed }) => (
+            {visibleComputed.map(({ r, normOk, rateOk, belowIssued, changed }) => (
               <tr key={r.key} className={r.remove ? 'opacity-50 line-through' : changed ? 'bg-[#fffbeb]/60' : ''}>
                 <td className="py-2 px-3 font-mono font-semibold">
                   {r.materialCode}
@@ -214,8 +365,9 @@ export function AdjustNormModal({ detail, onClose, onDone }: AdjustNormModalProp
                     inputMode="decimal"
                     value={r.norm}
                     disabled={r.remove}
-                    onChange={(e) => update(r.key, { norm: e.target.value })}
+                    onChange={(e) => updateNorm(r.key, e.target.value)}
                     className={cellInput(!r.remove && !normOk)}
+                    title="Sửa Định mức / 1 đv sẽ tự tính Nhu cầu mới"
                   />
                 </td>
                 <td className="py-1.5 px-3">
@@ -223,12 +375,19 @@ export function AdjustNormModal({ detail, onClose, onDone }: AdjustNormModalProp
                     inputMode="decimal"
                     value={r.rate}
                     disabled={r.remove}
-                    onChange={(e) => update(r.key, { rate: e.target.value })}
+                    onChange={(e) => updateRate(r.key, e.target.value)}
                     className={cellInput(!r.remove && !rateOk)}
                   />
                 </td>
-                <td className={`py-2 px-3 text-right font-semibold ${belowIssued ? 'text-[#fb2c36]' : ''}`}>
-                  {required === null ? '—' : fmtQty(required)}
+                <td className="py-1.5 px-3">
+                  <input
+                    inputMode="decimal"
+                    value={r.required}
+                    disabled={r.remove}
+                    onChange={(e) => updateRequired(r.key, e.target.value)}
+                    className={`${cellInput(!r.remove && belowIssued)} font-semibold`}
+                    title="Sửa Nhu cầu mới sẽ tự chia ngược lại Định mức / 1 đv"
+                  />
                 </td>
                 <td className="py-2 px-3 text-right">{fmtQty(r.issuedQty)}</td>
                 <td className="py-2 px-3 text-center">

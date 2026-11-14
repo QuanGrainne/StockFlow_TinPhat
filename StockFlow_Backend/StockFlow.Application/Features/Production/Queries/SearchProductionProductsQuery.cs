@@ -11,7 +11,7 @@ namespace StockFlow.Application.Features.Production.Queries;
 /// Tra cứu mặt hàng cho form BOM và form lập lệnh sản xuất: mã, tên, đơn vị cơ sở, đã có BOM đang áp dụng chưa,
 /// tồn tại kho đang chọn (nếu được quyền kho). Không trả giá (BR-39).
 /// </summary>
-public record SearchProductionProductsQuery(string? Search, int? WarehouseId, bool ActiveBomOnly, int Limit)
+public record SearchProductionProductsQuery(string? Search, int? WarehouseId, bool ActiveBomOnly, int Limit, string? ProductType = null)
     : IRequest<Result<List<ProductionProductLookupDto>>>;
 
 public class SearchProductionProductsQueryHandler
@@ -36,6 +36,11 @@ public class SearchProductionProductsQueryHandler
                              || (p.ProductName != null && p.ProductName.ToLower().Contains(s)));
         }
         if (query.ActiveBomOnly) q = q.Where(p => p.MstBoms.Any(b => b.IsActive == true));
+        if (!string.IsNullOrWhiteSpace(query.ProductType))
+        {
+            var pt = query.ProductType.Trim().ToUpper();
+            q = q.Where(p => p.ProductType != null && p.ProductType.ToUpper() == pt);
+        }
 
         var limit = query.Limit is > 0 and <= 100 ? query.Limit : 30;
         var rows = await q

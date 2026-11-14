@@ -44,30 +44,31 @@ Mã BR giữ nguyên theo Report 3 để truy vết.
 | Mã | Quy tắc |
 |---|---|
 | BR-30 | Chỉ tạo lệnh cho thành phẩm có BOM Active; mỗi thành phẩm tối đa một BOM Active. |
-| BR-31 | Nhu cầu vật tư = SL kế hoạch × định mức × (1 + tỷ lệ hao hụt); do hệ thống tính. |
+| BR-31 | Nhu cầu vật tư = SL kế hoạch × định mức × (1 + tỷ lệ hao hụt); hỗ trợ tính ngược 2 chiều giữa định mức / 1 đv và tổng SL NVL cần. |
 | BR-32 | Mọi lần xuất vật tư tham chiếu mã lệnh; giữ lũy kế đã xuất và số thiếu. |
 | BR-33 | Tồn vật tư giảm theo số thực xuất; không vượt tồn khả dụng. |
 | BR-34 | Xuất bổ sung làm lũy kế vượt nhu cầu phải có lý do. |
-| BR-35 | Lũy kế thành phẩm nhận không vượt SL kế hoạch. |
+| BR-35 | Khi lũy kế thành phẩm nhận vượt SL kế hoạch của lệnh, hiện hộp thoại cảnh báo xác nhận `[Có] / [Không]`; xác nhận `[Có]` cho phép lưu phiếu nhập. |
 | BR-36 | Thành phẩm đạt vào kho thành phẩm; thành phẩm lỗi ghi riêng. |
 | BR-37 | Thành phẩm cần nhiều vật tư hơn đã xuất: cảnh báo, bắt nhập ghi chú, gắn cờ cho Manager, không chặn. |
-| BR-38 | Trạng thái lệnh: Not Started → In Progress (lần xuất đầu) → Completed. Chỉ hủy lệnh chưa xuất vật tư. |
+| BR-38 | Trạng thái lệnh: Not Started → In Progress (lần xuất đầu) → Completed (khi mọi thành phẩm trong lệnh đạt đủ SL kế hoạch). Chỉ hủy lệnh chưa xuất vật tư. |
 | BR-39 | Production Accountant không xem giá. |
 | BR-42 | Đang kiểm kê thì không xác nhận xuất vật tư. |
+| BR-51 | Cho phép điều chỉnh định mức NVL (sửa 2 chiều, thêm/xóa dòng NVL) ngay khi lập lệnh hoặc trên lệnh kèm lý do điều chỉnh; chỉ áp dụng cho lệnh đó, không đổi BOM gốc. |
 
 ## 6. Functional Requirements
 
 | Mã | Yêu cầu (Expected) | Hiện trạng | Hành vi hiện tại (Existing) |
 |---|---|---|---|
-| FR-PROD-01 | Manager tạo lệnh: chọn thành phẩm, hiện BOM, nhập SL kế hoạch, hạn, xưởng; tính nhu cầu và thiếu hụt; lưu Not Started | Chưa có | Màn hình dùng dữ liệu giả |
-| FR-PROD-02 | Sửa lệnh Not Started, hủy lệnh chưa xuất, đóng sớm lệnh In Progress kèm lý do | Chưa có | — |
-| FR-PROD-03 | Production Accountant xem danh sách và chi tiết lệnh, không có dữ liệu giá | Chưa có | Màn hình dùng dữ liệu giả |
-| FR-PROD-04 | Xem nhu cầu, đã xuất, còn thiếu, tồn theo kho | Chưa có | — |
-| FR-PROD-05 | Xuất vật tư theo số thực giao; lần đầu chuyển lệnh In Progress | Chưa có | — |
-| FR-PROD-06 | Xuất bổ sung cùng mã lệnh; bắt lý do khi vượt nhu cầu | Chưa có | — |
-| FR-PROD-07 | Nhập thành phẩm: số đạt, lô, ngày sản xuất, số lỗi và lý do; cảnh báo sử dụng vật tư | Chưa có | — |
-| FR-PROD-08 | Đủ SL kế hoạch thì lệnh Completed | Chưa có | — |
-| FR-PROD-09 | Manager theo dõi vật tư và thành phẩm | Chưa có | — |
+| FR-PROD-01 | Manager tạo lệnh (hỗ trợ 1 lệnh chứa nhiều thành phẩm `dtl_production_order_items`): chọn các thành phẩm, hiện BOM từng thành phẩm, sửa định mức 2 chiều / thêm xóa NVL ngay trên lệnh; lưu Not Started | Có | Hỗ trợ đa thành phẩm trên 1 lệnh và tùy chỉnh định mức trực tiếp |
+| FR-PROD-02 | Sửa lệnh Not Started, hủy lệnh chưa xuất, đóng sớm lệnh In Progress kèm lý do | Có | Đã có API và UI |
+| FR-PROD-03 | Production Accountant xem danh sách (kèm trạng thái `Đã lập đủ PX`, `Đã lập đủ PN`) và chi tiết lệnh, không có dữ liệu giá | Có | Đã có API và UI, tuân thủ BR-39 |
+| FR-PROD-04 | Xem nhu cầu, đã xuất, còn thiếu, tồn theo kho theo từng thành phẩm | Có | Đã có API và UI |
+| FR-PROD-05 | Xuất vật tư: chọn thành phẩm & SL sản xuất đợt này để tự tính SL xuất; lần đầu chuyển lệnh In Progress | Có | Đã có API và UI |
+| FR-PROD-06 | Xuất bổ sung cùng mã lệnh; bắt lý do khi vượt nhu cầu | Có | Đã có API và UI |
+| FR-PROD-07 | Nhập thành phẩm theo từng thành phẩm trong lệnh: số đạt, lô, ngày sản xuất, số lỗi và lý do; cảnh báo `[Có]/[Không]` khi vượt kế hoạch | Có | Đã có API và UI |
+| FR-PROD-08 | Đủ SL kế hoạch cho tất cả thành phẩm trong lệnh thì lệnh Completed | Có | Đã có API và UI |
+| FR-PROD-09 | Manager theo dõi vật tư và thành phẩm | Có | Đã có API và UI |
 
 ## 7. Non-functional Requirements
 

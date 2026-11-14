@@ -91,6 +91,8 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
 
     public virtual DbSet<TrxProductionOrder> TrxProductionOrders { get; set; }
 
+    public virtual DbSet<DtlProductionOrderItem> DtlProductionOrderItems { get; set; }
+
     public virtual DbSet<TrxProductionReport> TrxProductionReports { get; set; }
 
     public virtual DbSet<TrxProductionPlan> TrxProductionPlans { get; set; }
@@ -1091,6 +1093,7 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
                 .HasColumnName("notes");
             entity.Property(e => e.ProductId).HasColumnName("product_id");
             entity.Property(e => e.ProductionOrderId).HasColumnName("production_order_id");
+            entity.Property(e => e.ProductionOrderItemId).HasColumnName("production_order_item_id");
             entity.Property(e => e.Quantity)
                 .HasPrecision(18, 2)
                 .HasColumnName("quantity");
@@ -1121,6 +1124,11 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
                 .HasForeignKey(d => d.ProductionOrderId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("fk_trx_finished_goods_receipts_production_order_id");
+
+            entity.HasOne(d => d.ProductionOrderItem).WithMany(p => p.TrxFinishedGoodsReceipts)
+                .HasForeignKey(d => d.ProductionOrderItemId)
+                .OnDelete(DeleteBehavior.SetNull)
+                .HasConstraintName("fk_trx_finished_goods_receipts_production_order_item_id");
 
             entity.HasOne(d => d.ReceivedByNavigation).WithMany(p => p.TrxFinishedGoodsReceipts)
                 .HasForeignKey(d => d.ReceivedBy)
@@ -1569,6 +1577,7 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
                 .HasColumnName("issued_qty");
             entity.Property(e => e.MaterialId).HasColumnName("material_id");
             entity.Property(e => e.ProductionOrderId).HasColumnName("production_order_id");
+            entity.Property(e => e.ProductionOrderItemId).HasColumnName("production_order_item_id");
             entity.Property(e => e.RequiredQty)
                 .HasPrecision(18, 2)
                 .HasColumnName("required_qty");
@@ -1586,6 +1595,11 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
                 .HasForeignKey(d => d.ProductionOrderId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("fk_trx_production_material_requirements_production_order_id");
+
+            entity.HasOne(d => d.ProductionOrderItem).WithMany(p => p.TrxProductionMaterialRequirements)
+                .HasForeignKey(d => d.ProductionOrderItemId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("fk_trx_production_material_requirements_order_item_id");
 
             entity.HasOne(d => d.Unit).WithMany(p => p.TrxProductionMaterialRequirements)
                 .HasForeignKey(d => d.UnitId)
@@ -1735,6 +1749,44 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
                 .HasForeignKey(d => d.WarehouseId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("fk_dtl_production_plan_items_warehouse_id");
+        });
+
+        modelBuilder.Entity<DtlProductionOrderItem>(entity =>
+        {
+            entity.HasKey(e => e.ProductionOrderItemId).HasName("dtl_production_order_items_pkey");
+
+            entity.ToTable("dtl_production_order_items", "stockflow");
+
+            entity.HasIndex(e => e.ProductionOrderId, "ix_dtl_production_order_items_order_id");
+
+            entity.Property(e => e.ProductionOrderItemId).HasColumnName("production_order_item_id");
+            entity.Property(e => e.ProductionOrderId).HasColumnName("production_order_id");
+            entity.Property(e => e.ProductId).HasColumnName("product_id");
+            entity.Property(e => e.BomId).HasColumnName("bom_id");
+            entity.Property(e => e.PlannedQuantity)
+                .HasPrecision(18, 2)
+                .HasColumnName("planned_quantity");
+            entity.Property(e => e.ActualQuantity)
+                .HasPrecision(18, 2)
+                .HasColumnName("actual_quantity");
+            entity.Property(e => e.Notes)
+                .HasMaxLength(500)
+                .HasColumnName("notes");
+
+            entity.HasOne(d => d.ProductionOrder).WithMany(p => p.DtlProductionOrderItems)
+                .HasForeignKey(d => d.ProductionOrderId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("fk_dtl_production_order_items_production_order_id");
+
+            entity.HasOne(d => d.Product).WithMany(p => p.DtlProductionOrderItems)
+                .HasForeignKey(d => d.ProductId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("fk_dtl_production_order_items_product_id");
+
+            entity.HasOne(d => d.Bom).WithMany(p => p.DtlProductionOrderItems)
+                .HasForeignKey(d => d.BomId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("fk_dtl_production_order_items_bom_id");
         });
 
         modelBuilder.Entity<TrxProductionReport>(entity =>

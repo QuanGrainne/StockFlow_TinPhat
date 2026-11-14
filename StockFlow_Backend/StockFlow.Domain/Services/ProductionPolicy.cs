@@ -12,9 +12,16 @@ public static class ProductionPolicy
     /// <summary>Số chữ số thập phân của số lượng tồn kho, nhu cầu và số đã xuất.</summary>
     public const int QuantityScale = 2;
 
+    /// <summary>Số chữ số thập phân của định mức NVL trên 1 đơn vị thành phẩm.</summary>
+    public const int NormScale = 4;
+
     /// <summary>Làm tròn số lượng về độ chính xác lưu trữ (half-up).</summary>
     public static decimal RoundQuantity(decimal value) =>
         Math.Round(value, QuantityScale, MidpointRounding.AwayFromZero);
+
+    /// <summary>Làm tròn định mức NVL trên 1 đơn vị thành phẩm (half-up 4 chữ số thập phân).</summary>
+    public static decimal RoundNorm(decimal value) =>
+        Math.Round(value, NormScale, MidpointRounding.AwayFromZero);
 
     /// <summary>
     /// BR-31: Nhu cầu NVL = SL kế hoạch × Định mức trên 1 đơn vị × (1 + Hao hụt% / 100).
@@ -27,6 +34,16 @@ public static class ProductionPolicy
         if (plannedQuantity <= 0 || normPerUnit <= 0) return 0;
         var rate = wastageRatePercent < 0 ? 0 : wastageRatePercent;
         return RoundQuantity(plannedQuantity * normPerUnit * (1 + rate / 100m));
+    }
+
+    /// <summary>
+    /// BR-31 (chiều ngược): Tính định mức trên 1 đơn vị từ Tổng nhu cầu NVL = RequiredQty ÷ (PlannedQty × (1 + Hao hụt% / 100)).
+    /// </summary>
+    public static decimal CalculateNormFromRequirement(decimal plannedQuantity, decimal requiredQuantity, decimal wastageRatePercent)
+    {
+        if (plannedQuantity <= 0 || requiredQuantity <= 0) return 0;
+        var rate = wastageRatePercent < 0 ? 0 : wastageRatePercent;
+        return RoundNorm(requiredQuantity / (plannedQuantity * (1 + rate / 100m)));
     }
 
     /// <summary>BR-32: Số còn thiếu = Nhu cầu − Đã xuất, tối thiểu 0.</summary>
