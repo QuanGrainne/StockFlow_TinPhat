@@ -990,6 +990,9 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
             entity.Property(e => e.ApprovalType)
                 .HasMaxLength(20)
                 .HasColumnName("approval_type");
+            entity.Property(e => e.ApprovedLimit)
+                .HasPrecision(18, 2)
+                .HasColumnName("approved_limit");
             entity.HasIndex(e => e.RequestCode, "uq_trx_credit_limit_requests_request_code").IsUnique();
 
             entity.HasOne(d => d.ApprovedByNavigation).WithMany(p => p.TrxCreditLimitRequestApprovedByNavigations)

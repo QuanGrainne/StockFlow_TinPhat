@@ -24,6 +24,10 @@ public class ApproveCreditRequestCommandValidator : AbstractValidator<ApproveCre
         RuleFor(x => x.Request.ApprovalType)
             .Must(CreditApprovalType.IsValid).WithMessage(CreditRequestMessages.InvalidApprovalType);
 
+        RuleFor(x => x.Request.ApprovedLimit)
+            .GreaterThan(0).When(x => x.Request.ApprovedLimit.HasValue)
+            .WithMessage("Mức duyệt phải lớn hơn 0.");
+
         RuleFor(x => x.Request.Notes)
             .MaximumLength(500).WithMessage("Ghi chú tối đa 500 ký tự.");
     }
@@ -57,18 +61,25 @@ public class ApproveCreditRequestCommandHandler : IRequestHandler<ApproveCreditR
         if (!entity.CanApprove())
             return Result<CreditRequestActionResultDto>.Failure(CreditRequestMessages.AlreadyProcessed);
 
+        // Kế toán trưởng quyết định con số (sửa được); bỏ trống = theo số Sales đề xuất
+        decimal approvedLimit = command.Request.ApprovedLimit ?? entity.RequestedLimit ?? 0;
+        decimal partnerLimit = entity.Partner.CreditLimit ?? 0;
+
         if (approvalType == CreditApprovalType.NewLimit)
         {
             // E62.1: hạn mức mới không được thấp hơn hạn mức hiện tại của khách
-            decimal newLimit = entity.RequestedLimit ?? 0;
-            decimal partnerLimit = entity.Partner.CreditLimit ?? 0;
-            if (newLimit < partnerLimit)
+            if (approvedLimit < partnerLimit)
                 return Result<CreditRequestActionResultDto>.Failure(CreditRequestMessages.NewLimitBelowCurrent(partnerLimit));
 
-            entity.Partner.CreditLimit = newLimit;
+            entity.Partner.CreditLimit = approvedLimit;
+        }
+        else if (approvedLimit <= partnerLimit)
+        {
+            // Ngoại lệ một lần: mức dư nợ tối đa phải vượt hạn mức hiện tại, nếu không thì không cần ngoại lệ
+            return Result<CreditRequestActionResultDto>.Failure(CreditRequestMessages.OneTimeCeilingTooLow(partnerLimit));
         }
 
-        entity.MarkApproved(approvalType);
+        entity.MarkApproved(approvalType, approvedLimit);
         entity.ApprovedBy = currentUserId;
         entity.ApprovalDate = VietnamTime.Now;
         entity.ApprovalNotes = string.IsNullOrWhiteSpace(command.Request.Notes) ? null : command.Request.Notes.Trim();

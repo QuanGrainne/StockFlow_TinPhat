@@ -19,8 +19,10 @@ export interface CreditRequest {
   currentCreditLimit: number;
   /** Hạn mức của khách lúc gửi yêu cầu */
   limitAtRequest: number | null;
-  /** Hạn mức đề xuất; với ngoại lệ một lần là mức dư nợ tối đa sau hóa đơn */
+  /** Số Sales đề xuất (dư nợ tối đa cần có sau hóa đơn) */
   requestedLimit: number | null;
+  /** Số Kế toán trưởng duyệt: ONE_TIME = dư nợ tối đa sau hóa đơn; NEW_LIMIT = hạn mức mới */
+  approvedLimit: number | null;
   reason: string | null;
   status: CreditRequestStatus;
   approvalType: CreditApprovalType | null;
@@ -59,6 +61,8 @@ export interface CreateCreditRequestPayload {
 
 export interface ApproveCreditRequestPayload {
   approvalType: CreditApprovalType;
+  /** Mức Kế toán trưởng duyệt (bỏ trống = theo đề xuất của Sales) */
+  approvedLimit?: number;
   notes?: string;
 }
 

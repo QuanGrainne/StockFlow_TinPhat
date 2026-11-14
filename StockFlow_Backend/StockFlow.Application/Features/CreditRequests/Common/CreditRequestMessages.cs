@@ -26,6 +26,9 @@ public static class CreditRequestMessages
     public static string NewLimitBelowCurrent(decimal current) =>
         $"Hạn mức mới thấp hơn hạn mức hiện tại của khách hàng ({current:N0} đ), không thể duyệt nâng hạn mức (E62.1).";
 
+    public static string OneTimeCeilingTooLow(decimal current) =>
+        $"Mức dư nợ tối đa duyệt cho ngoại lệ phải lớn hơn hạn mức hiện tại của khách hàng ({current:N0} đ).";
+
     // Kiểm tra khi gửi yêu cầu (UC-27) – SRS không có mã MSG riêng
     public const string ReasonRequired = "Vui lòng nhập lý do gửi yêu cầu duyệt tín dụng.";
     public const string NotOverLimit =

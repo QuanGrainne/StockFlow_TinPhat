@@ -134,7 +134,7 @@ export function CreditRequestDialog({ customer, expectedNewDebt, blockMessage, o
             />
           </div>
           <div>
-            <div className="mb-1 font-semibold">Hạn mức đề xuất (không bắt buộc)</div>
+            <div className="mb-1 font-semibold">Hạn mức đề xuất (không bắt buộc, Kế toán trưởng quyết định mức duyệt)</div>
             <input
               inputMode="numeric"
               value={requestedLimit ? requestedLimit.toLocaleString('vi-VN') : ''}

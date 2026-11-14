@@ -18,6 +18,7 @@ public static class CreditRequestProjection
         CurrentCreditLimit = r.Partner.CreditLimit ?? 0,
         LimitAtRequest = r.CurrentLimit,
         RequestedLimit = r.RequestedLimit,
+        ApprovedLimit = r.ApprovedLimit,
         Reason = r.Reason,
         Status = r.Status,
         ApprovalType = r.ApprovalType,

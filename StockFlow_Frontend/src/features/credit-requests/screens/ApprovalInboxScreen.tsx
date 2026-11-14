@@ -107,6 +107,12 @@ export default function ApprovalInboxScreen() {
         align: 'right',
         render: (v: number | null) => <span className="font-mono font-semibold">{formatVnd(v)}</span>,
       },
+      {
+        title: 'Mức duyệt',
+        dataIndex: 'approvedLimit',
+        align: 'right',
+        render: (v: number | null) => <span className="font-mono">{v == null ? '—' : formatVnd(v)}</span>,
+      },
       { title: 'Người gửi', dataIndex: 'requestedByName', render: (v: string | null) => v ?? '—' },
       {
         title: 'Thời gian gửi',

@@ -87,7 +87,7 @@ export function MyCreditRequestsDialog({ partnerId, customerName, selectedId, on
                 <tr>
                   <th className="py-2 px-3">Mã yêu cầu</th>
                   <th className="py-2 px-3">Thời gian gửi</th>
-                  <th className="py-2 px-3 text-right">Hạn mức đề xuất</th>
+                  <th className="py-2 px-3 text-right">Đề xuất / Duyệt</th>
                   <th className="py-2 px-3">Trạng thái</th>
                   <th className="py-2 px-3">Kết quả xử lý</th>
                   <th className="py-2 px-3 w-28" />
@@ -125,7 +125,14 @@ export function MyCreditRequestsDialog({ partnerId, customerName, selectedId, on
                           {code}
                         </td>
                         <td className="py-2.5 px-3 whitespace-nowrap">{formatDateTimeVN(r.requestDate)}</td>
-                        <td className="py-2.5 px-3 text-right font-mono">{fmt(r.requestedLimit)}</td>
+                        <td className="py-2.5 px-3 text-right font-mono">
+                          {fmt(r.requestedLimit)}
+                          {r.approvedLimit != null && (
+                            <div className="font-semibold text-[#0071BA]" title="Mức Kế toán trưởng duyệt">
+                              {fmt(r.approvedLimit)}
+                            </div>
+                          )}
+                        </td>
                         <td className="py-2.5 px-3">
                           <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold border whitespace-nowrap ${STATUS_CLS[st.color] ?? ''}`}>
                             {st.label}

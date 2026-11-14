@@ -25,17 +25,22 @@ public partial class TrxCreditLimitRequest
     public bool CanReject() => IsPending();
 
     // Mark*: handler đã kiểm tra Can*() trước, ở đây chỉ gán giá trị.
-    public void MarkApproved(string approvalType)
+    public void MarkApproved(string approvalType, decimal approvedLimit)
     {
         Status = CreditRequestStatus.Approved;
         ApprovalType = approvalType;
+        ApprovedLimit = approvedLimit;
     }
 
     public void MarkRejected()
     {
         Status = CreditRequestStatus.Rejected;
         ApprovalType = null;
+        ApprovedLimit = null;
     }
+
+    /// <summary>Mức dư nợ tối đa POS được phép khi dùng ngoại lệ một lần (số Manager duyệt; dữ liệu cũ dùng số đề xuất).</summary>
+    public decimal OneTimeCeiling() => ApprovedLimit ?? RequestedLimit ?? 0;
 
     /// <summary>Đánh dấu ngoại lệ một lần đã dùng cho hóa đơn.</summary>
     public void MarkUsed(int salesOrderId) => SalesOrderId = salesOrderId;

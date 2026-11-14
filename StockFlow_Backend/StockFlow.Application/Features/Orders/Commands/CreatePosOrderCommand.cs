@@ -445,7 +445,7 @@ public class CreatePosOrderCommandHandler : IRequestHandler<CreatePosOrderComman
                 if (creditRequest.IsUsed())
                     return Result<PosOrderResultDto>.Failure(CreditRequestMessages.UseAlreadyUsed(code));
 
-                decimal approvedCeiling = creditRequest.RequestedLimit ?? 0;
+                decimal approvedCeiling = creditRequest.OneTimeCeiling();
                 if (currentDebt + outstanding > approvedCeiling)
                     return Result<PosOrderResultDto>.Failure(
                         CreditRequestMessages.UseOverApproved(code, approvedCeiling, currentDebt + outstanding));

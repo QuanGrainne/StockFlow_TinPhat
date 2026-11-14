@@ -25,8 +25,8 @@ interface Props {
 }
 
 const DECISIONS: { value: Decision; label: string; hint: string }[] = [
-  { value: 'ONE_TIME', label: 'Duyệt ngoại lệ một lần', hint: 'Cho đúng một hóa đơn ghi nợ, không đổi hạn mức của khách.' },
-  { value: 'NEW_LIMIT', label: 'Duyệt nâng hạn mức', hint: 'Hạn mức của khách được cập nhật bằng hạn mức đề xuất.' },
+  { value: 'ONE_TIME', label: 'Duyệt ngoại lệ một lần', hint: 'Cho đúng một hóa đơn ghi nợ tới mức dư nợ bạn nhập; không đổi hạn mức của khách.' },
+  { value: 'NEW_LIMIT', label: 'Duyệt nâng hạn mức', hint: 'Hạn mức của khách được cập nhật bằng hạn mức mới bạn nhập.' },
   { value: 'REJECT', label: 'Từ chối', hint: 'Bắt buộc nhập lý do từ chối.' },
 ];
 
@@ -43,6 +43,8 @@ export default function CreditRequestDetailModal({ requestId, onClose, onChanged
   const [detail, setDetail] = useState<{ id: number; data: CreditRequest | null }>({ id: 0, data: null });
   const [decision, setDecision] = useState<Decision>('ONE_TIME');
   const [notes, setNotes] = useState('');
+  /** Mức Kế toán trưởng duyệt (mặc định = số Sales đề xuất, sửa được) */
+  const [approvedLimit, setApprovedLimit] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
 
   const open = requestId != null;
@@ -59,6 +61,7 @@ export default function CreditRequestDetailModal({ requestId, onClose, onChanged
         setDetail({ id: requestId, data: d });
         setDecision('ONE_TIME');
         setNotes('');
+        setApprovedLimit(d.requestedLimit);
       })
       .catch((err: unknown) => {
         if (!alive) return;
@@ -80,9 +83,18 @@ export default function CreditRequestDetailModal({ requestId, onClose, onChanged
   if (!open || typeof document === 'undefined') return null;
 
   const pending = req?.status === 'PENDING';
-  // E62.1: hạn mức mới không thấp hơn hạn mức hiện tại
-  const newLimitBlocked = !!req && (req.requestedLimit ?? 0) < req.currentCreditLimit;
   const rejectMissingReason = decision === 'REJECT' && !notes.trim();
+  // E62.1: hạn mức mới không thấp hơn hạn mức hiện tại; ngoại lệ một lần phải vượt hạn mức hiện tại
+  const limitError =
+    !req || decision === 'REJECT'
+      ? null
+      : !approvedLimit
+        ? 'Vui lòng nhập mức duyệt.'
+        : decision === 'NEW_LIMIT' && approvedLimit < req.currentCreditLimit
+          ? `Hạn mức mới thấp hơn hạn mức hiện tại của khách hàng (${formatVnd(req.currentCreditLimit)} đ) (E62.1).`
+          : decision === 'ONE_TIME' && approvedLimit <= req.currentCreditLimit
+            ? `Mức dư nợ tối đa phải lớn hơn hạn mức hiện tại (${formatVnd(req.currentCreditLimit)} đ).`
+            : null;
 
   const submit = async () => {
     if (!req) return;
@@ -98,6 +110,7 @@ export default function CreditRequestDetailModal({ requestId, onClose, onChanged
           ? await creditRequestService.reject(req.requestId, notes.trim())
           : await creditRequestService.approve(req.requestId, {
               approvalType: decision,
+              approvedLimit: approvedLimit ?? undefined,
               notes: notes.trim() || undefined,
             });
       message.success(res.message);
@@ -145,7 +158,9 @@ export default function CreditRequestDetailModal({ requestId, onClose, onChanged
           </div>
         ) : (
           <>
-            <div className="px-5 py-4 space-y-4">
+            <div className="px-5 py-4 grid grid-cols-1 gap-5">
+            {/* Cột trái: yêu cầu + quyết định */}
+            <div className="space-y-4">
               <div className="rounded-[8px] border border-slate-200 px-4 py-2">
                 <InfoRow label="Khách hàng" strong>
                   {req.partnerCode} – {req.partnerName}
@@ -153,10 +168,10 @@ export default function CreditRequestDetailModal({ requestId, onClose, onChanged
                 <InfoRow label="Dư nợ hiện tại">{formatVnd(req.currentDebt)} đ</InfoRow>
                 <InfoRow label="Hạn mức hiện tại">{formatVnd(req.currentCreditLimit)} đ</InfoRow>
                 <InfoRow label="Hạn mức lúc gửi">{formatVnd(req.limitAtRequest)} đ</InfoRow>
-                <InfoRow label="Hạn mức đề xuất" strong>
+                <InfoRow label="Sales đề xuất" strong>
                   {formatVnd(req.requestedLimit)} đ
                 </InfoRow>
-                <InfoRow label="Vượt hạn mức hiện tại">
+                <InfoRow label="Đề xuất vượt hạn mức hiện tại">
                   <span className="text-[#fb2c36]">{formatVnd(exceedOverLimit(req))} đ</span>
                 </InfoRow>
                 <InfoRow label="Người gửi">{req.requestedByName ?? '—'}</InfoRow>
@@ -167,6 +182,11 @@ export default function CreditRequestDetailModal({ requestId, onClose, onChanged
               {!pending && (
                 <div className="rounded-[8px] border border-slate-200 px-4 py-2">
                   {req.approvalType && <InfoRow label="Loại duyệt">{APPROVAL_TYPE_LABEL[req.approvalType]}</InfoRow>}
+                  {req.approvedLimit != null && (
+                    <InfoRow label={req.approvalType === 'NEW_LIMIT' ? 'Hạn mức mới được duyệt' : 'Dư nợ tối đa được duyệt'} strong>
+                      {formatVnd(req.approvedLimit)} đ
+                    </InfoRow>
+                  )}
                   <InfoRow label="Người xử lý">{req.approvedByName ?? '—'}</InfoRow>
                   <InfoRow label="Thời gian xử lý">{formatDateTimeVN(req.approvalDate)}</InfoRow>
                   <InfoRow label={req.status === 'REJECTED' ? 'Lý do từ chối' : 'Ghi chú'}>{req.approvalNotes ?? '—'}</InfoRow>
@@ -179,33 +199,49 @@ export default function CreditRequestDetailModal({ requestId, onClose, onChanged
               {pending && (
                 <div className="space-y-2">
                   <div className="font-semibold">Quyết định</div>
-                  {DECISIONS.map((d) => {
-                    const disabled = d.value === 'NEW_LIMIT' && newLimitBlocked;
-                    return (
-                      <label
-                        key={d.value}
-                        className={`flex items-start gap-2 rounded-[8px] border px-3 py-2 ${
-                          decision === d.value ? 'border-[#0071BA] bg-[#e8f2ff]' : 'border-slate-200'
-                        } ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
-                      >
-                        <input
-                          type="radio"
-                          name="credit-decision"
-                          value={d.value}
-                          checked={decision === d.value}
-                          disabled={disabled || saving}
-                          onChange={() => setDecision(d.value)}
-                          className="mt-0.5 accent-[#0071BA]"
-                        />
-                        <span>
-                          <span className="font-semibold">{d.label}</span>
-                          <span className="block text-[12px] text-[#677484]">
-                            {disabled ? 'Hạn mức đề xuất thấp hơn hạn mức hiện tại của khách (E62.1).' : d.hint}
-                          </span>
-                        </span>
-                      </label>
-                    );
-                  })}
+                  {DECISIONS.map((d) => (
+                    <label
+                      key={d.value}
+                      className={`flex items-start gap-2 rounded-[8px] border px-3 py-2 cursor-pointer ${
+                        decision === d.value ? 'border-[#0071BA] bg-[#e8f2ff]' : 'border-slate-200'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="credit-decision"
+                        value={d.value}
+                        checked={decision === d.value}
+                        disabled={saving}
+                        onChange={() => setDecision(d.value)}
+                        className="mt-0.5 accent-[#0071BA]"
+                      />
+                      <span>
+                        <span className="font-semibold">{d.label}</span>
+                        <span className="block text-[12px] text-[#677484]">{d.hint}</span>
+                      </span>
+                    </label>
+                  ))}
+                  {decision !== 'REJECT' && (
+                    <div>
+                      {/* Kế toán trưởng quyết định con số (mặc định = số Sales đề xuất) – A62.2 */}
+                      <div className="mb-1 font-semibold">
+                        {decision === 'NEW_LIMIT' ? 'Hạn mức mới' : 'Dư nợ tối đa cho hóa đơn này'}{' '}
+                        <span className="text-[#fb2c36]">*</span>
+                      </div>
+                      <input
+                        inputMode="numeric"
+                        value={approvedLimit ? approvedLimit.toLocaleString('vi-VN') : ''}
+                        disabled={saving}
+                        onChange={(e) => {
+                          const v = Number(e.target.value.replace(/\D/g, '')) || 0;
+                          setApprovedLimit(v > 0 ? v : null);
+                        }}
+                        className="w-full h-9 rounded-[8px] border border-slate-300 px-3 text-right font-mono focus:outline-none focus:border-[#0071BA]"
+                      />
+                      <div className="mt-1 text-[12px] text-[#677484]">Sales đề xuất: {formatVnd(req.requestedLimit)} đ</div>
+                      {limitError && <div className="mt-1 text-[12px] text-[#fb2c36]">{limitError}</div>}
+                    </div>
+                  )}
                   <div>
                     <div className="mb-1 font-semibold">
                       {decision === 'REJECT' ? (
@@ -229,6 +265,7 @@ export default function CreditRequestDetailModal({ requestId, onClose, onChanged
                 </div>
               )}
             </div>
+            </div>
 
             <div className="flex justify-end gap-2 px-5 py-3 border-t border-slate-200">
               <Button onClick={onClose} disabled={saving}>
@@ -239,7 +276,7 @@ export default function CreditRequestDetailModal({ requestId, onClose, onChanged
                   type="primary"
                   danger={decision === 'REJECT'}
                   loading={saving}
-                  disabled={rejectMissingReason}
+                  disabled={rejectMissingReason || !!limitError}
                   onClick={() => void submit()}
                 >
                   {decision === 'REJECT' ? 'Từ chối' : 'Duyệt'}

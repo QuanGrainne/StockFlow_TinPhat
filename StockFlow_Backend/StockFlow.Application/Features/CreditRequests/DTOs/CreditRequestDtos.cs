@@ -18,6 +18,13 @@ public class CreateCreditRequestRequest
 public class ApproveCreditRequestRequest
 {
     public string ApprovalType { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Mức Kế toán trưởng duyệt (sửa được; bỏ trống = theo số Sales đề xuất).
+    /// ONE_TIME: dư nợ tối đa sau hóa đơn; NEW_LIMIT: hạn mức mới (A62.2: Manager nhập hạn mức mới).
+    /// </summary>
+    public decimal? ApprovedLimit { get; set; }
+
     public string? Notes { get; set; }
 }
 
@@ -44,8 +51,11 @@ public class CreditRequestDto
     /// <summary>Hạn mức của khách tại thời điểm gửi yêu cầu (cột current_limit).</summary>
     public decimal? LimitAtRequest { get; set; }
 
-    /// <summary>Hạn mức đề xuất; với ngoại lệ một lần là mức dư nợ tối đa sau hóa đơn.</summary>
+    /// <summary>Số Sales đề xuất (dư nợ tối đa cần có sau hóa đơn).</summary>
     public decimal? RequestedLimit { get; set; }
+
+    /// <summary>Số Kế toán trưởng duyệt (null khi chờ / từ chối).</summary>
+    public decimal? ApprovedLimit { get; set; }
 
     public string? Reason { get; set; }
     public string? Status { get; set; }

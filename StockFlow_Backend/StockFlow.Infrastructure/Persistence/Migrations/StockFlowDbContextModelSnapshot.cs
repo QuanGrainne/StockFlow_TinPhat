@@ -1643,6 +1643,11 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("approved_by");
 
+                    b.Property<decimal?>("ApprovedLimit")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("approved_limit");
+
                     b.Property<decimal?>("CurrentLimit")
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)")
