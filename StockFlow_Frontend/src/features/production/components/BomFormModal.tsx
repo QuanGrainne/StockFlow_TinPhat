@@ -157,7 +157,6 @@ export function BomFormModal({ source, asNewVersion, onClose, onDone }: BomFormM
               productType="FINISHED"
               onSelect={(p) => setProduct({ productId: p.productId, productCode: p.productCode, productName: p.productName })}
               excludeIds={lines.map((l) => l.materialId)}
-              autoFocus
             />
           )}
         </div>
