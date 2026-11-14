@@ -34,12 +34,12 @@ import { AddFromCategoryPopover } from '@/features/purchases';
 import { NumberInput } from '@/components/inputs/NumberInput';
 import { ProductThumb } from '@/components/ProductThumb';
 
-// Bố cục cột bảng hàng hóa (cùng kiểu màn Nhập hàng): Xóa | STT | Mã | Tên | ĐVT | Tồn kho | Tồn kho nhận | SL | Giá | Thành tiền
+// Bố cục cột bảng hàng hóa (cùng kiểu màn Nhập hàng): Xóa | STT | Ảnh | Mã | Tên | ĐVT | Tồn kho | Tồn kho nhận | SL | Giá | Thành tiền
 /** Tiền tố mã khi sao chép phiếu (giống phiếu nhập / kiểm kho) — khi lưu hệ thống tự sinh mã mới */
 const COPY_CODE_PREFIX = 'Copy_';
 
-const TRANSFER_GRID ='36px 44px 110px minmax(170px,1fr) 70px 90px 110px 90px 110px 110px';
-const TRANSFER_TABLE_MIN_WIDTH = 36 + 44 + 110 + 170 + 70 + 90 + 110 + 90 + 110 + 110 + 24;
+const TRANSFER_GRID ='36px 44px 48px 110px minmax(170px,1fr) 70px 90px 110px 90px 110px 110px';
+const TRANSFER_TABLE_MIN_WIDTH = 36 + 44 + 48 + 110 + 170 + 70 + 90 + 110 + 90 + 110 + 110 + 24;
 
 interface CreateItemRow {
   productId: number;
@@ -52,6 +52,8 @@ interface CreateItemRow {
   transferPrice: number;
   lineTotal: number;
   notes?: string;
+  /** Ảnh hàng hóa (dòng nạp từ phiếu cũ được bổ sung khi lấy lại tồn kho) */
+  imageUrl?: string | null;
 }
 
 export default function CreateTransferScreen() {
@@ -257,6 +259,7 @@ export default function CreateTransferScreen() {
               transferPrice: price,
               lineTotal: it.transferQuantity * price,
               notes: it.notes,
+              imageUrl: f ? f.imageUrl ?? null : undefined,
             };
           })
         );
@@ -352,6 +355,7 @@ export default function CreateTransferScreen() {
               ...it,
               sourceStock: match ? match.sourceStock : it.sourceStock,
               destStock: match ? match.destStock : 0,
+              imageUrl: match ? match.imageUrl ?? null : it.imageUrl,
             };
           })
         );
@@ -395,6 +399,7 @@ export default function CreateTransferScreen() {
         transferQuantity: 1,
         transferPrice: initialPrice,
         lineTotal: initialPrice * 1,
+        imageUrl: product.imageUrl ?? null,
       };
       return [newRow, ...prev];
     });
@@ -440,6 +445,7 @@ export default function CreateTransferScreen() {
         transferQuantity: 1,
         transferPrice: price,
         lineTotal: price,
+        imageUrl: p.imageUrl ?? null,
       };
     });
     setItems((prev) => [...newRows, ...prev]);
@@ -972,6 +978,7 @@ export default function CreateTransferScreen() {
               >
                 <div />
                 <div className="text-center">STT</div>
+                <div />
                 <div className="pl-2">Mã hàng</div>
                 <div className="pl-2">Tên hàng</div>
                 <div className="pl-2">ĐVT</div>
@@ -1036,6 +1043,15 @@ export default function CreateTransferScreen() {
 
                       {/* STT */}
                       <div className="text-center text-[#15171a] pt-1.5">{index + 1}</div>
+
+                      {/* Ảnh hàng hóa */}
+                      <div className="pt-0.5">
+                        <ProductThumb
+                          src={row.imageUrl}
+                          alt={row.productName}
+                          size={32}
+                        />
+                      </div>
 
                       {/* Mã hàng */}
                       <div className="pl-2 pt-1.5 text-[#0070f4] truncate" title={row.productCode}>
