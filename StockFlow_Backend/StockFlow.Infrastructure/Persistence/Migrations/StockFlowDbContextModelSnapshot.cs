@@ -2107,6 +2107,10 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("DisposalId"));
 
+                    b.Property<int?>("CreatedBy")
+                        .HasColumnType("integer")
+                        .HasColumnName("created_by");
+
                     b.Property<string>("DisposalCode")
                         .HasMaxLength(30)
                         .HasColumnType("character varying(30)")
@@ -2136,6 +2140,8 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
 
                     b.HasKey("DisposalId")
                         .HasName("trx_inventory_disposals_pkey");
+
+                    b.HasIndex("CreatedBy");
 
                     b.HasIndex("ProcessedBy");
 
@@ -3923,6 +3929,11 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("StockFlow.Domain.Entities.TrxInventoryDisposal", b =>
                 {
+                    b.HasOne("StockFlow.Domain.Entities.SecUser", "CreatedByNavigation")
+                        .WithMany()
+                        .HasForeignKey("CreatedBy")
+                        .HasConstraintName("fk_trx_inventory_disposals_created_by");
+
                     b.HasOne("StockFlow.Domain.Entities.SecUser", "ProcessedByNavigation")
                         .WithMany("TrxInventoryDisposals")
                         .HasForeignKey("ProcessedBy")
@@ -3934,6 +3945,8 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                         .HasForeignKey("WarehouseId")
                         .IsRequired()
                         .HasConstraintName("fk_trx_inventory_disposals_warehouse_id");
+
+                    b.Navigation("CreatedByNavigation");
 
                     b.Navigation("ProcessedByNavigation");
 

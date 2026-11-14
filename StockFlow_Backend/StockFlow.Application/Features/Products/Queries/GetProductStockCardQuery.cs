@@ -50,6 +50,7 @@ public class GetProductStockCardQueryHandler : IRequestHandler<GetProductStockCa
         ["PRODUCTION_ISSUE"] = "Xuất NVL sản xuất",
         ["PRODUCTION_RECEIPT"] = "Nhập thành phẩm",
         ["DISPOSAL"] = "Xuất hủy",
+        ["DISPOSAL_CANCEL"] = "Hủy phiếu xuất hủy",
     };
 
     public async Task<Result<List<StockCardEntryDto>>> Handle(GetProductStockCardQuery request, CancellationToken ct)
