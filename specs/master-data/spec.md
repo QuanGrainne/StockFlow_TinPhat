@@ -61,7 +61,7 @@ Mã BR giữ nguyên theo Report 3 để truy vết.
 | FR-MD-03 | Khách hàng / nhà cung cấp: mã, tên, loại, liên hệ, kỳ hạn thanh toán | Một phần | Không có kỳ hạn thanh toán; có thêm hồ sơ khách (giới tính, ngày sinh…) |
 | FR-MD-04 | Đặt hạn mức tín dụng, hiện dư nợ, ghi audit | Một phần | Lưu được qua sửa khách hàng; không kiểm tra số âm khi sửa; không audit |
 | FR-MD-05 | Kho và vị trí lưu trữ | Một phần | Có CRUD kho (chỉ Admin); không có vị trí |
-| FR-MD-06 | BOM: phiên bản, vật tư, định mức, hao hụt; kích hoạt phiên bản | Chưa có | Màn BOM dùng dữ liệu giả |
+| FR-MD-06 | BOM: phiên bản, vật tư, định mức (tối đa 4 số lẻ), hao hụt; lọc đúng loại hàng (FINISHED / RAW_MATERIAL + bật chọn bán thành phẩm); kích hoạt & tạo phiên bản mới | Có | Đã có CRUD BOM (`/api/production/boms`), lọc theo loại mặt hàng, định mức 4 số lẻ, tạo phiên bản mới |
 | FR-MD-07 | Ngừng hoạt động thay cho xóa khi dữ liệu đã dùng | Có | Hàng hóa, khách, nhà cung cấp, kho đều có kiểm tra |
 | FR-MD-08 | (Existing) Sửa trực tiếp dư nợ khách và công nợ nhà cung cấp qua API cập nhật | Ngoài tài liệu | Trái BR-15, BR-25, BR-46 |
 

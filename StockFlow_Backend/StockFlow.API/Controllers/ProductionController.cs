@@ -201,9 +201,9 @@ public class ProductionController : ControllerBase
     [RequirePermission("PROD_READ")]
     [RequireFeature("feat-bom", "feat-prod-plan")]
     public async Task<IActionResult> SearchProducts(
-        [FromQuery] string? search, [FromQuery] int? warehouseId, [FromQuery] bool activeBomOnly = false, [FromQuery] int limit = 30)
+        [FromQuery] string? search, [FromQuery] int? warehouseId, [FromQuery] bool activeBomOnly = false, [FromQuery] int limit = 30, [FromQuery] string? productType = null)
     {
-        var result = await _mediator.Send(new SearchProductionProductsQuery(search, warehouseId, activeBomOnly, limit));
+        var result = await _mediator.Send(new SearchProductionProductsQuery(search, warehouseId, activeBomOnly, limit, productType));
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { message = result.Error });
     }
 

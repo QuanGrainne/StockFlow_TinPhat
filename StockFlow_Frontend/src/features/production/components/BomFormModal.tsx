@@ -145,7 +145,7 @@ export function BomFormModal({ source, asNewVersion, onClose, onDone }: BomFormM
             <div className="flex items-center gap-2 h-8 px-2.5 border border-slate-300 rounded-[6px] bg-slate-50">
               <span className="font-mono font-semibold text-[#0070f4]">{product.productCode}</span>
               <span className="truncate">{product.productName}</span>
-              {!source && (
+              {!isEdit && (
                 <button type="button" onClick={() => setProduct(null)} className="ml-auto text-xs text-[#677484] hover:text-[#fb2c36] cursor-pointer">
                   Đổi
                 </button>
@@ -154,6 +154,7 @@ export function BomFormModal({ source, asNewVersion, onClose, onDone }: BomFormM
           ) : (
             <ProductSearchInput
               placeholder="Tìm thành phẩm theo mã hoặc tên"
+              productType="FINISHED"
               onSelect={(p) => setProduct({ productId: p.productId, productCode: p.productCode, productName: p.productName })}
               excludeIds={lines.map((l) => l.materialId)}
               autoFocus
@@ -181,6 +182,7 @@ export function BomFormModal({ source, asNewVersion, onClose, onDone }: BomFormM
         <div className="w-80">
           <ProductSearchInput
             placeholder="Thêm nguyên vật liệu (mã hoặc tên)"
+            productType="RAW_MATERIAL"
             onSelect={addMaterial}
             excludeIds={[...(product ? [product.productId] : []), ...lines.map((l) => l.materialId)]}
           />
@@ -219,7 +221,7 @@ export function BomFormModal({ source, asNewVersion, onClose, onDone }: BomFormM
                       inputMode="decimal"
                       value={l.quantity}
                       onChange={(e) => setLines((prev) => prev.map((x) => (x.materialId === l.materialId ? { ...x, quantity: e.target.value } : x)))}
-                      placeholder="0"
+                      placeholder="0,0000"
                       className={cellInput(l.quantity.trim() !== '' && !qtyOk)}
                     />
                   </td>

@@ -13,6 +13,8 @@ interface ProductSearchInputProps {
   onSelect: (product: ProductionProductLookup) => void;
   /** Chỉ thành phẩm có BOM đang áp dụng (lập lệnh, BR-30) */
   activeBomOnly?: boolean;
+  /** Lọc theo loại mặt hàng: FINISHED (Thành phẩm) hoặc RAW_MATERIAL (Nguyên vật liệu) */
+  productType?: 'FINISHED' | 'RAW_MATERIAL';
   /** Kho để hiện tồn (tuỳ chọn) */
   warehouseId?: number | null;
   /** Mặt hàng không được chọn (đã có trên form) */
@@ -25,6 +27,7 @@ export function ProductSearchInput({
   placeholder,
   onSelect,
   activeBomOnly,
+  productType,
   warehouseId,
   excludeIds = [],
   autoFocus,
@@ -32,10 +35,17 @@ export function ProductSearchInput({
 }: ProductSearchInputProps) {
   const [text, setText] = useState('');
   const [open, setOpen] = useState(false);
+  const [includeAllTypes, setIncludeAllTypes] = useState(false);
   const [result, setResult] = useState<{ key: string; items: ProductionProductLookup[] }>({ key: '', items: [] });
   const boxRef = useRef<HTMLDivElement>(null);
 
-  const requestKey = JSON.stringify({ text: text.trim(), activeBomOnly: !!activeBomOnly, warehouseId: warehouseId ?? null });
+  const effectiveType = includeAllTypes ? undefined : productType;
+  const requestKey = JSON.stringify({
+    text: text.trim(),
+    activeBomOnly: !!activeBomOnly,
+    productType: effectiveType ?? null,
+    warehouseId: warehouseId ?? null,
+  });
   const loading = open && result.key !== requestKey;
 
   useEffect(() => {
@@ -43,7 +53,7 @@ export function ProductSearchInput({
     let stale = false;
     const timer = setTimeout(() => {
       productionService
-        .searchProducts({ search: text, activeBomOnly, warehouseId, limit: 20 })
+        .searchProducts({ search: text, activeBomOnly, productType: effectiveType, warehouseId, limit: 20 })
         .then((items) => {
           if (!stale) setResult({ key: requestKey, items });
         })
@@ -87,6 +97,20 @@ export function ProductSearchInput({
       />
       {open && !disabled && (
         <div className="absolute left-0 right-0 top-full mt-1.5 bg-white border border-slate-200 rounded-[8px] shadow-[rgba(169,180,203,0.32)_0px_8px_20px_0px] z-50 max-h-72 overflow-y-auto divide-y divide-slate-100">
+          {productType === 'RAW_MATERIAL' && (
+            <label className="px-2.5 py-1.5 bg-slate-50 flex items-center justify-between text-[11px] text-[#677484] cursor-pointer select-none">
+              <span>Mặc định lọc Nguyên vật liệu</span>
+              <span className="inline-flex items-center gap-1.5 font-medium text-slate-700">
+                <input
+                  type="checkbox"
+                  checked={includeAllTypes}
+                  onChange={(e) => setIncludeAllTypes(e.target.checked)}
+                  className="accent-[#0070f4] cursor-pointer"
+                />
+                Hiện cả Thành phẩm / Bán TP
+              </span>
+            </label>
+          )}
           {loading ? (
             <div className="p-4 text-center text-[#677484] italic">Đang tìm hàng hóa...</div>
           ) : items.length === 0 ? (
@@ -109,6 +133,13 @@ export function ProductSearchInput({
                   <span className="font-bold text-[#0070f4] group-hover:underline shrink-0">{p.productCode}</span>
                   <span className="text-[12px] truncate">{p.productName}</span>
                   <span className="text-[10px] px-1.5 rounded-[4px] bg-[#f7f8f9] text-[#677484] shrink-0">{p.unitName}</span>
+                  <span
+                    className={`text-[10px] px-1.5 rounded-[4px] shrink-0 ${
+                      p.productType === 'RAW_MATERIAL' ? 'bg-amber-50 text-amber-700' : 'bg-blue-50 text-[#0070f4]'
+                    }`}
+                  >
+                    {p.productType === 'RAW_MATERIAL' ? 'NVL' : 'Thành phẩm'}
+                  </span>
                 </div>
                 {p.availableQty !== null ? (
                   <span className={`text-[11px] font-semibold shrink-0 ${p.availableQty > 0 ? 'text-[#00b63e]' : 'text-[#fb2c36]'}`}>

@@ -174,6 +174,7 @@ export const productionService = {
     search?: string;
     warehouseId?: number | null;
     activeBomOnly?: boolean;
+    productType?: string;
     limit?: number;
   }): Promise<ProductionProductLookup[]> {
     return asList(
@@ -182,6 +183,7 @@ export const productionService = {
           search: params.search?.trim(),
           warehouseId: params.warehouseId,
           activeBomOnly: params.activeBomOnly || undefined,
+          productType: params.productType || undefined,
           limit: params.limit,
         })}`
       )
