@@ -23,7 +23,6 @@ interface InlineFormulaPopoverProps {
 }
 
 export default function InlineFormulaPopover({
-  placement = 'below',
   isOpen,
   onClose,
   product,

@@ -170,7 +170,8 @@ public class CreateCustomerCommandHandler : IRequestHandler<CreateCustomerComman
             Phone = normalizedPhone,
             Email = normalizedEmail,
             Address = normalizedAddress,
-            CreditLimit = req.CreditLimit ?? 0,
+            // Hạn mức mặc định; không nhận giá trị từ form (chỉ đổi qua duyệt yêu cầu hạn mức, UC-64)
+            CreditLimit = CustomerCreditPolicy.DefaultCreditLimit,
             CurrentDebt = 0,
             CurrentPayable = 0,
             IsActive = isActive,

@@ -1175,6 +1175,10 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                         .HasColumnType("text")
                         .HasColumnName("scope_customer_group_codes");
 
+                    b.Property<string>("ScopeCustomerIds")
+                        .HasColumnType("text")
+                        .HasColumnName("scope_customer_ids");
+
                     b.Property<string>("ScopeCustomerType")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -1685,9 +1689,19 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(500)")
                         .HasColumnName("approval_notes");
 
+                    b.Property<string>("ApprovalType")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("approval_type");
+
                     b.Property<int?>("ApprovedBy")
                         .HasColumnType("integer")
                         .HasColumnName("approved_by");
+
+                    b.Property<decimal?>("ApprovedLimit")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("approved_limit");
 
                     b.Property<decimal?>("CurrentLimit")
                         .HasPrecision(18, 2)
@@ -1703,6 +1717,11 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(500)")
                         .HasColumnName("reason");
 
+                    b.Property<string>("RequestCode")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("request_code");
+
                     b.Property<DateTime?>("RequestDate")
                         .HasColumnType("timestamp without time zone")
                         .HasColumnName("request_date");
@@ -1717,10 +1736,12 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                         .HasColumnName("requested_limit");
 
                     b.Property<int?>("SalesOrderId")
+                        .IsConcurrencyToken()
                         .HasColumnType("integer")
                         .HasColumnName("sales_order_id");
 
                     b.Property<string>("Status")
+                        .IsConcurrencyToken()
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)")
                         .HasColumnName("status");
@@ -1735,6 +1756,9 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                     b.HasIndex("RequestedBy");
 
                     b.HasIndex("SalesOrderId");
+
+                    b.HasIndex(new[] { "RequestCode" }, "uq_trx_credit_limit_requests_request_code")
+                        .IsUnique();
 
                     b.ToTable("trx_credit_limit_requests", "stockflow");
                 });

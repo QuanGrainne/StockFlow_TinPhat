@@ -49,6 +49,7 @@ public class GetProductStockCardQueryHandler : IRequestHandler<GetProductStockCa
         ["ADJUSTMENT_OUT"] = "Điều chỉnh tồn kho",
         ["PRODUCTION_ISSUE"] = "Xuất NVL sản xuất",
         ["PRODUCTION_RECEIPT"] = "Nhập thành phẩm",
+        ["DISPOSAL"] = "Xuất hủy",
     };
 
     public async Task<Result<List<StockCardEntryDto>>> Handle(GetProductStockCardQuery request, CancellationToken ct)
@@ -151,6 +152,13 @@ public class GetProductStockCardQueryHandler : IRequestHandler<GetProductStockCa
             .Select(f => new { f.FgrId, f.FgrCode, OrderCode = f.ProductionOrder.ProductionOrderCode })
             .ToDictionaryAsync(f => f.FgrId, ct);
 
+        // Phiếu xuất hủy: mã phiếu XH...
+        var dispIds = IdsOf("DISPOSAL");
+        var disposals = await _context.TrxInventoryDisposals.AsNoTracking()
+            .Where(d => dispIds.Contains(d.DisposalId))
+            .Select(d => new { d.DisposalId, d.DisposalCode })
+            .ToDictionaryAsync(d => d.DisposalId, ct);
+
         // ── Tồn cuối: dòng mới đã lưu sẵn BalanceAfter; dòng cũ tính lùi từ tồn hiện tại của kho ──
         var running = await _context.TrxInventoryBalances.AsNoTracking()
             .Where(b => b.ProductId == request.ProductId && b.WarehouseId == request.WarehouseId)
@@ -229,6 +237,11 @@ public class GetProductStockCardQueryHandler : IRequestHandler<GetProductStockCa
                         code = fg.FgrCode ?? $"NTP{refId:D6}";
                         partner = fg.OrderCode;
                     }
+                    break;
+                case "DISPOSAL" when refId.HasValue:
+                    code = disposals.TryGetValue(refId.Value, out var dp) && dp.DisposalCode != null
+                        ? dp.DisposalCode
+                        : $"XH{refId:D6}";
                     break;
                 case "COST_UPDATE" when refId.HasValue:
                     code = $"CB{refId:D6}";

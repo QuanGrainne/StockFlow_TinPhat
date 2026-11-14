@@ -21,13 +21,17 @@ public record PriceBookDto(
     bool WarnUnlistedProducts,
     string ScopeBranchType,
     List<int>? ScopeWarehouseIds,
+    /// <summary>"ALL" = mọi khách; "SPECIFIC" = chỉ các khách trong ScopeCustomerIds</summary>
     string ScopeCustomerType,
-    List<string>? ScopeCustomerGroupCodes,
-    string ScopeUserType,
-    List<int>? ScopeUserIds,
+    List<int>? ScopeCustomerIds,
+    /// <summary>Mã, tên các khách được chọn (để hiển thị)</summary>
+    List<PriceBookCustomerRefDto> ScopeCustomers,
     int TotalItemsCount,
     DateTime? UpdatedAt
 );
+
+/// <summary>Khách hàng trong phạm vi bảng giá / gợi ý khi chọn khách.</summary>
+public record PriceBookCustomerRefDto(int PartnerId, string? PartnerCode, string? PartnerName, string? Phone);
 
 public record PriceBookMatrixItemDto(
     int ProductId,

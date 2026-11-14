@@ -90,7 +90,8 @@ public class TransfersController : ControllerBase
     [ProducesResponseType(typeof(List<ProductWithStockDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [RequirePermission("STOCK_READ")]
-    [RequireFeature("feat-transfers", "feat-stocktake")]
+    // Dùng chung cho màn Kiểm kho và Xuất hủy (tìm hàng kèm tồn kho + giá vốn theo kho)
+    [RequireFeature("feat-transfers", "feat-stocktake", "feat-disposal")]
     public async Task<IActionResult> GetProductsForTransfer(
         [FromQuery] int sourceWarehouseId,
         [FromQuery] int? destWarehouseId,

@@ -16,6 +16,7 @@ import {
   Package,
   PackageMinus,
   PackagePlus,
+  PackageX,
   Repeat,
   RotateCcw,
   ShieldCheck,
@@ -172,6 +173,16 @@ export const NAV_GROUPS: NavGroup[] = [
         // API /api/Stocktakes dùng quyền STOCK_*
         backendModule: 'STOCK',
       },
+      {
+        screen: 'disposals',
+        path: '/disposals',
+        featureId: 'feat-disposal',
+        title: 'Xuất hủy',
+        desc: 'Xuất hủy hàng lỗi, hỏng; trừ tồn kho theo giá vốn',
+        icon: PackageX,
+        // API /api/Disposals dùng quyền STOCK_*
+        backendModule: 'STOCK',
+      },
     ],
   },
   {
@@ -232,6 +243,16 @@ export const NAV_GROUPS: NavGroup[] = [
         title: 'Trả hàng',
         desc: 'Khách trả lại hàng đã mua',
         icon: RotateCcw,
+        backendModule: 'SALES',
+      },
+      {
+        // Approval Inbox (UC-64): mặc định chỉ Kế toán trưởng / Admin
+        screen: 'credit-approvals',
+        path: '/approvals',
+        featureId: 'feat-credit-approvals',
+        title: 'Duyệt yêu cầu',
+        desc: 'Duyệt yêu cầu vượt hạn mức công nợ',
+        icon: ShieldCheck,
         backendModule: 'SALES',
       },
     ],
