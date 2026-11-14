@@ -25,8 +25,13 @@ public interface IStockFlowDbContext
     DbSet<TrxPurchaseReturn> TrxPurchaseReturns { get; }
     DbSet<TrxStocktake> TrxStocktakes { get; }
     DbSet<DtlStocktakeItem> DtlStocktakeItems { get; }
+    // Xuất hủy hàng hóa (bảng có từ InitialDatabase)
+    DbSet<TrxInventoryDisposal> TrxInventoryDisposals { get; }
+    DbSet<DtlInventoryDisposalItem> DtlInventoryDisposalItems { get; }
     DbSet<DtlPurchaseReturnItem> DtlPurchaseReturnItems { get; }
     DbSet<TrxFinancialTransaction> TrxFinancialTransactions { get; }
+    // Yêu cầu duyệt vượt hạn mức công nợ (UC-27, UC-64)
+    DbSet<TrxCreditLimitRequest> TrxCreditLimitRequests { get; }
     DbSet<MstPriceBook> MstPriceBooks { get; }
     DbSet<DtlPriceBookItem> DtlPriceBookItems { get; }
 
@@ -47,6 +52,8 @@ public interface IStockFlowDbContext
     DbSet<DtlProductionOrderItem> DtlProductionOrderItems { get; }
     DbSet<TrxProductionMaterialRequirement> TrxProductionMaterialRequirements { get; }
     DbSet<TrxProductionReport> TrxProductionReports { get; }
+    DbSet<TrxProductionPlan> TrxProductionPlans { get; }
+    DbSet<DtlProductionPlanItem> DtlProductionPlanItems { get; }
     DbSet<TrxFinishedGoodsReceipt> TrxFinishedGoodsReceipts { get; }
     DbSet<MstInventoryLot> MstInventoryLots { get; }
     DbSet<MstWarehouseLocation> MstWarehouseLocations { get; }

@@ -106,6 +106,10 @@ export interface SalesReturnSource {
   isWalkIn: boolean;
   sellerName: string;
   items: SalesReturnSourceItem[];
+  /** Tổng tiền hàng của hóa đơn (trước giảm giá hóa đơn) — cơ sở phân bổ giảm giá cho hàng trả */
+  invoiceSubTotal: number;
+  /** Giảm giá tổng hóa đơn */
+  invoiceDiscount: number;
 }
 
 export interface CreateSalesReturnPayload {

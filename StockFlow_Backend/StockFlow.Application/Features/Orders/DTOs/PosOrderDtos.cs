@@ -41,6 +41,8 @@ public class CreatePosOrderRequest
     public int? BookingOrderId { get; set; }
     /// <summary>Hóa đơn từ đơn đặt, khách lấy thiếu: true = tạo đơn đặt mới (Phiếu tạm) cho phần còn lại; false = bỏ phần còn lại</summary>
     public bool CreateRemainderBooking { get; set; }
+    /// <summary>Yêu cầu duyệt hạn mức đã được Manager duyệt ngoại lệ một lần (UC-27/UC-64): cho ghi nợ vượt hạn mức đúng một lần</summary>
+    public int? CreditRequestId { get; set; }
     public List<PosOrderItemRequest> Items { get; set; } = new();
 }
 
@@ -69,6 +71,8 @@ public class PosOrderResultDto
     public int? StockIssueId { get; set; }
     public string? StockIssueCode { get; set; }
     public decimal CustomerCurrentDebt { get; set; }
+    /// <summary>Tiền khách trả thừa đã dùng trả nợ cũ ("Tính vào công nợ")</summary>
+    public decimal DebtPaymentAmount { get; set; }
     public string Message { get; set; } = string.Empty;
 }
 

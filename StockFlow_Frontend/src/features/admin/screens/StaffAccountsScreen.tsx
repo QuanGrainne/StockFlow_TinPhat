@@ -17,12 +17,14 @@ import {
   Shield,
   X,
   CheckCircle2,
+  Check,
   Camera,
   Upload,
   Trash2,
 } from 'lucide-react';
 import { StaffAccount, UserRole, RoleDefinition, WarehouseFacility } from '../types';
 import { adminService } from '../services/adminService';
+import { PASSWORD_RULES, firstPasswordViolation } from '@/lib/auth/passwordPolicy';
 
 const WAREHOUSE_OPTIONS = [
   {
@@ -304,6 +306,16 @@ export const StaffAccountsScreen: React.FC<StaffAccountsScreenProps> = ({
     if (!trimmedPhone) {
       alert('Vui lòng nhập Số điện thoại cho nhân viên');
       return;
+    }
+
+    // BR-35: mật khẩu Admin nhập (tạo mới / đổi cho nhân viên) phải đủ mạnh; để trống khi sửa = giữ mật khẩu cũ
+    const trimmedPassword = formPassword.trim();
+    if (trimmedPassword) {
+      const violation = firstPasswordViolation(trimmedPassword);
+      if (violation) {
+        alert(`Mật khẩu chưa đạt yêu cầu: ${violation.label.toLowerCase()}.\nMật khẩu cần tối thiểu 8 ký tự, có chữ in hoa, chữ thường, chữ số và ký tự đặc biệt.`);
+        return;
+      }
     }
 
     const autoCode = getNextStaffCode(staffList);
@@ -926,6 +938,20 @@ export const StaffAccountsScreen: React.FC<StaffAccountsScreenProps> = ({
                       ? 'Để trống nếu muốn giữ nguyên mật khẩu hiện tại'
                       : 'Mặc định: TinPhat@2026'}
                   </span>
+                  {/* BR-35: gợi ý độ mạnh khi Admin nhập mật khẩu */}
+                  {formPassword.trim() && (
+                    <ul className="mt-1.5 grid grid-cols-1 gap-0.5">
+                      {PASSWORD_RULES.map((r) => {
+                        const ok = r.test(formPassword.trim());
+                        return (
+                          <li key={r.label} className={`flex items-center gap-1 text-[10px] ${ok ? 'text-emerald-600' : 'text-slate-400'}`}>
+                            <Check size={11} className={ok ? 'opacity-100' : 'opacity-40'} />
+                            {r.label}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
                 </div>
               </div>
 

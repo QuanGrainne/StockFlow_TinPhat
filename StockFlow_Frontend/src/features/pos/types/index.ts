@@ -63,6 +63,9 @@ export interface PosPriceBook {
   priceBookName: string;
   isActive: boolean;
   isDefault: boolean;
+  /** SPECIFIC = bảng giá dành riêng cho các khách trong scopeCustomerIds */
+  scopeCustomerType: 'ALL' | 'SPECIFIC';
+  scopeCustomerIds: number[];
 }
 
 export interface PosWarehouse {

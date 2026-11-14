@@ -11,6 +11,7 @@ import { purchaseService } from '@/features/purchases/services/purchaseService';
 import { purchaseReturnService } from '@/features/purchase-returns/services/purchaseReturnService';
 import { transferService } from '@/features/transfers/services/transferService';
 import { stocktakeService } from '@/features/stocktakes/services/stocktakeService';
+import { disposalService } from '@/features/disposals/services/disposalService';
 import { orderService } from '@/features/orders/services/orderService';
 import { purchaseOrderService } from '@/features/purchase-orders/services/purchaseOrderService';
 import { salesReturnService } from '@/features/sales-returns/services/salesReturnService';
@@ -212,6 +213,41 @@ async function loadDocument(ref: StockCardDocumentRef): Promise<DocView> {
         .filter(Boolean)
         .join('\n'),
       openHref: documentLinkHref('/transfers', { code: d.code, id: d.id, date: toLinkDate(d.transferDate) }),
+    };
+  }
+
+  if (type === 'DISPOSAL') {
+    const d = await disposalService.getById(ref.documentId);
+    const s = d.summary;
+    const done = s.status === 'COMPLETED';
+    return {
+      title: 'Phiếu xuất hủy',
+      code: s.disposalCode,
+      statusLabel: done ? 'Hoàn thành' : 'Phiếu tạm',
+      statusTone: done ? 'green' : 'amber',
+      branch: s.warehouseName,
+      info: [
+        { label: 'Người lập', value: s.processedByName },
+        { label: done ? 'Ngày hủy' : 'Ngày lập', value: dateTime(s.disposalDate) },
+      ],
+      columns: [
+        ITEM_COLS.code, ITEM_COLS.name,
+        { key: 'qty', label: 'SL hủy', align: 'right' },
+        { key: 'cost', label: 'Giá vốn', align: 'right' },
+        { key: 'value', label: 'Giá trị hủy', align: 'right' },
+      ],
+      rows: d.items.map((i) => ({
+        code: i.productCode, productId: i.productId, name: i.productName, qty: qtyFmt(i.quantity),
+        cost: money(i.unitCost), value: money(i.value),
+      })),
+      totals: [
+        { label: 'Tổng SL hủy', value: qtyFmt(s.totalQuantity) },
+        { label: 'Tổng giá trị hủy', value: money(s.totalValue), strong: true },
+      ],
+      notes: s.reason ? `Lý do: ${s.reason}` : null,
+      openHref: documentLinkHref('/disposals', {
+        code: s.disposalCode, id: s.disposalId, date: toLinkDate(s.disposalDate), warehouseId: s.warehouseId,
+      }),
     };
   }
 

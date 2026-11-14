@@ -27,6 +27,7 @@ import {
   PlusCircle,
   RefreshCw,
   Search,
+  ShieldCheck,
   ShoppingBag,
   Trash2,
   Undo2,
@@ -48,6 +49,9 @@ import { posService, type PosSaleRequest } from '../services/posService';
 import { ReturnTabView } from '../components/ReturnTabView';
 import { PickBookingDialog, PickInvoiceDialog } from '../components/PosPickerDialogs';
 import { BookingShortageDialog, type BookingShortageLine } from '../components/BookingShortageDialog';
+import { CreditRequestDialog } from '../components/CreditRequestDialog';
+import { MyCreditRequestsDialog } from '../components/MyCreditRequestsDialog';
+import { isOverCreditLimitError } from '@/features/credit-requests';
 import { salesReturnService } from '@/features/sales-returns/services/salesReturnService';
 import type { PosCustomer, PosPriceBook, PosProduct } from '../types';
 import {
@@ -314,6 +318,10 @@ export default function PosScreen() {
   const [submitting, setSubmitting] = useState(false);
   /** Hóa đơn từ đơn đặt, khách lấy thiếu: các dòng thiếu (mở hộp hỏi tạo đơn chờ) */
   const [shortage, setShortage] = useState<BookingShortageLine[] | null>(null);
+  /** Thanh toán bị chặn vì vượt hạn mức (CUS-008/009) → hộp gửi yêu cầu duyệt (UC-27) */
+  const [creditBlock, setCreditBlock] = useState<{ message: string; expectedNewDebt: number } | null>(null);
+  /** Hộp "Yêu cầu hạn mức của tôi" cho khách đang chọn */
+  const [myCreditOpen, setMyCreditOpen] = useState(false);
   const [now, setNow] = useState(() => new Date());
 
   const productSearchRef = useRef<HTMLInputElement>(null);
@@ -337,6 +345,29 @@ export default function PosScreen() {
   const tab = tabs.find((t) => t.id === activeTabId) ?? tabs[0];
   const defaultPriceBookId = priceBooks.find((p) => p.isDefault)?.priceBookId ?? priceBooks[0]?.priceBookId ?? null;
   const priceBookId = tab.priceBookId ?? defaultPriceBookId;
+
+  // ── Bảng giá dùng được cho chi nhánh + khách đang chọn (phạm vi áp dụng, hiệu lực) ──
+  const saleCustomerId = tab.kind === 'RETURN' ? null : tab.customer?.id ?? null;
+  const saleBooksKey = `${warehouseId}|${saleCustomerId ?? 0}`;
+  const [saleBooks, setSaleBooks] = useState<{ key: string; books: PosPriceBook[] }>({ key: '', books: [] });
+  /** Đã đề xuất bảng giá riêng cho (tab, khách) này chưa: chỉ đề xuất 1 lần, người dùng đổi tay thì giữ */
+  const suggestedBookRef = useRef<string>('');
+  const syncPriceBookRef = useRef<(books: PosPriceBook[], customerId: number | null) => void>(() => {});
+  useEffect(() => {
+    let alive = true;
+    posService
+      .getPriceBooks({ warehouseId, customerId: saleCustomerId ?? undefined, forSale: true })
+      .then((books) => {
+        if (!alive) return;
+        setSaleBooks({ key: saleBooksKey, books });
+        if (books.length > 0) syncPriceBookRef.current(books, saleCustomerId);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [saleBooksKey, warehouseId, saleCustomerId]);
+  // Đang tải / lỗi: tạm hiện danh sách đầy đủ để không trống ô chọn
+  const selectableBooks = saleBooks.key === saleBooksKey && saleBooks.books.length > 0 ? saleBooks.books : priceBooks;
 
   // ── Tải dữ liệu: hàng hóa theo kho làm việc, bảng giá, ma trận giá, thiết lập bán âm ──
   useEffect(() => {
@@ -433,6 +464,7 @@ export default function PosScreen() {
             note: '',
             orderItemId: it.orderItemId,
             maxQty: it.remainingQuantity,
+            returnSalePrice: it.salePrice,
           }));
         if (lines.length === 0) {
           message.warning(`Hóa đơn ${src.invoiceCode} đã được trả hết hàng.`);
@@ -467,6 +499,9 @@ export default function PosScreen() {
           returnSellerName: src.sellerName,
           returnFee: 0,
           returnWalkIn: src.isWalkIn,
+          returnInvoiceSubTotal: src.invoiceSubTotal ?? 0,
+          returnInvoiceDiscount: src.invoiceDiscount ?? 0,
+          returnDiscountEdited: false,
         };
         setTabs((prev) => [...prev.filter((x) => x.lines.length > 0 || x.bookingId || x.returnInvoiceId || x.returnQuick), t]);
         setActiveTabId(t.id);
@@ -665,6 +700,13 @@ export default function PosScreen() {
   // Đơn đặt hàng: khách trả trước mặc định 0; hóa đơn: mặc định trả đủ
   const paid = tab.paid ?? (isBooking ? 0 : dueNow);
   const change = paid - dueNow;
+  // Khách trả thừa mà đang nợ cũ: chọn "Tính vào công nợ" → phần thừa trừ nợ cũ (tối đa bằng nợ cũ), phần vượt vẫn trả lại.
+  // Nợ cũ tính cả tiền trả trước của đơn đặt sắp trừ vào hóa đơn (khớp CreatePosOrderCommand).
+  const oldDebt = Math.max(0, (tab.customer?.currentDebt ?? 0) + depositApplied);
+  const canExcessToDebt = !isBooking && !!tab.customer && change > 0 && oldDebt > 0;
+  const excessToDebt = canExcessToDebt && !!tab.excessToDebt;
+  const debtPayment = excessToDebt ? Math.min(change, oldDebt) : 0;
+  const cashChange = change - debtPayment;
   /** Đặt hàng: tiền đã trả trước (khi sửa đơn) + trả thêm lần này không vượt giá trị đơn */
   const bookingPaidTotal = isBooking ? (tab.bookingPaid ?? 0) + paid : 0;
 
@@ -756,6 +798,33 @@ export default function PosScreen() {
     }));
   };
 
+  // Chọn khách có bảng giá riêng → tự đề xuất bảng giá đó (1 lần cho mỗi tab + khách).
+  // Bảng giá đang chọn không còn áp dụng (đổi khách / chi nhánh, hết hiệu lực) → về bảng giá chung.
+  useEffect(() => {
+    syncPriceBookRef.current = (books, customerId) => {
+      const selectedId = tab.priceBookId ?? defaultPriceBookId;
+      const own = customerId
+        ? books.find((b) => !b.isDefault && b.scopeCustomerType === 'SPECIFIC' && b.scopeCustomerIds.includes(customerId))
+        : undefined;
+      const key = `${tab.id}:${customerId ?? 0}`;
+      if (own && suggestedBookRef.current !== key) {
+        suggestedBookRef.current = key;
+        if (selectedId !== own.priceBookId) {
+          changePriceBook(own.priceBookId);
+          message.info(`Đã chọn bảng giá "${own.priceBookName}" dành riêng cho khách hàng này.`);
+        }
+        return;
+      }
+      if (selectedId != null && !books.some((b) => b.priceBookId === selectedId)) {
+        const fallback = books.find((b) => b.isDefault) ?? books[0];
+        if (fallback && fallback.priceBookId !== selectedId) {
+          changePriceBook(fallback.priceBookId);
+          message.info(`Bảng giá đang chọn không áp dụng cho khách / chi nhánh này, đã chuyển về "${fallback.priceBookName}".`);
+        }
+      }
+    };
+  });
+
   const productMatches = useMemo(() => {
     const q = productQuery.trim().toLowerCase();
     if (!q) return [];
@@ -799,8 +868,8 @@ export default function PosScreen() {
   // ── Khách hàng ──
   const customerItems = customerResults.q === customerQuery.trim() ? customerResults.items : [];
   const selectCustomer = (c: PosCustomer | null) => {
-    // Chọn / bỏ khách không làm mất số tiền khách trả đã nhập
-    updateTab({ customer: c });
+    // Chọn / bỏ khách không làm mất số tiền khách trả đã nhập; ngoại lệ hạn mức gắn theo khách nên bỏ khi đổi khách
+    updateTab({ customer: c, creditRequestId: null, creditRequestCode: null });
     setCustomerQuery('');
     setCustomerDropdown(false);
   };
@@ -939,6 +1008,8 @@ export default function PosScreen() {
       orderDate: !lockSaleTime && saleTime ? new Date(saleTime).toISOString() : undefined,
       bookingOrderId: tab.bookingId ?? undefined,
       createRemainderBooking,
+      creditRequestId: tab.creditRequestId ?? undefined,
+      excessAction: excessToDebt ? 'RECORD_DEBT' : 'RETURN_CASH',
       items: tab.lines.map((l) => {
         const c = lineCalc(l);
         // Bán cao hơn đơn giá: gửi giá bán làm đơn giá gốc, không giảm giá (server không nhận giảm giá âm)
@@ -964,6 +1035,7 @@ export default function PosScreen() {
           `Đã thanh toán hóa đơn ${res.orderCode}`,
           tab.bookingCode ? ` (giao theo đơn ${tab.bookingCode})` : '',
           res.depositAmount ? `. Đã trừ ${fmt(res.depositAmount)} tiền khách trả trước` : '',
+          res.debtPaymentAmount ? `. Đã trừ ${fmt(res.debtPaymentAmount)} vào nợ cũ, dư nợ còn ${fmt(res.customerCurrentDebt ?? 0)}` : '',
           res.changeAmount > 0 ? `. Tiền thừa trả khách: ${fmt(res.changeAmount)}` : '',
           res.remainderBookingCode ? `. Đã tạo đơn chờ ${res.remainderBookingCode} cho phần khách chưa lấy` : '',
         ].join(''),
@@ -974,7 +1046,15 @@ export default function PosScreen() {
       setSaleTime(null);
       setReloadTick((t) => t + 1); // tồn kho thay đổi
     } catch (err) {
-      message.error(err instanceof Error ? err.message : 'Thanh toán không thành công.');
+      const msg = err instanceof Error ? err.message : 'Thanh toán không thành công.';
+      if (tab.customer && !tab.creditRequestId && isOverCreditLimitError(msg)) {
+        // BR-12: vượt hạn mức → cho gửi yêu cầu duyệt. Nợ mới cộng cả tiền trả trước của đơn đặt
+        // vì server cộng lại phần này vào dư nợ khi so hạn mức.
+        setShortage(null);
+        setCreditBlock({ message: msg, expectedNewDebt: Math.max(0, dueNow - paid) + depositApplied });
+      } else {
+        message.error(msg);
+      }
     } finally {
       setSubmitting(false);
     }
@@ -1486,9 +1566,27 @@ export default function PosScreen() {
                   {tab.customer.currentDebt > 0 && (
                     <span className="text-[12px] text-[#fb2c36] shrink-0">Nợ: {fmt(tab.customer.currentDebt)}</span>
                   )}
+                  {/* Hóa đơn: yêu cầu vượt hạn mức đã gửi / chọn ngoại lệ một lần đã duyệt (UC-27) */}
+                  {!isBooking && (
+                    <button
+                      type="button"
+                      onClick={() => setMyCreditOpen(true)}
+                      title={tab.creditRequestCode ? `Đang dùng ngoại lệ ${tab.creditRequestCode}` : 'Yêu cầu hạn mức của tôi'}
+                      className={`ml-auto shrink-0 inline-flex items-center gap-1 h-6 px-2 rounded-md text-[12px] font-semibold cursor-pointer ${
+                        tab.creditRequestCode ? 'bg-[#0071BA] text-white' : 'text-[#0071BA] hover:bg-black/5'
+                      }`}
+                    >
+                      <ShieldCheck size={13} />
+                      {tab.creditRequestCode ?? 'Hạn mức'}
+                    </button>
+                  )}
                   {/* Tab gắn với đơn đặt: khách hàng cố định theo đơn */}
                   {!tab.bookingId && (
-                    <button type="button" onClick={() => selectCustomer(null)} className="ml-auto p-0.5 rounded hover:bg-black/5 cursor-pointer">
+                    <button
+                      type="button"
+                      onClick={() => selectCustomer(null)}
+                      className={`${isBooking ? 'ml-auto' : ''} p-0.5 rounded hover:bg-black/5 cursor-pointer`}
+                    >
                       <X size={15} />
                     </button>
                   )}
@@ -1545,9 +1643,10 @@ export default function PosScreen() {
                 onChange={(e) => changePriceBook(Number(e.target.value))}
                 className="h-9 pl-3 pr-8 rounded-lg bg-[#f1f3f6] outline-none appearance-none cursor-pointer max-w-[170px] truncate"
               >
-                {priceBooks.map((p) => (
+                {/* Chỉ bảng giá áp dụng cho chi nhánh + khách đang chọn; bảng giá riêng của khách có đánh dấu ★ */}
+                {selectableBooks.map((p) => (
                   <option key={p.priceBookId} value={p.priceBookId}>
-                    {p.priceBookName}
+                    {p.scopeCustomerType === 'SPECIFIC' ? `★ ${p.priceBookName}` : p.priceBookName}
                   </option>
                 ))}
               </select>
@@ -1668,10 +1767,59 @@ export default function PosScreen() {
               </>
             ) : (
               <>
-                {change > 0 && (
+                {change > 0 && !canExcessToDebt && (
                   <div className="flex items-center justify-between">
                     <span>Tiền thừa trả khách</span>
                     <span className="font-semibold">{fmt(change)}</span>
+                  </div>
+                )}
+                {/* Như KiotViet: khách trả thừa mà còn nợ cũ → chọn trả lại tiền thừa hoặc tính vào công nợ */}
+                {canExcessToDebt && (
+                  <div className="space-y-2.5">
+                    <label className="flex items-center justify-between gap-2 cursor-pointer">
+                      <span className="flex items-center gap-2">
+                        <input
+                          type="radio"
+                          name={`excess-${tab.id}`}
+                          checked={!excessToDebt}
+                          onChange={() => updateTab({ excessToDebt: false })}
+                          className="h-[18px] w-[18px] accent-[#0070f4] cursor-pointer"
+                        />
+                        Tiền thừa trả khách
+                      </span>
+                      <span className={excessToDebt ? 'text-[#677484]' : 'font-semibold'}>{fmt(change)}</span>
+                    </label>
+                    <label className="flex items-center justify-between gap-2 cursor-pointer">
+                      <span className="flex items-center gap-2">
+                        <input
+                          type="radio"
+                          name={`excess-${tab.id}`}
+                          checked={excessToDebt}
+                          onChange={() => updateTab({ excessToDebt: true })}
+                          className="h-[18px] w-[18px] accent-[#0070f4] cursor-pointer"
+                        />
+                        Tính vào công nợ
+                      </span>
+                      <span className="text-[13px] text-[#677484]">Nợ cũ {fmt(oldDebt)}</span>
+                    </label>
+                    {excessToDebt && (
+                      <div className="rounded-lg bg-[#f7f8fa] px-3 py-2 text-[13px] space-y-1">
+                        <div className="flex justify-between">
+                          <span className="text-[#677484]">Trừ vào nợ cũ</span>
+                          <span className="font-semibold text-[#16a34a]">{fmt(debtPayment)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-[#677484]">Nợ còn lại</span>
+                          <span className="font-semibold">{fmt(oldDebt - debtPayment)}</span>
+                        </div>
+                        {cashChange > 0 && (
+                          <div className="flex justify-between">
+                            <span className="text-[#677484]">Tiền thừa trả khách</span>
+                            <span className="font-semibold">{fmt(cashChange)}</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
                 {change < 0 && (
@@ -1733,6 +1881,34 @@ export default function PosScreen() {
           onSelect={(id) => {
             setPicker(null);
             openBookingTab(id, 'invoice');
+          }}
+        />
+      )}
+
+      {creditBlock && tab.customer && (
+        <CreditRequestDialog
+          // Cùng mã khách với hóa đơn (partnerId: tab.customer.id khi thanh toán)
+          customer={{ ...tab.customer, partnerId: tab.customer.id }}
+          expectedNewDebt={creditBlock.expectedNewDebt}
+          blockMessage={creditBlock.message}
+          onClose={() => setCreditBlock(null)}
+          onSubmitted={(_, msg) => {
+            setCreditBlock(null);
+            // MSG23: giữ nguyên tab để thanh toán lại sau khi được duyệt
+            message.success(msg, 6);
+          }}
+        />
+      )}
+      {myCreditOpen && tab.customer && (
+        <MyCreditRequestsDialog
+          partnerId={tab.customer.id}
+          customerName={tab.customer.name}
+          selectedId={tab.creditRequestId ?? null}
+          onClose={() => setMyCreditOpen(false)}
+          onSelect={(r) => {
+            updateTab({ creditRequestId: r?.requestId ?? null, creditRequestCode: r ? (r.requestCode ?? `#${r.requestId}`) : null });
+            setMyCreditOpen(false);
+            if (r) message.info(`Hóa đơn này sẽ dùng ngoại lệ ${r.requestCode ?? `#${r.requestId}`} khi thanh toán.`);
           }}
         />
       )}

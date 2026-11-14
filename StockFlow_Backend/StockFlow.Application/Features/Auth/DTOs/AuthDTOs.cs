@@ -31,3 +31,5 @@ public record CurrentUserResponse(
     string? Code = null,
     string? Title = null);
 
+/// <summary>Yêu cầu đổi mật khẩu của chính tài khoản đang đăng nhập (UC-50, BR-35..BR-37)</summary>
+public record ChangePasswordRequest(string CurrentPassword, string NewPassword, string ConfirmNewPassword);

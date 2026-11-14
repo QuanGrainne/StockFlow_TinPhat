@@ -14,9 +14,11 @@ import PurchaseOrdersScreen from '@/features/purchase-orders/screens/PurchaseOrd
 import PriceBooksScreen from '@/features/price-books/screens/PriceBooksScreen';
 import TransfersScreen from '@/features/transfers/screens/TransfersScreen';
 import StocktakesScreen from '@/features/stocktakes/screens/StocktakesScreen';
+import DisposalsScreen from '@/features/disposals/screens/DisposalsScreen';
 import OrdersScreen from '@/features/orders/screens/OrdersScreen';
 import SalesBookingsScreen from '@/features/sales-bookings/screens/SalesBookingsScreen';
 import SalesReturnsScreen from '@/features/sales-returns/screens/SalesReturnsScreen';
+import ApprovalInboxScreen from '@/features/credit-requests/screens/ApprovalInboxScreen';
 import { OrderSettingsScreen } from '@/features/settings/screens/OrderSettingsScreen';
 import { permissionService } from '@/features/admin/services/permissionService';
 import { SCREEN_PATH_MAP, canOpenScreen, firstAllowedPath } from '@/lib/navigation/navbar';
@@ -148,6 +150,10 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ initialScreen, children })
       case 'sales-returns':
         return <SalesReturnsScreen />;
 
+      // Approval Inbox – tab Yêu cầu hạn mức (UC-64)
+      case 'credit-approvals':
+        return <ApprovalInboxScreen />;
+
       // ─── Sản xuất ───
       case 'manager-bom':
         return <BomManagementScreen />;
@@ -233,6 +239,9 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ initialScreen, children })
       case 'stocktakes':
         return <StocktakesScreen />;
 
+      case 'disposals':
+        return <DisposalsScreen />;
+
       case 'transfers':
       case 'admin-transfers':
       case 'manager-transfers':
@@ -271,12 +280,14 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ initialScreen, children })
         activeScreen === 'purchase-orders' ||
         activeScreen === 'sales-booking' ||
         activeScreen === 'sales-returns' ||
+        activeScreen === 'credit-approvals' ||
         activeScreen === 'suppliers' || activeScreen.includes('suppliers') ||
         activeScreen === 'customers' || activeScreen.includes('customers') ||
         activeScreen === 'goods-catalog' || activeScreen === 'products' ||
         activeScreen.includes('goods') || activeScreen.includes('catalog') ||
         activeScreen === 'price-books' || activeScreen === 'admin-price-books' ||
         activeScreen === 'stocktakes' ||
+        activeScreen === 'disposals' ||
         activeScreen === 'manager-bom' || activeScreen.startsWith('production-') ||
         activeScreen.includes('price-book') ? (
         <main className="flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden bg-transparent">

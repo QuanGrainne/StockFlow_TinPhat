@@ -1,29 +1,17 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { X, ChevronDown, ChevronUp, Info, Calendar, Check, Trash2, Search } from 'lucide-react';
-import { PriceBook, CreatePriceBookPayload, UpdatePriceBookPayload } from '../types';
+import { X, ChevronDown, ChevronUp, Info, Check, Trash2, Search } from 'lucide-react';
+import {
+  PriceBook,
+  CreatePriceBookPayload,
+  UpdatePriceBookPayload,
+  PriceBookCustomerRef,
+  PriceBookWarehouseOption,
+} from '../types';
 import { priceBookService } from '../services/priceBookService';
-import { apiClient } from '@/lib/api/client';
-
-interface WarehouseOption {
-  warehouseId: number;
-  code?: string;
-  name?: string;
-  warehouseCode?: string;
-  warehouseName?: string;
-  status?: string;
-}
-
-interface UserOption {
-  id?: number;
-  userId?: number;
-  username: string;
-  fullName?: string;
-  name?: string;
-  code?: string;
-  roleTitle?: string;
-}
+import CustomerScopePicker from './CustomerScopePicker';
+import { toLocalDatetimeInputString } from '@/lib/utils/date';
 
 interface MultiSelectScopeInputProps<T extends string | number> {
   placeholder: string;
@@ -143,14 +131,6 @@ function MultiSelectScopeInput<T extends string | number>({
   );
 }
 
-const CUSTOMER_GROUPS = [
-  { code: 'WHOLESALE', name: 'Khách buôn / Đại lý sỉ' },
-  { code: 'VIP', name: 'Khách hàng thân thiết / VIP' },
-  { code: 'RETAIL', name: 'Khách hàng bán lẻ' },
-  { code: 'PROJECT', name: 'Khách hàng công trình / dự án' },
-  { code: 'DEALER_L1', name: 'Đại lý Cấp 1 phân phối' },
-];
-
 interface CreatePriceBookModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -176,23 +156,31 @@ export default function CreatePriceBookModal({
   const [expandOrderRule, setExpandOrderRule] = useState(true);
 
   // Form states - Tab 1
-  const [priceBookName, setPriceBookName] = useState('');
-  const [effectiveFrom, setEffectiveFrom] = useState('');
-  const [effectiveTo, setEffectiveTo] = useState('');
-  const [isActive, setIsActive] = useState(true);
+  // Khởi tạo từ bảng giá đang sửa (màn cha gắn key theo bảng giá nên mỗi lần mở là form mới,
+  // không cần useEffect đồng bộ state). Giờ hiệu lực: server lưu giờ Việt Nam → hiển thị nguyên giờ đó;
+  // bảng giá mới mặc định từ bây giờ đến 1 năm sau theo giờ địa phương (toISOString().slice là UTC → lệch 7 tiếng).
+  const pb = editingPriceBook ?? null;
+  const [priceBookName, setPriceBookName] = useState(() => pb?.priceBookName ?? '');
+  const [effectiveFrom, setEffectiveFrom] = useState(() =>
+    pb ? (pb.effectiveFrom ? toLocalDatetimeInputString(pb.effectiveFrom) : '') : toLocalDatetimeInputString(new Date())
+  );
+  const [effectiveTo, setEffectiveTo] = useState(() => {
+    if (pb) return pb.effectiveTo ? toLocalDatetimeInputString(pb.effectiveTo) : '';
+    const inOneYear = new Date();
+    inOneYear.setFullYear(inOneYear.getFullYear() + 1);
+    return toLocalDatetimeInputString(inOneYear);
+  });
+  const [isActive, setIsActive] = useState(() => pb?.isActive ?? true);
 
-  const [formulaBaseType, setFormulaBaseType] = useState<string>('');
-  const [formulaBasePriceBookId, setFormulaBasePriceBookId] = useState<number | null>(null);
-  const [formulaOperator, setFormulaOperator] = useState<'+' | '-'>('+');
-  const [formulaValue, setFormulaValue] = useState<number | ''>('');
-  const [formulaUnit, setFormulaUnit] = useState<'VND' | 'PERCENT'>('VND');
+  const [formulaBaseType, setFormulaBaseType] = useState<string>(() => pb?.formulaBaseType ?? '');
+  const [formulaBasePriceBookId, setFormulaBasePriceBookId] = useState<number | null>(() => pb?.formulaBasePriceBookId ?? null);
+  const [formulaOperator, setFormulaOperator] = useState<'+' | '-'>(() => pb?.formulaOperator ?? '+');
+  const [formulaValue, setFormulaValue] = useState<number | ''>(() => pb?.formulaValue ?? '');
+  const [formulaUnit, setFormulaUnit] = useState<'VND' | 'PERCENT'>(() => (pb?.formulaUnit === 'PERCENT' ? 'PERCENT' : 'VND'));
 
   // Checkboxes mở rộng dưới công thức giá
-  const [autoUpdateByBase, setAutoUpdateByBase] = useState(true);
+  const [autoUpdateByBase, setAutoUpdateByBase] = useState(() => (pb ? Boolean(pb.formulaBaseType) : true));
   const [includeProductsFromBase, setIncludeProductsFromBase] = useState(false);
-  const [autoRounding, setAutoRounding] = useState(true);
-  const [roundingUnit, setRoundingUnit] = useState<string>('dong');
-  const [isRoundingOpen, setIsRoundingOpen] = useState(false);
 
   // Custom searchable dropdown for base price book
   const [isBaseTypeDropdownOpen, setIsBaseTypeDropdownOpen] = useState(false);
@@ -224,106 +212,38 @@ export default function CreatePriceBookModal({
     return 'Chọn bảng giá';
   }, [formulaBaseType, formulaBasePriceBookId, existingPriceBooks]);
 
-  const [allowUnlistedProducts, setAllowUnlistedProducts] = useState(true);
-  const [warnUnlistedProducts, setWarnUnlistedProducts] = useState(false);
+  const [allowUnlistedProducts, setAllowUnlistedProducts] = useState(() => pb?.allowUnlistedProducts ?? true);
+  const [warnUnlistedProducts, setWarnUnlistedProducts] = useState(() => pb?.warnUnlistedProducts ?? false);
 
   // Form states - Tab 2 (Phạm vi áp dụng)
-  const [scopeBranchType, setScopeBranchType] = useState<'ALL' | 'SPECIFIC'>('ALL');
-  const [selectedWarehouseIds, setSelectedWarehouseIds] = useState<number[]>([]);
+  const [scopeBranchType, setScopeBranchType] = useState<'ALL' | 'SPECIFIC'>(() => pb?.scopeBranchType ?? 'ALL');
+  const [selectedWarehouseIds, setSelectedWarehouseIds] = useState<number[]>(() => pb?.scopeWarehouseIds ?? []);
 
-  const [scopeCustomerType, setScopeCustomerType] = useState<'ALL' | 'SPECIFIC'>('ALL');
-  const [selectedCustomerGroupCodes, setSelectedCustomerGroupCodes] = useState<string[]>([]);
+  // Khách hàng cụ thể (dữ liệu khách thật); "Nhóm khách hàng" và "Người tạo giao dịch" đã bỏ
+  const [scopeCustomerType, setScopeCustomerType] = useState<'ALL' | 'SPECIFIC'>(() => pb?.scopeCustomerType ?? 'ALL');
+  const [selectedCustomers, setSelectedCustomers] = useState<PriceBookCustomerRef[]>(() => pb?.scopeCustomers ?? []);
 
-  const [scopeUserType, setScopeUserType] = useState<'ALL' | 'SPECIFIC'>('ALL');
-  const [selectedUserIds, setSelectedUserIds] = useState<number[]>([]);
-
-  // Lookup options
-  const [warehouses, setWarehouses] = useState<WarehouseOption[]>([]);
-  const [users, setUsers] = useState<UserOption[]>([]);
+  // Chi nhánh đang hoạt động từ /api/warehouses
+  const [warehouses, setWarehouses] = useState<PriceBookWarehouseOption[]>([]);
+  const [warehouseError, setWarehouseError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // Fetch warehouses and users for Scope tab
   useEffect(() => {
     if (!isOpen) return;
-
-    apiClient.get<WarehouseOption[]>('/api/warehouses')
-      .then(res => setWarehouses(Array.isArray(res) ? res : []))
-      .catch(() => {});
-
-    apiClient.get<UserOption[]>('/api/staff')
-      .then(res => setUsers(Array.isArray(res) ? res : []))
-      .catch(() => {});
+    let alive = true;
+    priceBookService
+      .getActiveWarehouses()
+      .then((res) => {
+        if (!alive) return;
+        setWarehouses(res);
+        setWarehouseError(null);
+      })
+      .catch((err: unknown) => alive && setWarehouseError(err instanceof Error ? err.message : 'Không tải được danh sách chi nhánh.'));
+    return () => {
+      alive = false;
+    };
   }, [isOpen]);
-
-  // Sync state on open or edit
-  useEffect(() => {
-    if (!isOpen) return;
-
-    if (editingPriceBook) {
-      setPriceBookName(editingPriceBook.priceBookName || '');
-      setEffectiveFrom(editingPriceBook.effectiveFrom ? editingPriceBook.effectiveFrom.slice(0, 16) : '');
-      setEffectiveTo(editingPriceBook.effectiveTo ? editingPriceBook.effectiveTo.slice(0, 16) : '');
-      setIsActive(editingPriceBook.isActive);
-
-      setFormulaBaseType(editingPriceBook.formulaBaseType || '');
-      setFormulaBasePriceBookId(editingPriceBook.formulaBasePriceBookId);
-      setFormulaOperator(editingPriceBook.formulaOperator || '+');
-      setFormulaValue(editingPriceBook.formulaValue ?? '');
-      setFormulaUnit(editingPriceBook.formulaUnit === 'PERCENT' ? 'PERCENT' : 'VND');
-      setAutoUpdateByBase(Boolean(editingPriceBook.formulaBaseType));
-
-      setAllowUnlistedProducts(editingPriceBook.allowUnlistedProducts);
-      setWarnUnlistedProducts(editingPriceBook.warnUnlistedProducts);
-
-      setScopeBranchType(editingPriceBook.scopeBranchType || 'ALL');
-      setSelectedWarehouseIds(editingPriceBook.scopeWarehouseIds || []);
-
-      setScopeCustomerType(editingPriceBook.scopeCustomerType || 'ALL');
-      setSelectedCustomerGroupCodes(editingPriceBook.scopeCustomerGroupCodes || []);
-
-      setScopeUserType(editingPriceBook.scopeUserType || 'ALL');
-      setSelectedUserIds(editingPriceBook.scopeUserIds || []);
-    } else {
-      // Default new price book
-      setPriceBookName('');
-      const now = new Date();
-      const inOneYear = new Date();
-      inOneYear.setFullYear(now.getFullYear() + 1);
-
-      setEffectiveFrom(now.toISOString().slice(0, 16));
-      setEffectiveTo(inOneYear.toISOString().slice(0, 16));
-      setIsActive(true);
-
-      setFormulaBaseType('');
-      setFormulaBasePriceBookId(null);
-      setFormulaOperator('+');
-      setFormulaValue('');
-      setFormulaUnit('VND');
-      setAutoUpdateByBase(true);
-      setIncludeProductsFromBase(false);
-      setAutoRounding(true);
-      setRoundingUnit('dong');
-      setIsRoundingOpen(false);
-      setIsBaseTypeDropdownOpen(false);
-      setBaseSearchKeyword('');
-
-      setAllowUnlistedProducts(true);
-      setWarnUnlistedProducts(false);
-
-      setScopeBranchType('ALL');
-      setSelectedWarehouseIds([]);
-
-      setScopeCustomerType('ALL');
-      setSelectedCustomerGroupCodes([]);
-
-      setScopeUserType('ALL');
-      setSelectedUserIds([]);
-    }
-
-    setActiveTab('info');
-    setErrorMsg(null);
-  }, [isOpen, editingPriceBook]);
 
   if (!isOpen) return null;
 
@@ -334,30 +254,52 @@ export default function CreatePriceBookModal({
       setActiveTab('info');
       return;
     }
+    if (effectiveFrom && effectiveTo && new Date(effectiveFrom) > new Date(effectiveTo)) {
+      setErrorMsg('Ngày bắt đầu hiệu lực phải trước ngày kết thúc.');
+      setActiveTab('info');
+      return;
+    }
+    if (formulaBaseType === 'PRICE_BOOK' && !formulaBasePriceBookId) {
+      setErrorMsg('Vui lòng chọn bảng giá nguồn cho công thức.');
+      setActiveTab('info');
+      return;
+    }
+    if (scopeBranchType === 'SPECIFIC' && selectedWarehouseIds.length === 0) {
+      setErrorMsg('Vui lòng chọn ít nhất một chi nhánh áp dụng.');
+      setActiveTab('scope');
+      return;
+    }
+    if (scopeCustomerType === 'SPECIFIC' && selectedCustomers.length === 0) {
+      setErrorMsg('Vui lòng chọn ít nhất một khách hàng áp dụng.');
+      setActiveTab('scope');
+      return;
+    }
 
     setLoading(true);
     setErrorMsg(null);
 
     try {
+      // Có chọn nguồn giá thì luôn gửi công thức để tính giá; "Tự động cập nhật" quyết định có giữ liên kết hay không
+      // (trước đây bỏ tick "Tự động cập nhật" thì công thức bị bỏ luôn, nên "Thêm hàng hóa từ nguồn" không tính được giá)
+      const hasFormula = Boolean(formulaBaseType);
       const payload: CreatePriceBookPayload = {
         priceBookName: priceBookName.trim(),
         effectiveFrom: effectiveFrom ? new Date(effectiveFrom).toISOString() : null,
         effectiveTo: effectiveTo ? new Date(effectiveTo).toISOString() : null,
         isActive,
-        formulaBaseType: (autoUpdateByBase && formulaBaseType) ? formulaBaseType : null,
-        formulaBasePriceBookId: (autoUpdateByBase && formulaBaseType === 'PRICE_BOOK') ? formulaBasePriceBookId : null,
-        formulaOperator: (autoUpdateByBase && formulaBaseType) ? formulaOperator : null,
-        formulaValue: (autoUpdateByBase && formulaBaseType) ? (formulaValue !== '' ? Number(formulaValue) : 0) : null,
-        formulaUnit: (autoUpdateByBase && formulaBaseType) ? (formulaUnit || 'VND') : null,
+        formulaBaseType: hasFormula ? formulaBaseType : null,
+        formulaBasePriceBookId: formulaBaseType === 'PRICE_BOOK' ? formulaBasePriceBookId : null,
+        formulaOperator: hasFormula ? formulaOperator : null,
+        formulaValue: hasFormula ? (formulaValue !== '' ? Number(formulaValue) : 0) : null,
+        formulaUnit: hasFormula ? formulaUnit || 'VND' : null,
         allowUnlistedProducts,
         warnUnlistedProducts: allowUnlistedProducts ? warnUnlistedProducts : false,
         scopeBranchType,
         scopeWarehouseIds: scopeBranchType === 'SPECIFIC' ? selectedWarehouseIds : [],
         scopeCustomerType,
-        scopeCustomerGroupCodes: scopeCustomerType === 'SPECIFIC' ? selectedCustomerGroupCodes : [],
-        scopeUserType,
-        scopeUserIds: scopeUserType === 'SPECIFIC' ? selectedUserIds : [],
+        scopeCustomerIds: scopeCustomerType === 'SPECIFIC' ? selectedCustomers.map((c) => c.partnerId) : [],
         autoApplyFormula: includeProductsFromBase,
+        linkFormula: autoUpdateByBase,
       };
 
       let result: PriceBook;
@@ -365,7 +307,7 @@ export default function CreatePriceBookModal({
         const updatePayload: UpdatePriceBookPayload = {
           ...payload,
           priceBookId: editingPriceBook.priceBookId,
-          recalculateFormula: autoUpdateByBase,
+          recalculateFormula: hasFormula && autoUpdateByBase,
         };
         result = await priceBookService.updatePriceBook(editingPriceBook.priceBookId, updatePayload);
       } else {
@@ -501,10 +443,14 @@ export default function CreatePriceBookModal({
                           name="status_radio"
                           checked={isActive === false}
                           onChange={() => setIsActive(false)}
+                          disabled={Boolean(editingPriceBook?.isDefault)}
                           className="accent-[#0071BA]"
                         />
                         <span className="font-medium text-slate-800">Chưa áp dụng</span>
                       </label>
+                      {editingPriceBook?.isDefault && (
+                        <span className="text-[11px] text-slate-500">Bảng giá chung luôn áp dụng</span>
+                      )}
                     </div>
                   </div>
                 )}
@@ -738,71 +684,12 @@ export default function CreatePriceBookModal({
                           </span>
                         </label>
 
-                        {/* 3. Tự động làm tròn giá đến [ đồng v ] ⓘ */}
-                        <div className="flex items-center gap-2 text-xs text-slate-700 select-none relative">
-                          <label className="flex items-center gap-2 cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={autoRounding}
-                              onChange={e => setAutoRounding(e.target.checked)}
-                              className="rounded accent-[#0071BA] w-3.5 h-3.5 cursor-pointer"
-                            />
-                            <span>Tự động làm tròn giá đến</span>
-                          </label>
-
-                          <div className="relative">
-                            <button
-                              type="button"
-                              disabled={!autoRounding}
-                              onClick={() => setIsRoundingOpen(!isRoundingOpen)}
-                              className="inline-flex items-center gap-1 font-semibold text-[#0071BA] hover:underline cursor-pointer disabled:opacity-50"
-                            >
-                              <span>
-                                {
-                                  {
-                                    dong: 'đồng',
-                                    chuc: 'chục đồng',
-                                    tram: 'trăm đồng',
-                                    nghin: 'nghìn đồng',
-                                    chuc_nghin: 'chục nghìn đồng',
-                                  }[roundingUnit] || 'đồng'
-                                }
-                              </span>
-                              <ChevronDown size={13} className="text-[#0071BA]" />
-                            </button>
-
-                            {isRoundingOpen && (
-                              <div className="absolute left-0 top-full mt-1 z-50 w-36 rounded-md border border-slate-200 bg-white py-1 shadow-lg text-xs">
-                                {[
-                                  { key: 'dong', label: 'đồng' },
-                                  { key: 'chuc', label: 'chục đồng' },
-                                  { key: 'tram', label: 'trăm đồng' },
-                                  { key: 'nghin', label: 'nghìn đồng' },
-                                  { key: 'chuc_nghin', label: 'chục nghìn đồng' },
-                                ].map(opt => (
-                                  <button
-                                    key={opt.key}
-                                    type="button"
-                                    onClick={() => {
-                                      setRoundingUnit(opt.key);
-                                      setIsRoundingOpen(false);
-                                    }}
-                                    className="flex w-full items-center justify-between px-3 py-1.5 text-left hover:bg-slate-50 transition cursor-pointer"
-                                  >
-                                    <span className={roundingUnit === opt.key ? 'font-bold text-[#0071BA]' : 'text-slate-700'}>
-                                      {opt.label}
-                                    </span>
-                                    {roundingUnit === opt.key && <Check size={13} className="text-[#0071BA]" />}
-                                  </button>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-
-                          <span title="Làm tròn giá bán theo đơn vị tiền tệ" className="text-slate-400 cursor-help">
-                            <Info size={13} />
-                          </span>
-                        </div>
+                        {/* Làm tròn: hệ thống luôn làm tròn đến đồng (PriceFormulaCalculator); ô chọn đơn vị làm tròn cũ không được lưu nên đã bỏ */}
+                        <p className="flex items-center gap-1.5 text-[11px] text-slate-500">
+                          <Info size={12} className="text-slate-400" />
+                          Giá tính theo công thức được làm tròn đến đồng.
+                          {!autoUpdateByBase && ' Bỏ chọn tự động cập nhật: công thức chỉ dùng để tính giá lúc lưu.'}
+                        </p>
                       </div>
                     )}
 
@@ -880,8 +767,13 @@ export default function CreatePriceBookModal({
             </div>
           )}
 
-          {/* TAB 2: PHẠM VI ÁP DỤNG CHUẨN KIOTVIET */}
-          {activeTab === 'scope' && (
+          {/* TAB 2: PHẠM VI ÁP DỤNG – chi nhánh + khách hàng (dữ liệu thật); POS chỉ hiện bảng giá đúng phạm vi */}
+          {activeTab === 'scope' && editingPriceBook?.isDefault && (
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-xs text-slate-600">
+              Bảng giá chung luôn áp dụng cho toàn hệ thống và mọi khách hàng (là bảng giá mặc định khi bán hàng).
+            </div>
+          )}
+          {activeTab === 'scope' && !editingPriceBook?.isDefault && (
             <div className="space-y-4">
               {/* Section 1: Chi nhánh / Kho áp dụng */}
               <div className="rounded-lg border border-slate-200 bg-white p-4 space-y-3 text-xs">
@@ -913,22 +805,25 @@ export default function CreatePriceBookModal({
                 </div>
 
                 {scopeBranchType === 'SPECIFIC' && (
-                  <MultiSelectScopeInput
-                    placeholder="Chọn chi nhánh / kho áp dụng"
-                    options={warehouses.map(w => ({
-                      value: w.warehouseId,
-                      label: `${w.name || w.warehouseName || w.code || `Kho #${w.warehouseId}`}${w.code ? ` (${w.code})` : ''}`
-                    }))}
-                    selectedValues={selectedWarehouseIds}
-                    onChange={setSelectedWarehouseIds}
-                  />
+                  <>
+                    <MultiSelectScopeInput
+                      placeholder="Chọn chi nhánh / kho áp dụng"
+                      options={warehouses.map(w => ({
+                        value: w.warehouseId,
+                        label: `${w.name}${w.code ? ` (${w.code})` : ''}`,
+                      }))}
+                      selectedValues={selectedWarehouseIds}
+                      onChange={setSelectedWarehouseIds}
+                    />
+                    {warehouseError && <p className="text-rose-600">{warehouseError}</p>}
+                  </>
                 )}
               </div>
 
-              {/* Section 2: Nhóm khách hàng */}
+              {/* Section 2: Khách hàng áp dụng (thay "Nhóm khách hàng": hệ thống không có nhóm khách) */}
               <div className="rounded-lg border border-slate-200 bg-white p-4 space-y-3 text-xs">
                 <span className="block font-bold text-slate-800 uppercase tracking-wide">
-                  Nhóm khách hàng
+                  Khách hàng áp dụng
                 </span>
                 <div className="space-y-2">
                   <label className="flex items-center gap-2 cursor-pointer">
@@ -939,7 +834,7 @@ export default function CreatePriceBookModal({
                       onChange={() => setScopeCustomerType('ALL')}
                       className="accent-[#0071BA]"
                     />
-                    <span className="font-medium text-slate-800">Tất cả</span>
+                    <span className="font-medium text-slate-800">Tất cả khách hàng</span>
                   </label>
 
                   <label className="flex items-center gap-2 cursor-pointer">
@@ -950,66 +845,23 @@ export default function CreatePriceBookModal({
                       onChange={() => setScopeCustomerType('SPECIFIC')}
                       className="accent-[#0071BA]"
                     />
-                    <span className="font-medium text-slate-800">Nhóm khách hàng cụ thể</span>
+                    <span className="font-medium text-slate-800">Khách hàng cụ thể</span>
                   </label>
                 </div>
 
                 {scopeCustomerType === 'SPECIFIC' && (
-                  <MultiSelectScopeInput
-                    placeholder="Chọn nhóm khách hàng"
-                    options={CUSTOMER_GROUPS.map(g => ({ value: g.code, label: g.name }))}
-                    selectedValues={selectedCustomerGroupCodes}
-                    onChange={setSelectedCustomerGroupCodes}
-                  />
-                )}
-              </div>
-
-              {/* Section 3: Người tạo giao dịch */}
-              <div className="rounded-lg border border-slate-200 bg-white p-4 space-y-3 text-xs">
-                <span className="block font-bold text-slate-800 uppercase tracking-wide">
-                  Người tạo giao dịch
-                </span>
-                <div className="space-y-2">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="scope_user_radio"
-                      checked={scopeUserType === 'ALL'}
-                      onChange={() => setScopeUserType('ALL')}
-                      className="accent-[#0071BA]"
-                    />
-                    <span className="font-medium text-slate-800">Tất cả</span>
-                  </label>
-
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="scope_user_radio"
-                      checked={scopeUserType === 'SPECIFIC'}
-                      onChange={() => setScopeUserType('SPECIFIC')}
-                      className="accent-[#0071BA]"
-                    />
-                    <span className="font-medium text-slate-800">Người tạo giao dịch cụ thể</span>
-                  </label>
-                </div>
-
-                {scopeUserType === 'SPECIFIC' && (
-                  <MultiSelectScopeInput
-                    placeholder="Chọn người tạo giao dịch"
-                    options={users.map(u => ({
-                      value: u.id ?? u.userId ?? 0,
-                      label: `${u.name || u.fullName || u.username}${u.code ? ` (${u.code})` : ''}${u.roleTitle ? ` - ${u.roleTitle}` : ''}`
-                    }))}
-                    selectedValues={selectedUserIds}
-                    onChange={setSelectedUserIds}
-                  />
+                  <>
+                    <CustomerScopePicker selected={selectedCustomers} onChange={setSelectedCustomers} />
+                    <p className="text-[11px] text-slate-500">
+                      Khi bán hàng, chọn đúng khách này thì bảng giá được tự động đề xuất; khách khác không thấy bảng giá này.
+                    </p>
+                  </>
                 )}
               </div>
             </div>
           )}
 
           {/* Footer Actions */}
-                    {/* Footer Actions */}
           <div className="flex items-center justify-between gap-3 pt-3 border-t border-slate-200">
             {editingPriceBook && !editingPriceBook.isDefault ? (
               <button
