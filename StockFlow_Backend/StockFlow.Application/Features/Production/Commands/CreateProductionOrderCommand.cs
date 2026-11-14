@@ -20,11 +20,9 @@ public class CreateProductionOrderCommandValidator : AbstractValidator<CreatePro
 {
     public CreateProductionOrderCommandValidator()
     {
-        RuleFor(x => x.Request.ProductId).GreaterThan(0).WithMessage("Vui lòng chọn thành phẩm.");
-        RuleFor(x => x.Request.PlannedQuantity)
-            .GreaterThan(0).WithMessage("Số lượng kế hoạch phải lớn hơn 0.")
-            .Must(q => ProductionHelper.HasMaxScale(q, ProductionPolicy.QuantityScale))
-            .WithMessage("Số lượng kế hoạch có tối đa 2 chữ số thập phân.");
+        RuleFor(x => x.Request)
+            .Must(r => (r.Items is { Count: > 0 }) || (r.ProductId > 0 && r.PlannedQuantity > 0))
+            .WithMessage("Vui lòng chọn ít nhất một thành phẩm và nhập số lượng kế hoạch lớn hơn 0.");
         RuleFor(x => x.Request.Workshop).MaximumLength(200).WithMessage("Tên xưởng tối đa 200 ký tự.");
         RuleFor(x => x.Request.Notes).MaximumLength(500).WithMessage("Ghi chú tối đa 500 ký tự.");
     }
@@ -53,37 +51,28 @@ public class CreateProductionOrderCommandHandler : IRequestHandler<CreateProduct
         var deadlineError = ProductionOrderRules.ValidateDeadline(req.Deadline);
         if (deadlineError != null) return Result.Failure<ProductionOrderDetailDto>(deadlineError);
 
-        var product = await _context.MstProducts.AsNoTracking().FirstOrDefaultAsync(p => p.ProductId == req.ProductId, ct);
-        if (product == null || product.IsActive == false)
-            return Result.Failure<ProductionOrderDetailDto>("Vui lòng chọn thành phẩm đang hoạt động.");
-
-        var bom = await _context.MstBoms.AsNoTracking()
-            .Include(b => b.DtlBomItems)
-            .FirstOrDefaultAsync(b => b.ProductId == req.ProductId && b.IsActive == true, ct);
-        if (bom == null || bom.DtlBomItems.Count == 0)
-            return Result.Failure<ProductionOrderDetailDto>(ProductionMessages.NoActiveBom);
-
         await using var tx = await _context.BeginTransactionAsync(ct);
 
+        var now = VietnamTime.Now;
         var code = await ProductionHelper.NextCodeAsync(_context, _codeGenerator, "PRODUCTION_ORDER",
             (c, token) => _context.TrxProductionOrders.AnyAsync(o => o.ProductionOrderCode == c, token), ct);
 
         var order = new TrxProductionOrder
         {
             ProductionOrderCode = code,
-            ProductId = req.ProductId,
-            BomId = bom.BomId,
-            PlannedQuantity = req.PlannedQuantity,
             ActualQuantity = 0,
             Status = ProductionOrderStatus.NotStarted,
             CreatedBy = userId,
-            StartDate = VietnamTime.Now,
+            StartDate = now,
             EndDate = req.Deadline?.Date,
             Workshop = string.IsNullOrWhiteSpace(req.Workshop) ? null : req.Workshop.Trim(),
             Notes = string.IsNullOrWhiteSpace(req.Notes) ? null : req.Notes.Trim(),
         };
+
+        var populateError = await ProductionOrderRules.PopulateItemsAndRequirementsAsync(_context, order, req, userId, now, ct);
+        if (populateError != null) return Result.Failure<ProductionOrderDetailDto>(populateError);
+
         _context.TrxProductionOrders.Add(order);
-        ProductionOrderRules.AddRequirementsFromBom(_context, order, bom, req.PlannedQuantity);
 
         await _context.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);

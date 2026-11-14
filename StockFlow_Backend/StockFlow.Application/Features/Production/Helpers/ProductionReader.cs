@@ -57,11 +57,16 @@ public static class ProductionReader
 
     // ─── Lệnh sản xuất ─────────────────────────────────────────────────────
 
+    private sealed record OrderItemRow(
+        int ProductionOrderItemId, int ProductId, string? ProductCode, string? ProductName, string? UnitName,
+        int BomId, string? BomCode, string? BomVersion, decimal Planned, decimal Received, string? Notes);
+
     private sealed record OrderRow(
         int ProductionOrderId, string? Code, int ProductId, string? ProductCode, string? ProductName, string? UnitName,
         int BomId, string? BomCode, string? BomVersion, decimal? Planned, decimal? Received, decimal Defect,
         DateTime? StartDate, DateTime? EndDate, string? Workshop, string? Status, string? CreatorFullName,
-        string? CreatorUsername, int ShortageLines, int ReviewFlags, string? Notes);
+        string? CreatorUsername, int RequirementCount, int ShortageLines, int ReviewFlags, string? Notes,
+        List<OrderItemRow> Items);
 
     private static IQueryable<OrderRow> OrderRows(IQueryable<TrxProductionOrder> orders) =>
         orders.AsNoTracking().Select(o => new OrderRow(
@@ -83,21 +88,85 @@ public static class ProductionReader
             o.Status,
             o.CreatedByNavigation.FullName,
             o.CreatedByNavigation.Username,
+            o.TrxProductionMaterialRequirements.Count(),
             o.TrxProductionMaterialRequirements.Count(r => (r.ShortageQty ?? 0) > 0),
             o.TrxFinishedGoodsReceipts.Count(f => f.NeedsReview),
-            o.Notes));
+            o.Notes,
+            o.DtlProductionOrderItems
+                .OrderBy(i => i.ProductionOrderItemId)
+                .Select(i => new OrderItemRow(
+                    i.ProductionOrderItemId,
+                    i.ProductId,
+                    i.Product.ProductCode,
+                    i.Product.ProductName,
+                    i.Product.BaseUnit.UnitName,
+                    i.BomId,
+                    i.Bom.BomName,
+                    i.Bom.Version,
+                    i.PlannedQuantity,
+                    i.ActualQuantity,
+                    i.Notes))
+                .ToList()));
 
     private static ProductionOrderSummaryDto ToSummary(OrderRow o)
     {
+        var items = o.Items.Count > 0
+            ? o.Items.Select(i =>
+            {
+                var itemProgress = i.Planned > 0 ? Math.Min(100, Math.Round(i.Received * 100 / i.Planned, 1)) : 0;
+                return new ProductionOrderProductItemDto(
+                    i.ProductionOrderItemId,
+                    i.ProductId,
+                    i.ProductCode ?? "",
+                    i.ProductName ?? "",
+                    i.UnitName ?? "",
+                    i.BomId,
+                    i.BomCode ?? "",
+                    i.BomVersion ?? "",
+                    i.Planned,
+                    i.Received,
+                    Math.Max(0, i.Planned - i.Received),
+                    itemProgress,
+                    i.Notes);
+            }).ToList()
+            : new List<ProductionOrderProductItemDto>
+            {
+                new(
+                    0,
+                    o.ProductId,
+                    o.ProductCode ?? "",
+                    o.ProductName ?? "",
+                    o.UnitName ?? "",
+                    o.BomId,
+                    o.BomCode ?? "",
+                    o.BomVersion ?? "",
+                    o.Planned ?? 0,
+                    o.Received ?? 0,
+                    Math.Max(0, (o.Planned ?? 0) - (o.Received ?? 0)),
+                    (o.Planned ?? 0) > 0 ? Math.Min(100, Math.Round((o.Received ?? 0) * 100 / (o.Planned ?? 0), 1)) : 0,
+                    null)
+            };
+
         var planned = o.Planned ?? 0;
         var received = o.Received ?? 0;
         var progress = planned > 0 ? Math.Min(100, Math.Round(received * 100 / planned, 1)) : 0;
+        var productCode = items.Count > 1
+            ? string.Join(", ", items.Select(i => i.ProductCode).Where(c => !string.IsNullOrWhiteSpace(c)))
+            : (o.ProductCode ?? "");
+        var productName = items.Count > 1
+            ? string.Join(", ", items.Select(i => i.ProductName).Where(n => !string.IsNullOrWhiteSpace(n)))
+            : (o.ProductName ?? "");
+        var isFullyIssued = o.RequirementCount > 0 && o.ShortageLines == 0;
+        var isFullyReceived = items.Count > 0
+            ? items.All(i => i.PlannedQuantity > 0 && i.ReceivedQuantity >= i.PlannedQuantity)
+            : (planned > 0 && received >= planned);
+
         return new ProductionOrderSummaryDto(
             o.ProductionOrderId,
             o.Code ?? "",
             o.ProductId,
-            o.ProductCode ?? "",
-            o.ProductName ?? "",
+            productCode,
+            productName,
             o.UnitName ?? "",
             o.BomId,
             o.BomCode ?? "",
@@ -113,7 +182,10 @@ public static class ProductionReader
             !string.IsNullOrWhiteSpace(o.CreatorFullName) ? o.CreatorFullName! : o.CreatorUsername ?? "",
             o.ShortageLines > 0 ? "SHORTAGE" : "FULL",
             o.ShortageLines,
-            o.ReviewFlags);
+            o.ReviewFlags,
+            isFullyIssued,
+            isFullyReceived,
+            items);
     }
 
     public static async Task<List<ProductionOrderSummaryDto>> OrderSummariesAsync(
@@ -154,6 +226,10 @@ public static class ProductionReader
                 r.AdjustedBy,
                 r.AdjustedAt,
                 r.SourceBomItemId,
+                r.ProductionOrderItemId,
+                FinishedProductId = r.ProductionOrderItem != null ? (int?)r.ProductionOrderItem.ProductId : row.ProductId,
+                FinishedProductCode = r.ProductionOrderItem != null ? r.ProductionOrderItem.Product.ProductCode : row.ProductCode,
+                FinishedProductName = r.ProductionOrderItem != null ? r.ProductionOrderItem.Product.ProductName : row.ProductName,
             })
             .ToListAsync(ct);
 
@@ -173,7 +249,11 @@ public static class ProductionReader
             r.IsAdjusted, r.AdjustReason,
             r.AdjustedBy.HasValue && adjusters.TryGetValue(r.AdjustedBy.Value, out var u) ? ProductionHelper.UserName(u) : null,
             r.AdjustedAt,
-            r.SourceBomItemId.HasValue)).ToList();
+            r.SourceBomItemId.HasValue,
+            r.ProductionOrderItemId,
+            r.FinishedProductId,
+            r.FinishedProductCode,
+            r.FinishedProductName)).ToList();
 
         var issues = await IssuesAsync(
             context.TrxStockIssues.Where(i => i.ProductionOrderId == productionOrderId), authorized, ct);
@@ -224,6 +304,12 @@ public static class ProductionReader
                 Name = d.MaterialRequirement.Material.ProductName ?? "",
                 Unit = d.MaterialRequirement.Unit.UnitName ?? "",
                 Qty = d.ActualIssuedQty ?? 0,
+                FinishedProductCode = d.MaterialRequirement.ProductionOrderItem != null
+                    ? d.MaterialRequirement.ProductionOrderItem.Product.ProductCode
+                    : d.MaterialRequirement.ProductionOrder.Product.ProductCode,
+                FinishedProductName = d.MaterialRequirement.ProductionOrderItem != null
+                    ? d.MaterialRequirement.ProductionOrderItem.Product.ProductName
+                    : d.MaterialRequirement.ProductionOrder.Product.ProductName,
             })
             .ToListAsync(ct);
         var byIssue = items.GroupBy(i => i.StockIssueId).ToDictionary(g => g.Key, g => g.ToList());
@@ -236,7 +322,9 @@ public static class ProductionReader
                 h.WarehouseId, h.WarehouseName ?? "", h.Supplementary, h.Reason,
                 !string.IsNullOrWhiteSpace(h.FullName) ? h.FullName! : h.Username ?? "",
                 lines.Sum(l => l.Qty),
-                lines.Select(l => new MaterialIssueItemDto(l.RequirementId, l.MaterialId, l.Code, l.Name, l.Unit, l.Qty)).ToList());
+                lines.Select(l => new MaterialIssueItemDto(
+                    l.RequirementId, l.MaterialId, l.Code, l.Name, l.Unit, l.Qty,
+                    l.FinishedProductCode, l.FinishedProductName)).ToList());
         }).ToList();
     }
 

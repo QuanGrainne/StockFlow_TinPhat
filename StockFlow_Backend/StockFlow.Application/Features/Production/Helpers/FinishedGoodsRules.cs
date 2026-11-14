@@ -9,10 +9,19 @@ namespace StockFlow.Application.Features.Production.Helpers;
 /// <summary>Luật nhập thành phẩm dùng chung cho bước kiểm tra và bước ghi nhận (UC-49, BR-35, BR-37).</summary>
 public static class FinishedGoodsRules
 {
-    /// <summary>Số thành phẩm đã sản xuất luỹ kế của lệnh (đạt + lỗi) theo các báo cáo đã ghi.</summary>
+    /// <summary>Số thành phẩm đã sản xuất luỹ kế của lệnh hoặc dòng thành phẩm (đạt + lỗi) theo các báo cáo đã ghi.</summary>
     public static async Task<(decimal Accepted, decimal Defect)> ProducedSoFarAsync(
-        IStockFlowDbContext context, int productionOrderId, CancellationToken ct)
+        IStockFlowDbContext context, int productionOrderId, CancellationToken ct, int? productionOrderItemId = null)
     {
+        if (productionOrderItemId.HasValue)
+        {
+            var itemRows = await context.TrxFinishedGoodsReceipts.AsNoTracking()
+                .Where(f => f.ProductionOrderId == productionOrderId && f.ProductionOrderItemId == productionOrderItemId.Value)
+                .Select(f => new { Accepted = f.Quantity ?? 0, Defect = f.Report.DefectQty ?? 0 })
+                .ToListAsync(ct);
+            return (itemRows.Sum(r => r.Accepted), itemRows.Sum(r => r.Defect));
+        }
+
         var rows = await context.TrxProductionReports.AsNoTracking()
             .Where(r => r.ProductionOrderId == productionOrderId)
             .Select(r => new { Accepted = r.ProducedQty ?? 0, Defect = r.DefectQty ?? 0 })
@@ -25,11 +34,16 @@ public static class FinishedGoodsRules
     /// Lượng cần = Nhu cầu của lệnh × SL sản xuất luỹ kế / SL kế hoạch.
     /// </summary>
     public static async Task<List<MaterialUsageWarningDto>> MaterialWarningsAsync(
-        IStockFlowDbContext context, TrxProductionOrder order, decimal producedAfter, CancellationToken ct)
+        IStockFlowDbContext context, TrxProductionOrder order, decimal producedAfter, CancellationToken ct,
+        int? productionOrderItemId = null, decimal? itemPlannedQty = null)
     {
-        var planned = order.PlannedQuantity ?? 0;
-        var reqs = await context.TrxProductionMaterialRequirements.AsNoTracking()
-            .Where(r => r.ProductionOrderId == order.ProductionOrderId)
+        var planned = itemPlannedQty ?? order.PlannedQuantity ?? 0;
+        var q = context.TrxProductionMaterialRequirements.AsNoTracking()
+            .Where(r => r.ProductionOrderId == order.ProductionOrderId);
+        if (productionOrderItemId.HasValue)
+            q = q.Where(r => r.ProductionOrderItemId == productionOrderItemId.Value || r.ProductionOrderItemId == null);
+
+        var reqs = await q
             .Select(r => new
             {
                 Code = r.Material.ProductCode ?? "",

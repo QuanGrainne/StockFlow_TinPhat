@@ -48,6 +48,22 @@ public record SaveBomRequest(
 
 // ─── Lệnh sản xuất (UC-44, UC-58/59, UC-60, UC-61) ──────────────────────────
 
+public record ProductionOrderProductItemDto(
+    int ProductionOrderItemId,
+    int ProductId,
+    string ProductCode,
+    string ProductName,
+    string UnitName,
+    int BomId,
+    string BomCode,
+    string BomVersion,
+    decimal PlannedQuantity,
+    decimal ReceivedQuantity,
+    decimal RemainingQuantity,
+    decimal ProgressPercent,
+    string? Notes
+);
+
 public record ProductionOrderSummaryDto(
     int ProductionOrderId,
     string Code,
@@ -71,7 +87,12 @@ public record ProductionOrderSummaryDto(
     string MaterialStatus,
     int ShortageLineCount,
     /// <summary>Số phiếu nhập thành phẩm bị gắn cờ cần Manager xem xét (BR-37)</summary>
-    int ReviewFlagCount
+    int ReviewFlagCount,
+    /// <summary>Đã lập đủ phiếu xuất NVL (mọi dòng nhu cầu đều đã xuất đủ)</summary>
+    bool IsFullyIssued = false,
+    /// <summary>Đã lập đủ phiếu nhập thành phẩm (mọi thành phẩm trong lệnh đều đã nhập đủ SL kế hoạch)</summary>
+    bool IsFullyReceived = false,
+    List<ProductionOrderProductItemDto>? Items = null
 );
 
 public record ProductionMaterialDto(
@@ -91,7 +112,11 @@ public record ProductionMaterialDto(
     string? AdjustReason,
     string? AdjustedByName,
     DateTime? AdjustedAt,
-    bool FromBom
+    bool FromBom,
+    int? ProductionOrderItemId = null,
+    int? FinishedProductId = null,
+    string? FinishedProductCode = null,
+    string? FinishedProductName = null
 );
 
 public record MaterialIssueItemDto(
@@ -100,7 +125,9 @@ public record MaterialIssueItemDto(
     string MaterialCode,
     string MaterialName,
     string UnitName,
-    decimal Quantity
+    decimal Quantity,
+    string? FinishedProductCode = null,
+    string? FinishedProductName = null
 );
 
 public record MaterialIssueDto(
@@ -149,7 +176,23 @@ public record ProductionOrderDetailDto(
     int? AvailabilityWarehouseId,
     List<ProductionMaterialDto> Materials,
     List<MaterialIssueDto> Issues,
-    List<FinishedGoodsReceiptDto> Receipts
+    List<FinishedGoodsReceiptDto> Receipts,
+    List<ProductionOrderProductItemDto>? Items = null
+);
+
+public record SaveProductionOrderMaterialInput(
+    int MaterialId,
+    decimal NormPerUnit,
+    decimal WastageRate,
+    int? SourceBomItemId = null
+);
+
+public record SaveProductionOrderItemInput(
+    int ProductId,
+    decimal PlannedQuantity,
+    string? Notes = null,
+    List<SaveProductionOrderMaterialInput>? CustomMaterials = null,
+    string? AdjustReason = null
 );
 
 public record SaveProductionOrderRequest(
@@ -157,7 +200,10 @@ public record SaveProductionOrderRequest(
     decimal PlannedQuantity,
     DateTime? Deadline,
     string? Workshop,
-    string? Notes
+    string? Notes,
+    List<SaveProductionOrderItemInput>? Items = null,
+    List<SaveProductionOrderMaterialInput>? CustomMaterials = null,
+    string? AdjustReason = null
 );
 
 public record CloseProductionOrderRequest(string? Reason);
@@ -169,7 +215,8 @@ public record AdjustMaterialNormLine(
     decimal NormPerUnit,
     decimal WastageRate,
     /// <summary>Bỏ NVL khỏi lệnh (chỉ khi chưa xuất, BR-52)</summary>
-    bool Remove
+    bool Remove,
+    int? ProductionOrderItemId = null
 );
 
 public record AdjustMaterialNormRequest(string? Reason, List<AdjustMaterialNormLine> Lines);
@@ -219,7 +266,10 @@ public record CreateFinishedGoodsReceiptRequest(
     DateOnly? ProductionDate,
     string? Notes,
     /// <summary>Ghi chú bắt buộc khi có cảnh báo dùng NVL (BR-37, MSG43)</summary>
-    string? ReviewNote
+    string? ReviewNote,
+    int? ProductionOrderItemId = null,
+    /// <summary>Cho phép lưu phiếu nhập khi số lượng vượt kế hoạch (xác nhận Có trên popup cảnh báo)</summary>
+    bool ConfirmExceedPlan = false
 );
 
 public record MaterialUsageWarningDto(
