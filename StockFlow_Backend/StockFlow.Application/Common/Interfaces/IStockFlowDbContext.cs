@@ -46,6 +46,8 @@ public interface IStockFlowDbContext
     DbSet<TrxProductionOrder> TrxProductionOrders { get; }
     DbSet<TrxProductionMaterialRequirement> TrxProductionMaterialRequirements { get; }
     DbSet<TrxProductionReport> TrxProductionReports { get; }
+    DbSet<TrxProductionPlan> TrxProductionPlans { get; }
+    DbSet<DtlProductionPlanItem> DtlProductionPlanItems { get; }
     DbSet<TrxFinishedGoodsReceipt> TrxFinishedGoodsReceipts { get; }
     DbSet<MstInventoryLot> MstInventoryLots { get; }
     DbSet<MstWarehouseLocation> MstWarehouseLocations { get; }
