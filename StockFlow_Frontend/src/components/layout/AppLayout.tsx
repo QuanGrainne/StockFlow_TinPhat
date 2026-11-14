@@ -14,6 +14,7 @@ import PurchaseOrdersScreen from '@/features/purchase-orders/screens/PurchaseOrd
 import PriceBooksScreen from '@/features/price-books/screens/PriceBooksScreen';
 import TransfersScreen from '@/features/transfers/screens/TransfersScreen';
 import StocktakesScreen from '@/features/stocktakes/screens/StocktakesScreen';
+import DisposalsScreen from '@/features/disposals/screens/DisposalsScreen';
 import OrdersScreen from '@/features/orders/screens/OrdersScreen';
 import SalesBookingsScreen from '@/features/sales-bookings/screens/SalesBookingsScreen';
 import SalesReturnsScreen from '@/features/sales-returns/screens/SalesReturnsScreen';
@@ -233,6 +234,9 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ initialScreen, children })
       case 'stocktakes':
         return <StocktakesScreen />;
 
+      case 'disposals':
+        return <DisposalsScreen />;
+
       case 'transfers':
       case 'admin-transfers':
       case 'manager-transfers':
@@ -277,6 +281,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ initialScreen, children })
         activeScreen.includes('goods') || activeScreen.includes('catalog') ||
         activeScreen === 'price-books' || activeScreen === 'admin-price-books' ||
         activeScreen === 'stocktakes' ||
+        activeScreen === 'disposals' ||
         activeScreen === 'manager-bom' || activeScreen.startsWith('production-') ||
         activeScreen.includes('price-book') ? (
         <main className="flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden bg-transparent">

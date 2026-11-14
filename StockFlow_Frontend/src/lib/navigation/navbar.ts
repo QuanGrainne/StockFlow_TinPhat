@@ -16,6 +16,7 @@ import {
   Package,
   PackageMinus,
   PackagePlus,
+  PackageX,
   Repeat,
   RotateCcw,
   ShieldCheck,
@@ -170,6 +171,16 @@ export const NAV_GROUPS: NavGroup[] = [
         desc: 'Kiểm kê, cân bằng tồn kho thực tế',
         icon: ClipboardCheck,
         // API /api/Stocktakes dùng quyền STOCK_*
+        backendModule: 'STOCK',
+      },
+      {
+        screen: 'disposals',
+        path: '/disposals',
+        featureId: 'feat-disposal',
+        title: 'Xuất hủy',
+        desc: 'Xuất hủy hàng lỗi, hỏng; trừ tồn kho theo giá vốn',
+        icon: PackageX,
+        // API /api/Disposals dùng quyền STOCK_*
         backendModule: 'STOCK',
       },
     ],
