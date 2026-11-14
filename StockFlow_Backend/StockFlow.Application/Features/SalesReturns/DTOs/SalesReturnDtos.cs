@@ -92,7 +92,11 @@ public record SalesReturnSourceDto(
     decimal PartnerDebt,
     bool IsWalkIn,
     string SellerName,
-    List<SalesReturnSourceItemDto> Items);
+    List<SalesReturnSourceItemDto> Items,
+    /// <summary>Tổng tiền hàng của hóa đơn (trước giảm giá hóa đơn) — cơ sở phân bổ giảm giá cho hàng trả</summary>
+    decimal InvoiceSubTotal = 0,
+    /// <summary>Giảm giá tổng hóa đơn</summary>
+    decimal InvoiceDiscount = 0);
 
 public class SalesReturnLineRequest
 {

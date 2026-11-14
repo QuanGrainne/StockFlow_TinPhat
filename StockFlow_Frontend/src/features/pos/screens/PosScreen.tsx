@@ -433,6 +433,7 @@ export default function PosScreen() {
             note: '',
             orderItemId: it.orderItemId,
             maxQty: it.remainingQuantity,
+            returnSalePrice: it.salePrice,
           }));
         if (lines.length === 0) {
           message.warning(`Hóa đơn ${src.invoiceCode} đã được trả hết hàng.`);
@@ -467,6 +468,9 @@ export default function PosScreen() {
           returnSellerName: src.sellerName,
           returnFee: 0,
           returnWalkIn: src.isWalkIn,
+          returnInvoiceSubTotal: src.invoiceSubTotal ?? 0,
+          returnInvoiceDiscount: src.invoiceDiscount ?? 0,
+          returnDiscountEdited: false,
         };
         setTabs((prev) => [...prev.filter((x) => x.lines.length > 0 || x.bookingId || x.returnInvoiceId || x.returnQuick), t]);
         setActiveTabId(t.id);

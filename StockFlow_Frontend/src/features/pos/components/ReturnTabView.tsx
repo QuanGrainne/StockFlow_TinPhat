@@ -73,7 +73,18 @@ export function ReturnTabView({ tab, userName, onChange, onDone, canReturn, ware
   const active = tab.lines.filter((l) => l.quantity > 0);
   const totalQty = active.reduce((s, l) => s + l.quantity, 0);
   const totalGoods = active.reduce((s, l) => s + Math.round(l.quantity * l.unitPrice), 0);
-  const discount = Math.min(totalGoods, tab.discountValue);
+  // Giá trị hàng trả theo giá bán trên hóa đơn ("Tổng giá gốc hàng mua" như KiotViet)
+  const originalGoods = active.reduce((s, l) => s + Math.round(l.quantity * (l.returnSalePrice ?? l.unitPrice)), 0);
+  // Giảm giá tổng hóa đơn phân bổ cho hàng trả theo tỷ lệ giá trị (khớp SalesReturnOps.AllocateInvoiceDiscount)
+  const invoiceDiscount = isQuick ? 0 : tab.returnInvoiceDiscount ?? 0;
+  const invoiceSubTotal = tab.returnInvoiceSubTotal ?? 0;
+  const allocated =
+    invoiceDiscount > 0 && invoiceSubTotal > 0 && originalGoods > 0
+      ? Math.min(invoiceDiscount, Math.round((invoiceDiscount * originalGoods) / invoiceSubTotal))
+      : 0;
+  const minDiscount = Math.min(allocated, totalGoods);
+  const discount = Math.min(totalGoods, tab.returnDiscountEdited ? tab.discountValue : allocated);
+  const discountTooLow = discount < minDiscount;
   const fee = Math.min(totalGoods - discount, tab.returnFee ?? 0);
   const mustRefund = totalGoods - discount - fee;
   const refund = Math.min(tab.paid ?? mustRefund, mustRefund);
@@ -84,6 +95,10 @@ export function ReturnTabView({ tab, userName, onChange, onDone, canReturn, ware
     if (!canReturn) return message.error('Vai trò của bạn chưa được phân quyền chức năng Trả hàng.');
     if (active.length === 0) return message.warning('Nhập số lượng trả cho ít nhất 1 hàng hóa.');
     if (walkIn && refund < mustRefund) return message.error('Khách lẻ không có công nợ — phải trả đủ tiền cho khách.');
+    if (discountTooLow)
+      return message.error(
+        `Hóa đơn được giảm giá ${fmt(invoiceDiscount)}: giảm giá hàng trả tối thiểu ${fmt(minDiscount)} (phân bổ theo giá trị hàng trả).`
+      );
     setSubmitting(true);
     try {
       const res = await salesReturnService.createReturn({
@@ -298,17 +313,45 @@ export function ReturnTabView({ tab, userName, onChange, onDone, canReturn, ware
         </div>
 
         <div className="mt-4 space-y-4 text-[15px]">
+          {!isQuick && (
+            <div className="flex items-center justify-between" title="Giá trị hàng trả theo giá bán trên hóa đơn gốc">
+              <span>
+                Tổng giá gốc hàng mua <span className="ml-6 text-[#677484]">{fmt(totalQty)}</span>
+              </span>
+              <span>{fmt(originalGoods)}</span>
+            </div>
+          )}
           <div className="flex items-center justify-between">
             <span>
               Tổng tiền hàng trả <span className="ml-6 text-[#677484]">{fmt(totalQty)}</span>
             </span>
             <span>{fmt(totalGoods)}</span>
           </div>
-          <div className="flex items-center justify-between">
-            <span>Giảm giá</span>
-            <div className="w-36">
-              <MoneyInput value={discount} onChange={(v) => onChange({ discountMode: 'VND', discountValue: v, paid: null })} />
+          <div>
+            <div className="flex items-center justify-between">
+              <span>Giảm giá</span>
+              <div className="w-36">
+                <MoneyInput
+                  value={discount}
+                  onChange={(v) => onChange({ discountMode: 'VND', discountValue: v, returnDiscountEdited: true, paid: null })}
+                  className={discountTooLow ? 'text-[#fb2c36] border-[#fb2c36]' : ''}
+                />
+              </div>
             </div>
+            {invoiceDiscount > 0 && (
+              <div className={`mt-1 text-[12px] text-right ${discountTooLow ? 'text-[#fb2c36]' : 'text-[#677484]'}`}>
+                Giảm giá HĐ {fmt(invoiceDiscount)}, phân bổ cho hàng trả: {fmt(allocated)}
+                {tab.returnDiscountEdited && discount !== Math.min(totalGoods, allocated) && (
+                  <button
+                    type="button"
+                    onClick={() => onChange({ returnDiscountEdited: false, paid: null })}
+                    className="ml-1.5 text-[#0070f4] hover:underline cursor-pointer"
+                  >
+                    Lấy lại
+                  </button>
+                )}
+              </div>
+            )}
           </div>
           <div className="flex items-center justify-between">
             <span title="Phí khách chịu khi trả hàng">Phí trả hàng</span>
@@ -351,7 +394,7 @@ export function ReturnTabView({ tab, userName, onChange, onDone, canReturn, ware
         <button
           type="button"
           onClick={() => void handleSubmit()}
-          disabled={submitting || !canReturn}
+          disabled={submitting || !canReturn || discountTooLow}
           className="mt-auto h-14 rounded-xl bg-[#0070f4] hover:bg-[#005ac3] text-white text-[17px] font-bold tracking-wide flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
         >
           {submitting && <RefreshCw size={18} className="animate-spin" />}

@@ -29,6 +29,8 @@ export interface PosLine {
   /** Trả hàng: dòng hóa đơn gốc, SL còn được trả */
   orderItemId?: number;
   maxQty?: number;
+  /** Trả hàng theo hóa đơn: giá bán trên hóa đơn (cơ sở phân bổ giảm giá hóa đơn) */
+  returnSalePrice?: number;
 }
 
 export interface PosTab {
@@ -64,6 +66,11 @@ export interface PosTab {
   returnSellerName?: string | null;
   returnFee?: number;
   returnWalkIn?: boolean;
+  /** Trả hàng theo hóa đơn: tổng tiền hàng và giảm giá tổng của hóa đơn gốc (phân bổ giảm giá như KiotViet) */
+  returnInvoiceSubTotal?: number;
+  returnInvoiceDiscount?: number;
+  /** Người dùng đã tự sửa Giảm giá (không còn lấy theo phân bổ) */
+  returnDiscountEdited?: boolean;
   /** Trả nhanh: khách quên hóa đơn — tự tìm hàng, tự chọn khách, không giới hạn theo hóa đơn */
   returnQuick?: boolean;
 }
