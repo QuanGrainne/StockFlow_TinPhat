@@ -1391,6 +1391,13 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("fk_trx_inventory_disposals_processed_by");
 
+            // Người tạo phiếu xuất hủy (người xuất hủy = processed_by)
+            entity.Property(e => e.CreatedBy).HasColumnName("created_by");
+            entity.HasOne(d => d.CreatedByNavigation).WithMany()
+                .HasForeignKey(d => d.CreatedBy)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("fk_trx_inventory_disposals_created_by");
+
             entity.HasOne(d => d.Warehouse).WithMany(p => p.TrxInventoryDisposals)
                 .HasForeignKey(d => d.WarehouseId)
                 .OnDelete(DeleteBehavior.ClientSetNull)

@@ -19,6 +19,11 @@ public partial class TrxInventoryDisposal
 
     public string? Status { get; set; }
 
+    /// <summary>Người tạo phiếu (khác Người xuất hủy = ProcessedBy, chọn được trên phiếu)</summary>
+    public int? CreatedBy { get; set; }
+
+    public virtual SecUser? CreatedByNavigation { get; set; }
+
     public virtual ICollection<DtlInventoryDisposalItem> DtlInventoryDisposalItems { get; set; } = new List<DtlInventoryDisposalItem>();
 
     public virtual SecUser ProcessedByNavigation { get; set; } = null!;

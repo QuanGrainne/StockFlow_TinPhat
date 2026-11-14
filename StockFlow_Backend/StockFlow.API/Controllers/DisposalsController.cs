@@ -66,6 +66,39 @@ public class DisposalsController : ControllerBase
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { message = result.Error });
     }
 
+    /// <summary>Nhân viên chọn làm "Người xuất hủy": đang hoạt động, được phân quyền kho của phiếu.</summary>
+    [HttpGet("staff-options")]
+    [RequirePermission("STOCK_READ")]
+    [RequireFeature("feat-disposal")]
+    public async Task<IActionResult> GetStaffOptions([FromQuery] int warehouseId)
+    {
+        var result = await _mediator.Send(new GetDisposalStaffOptionsQuery(warehouseId));
+        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { message = result.Error });
+    }
+
+    /// <summary>Nút "Lưu" ở chi tiết phiếu: người xuất hủy, ngày xuất hủy (phiếu tạm), ghi chú.</summary>
+    [HttpPut("{id:int}/info")]
+    [RequirePermission("STOCK_UPDATE")]
+    [RequireFeature("feat-disposal")]
+    public async Task<IActionResult> UpdateInfo(int id, [FromBody] UpdateDisposalInfoRequest request)
+    {
+        var result = await _mediator.Send(new UpdateDisposalInfoCommand(id, request));
+        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { message = result.Error });
+    }
+
+    /// <summary>Hủy/xóa phiếu xuất hủy (hỗ trợ POST/PATCH/DELETE /cancel hoặc DELETE /{id}): phiếu tạm đổi trạng thái, phiếu hoàn thành được hoàn tồn kho.</summary>
+    [HttpPost("{id:int}/cancel")]
+    [HttpPatch("{id:int}/cancel")]
+    [HttpDelete("{id:int}/cancel")]
+    [HttpDelete("{id:int}")]
+    [RequirePermission("STOCK_UPDATE")]
+    [RequireFeature("feat-disposal")]
+    public async Task<IActionResult> Cancel(int id)
+    {
+        var result = await _mediator.Send(new CancelDisposalCommand(id));
+        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { message = result.Error });
+    }
+
     /// <summary>Sửa phiếu tạm; Status COMPLETED thì hoàn thành phiếu (trừ tồn kho).</summary>
     [HttpPut("{id:int}")]
     [RequirePermission("STOCK_UPDATE")]

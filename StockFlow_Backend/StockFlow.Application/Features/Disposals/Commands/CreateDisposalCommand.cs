@@ -75,6 +75,16 @@ public class CreateDisposalCommandHandler : IRequestHandler<CreateDisposalComman
         if (!await _currentUser.HasWarehouseAccessAsync(req.WarehouseId, ct))
             return Result.Failure<DisposalDetailDto>($"Bạn không có quyền xuất hủy hàng của kho '{warehouse.WarehouseName}'.");
 
+        var date = DisposalLogic.ResolveDate(req.DisposalDate);
+        if (!date.IsSuccess) return Result.Failure<DisposalDetailDto>(date.Error!);
+        // Người xuất hủy: mặc định là người lập phiếu
+        var processedBy = req.ProcessedBy is > 0 ? req.ProcessedBy.Value : userId;
+        if (processedBy != userId)
+        {
+            var personError = await DisposalLogic.ValidateProcessedByAsync(_context, processedBy, req.WarehouseId, ct);
+            if (personError != null) return Result.Failure<DisposalDetailDto>(personError);
+        }
+
         using var tx = await _context.BeginTransactionAsync(ct);
         try
         {
@@ -85,8 +95,9 @@ public class CreateDisposalCommandHandler : IRequestHandler<CreateDisposalComman
             {
                 DisposalCode = code.Value,
                 WarehouseId = req.WarehouseId,
-                ProcessedBy = userId,
-                DisposalDate = VietnamTime.Now,
+                CreatedBy = userId,
+                ProcessedBy = processedBy,
+                DisposalDate = date.Value,
                 Reason = string.IsNullOrWhiteSpace(req.Reason) ? null : req.Reason.Trim(),
             };
             disposal.MarkDraft();

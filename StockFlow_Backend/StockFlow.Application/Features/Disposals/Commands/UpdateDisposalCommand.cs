@@ -50,6 +50,16 @@ public class UpdateDisposalCommandHandler : IRequestHandler<UpdateDisposalComman
         if (req.WarehouseId != disposal.WarehouseId)
             return Result.Failure<DisposalDetailDto>("Không đổi được kho của phiếu xuất hủy đã lập.");
 
+        var date = DisposalLogic.ResolveDate(req.DisposalDate);
+        if (!date.IsSuccess) return Result.Failure<DisposalDetailDto>(date.Error!);
+        // Người xuất hủy: giữ người đang ghi trên phiếu nếu form không gửi
+        var processedBy = req.ProcessedBy is > 0 ? req.ProcessedBy.Value : disposal.ProcessedBy;
+        if (processedBy != disposal.ProcessedBy)
+        {
+            var personError = await DisposalLogic.ValidateProcessedByAsync(_context, processedBy, disposal.WarehouseId, ct);
+            if (personError != null) return Result.Failure<DisposalDetailDto>(personError);
+        }
+
         using var tx = await _context.BeginTransactionAsync(ct);
         try
         {
@@ -57,7 +67,9 @@ public class UpdateDisposalCommandHandler : IRequestHandler<UpdateDisposalComman
             if (!code.IsSuccess) return Result.Failure<DisposalDetailDto>(code.Error!);
             disposal.DisposalCode = code.Value;
             disposal.Reason = string.IsNullOrWhiteSpace(req.Reason) ? null : req.Reason.Trim();
-            disposal.ProcessedBy = userId;
+            disposal.ProcessedBy = processedBy;
+            disposal.DisposalDate = date.Value;
+            if (!disposal.CreatedBy.HasValue) disposal.CreatedBy = disposal.ProcessedBy > 0 ? disposal.ProcessedBy : userId;
 
             var items = await DisposalLogic.ReplaceItemsAsync(_context, disposal, req.Items, ct);
             if (!items.IsSuccess) return Result.Failure<DisposalDetailDto>(items.Error!);

@@ -36,6 +36,7 @@ public class GetDisposalsQueryHandler : IRequestHandler<GetDisposalsQuery, Resul
         var q = _context.TrxInventoryDisposals.AsNoTracking()
             .Include(d => d.Warehouse)
             .Include(d => d.ProcessedByNavigation)
+            .Include(d => d.CreatedByNavigation)
             .Include(d => d.DtlInventoryDisposalItems)
             .Where(d => warehouseIds.Contains(d.WarehouseId));
 
