@@ -27,6 +27,7 @@ import {
   PlusCircle,
   RefreshCw,
   Search,
+  ShieldCheck,
   ShoppingBag,
   Trash2,
   Undo2,
@@ -48,6 +49,9 @@ import { posService, type PosSaleRequest } from '../services/posService';
 import { ReturnTabView } from '../components/ReturnTabView';
 import { PickBookingDialog, PickInvoiceDialog } from '../components/PosPickerDialogs';
 import { BookingShortageDialog, type BookingShortageLine } from '../components/BookingShortageDialog';
+import { CreditRequestDialog } from '../components/CreditRequestDialog';
+import { MyCreditRequestsDialog } from '../components/MyCreditRequestsDialog';
+import { isOverCreditLimitError } from '@/features/credit-requests';
 import { salesReturnService } from '@/features/sales-returns/services/salesReturnService';
 import type { PosCustomer, PosPriceBook, PosProduct } from '../types';
 import {
@@ -314,6 +318,10 @@ export default function PosScreen() {
   const [submitting, setSubmitting] = useState(false);
   /** Hóa đơn từ đơn đặt, khách lấy thiếu: các dòng thiếu (mở hộp hỏi tạo đơn chờ) */
   const [shortage, setShortage] = useState<BookingShortageLine[] | null>(null);
+  /** Thanh toán bị chặn vì vượt hạn mức (CUS-008/009) → hộp gửi yêu cầu duyệt (UC-27) */
+  const [creditBlock, setCreditBlock] = useState<{ message: string; expectedNewDebt: number } | null>(null);
+  /** Hộp "Yêu cầu hạn mức của tôi" cho khách đang chọn */
+  const [myCreditOpen, setMyCreditOpen] = useState(false);
   const [now, setNow] = useState(() => new Date());
 
   const productSearchRef = useRef<HTMLInputElement>(null);
@@ -799,8 +807,8 @@ export default function PosScreen() {
   // ── Khách hàng ──
   const customerItems = customerResults.q === customerQuery.trim() ? customerResults.items : [];
   const selectCustomer = (c: PosCustomer | null) => {
-    // Chọn / bỏ khách không làm mất số tiền khách trả đã nhập
-    updateTab({ customer: c });
+    // Chọn / bỏ khách không làm mất số tiền khách trả đã nhập; ngoại lệ hạn mức gắn theo khách nên bỏ khi đổi khách
+    updateTab({ customer: c, creditRequestId: null, creditRequestCode: null });
     setCustomerQuery('');
     setCustomerDropdown(false);
   };
@@ -939,6 +947,7 @@ export default function PosScreen() {
       orderDate: !lockSaleTime && saleTime ? new Date(saleTime).toISOString() : undefined,
       bookingOrderId: tab.bookingId ?? undefined,
       createRemainderBooking,
+      creditRequestId: tab.creditRequestId ?? undefined,
       items: tab.lines.map((l) => {
         const c = lineCalc(l);
         // Bán cao hơn đơn giá: gửi giá bán làm đơn giá gốc, không giảm giá (server không nhận giảm giá âm)
@@ -974,7 +983,15 @@ export default function PosScreen() {
       setSaleTime(null);
       setReloadTick((t) => t + 1); // tồn kho thay đổi
     } catch (err) {
-      message.error(err instanceof Error ? err.message : 'Thanh toán không thành công.');
+      const msg = err instanceof Error ? err.message : 'Thanh toán không thành công.';
+      if (tab.customer && !tab.creditRequestId && isOverCreditLimitError(msg)) {
+        // BR-12: vượt hạn mức → cho gửi yêu cầu duyệt. Nợ mới cộng cả tiền trả trước của đơn đặt
+        // vì server cộng lại phần này vào dư nợ khi so hạn mức.
+        setShortage(null);
+        setCreditBlock({ message: msg, expectedNewDebt: Math.max(0, dueNow - paid) + depositApplied });
+      } else {
+        message.error(msg);
+      }
     } finally {
       setSubmitting(false);
     }
@@ -1486,9 +1503,27 @@ export default function PosScreen() {
                   {tab.customer.currentDebt > 0 && (
                     <span className="text-[12px] text-[#fb2c36] shrink-0">Nợ: {fmt(tab.customer.currentDebt)}</span>
                   )}
+                  {/* Hóa đơn: yêu cầu vượt hạn mức đã gửi / chọn ngoại lệ một lần đã duyệt (UC-27) */}
+                  {!isBooking && (
+                    <button
+                      type="button"
+                      onClick={() => setMyCreditOpen(true)}
+                      title={tab.creditRequestCode ? `Đang dùng ngoại lệ ${tab.creditRequestCode}` : 'Yêu cầu hạn mức của tôi'}
+                      className={`ml-auto shrink-0 inline-flex items-center gap-1 h-6 px-2 rounded-md text-[12px] font-semibold cursor-pointer ${
+                        tab.creditRequestCode ? 'bg-[#0071BA] text-white' : 'text-[#0071BA] hover:bg-black/5'
+                      }`}
+                    >
+                      <ShieldCheck size={13} />
+                      {tab.creditRequestCode ?? 'Hạn mức'}
+                    </button>
+                  )}
                   {/* Tab gắn với đơn đặt: khách hàng cố định theo đơn */}
                   {!tab.bookingId && (
-                    <button type="button" onClick={() => selectCustomer(null)} className="ml-auto p-0.5 rounded hover:bg-black/5 cursor-pointer">
+                    <button
+                      type="button"
+                      onClick={() => selectCustomer(null)}
+                      className={`${isBooking ? 'ml-auto' : ''} p-0.5 rounded hover:bg-black/5 cursor-pointer`}
+                    >
                       <X size={15} />
                     </button>
                   )}
@@ -1733,6 +1768,34 @@ export default function PosScreen() {
           onSelect={(id) => {
             setPicker(null);
             openBookingTab(id, 'invoice');
+          }}
+        />
+      )}
+
+      {creditBlock && tab.customer && (
+        <CreditRequestDialog
+          // Cùng mã khách với hóa đơn (partnerId: tab.customer.id khi thanh toán)
+          customer={{ ...tab.customer, partnerId: tab.customer.id }}
+          expectedNewDebt={creditBlock.expectedNewDebt}
+          blockMessage={creditBlock.message}
+          onClose={() => setCreditBlock(null)}
+          onSubmitted={(_, msg) => {
+            setCreditBlock(null);
+            // MSG24: giữ nguyên tab để thanh toán lại sau khi được duyệt
+            message.success(msg, 6);
+          }}
+        />
+      )}
+      {myCreditOpen && tab.customer && (
+        <MyCreditRequestsDialog
+          partnerId={tab.customer.id}
+          customerName={tab.customer.name}
+          selectedId={tab.creditRequestId ?? null}
+          onClose={() => setMyCreditOpen(false)}
+          onSelect={(r) => {
+            updateTab({ creditRequestId: r?.requestId ?? null, creditRequestCode: r ? (r.requestCode ?? `#${r.requestId}`) : null });
+            setMyCreditOpen(false);
+            if (r) message.info(`Hóa đơn này sẽ dùng ngoại lệ ${r.requestCode ?? `#${r.requestId}`} khi thanh toán.`);
           }}
         />
       )}

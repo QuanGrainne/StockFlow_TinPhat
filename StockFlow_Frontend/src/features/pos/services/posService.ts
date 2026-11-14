@@ -37,6 +37,8 @@ export interface PosSaleRequest {
   bookingOrderId?: number;
   /** Hóa đơn từ đơn, khách lấy thiếu: true = tạo đơn đặt mới (Phiếu tạm) cho phần còn lại */
   createRemainderBooking?: boolean;
+  /** Ngoại lệ một lần đã duyệt (vượt hạn mức): server kiểm đúng khách, chưa dùng, không vượt mức đã duyệt */
+  creditRequestId?: number;
   items: {
     productId: number;
     quantity: number;

@@ -29,6 +29,12 @@ public partial class TrxCreditLimitRequest
 
     public string? ApprovalNotes { get; set; }
 
+    /// <summary>Mã yêu cầu (VD YCHM00001), sinh từ sequence seq_credit_request_code. Null với dữ liệu cũ.</summary>
+    public string? RequestCode { get; set; }
+
+    /// <summary>Loại duyệt: ONE_TIME / NEW_LIMIT (CreditApprovalType). Null khi chờ hoặc từ chối.</summary>
+    public string? ApprovalType { get; set; }
+
     public virtual SecUser? ApprovedByNavigation { get; set; }
 
     public virtual MstBusinessPartner Partner { get; set; } = null!;

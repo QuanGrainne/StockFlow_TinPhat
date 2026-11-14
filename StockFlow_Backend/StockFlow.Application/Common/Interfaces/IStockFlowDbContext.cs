@@ -27,6 +27,8 @@ public interface IStockFlowDbContext
     DbSet<DtlStocktakeItem> DtlStocktakeItems { get; }
     DbSet<DtlPurchaseReturnItem> DtlPurchaseReturnItems { get; }
     DbSet<TrxFinancialTransaction> TrxFinancialTransactions { get; }
+    // Yêu cầu duyệt vượt hạn mức công nợ (UC-27, UC-64)
+    DbSet<TrxCreditLimitRequest> TrxCreditLimitRequests { get; }
     DbSet<MstPriceBook> MstPriceBooks { get; }
     DbSet<DtlPriceBookItem> DtlPriceBookItems { get; }
 
