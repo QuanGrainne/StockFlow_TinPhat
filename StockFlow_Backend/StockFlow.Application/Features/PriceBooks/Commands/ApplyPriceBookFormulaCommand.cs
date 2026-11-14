@@ -166,7 +166,7 @@ public class ApplyPriceBookFormulaCommandHandler : IRequestHandler<ApplyPriceBoo
             if (existingMap.TryGetValue(p.ProductId, out var item))
             {
                 item.Price = calculatedPrice;
-                item.UpdatedAt = DateTime.UtcNow;
+                item.UpdatedAt = VietnamTime.Now;
             }
             else
             {
@@ -175,12 +175,12 @@ public class ApplyPriceBookFormulaCommandHandler : IRequestHandler<ApplyPriceBoo
                     PriceBookId = pb.PriceBookId,
                     ProductId = p.ProductId,
                     Price = calculatedPrice,
-                    UpdatedAt = DateTime.UtcNow
+                    UpdatedAt = VietnamTime.Now
                 }, cancellationToken);
             }
         }
 
-        pb.UpdatedAt = DateTime.UtcNow;
+        pb.UpdatedAt = VietnamTime.Now;
         await _context.SaveChangesAsync(cancellationToken);
 
         return Result.Success();

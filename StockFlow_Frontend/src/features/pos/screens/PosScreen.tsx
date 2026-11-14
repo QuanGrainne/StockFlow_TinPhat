@@ -338,6 +338,29 @@ export default function PosScreen() {
   const defaultPriceBookId = priceBooks.find((p) => p.isDefault)?.priceBookId ?? priceBooks[0]?.priceBookId ?? null;
   const priceBookId = tab.priceBookId ?? defaultPriceBookId;
 
+  // ── Bảng giá dùng được cho chi nhánh + khách đang chọn (phạm vi áp dụng, hiệu lực) ──
+  const saleCustomerId = tab.kind === 'RETURN' ? null : tab.customer?.id ?? null;
+  const saleBooksKey = `${warehouseId}|${saleCustomerId ?? 0}`;
+  const [saleBooks, setSaleBooks] = useState<{ key: string; books: PosPriceBook[] }>({ key: '', books: [] });
+  /** Đã đề xuất bảng giá riêng cho (tab, khách) này chưa: chỉ đề xuất 1 lần, người dùng đổi tay thì giữ */
+  const suggestedBookRef = useRef<string>('');
+  const syncPriceBookRef = useRef<(books: PosPriceBook[], customerId: number | null) => void>(() => {});
+  useEffect(() => {
+    let alive = true;
+    posService
+      .getPriceBooks({ warehouseId, customerId: saleCustomerId ?? undefined, forSale: true })
+      .then((books) => {
+        if (!alive) return;
+        setSaleBooks({ key: saleBooksKey, books });
+        if (books.length > 0) syncPriceBookRef.current(books, saleCustomerId);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [saleBooksKey, warehouseId, saleCustomerId]);
+  // Đang tải / lỗi: tạm hiện danh sách đầy đủ để không trống ô chọn
+  const selectableBooks = saleBooks.key === saleBooksKey && saleBooks.books.length > 0 ? saleBooks.books : priceBooks;
+
   // ── Tải dữ liệu: hàng hóa theo kho làm việc, bảng giá, ma trận giá, thiết lập bán âm ──
   useEffect(() => {
     let cancelled = false;
@@ -755,6 +778,33 @@ export default function PosScreen() {
       }),
     }));
   };
+
+  // Chọn khách có bảng giá riêng → tự đề xuất bảng giá đó (1 lần cho mỗi tab + khách).
+  // Bảng giá đang chọn không còn áp dụng (đổi khách / chi nhánh, hết hiệu lực) → về bảng giá chung.
+  useEffect(() => {
+    syncPriceBookRef.current = (books, customerId) => {
+      const selectedId = tab.priceBookId ?? defaultPriceBookId;
+      const own = customerId
+        ? books.find((b) => !b.isDefault && b.scopeCustomerType === 'SPECIFIC' && b.scopeCustomerIds.includes(customerId))
+        : undefined;
+      const key = `${tab.id}:${customerId ?? 0}`;
+      if (own && suggestedBookRef.current !== key) {
+        suggestedBookRef.current = key;
+        if (selectedId !== own.priceBookId) {
+          changePriceBook(own.priceBookId);
+          message.info(`Đã chọn bảng giá "${own.priceBookName}" dành riêng cho khách hàng này.`);
+        }
+        return;
+      }
+      if (selectedId != null && !books.some((b) => b.priceBookId === selectedId)) {
+        const fallback = books.find((b) => b.isDefault) ?? books[0];
+        if (fallback && fallback.priceBookId !== selectedId) {
+          changePriceBook(fallback.priceBookId);
+          message.info(`Bảng giá đang chọn không áp dụng cho khách / chi nhánh này, đã chuyển về "${fallback.priceBookName}".`);
+        }
+      }
+    };
+  });
 
   const productMatches = useMemo(() => {
     const q = productQuery.trim().toLowerCase();
@@ -1545,9 +1595,10 @@ export default function PosScreen() {
                 onChange={(e) => changePriceBook(Number(e.target.value))}
                 className="h-9 pl-3 pr-8 rounded-lg bg-[#f1f3f6] outline-none appearance-none cursor-pointer max-w-[170px] truncate"
               >
-                {priceBooks.map((p) => (
+                {/* Chỉ bảng giá áp dụng cho chi nhánh + khách đang chọn; bảng giá riêng của khách có đánh dấu ★ */}
+                {selectableBooks.map((p) => (
                   <option key={p.priceBookId} value={p.priceBookId}>
-                    {p.priceBookName}
+                    {p.scopeCustomerType === 'SPECIFIC' ? `★ ${p.priceBookName}` : p.priceBookName}
                   </option>
                 ))}
               </select>

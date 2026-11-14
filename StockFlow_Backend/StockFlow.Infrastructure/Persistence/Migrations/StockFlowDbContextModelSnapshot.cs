@@ -1124,6 +1124,10 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                         .HasColumnType("text")
                         .HasColumnName("scope_customer_group_codes");
 
+                    b.Property<string>("ScopeCustomerIds")
+                        .HasColumnType("text")
+                        .HasColumnName("scope_customer_ids");
+
                     b.Property<string>("ScopeCustomerType")
                         .IsRequired()
                         .HasMaxLength(20)

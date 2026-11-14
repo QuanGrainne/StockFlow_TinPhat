@@ -2023,6 +2023,7 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
                 .HasMaxLength(20)
                 .HasColumnName("scope_user_type");
             entity.Property(e => e.ScopeUserIds).HasColumnName("scope_user_ids");
+            entity.Property(e => e.ScopeCustomerIds).HasColumnName("scope_customer_ids");
             entity.Property(e => e.CreatedAt)
                 .HasColumnType("timestamp without time zone")
                 .HasColumnName("created_at");

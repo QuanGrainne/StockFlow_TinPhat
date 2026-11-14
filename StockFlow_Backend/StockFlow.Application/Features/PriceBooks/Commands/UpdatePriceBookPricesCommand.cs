@@ -55,7 +55,7 @@ public class UpdatePriceBookPricesCommandHandler : IRequestHandler<UpdatePriceBo
             if (existingMap.TryGetValue(item.ProductId, out var existing))
             {
                 existing.Price = validPrice;
-                existing.UpdatedAt = DateTime.UtcNow;
+                existing.UpdatedAt = VietnamTime.Now;
             }
             else
             {
@@ -64,12 +64,12 @@ public class UpdatePriceBookPricesCommandHandler : IRequestHandler<UpdatePriceBo
                     PriceBookId = request.PriceBookId,
                     ProductId = item.ProductId,
                     Price = validPrice,
-                    UpdatedAt = DateTime.UtcNow
+                    UpdatedAt = VietnamTime.Now
                 }, cancellationToken);
             }
         }
 
-        pb.UpdatedAt = DateTime.UtcNow;
+        pb.UpdatedAt = VietnamTime.Now;
 
         // Nếu cập nhật Bảng giá chung (hoặc bảng giá mặc định):
         // 1. Đồng bộ giá bán StandardPrice vào bảng MstProducts để toàn bộ hệ thống (danh mục hàng hóa, đơn hàng) nhận giá mới
@@ -122,7 +122,7 @@ public class UpdatePriceBookPricesCommandHandler : IRequestHandler<UpdatePriceBo
                         if (depItemMap.TryGetValue((depBook.PriceBookId, item.ProductId), out var existingDepItem))
                         {
                             existingDepItem.Price = calculatedPrice;
-                            existingDepItem.UpdatedAt = DateTime.UtcNow;
+                            existingDepItem.UpdatedAt = VietnamTime.Now;
                         }
                         else
                         {
@@ -131,12 +131,12 @@ public class UpdatePriceBookPricesCommandHandler : IRequestHandler<UpdatePriceBo
                                 PriceBookId = depBook.PriceBookId,
                                 ProductId = item.ProductId,
                                 Price = calculatedPrice,
-                                UpdatedAt = DateTime.UtcNow
+                                UpdatedAt = VietnamTime.Now
                             }, cancellationToken);
                         }
                     }
 
-                    depBook.UpdatedAt = DateTime.UtcNow;
+                    depBook.UpdatedAt = VietnamTime.Now;
                 }
             }
         }

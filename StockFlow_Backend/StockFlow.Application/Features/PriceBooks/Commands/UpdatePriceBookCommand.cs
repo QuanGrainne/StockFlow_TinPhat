@@ -31,10 +31,10 @@ public record UpdatePriceBookCommand(
     string ScopeBranchType = "ALL",
     List<int>? ScopeWarehouseIds = null,
     string ScopeCustomerType = "ALL",
-    List<string>? ScopeCustomerGroupCodes = null,
-    string ScopeUserType = "ALL",
-    List<int>? ScopeUserIds = null,
-    bool RecalculateFormula = false
+    List<int>? ScopeCustomerIds = null,
+    bool RecalculateFormula = false,
+    /// <summary>false = bỏ liên kết công thức (giá hiện có giữ nguyên)</summary>
+    bool LinkFormula = true
 ) : IRequest<Result<PriceBookDto>>;
 
 public class UpdatePriceBookCommandValidator : AbstractValidator<UpdatePriceBookCommand>
@@ -45,8 +45,15 @@ public class UpdatePriceBookCommandValidator : AbstractValidator<UpdatePriceBook
             .GreaterThan(0).WithMessage("ID bảng giá không hợp lệ.");
 
         RuleFor(x => x.PriceBookName)
-            .NotEmpty().WithMessage("Tên bảng giá không được để trống.")
+            .Must(n => !string.IsNullOrWhiteSpace(n)).WithMessage("Tên bảng giá không được để trống.")
             .MaximumLength(255).WithMessage("Tên bảng giá không vượt quá 255 ký tự.");
+
+        RuleFor(x => x)
+            .Must(x => !x.EffectiveFrom.HasValue || !x.EffectiveTo.HasValue || x.EffectiveFrom <= x.EffectiveTo)
+            .WithMessage("Ngày bắt đầu hiệu lực phải trước ngày kết thúc.");
+
+        PriceBookFormulaRules.Apply(this, x => x.FormulaBaseType, x => x.FormulaBasePriceBookId,
+            x => x.FormulaOperator, x => x.FormulaValue, x => x.FormulaUnit);
     }
 }
 
@@ -69,72 +76,80 @@ public class UpdatePriceBookCommandHandler : IRequestHandler<UpdatePriceBookComm
             return Result.Failure<PriceBookDto>("Không tìm thấy bảng giá cần sửa.");
         }
 
+        // Bảng giá chung: luôn áp dụng, toàn hệ thống, mọi khách (POS dùng làm bảng giá mặc định)
+        var branchType = pb.IsDefault ? PriceBookScope.All : PriceBookScope.NormalizeType(request.ScopeBranchType);
+        var customerType = pb.IsDefault ? PriceBookScope.All : PriceBookScope.NormalizeType(request.ScopeCustomerType);
+        var warehouseIds = branchType == PriceBookScope.Specific ? (request.ScopeWarehouseIds ?? new()).Distinct().ToList() : new List<int>();
+        var customerIds = customerType == PriceBookScope.Specific ? (request.ScopeCustomerIds ?? new()).Distinct().ToList() : new List<int>();
+
+        var scopeError = await PriceBookScope.ValidateAsync(_context, branchType, warehouseIds, customerType, customerIds, cancellationToken);
+        if (scopeError != null) return Result.Failure<PriceBookDto>(scopeError);
+
+        var formulaError = await PriceBookFormulaRules.ValidateBaseAsync(_context, request.FormulaBaseType, request.FormulaBasePriceBookId, pb.PriceBookId, cancellationToken);
+        if (formulaError != null) return Result.Failure<PriceBookDto>(formulaError);
+
+        var hasFormula = !string.IsNullOrWhiteSpace(request.FormulaBaseType) && request.LinkFormula;
+
         pb.PriceBookName = request.PriceBookName.Trim();
-        pb.EffectiveFrom = request.EffectiveFrom;
-        pb.EffectiveTo = request.EffectiveTo;
-        pb.IsActive = request.IsActive;
-        pb.FormulaBaseType = request.FormulaBaseType;
-        pb.FormulaBasePriceBookId = request.FormulaBasePriceBookId;
-        pb.FormulaOperator = request.FormulaOperator;
-        pb.FormulaValue = request.FormulaValue;
-        pb.FormulaUnit = request.FormulaUnit;
-        pb.AllowUnlistedProducts = request.AllowUnlistedProducts;
-        pb.WarnUnlistedProducts = request.WarnUnlistedProducts;
-        pb.ScopeBranchType = request.ScopeBranchType ?? "ALL";
-        pb.ScopeWarehouseIds = request.ScopeWarehouseIds != null && request.ScopeWarehouseIds.Any()
-            ? JsonSerializer.Serialize(request.ScopeWarehouseIds) : null;
-        pb.ScopeCustomerType = request.ScopeCustomerType ?? "ALL";
-        pb.ScopeCustomerGroupCodes = request.ScopeCustomerGroupCodes != null && request.ScopeCustomerGroupCodes.Any()
-            ? JsonSerializer.Serialize(request.ScopeCustomerGroupCodes) : null;
-        pb.ScopeUserType = request.ScopeUserType ?? "ALL";
-        pb.ScopeUserIds = request.ScopeUserIds != null && request.ScopeUserIds.Any()
-            ? JsonSerializer.Serialize(request.ScopeUserIds) : null;
-        pb.UpdatedAt = DateTime.UtcNow;
-
-        await _context.SaveChangesAsync(cancellationToken);
-
-        if (request.RecalculateFormula)
+        pb.EffectiveFrom = request.EffectiveFrom.HasValue ? VietnamTime.From(request.EffectiveFrom) : null;
+        pb.EffectiveTo = request.EffectiveTo.HasValue ? VietnamTime.From(request.EffectiveTo) : null;
+        pb.IsActive = pb.IsDefault || request.IsActive;
+        if (hasFormula)
         {
-            // Chỉ tính lại giá cho các sản phẩm HIỆN CÓ trong bảng giá này, không nạp toàn bộ danh mục sản phẩm khác
-            var oldItems = await _context.DtlPriceBookItems
-                .Where(i => i.PriceBookId == pb.PriceBookId)
-                .ToListAsync(cancellationToken);
+            pb.FormulaBaseType = request.FormulaBaseType;
+            pb.FormulaBasePriceBookId = request.FormulaBaseType == "PRICE_BOOK" ? request.FormulaBasePriceBookId : null;
+            pb.FormulaOperator = request.FormulaOperator ?? "+";
+            pb.FormulaValue = request.FormulaValue ?? 0;
+            pb.FormulaUnit = request.FormulaUnit ?? "VND";
+        }
+        else
+        {
+            PriceBookFormulaRules.Clear(pb);
+        }
+        pb.AllowUnlistedProducts = request.AllowUnlistedProducts;
+        pb.WarnUnlistedProducts = request.AllowUnlistedProducts && request.WarnUnlistedProducts;
+        pb.ScopeBranchType = branchType;
+        pb.ScopeWarehouseIds = PriceBookScope.SerializeIds(warehouseIds);
+        pb.ScopeCustomerType = customerType;
+        pb.ScopeCustomerIds = PriceBookScope.SerializeIds(customerIds);
+        // Bỏ phạm vi "Người tạo giao dịch" và "Nhóm khách hàng" (không còn dùng)
+        pb.ScopeUserType = PriceBookScope.All;
+        pb.ScopeUserIds = null;
+        pb.ScopeCustomerGroupCodes = null;
+        pb.UpdatedAt = VietnamTime.Now;
 
-            if (oldItems.Any())
+        // Lưu thông tin + tính lại giá trong cùng 1 transaction (trước đây xóa giá cũ rồi mới tính, lỗi giữa chừng là mất giá)
+        using var transaction = await _context.BeginTransactionAsync(cancellationToken);
+        try
+        {
+            await _context.SaveChangesAsync(cancellationToken);
+
+            if (request.RecalculateFormula && hasFormula)
             {
-                var targetProductIds = oldItems.Select(i => i.ProductId).Distinct().ToList();
-                _context.DtlPriceBookItems.RemoveRange(oldItems);
-                await _context.SaveChangesAsync(cancellationToken);
+                // Chỉ tính lại giá cho các sản phẩm HIỆN CÓ trong bảng giá này, không nạp toàn bộ danh mục sản phẩm khác
+                var oldItems = await _context.DtlPriceBookItems
+                    .Where(i => i.PriceBookId == pb.PriceBookId)
+                    .ToListAsync(cancellationToken);
 
-                await ApplyFormulaForBook(pb, targetProductIds, cancellationToken);
+                if (oldItems.Any())
+                {
+                    var targetProductIds = oldItems.Select(i => i.ProductId).Distinct().ToList();
+                    _context.DtlPriceBookItems.RemoveRange(oldItems);
+                    await _context.SaveChangesAsync(cancellationToken);
+
+                    await ApplyFormulaForBook(pb, targetProductIds, cancellationToken);
+                }
             }
+
+            await transaction.CommitAsync(cancellationToken);
+        }
+        catch
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            throw;
         }
 
-        return Result.Success(new PriceBookDto(
-            PriceBookId: pb.PriceBookId,
-            PriceBookCode: pb.PriceBookCode,
-            PriceBookName: pb.PriceBookName,
-            EffectiveFrom: pb.EffectiveFrom,
-            EffectiveTo: pb.EffectiveTo,
-            IsActive: pb.IsActive,
-            IsDefault: pb.IsDefault,
-            FormulaBaseType: pb.FormulaBaseType,
-            FormulaBasePriceBookId: pb.FormulaBasePriceBookId,
-            FormulaBasePriceBookName: null,
-            FormulaOperator: pb.FormulaOperator,
-            FormulaValue: pb.FormulaValue,
-            FormulaUnit: pb.FormulaUnit,
-            AllowUnlistedProducts: pb.AllowUnlistedProducts,
-            WarnUnlistedProducts: pb.WarnUnlistedProducts,
-            ScopeBranchType: pb.ScopeBranchType,
-            ScopeWarehouseIds: request.ScopeWarehouseIds,
-            ScopeCustomerType: pb.ScopeCustomerType,
-            ScopeCustomerGroupCodes: request.ScopeCustomerGroupCodes,
-            ScopeUserType: pb.ScopeUserType,
-            ScopeUserIds: request.ScopeUserIds,
-            TotalItemsCount: await _context.DtlPriceBookItems.CountAsync(i => i.PriceBookId == pb.PriceBookId, cancellationToken),
-            UpdatedAt: pb.UpdatedAt
-        ));
+        return Result.Success(await PriceBookDtoBuilder.BuildAsync(_context, pb, cancellationToken));
     }
 
     private async Task ApplyFormulaForBook(MstPriceBook priceBook, List<int>? targetProductIds, CancellationToken cancellationToken)
@@ -250,7 +265,7 @@ public class UpdatePriceBookCommandHandler : IRequestHandler<UpdatePriceBookComm
                 PriceBookId = priceBook.PriceBookId,
                 ProductId = p.ProductId,
                 Price = calculatedPrice,
-                UpdatedAt = DateTime.UtcNow
+                UpdatedAt = VietnamTime.Now
             });
         }
 
