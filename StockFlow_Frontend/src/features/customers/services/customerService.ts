@@ -13,6 +13,7 @@ import {
   CustomerPaymentResult,
   CreateCustomerPaymentPayload,
   CustomerReceiptDetail,
+  DebtWarningSettings,
 } from '../types';
 import type { DebtAdjustmentDetail, DebtAdjustPayload, DebtAdjustResult } from '@/components/debt/types';
 
@@ -42,6 +43,7 @@ interface BackendCustomerDto {
   totalSales?: number;
   totalSalesNetReturns?: number;
   lastTransactionDate?: string | null;
+  debtWarning?: string | null;
 }
 
 interface BackendStatsDto {
@@ -140,6 +142,7 @@ function mapDtoToCustomer(dto: BackendCustomerDto): Customer {
     totalSales: Number(dto.totalSales) || 0,
     totalSalesNetReturns: Number(dto.totalSalesNetReturns ?? dto.totalSales) || 0,
     lastTransactionDate: dto.lastTransactionDate ?? null,
+    debtWarning: dto.debtWarning ?? null,
   };
 }
 
@@ -303,5 +306,17 @@ export const customerService = {
   /** Xóa khách hàng (hoặc ngừng hoạt động nếu đã có giao dịch / còn nợ) */
   async deleteCustomer(id: number): Promise<void> {
     await apiClient.delete(`/api/customers/${id}`);
+  },
+
+  /** Thiết lập cảnh báo công nợ khách hàng */
+  async getDebtWarningSettings(): Promise<DebtWarningSettings> {
+    return apiClient.get<DebtWarningSettings>('/api/settings/debt-warning');
+  },
+
+  /** Lưu thiết lập cảnh báo công nợ (Manager / Kế toán trưởng / Admin) */
+  async updateDebtWarningSettings(
+    payload: Omit<DebtWarningSettings, 'noDebtForWalkIn' | 'updatedAt' | 'updatedByName'>
+  ): Promise<DebtWarningSettings> {
+    return apiClient.put<DebtWarningSettings>('/api/settings/debt-warning', payload);
   },
 };
