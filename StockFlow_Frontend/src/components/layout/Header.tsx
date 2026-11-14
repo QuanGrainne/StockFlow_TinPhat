@@ -3,6 +3,7 @@
 
 import { tabSession } from '@/lib/auth/tabSession';
 import React, { useState, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { UserRole, StaffAccount, WarehouseFacility } from '@/features/admin/types';
 import {
   Shield,
@@ -14,6 +15,7 @@ import {
   Layers,
   UserCheck,
   LogOut,
+  KeyRound,
   Users,
   Warehouse,
   Factory,
@@ -26,6 +28,7 @@ import { useRouter } from 'next/navigation';
 import { setActiveWarehouseGlobal, useAuthorizedWarehouses } from '@/lib/warehouse/useActiveWarehouse';
 import { ROLE_SWITCHER_ENABLED } from '@/lib/auth/flags';
 import { BrandLogo } from '@/components/brand/BrandLogo';
+import { ChangePasswordModal } from '@/components/layout/ChangePasswordModal';
 
 interface HeaderProps {
   currentRole: UserRole;
@@ -41,6 +44,7 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   const router = useRouter();
   const [roleDropdownOpen, setRoleDropdownOpen] = useState(false);
+  const [changePasswordOpen, setChangePasswordOpen] = useState(false);
   const [facilities, setFacilities] = useState<WarehouseFacility[]>([]);
   // Kho được phân quyền lấy từ server (GET /api/warehouses/my-warehouses), Admin: tất cả kho đang hoạt động
   const { warehouses: authorizedWarehouses, loaded: authorizedLoaded } = useAuthorizedWarehouses();
@@ -705,8 +709,19 @@ export const Header: React.FC<HeaderProps> = ({
                 </>
               )}
 
-              {/* Section 3: Logout button */}
-              <div className="pt-2 border-t border-slate-100 mt-2">
+              {/* Section 3: Đổi mật khẩu + Đăng xuất */}
+              <div className="pt-2 border-t border-slate-100 mt-2 space-y-0.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRoleDropdownOpen(false);
+                    setChangePasswordOpen(true);
+                  }}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 rounded-xl transition cursor-pointer"
+                >
+                  <KeyRound size={14} className="text-[#0071BA]" />
+                  <span>Đổi mật khẩu</span>
+                </button>
                 <button
                   type="button"
                   onClick={handleLogout}
@@ -720,6 +735,14 @@ export const Header: React.FC<HeaderProps> = ({
           </>
         )}
       </div>
+
+      {/* Form Đổi mật khẩu: render ra body vì khung Header có backdrop-blur (giới hạn phần tử fixed) */}
+      {changePasswordOpen &&
+        typeof document !== 'undefined' &&
+        createPortal(
+          <ChangePasswordModal open={changePasswordOpen} onClose={() => setChangePasswordOpen(false)} />,
+          document.body
+        )}
     </header>
   );
 };
