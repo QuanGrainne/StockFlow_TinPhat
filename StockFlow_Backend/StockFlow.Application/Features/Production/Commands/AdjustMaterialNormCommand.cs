@@ -50,17 +50,20 @@ public class AdjustMaterialNormCommandHandler : IRequestHandler<AdjustMaterialNo
             return Result.Failure<ProductionOrderDetailDto>("Không xác định được người dùng đăng nhập.");
 
         var order = await _context.TrxProductionOrders
+            .Include(o => o.DtlProductionOrderItems)
             .Include(o => o.TrxProductionMaterialRequirements).ThenInclude(r => r.Material)
             .FirstOrDefaultAsync(o => o.ProductionOrderId == command.ProductionOrderId, ct);
         if (order == null) return Result.Failure<ProductionOrderDetailDto>(ProductionMessages.OrderNotFound);
         if (!order.CanAdjustNorm()) return Result.Failure<ProductionOrderDetailDto>(ProductionMessages.StatusNotAllowed);
 
+        var orderItems = order.DtlProductionOrderItems.ToDictionary(i => i.ProductionOrderItemId);
+        var defaultOrderItem = order.DtlProductionOrderItems.OrderBy(i => i.ProductionOrderItemId).FirstOrDefault();
         var planned = order.PlannedQuantity ?? 0;
         var reason = req.Reason!.Trim();
         var now = VietnamTime.Now;
         var requirements = order.TrxProductionMaterialRequirements.ToDictionary(r => r.RequirementId);
         var removedIds = new HashSet<int>();
-        var addedMaterialIds = new HashSet<int>();
+        var addedMaterialKeys = new HashSet<(int? OrderItemId, int MaterialId)>();
         var changed = 0;
 
         foreach (var line in req.Lines)
@@ -95,7 +98,10 @@ public class AdjustMaterialNormCommandHandler : IRequestHandler<AdjustMaterialNo
                 var oldRate = r.WastageRate ?? 0;
                 if (oldNorm == line.NormPerUnit && oldRate == line.WastageRate) continue;
 
-                var required = ProductionPolicy.CalculateRequirement(planned, line.NormPerUnit, line.WastageRate);
+                var itemPlanned = r.ProductionOrderItemId.HasValue && orderItems.TryGetValue(r.ProductionOrderItemId.Value, out var oi)
+                    ? oi.PlannedQuantity
+                    : planned;
+                var required = ProductionPolicy.CalculateRequirement(itemPlanned, line.NormPerUnit, line.WastageRate);
                 if (required < issued)
                     return Result.Failure<ProductionOrderDetailDto>($"{ProductionMessages.RequirementBelowIssued} ({code})");
 
@@ -108,21 +114,29 @@ public class AdjustMaterialNormCommandHandler : IRequestHandler<AdjustMaterialNo
             }
             else if (!line.Remove)
             {
-                // Thêm NVL mới vào lệnh
-                if (line.MaterialId == order.ProductId)
+                // Thêm NVL mới vào lệnh (gắn theo dòng thành phẩm đang chọn)
+                var targetItem = line.ProductionOrderItemId.HasValue && orderItems.TryGetValue(line.ProductionOrderItemId.Value, out var ti)
+                    ? ti
+                    : defaultOrderItem;
+                var targetItemId = targetItem?.ProductionOrderItemId;
+                var targetProductId = targetItem?.ProductId ?? order.ProductId;
+                var itemPlanned = targetItem?.PlannedQuantity ?? planned;
+
+                if (line.MaterialId == targetProductId)
                     return Result.Failure<ProductionOrderDetailDto>("Thành phẩm không được là nguyên vật liệu của chính nó.");
-                if (addedMaterialIds.Contains(line.MaterialId)
-                    || requirements.Values.Any(r => r.MaterialId == line.MaterialId && !removedIds.Contains(r.RequirementId)))
-                    return Result.Failure<ProductionOrderDetailDto>("Nguyên vật liệu đã có trong lệnh sản xuất.");
+                if (addedMaterialKeys.Contains((targetItemId, line.MaterialId))
+                    || requirements.Values.Any(r => r.ProductionOrderItemId == targetItemId && r.MaterialId == line.MaterialId && !removedIds.Contains(r.RequirementId)))
+                    return Result.Failure<ProductionOrderDetailDto>("Nguyên vật liệu đã có trong định mức của thành phẩm này.");
 
                 var material = await _context.MstProducts.FirstOrDefaultAsync(p => p.ProductId == line.MaterialId, ct);
                 if (material == null || material.IsActive == false)
                     return Result.Failure<ProductionOrderDetailDto>("Nguyên vật liệu không tồn tại hoặc đã ngừng kinh doanh.");
 
-                var required = ProductionPolicy.CalculateRequirement(planned, line.NormPerUnit, line.WastageRate);
+                var required = ProductionPolicy.CalculateRequirement(itemPlanned, line.NormPerUnit, line.WastageRate);
                 var added = new TrxProductionMaterialRequirement
                 {
                     ProductionOrder = order,
+                    ProductionOrderItemId = targetItemId,
                     MaterialId = material.ProductId,
                     UnitId = material.BaseUnitId,
                     SourceBomItemId = null,
@@ -134,14 +148,14 @@ public class AdjustMaterialNormCommandHandler : IRequestHandler<AdjustMaterialNo
                 };
                 MarkAdjusted(added, userId, now, $"{reason} (thêm NVL ngoài BOM)");
                 _context.TrxProductionMaterialRequirements.Add(added);
-                addedMaterialIds.Add(material.ProductId);
+                addedMaterialKeys.Add((targetItemId, material.ProductId));
                 changed++;
             }
         }
 
         if (changed == 0) return Result.Failure<ProductionOrderDetailDto>("Không có thay đổi định mức nào.");
 
-        if (requirements.Count - removedIds.Count + addedMaterialIds.Count == 0)
+        if (requirements.Count - removedIds.Count + addedMaterialKeys.Count == 0)
             return Result.Failure<ProductionOrderDetailDto>("Lệnh sản xuất phải còn ít nhất một nguyên vật liệu.");
 
         await _context.SaveChangesAsync(ct);

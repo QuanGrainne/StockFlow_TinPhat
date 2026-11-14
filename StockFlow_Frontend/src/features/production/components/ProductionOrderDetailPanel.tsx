@@ -143,6 +143,52 @@ export function ProductionOrderDetailPanel({
             <ProgressBar percent={s.progressPercent} />
           </div>
 
+          {s.items && s.items.length > 1 && (
+            <div className="mb-4">
+              <div className="text-xs font-semibold text-[#15171a] mb-1.5">
+                Danh sách thành phẩm trong lệnh ({s.items.length} thành phẩm)
+              </div>
+              <div className="border border-slate-200 rounded-[8px] overflow-x-auto">
+                <table className="w-full text-left border-collapse text-xs min-w-[700px]">
+                  <thead className="bg-[#f7f8f9] border-b border-slate-200 font-semibold text-[#677484]">
+                    <tr>
+                      <th className="py-1.5 px-3 w-10 text-center">STT</th>
+                      <th className="py-1.5 px-3 w-32">Mã TP</th>
+                      <th className="py-1.5 px-3">Tên thành phẩm</th>
+                      <th className="py-1.5 px-3 w-14 text-center">ĐVT</th>
+                      <th className="py-1.5 px-3 w-36">Định mức BOM</th>
+                      <th className="py-1.5 px-3 w-24 text-right">Kế hoạch</th>
+                      <th className="py-1.5 px-3 w-24 text-right">Đã nhập</th>
+                      <th className="py-1.5 px-3 w-24 text-right">Còn lại</th>
+                      <th className="py-1.5 px-3 w-36">Tiến độ</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {s.items.map((it, idx) => (
+                      <tr key={it.productId}>
+                        <td className="py-1.5 px-3 text-center text-slate-400">{idx + 1}</td>
+                        <td className="py-1.5 px-3 font-mono font-semibold">
+                          <ProductCodeLink code={it.productCode} productId={it.productId} />
+                        </td>
+                        <td className="py-1.5 px-3 font-medium">{it.productName}</td>
+                        <td className="py-1.5 px-3 text-center text-slate-500">{it.unitName}</td>
+                        <td className="py-1.5 px-3 text-slate-600">
+                          {it.bomCode} (v{it.bomVersion})
+                        </td>
+                        <td className="py-1.5 px-3 text-right font-semibold">{fmtQty(it.plannedQuantity)}</td>
+                        <td className="py-1.5 px-3 text-right text-[#16a34a] font-semibold">{fmtQty(it.receivedQuantity)}</td>
+                        <td className="py-1.5 px-3 text-right text-[#0070f4] font-semibold">{fmtQty(it.remainingQuantity)}</td>
+                        <td className="py-1.5 px-3">
+                          <ProgressBar percent={it.progressPercent} />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
           <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
             <div className="text-xs font-semibold text-[#15171a]">Nguyên vật liệu theo BOM (không hiển thị giá)</div>
             <label className="flex items-center gap-2 text-xs text-[#677484]">
@@ -167,6 +213,7 @@ export function ProductionOrderDetailPanel({
                   <th className="py-2 px-3 w-10 text-center">STT</th>
                   <th className="py-2 px-3 w-32">Mã NVL</th>
                   <th className="py-2 px-3">Tên NVL</th>
+                  {s.items && s.items.length > 1 && <th className="py-2 px-3 w-28">Thành phẩm</th>}
                   <th className="py-2 px-3 w-14 text-center">ĐVT</th>
                   <th className="py-2 px-3 w-24 text-right">Định mức/đv</th>
                   <th className="py-2 px-3 w-20 text-right">Hao hụt</th>
@@ -195,6 +242,11 @@ export function ProductionOrderDetailPanel({
                         </span>
                       )}
                     </td>
+                    {s.items && s.items.length > 1 && (
+                      <td className="py-2 px-3 font-mono text-[11px] text-[#0070f4]">
+                        {m.finishedProductCode ?? s.productCode}
+                      </td>
+                    )}
                     <td className="py-2 px-3 text-center text-slate-500">{m.unitName}</td>
                     <td className="py-2 px-3 text-right">{fmtNorm(m.normPerUnit)}</td>
                     <td className="py-2 px-3 text-right">{fmtPercent(m.wastageRate)}</td>
@@ -253,6 +305,9 @@ export function ProductionOrderDetailPanel({
                     <td className="py-2 px-3">
                       {iss.items.map((it) => (
                         <div key={it.requirementId}>
+                          {s.items && s.items.length > 1 && it.finishedProductCode && (
+                            <span className="font-mono text-[10px] text-[#0070f4] mr-1">[{it.finishedProductCode}]</span>
+                          )}
                           <span className="font-mono">{it.materialCode}</span> · {it.materialName}:{' '}
                           <b>
                             {fmtQty(it.quantity)} {it.unitName}
@@ -275,11 +330,12 @@ export function ProductionOrderDetailPanel({
 
       {tab === 'receipts' && (
         <div className="border border-slate-200 rounded-[8px] overflow-x-auto mb-4">
-          <table className="w-full text-left border-collapse text-xs min-w-[900px]">
+          <table className="w-full text-left border-collapse text-xs min-w-[920px]">
             <thead className="bg-[#f7f8f9] border-b border-slate-200 font-semibold text-[#677484]">
               <tr>
                 <th className="py-2 px-3 w-28">Mã phiếu</th>
                 <th className="py-2 px-3 w-36">Thời gian</th>
+                <th className="py-2 px-3 w-44">Thành phẩm</th>
                 <th className="py-2 px-3 w-40">Kho / vị trí</th>
                 <th className="py-2 px-3 w-36">Số lô</th>
                 <th className="py-2 px-3 w-20 text-right">SL đạt</th>
@@ -291,7 +347,7 @@ export function ProductionOrderDetailPanel({
             <tbody className="divide-y divide-slate-100">
               {detail.receipts.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-6 text-center text-slate-400">
+                  <td colSpan={9} className="py-6 text-center text-slate-400">
                     Chưa có phiếu nhập thành phẩm nào (ở các kho bạn được phân quyền)
                   </td>
                 </tr>
@@ -307,6 +363,10 @@ export function ProductionOrderDetailPanel({
                       )}
                     </td>
                     <td className="py-2 px-3 whitespace-nowrap">{fmtDateTime(r.receivedDate)}</td>
+                    <td className="py-2 px-3">
+                      <span className="font-mono font-semibold">{r.productCode}</span>
+                      <div className="text-[11px] text-slate-500">{r.productName}</div>
+                    </td>
                     <td className="py-2 px-3">
                       {r.warehouseName}
                       {r.locationName && <div className="text-[11px] text-slate-400">{r.locationName}</div>}

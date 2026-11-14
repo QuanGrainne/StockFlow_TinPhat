@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace StockFlow.Domain.Entities;
@@ -44,6 +44,8 @@ public partial class TrxProductionOrder
     public virtual SecUser CreatedByNavigation { get; set; } = null!;
 
     public virtual MstProduct Product { get; set; } = null!;
+
+    public virtual ICollection<DtlProductionOrderItem> DtlProductionOrderItems { get; set; } = new List<DtlProductionOrderItem>();
 
     public virtual ICollection<TrxFinishedGoodsReceipt> TrxFinishedGoodsReceipts { get; set; } = new List<TrxFinishedGoodsReceipt>();
 

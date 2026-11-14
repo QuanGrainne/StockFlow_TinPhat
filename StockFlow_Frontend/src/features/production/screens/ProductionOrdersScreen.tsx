@@ -265,20 +265,22 @@ export default function ProductionOrdersScreen() {
                   <th className={th}>Hạn hoàn thành</th>
                   <th className={th}>Xưởng</th>
                   <th className={`${th} text-center`}>NVL</th>
+                  <th className={`${th} text-center`}>Đã lập đủ PX</th>
+                  <th className={`${th} text-center`}>Đã lập đủ PN</th>
                   <th className={`${th} text-center`}>Trạng thái</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {loading ? (
                   <tr>
-                    <td colSpan={10} className="py-20 text-center text-[#677484]">
+                    <td colSpan={12} className="py-20 text-center text-[#677484]">
                       <RefreshCcw size={18} className="animate-spin mx-auto mb-2 text-[#0070f4]" />
                       Đang tải lệnh sản xuất...
                     </td>
                   </tr>
                 ) : filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={10} className="py-24 text-center text-[#677484]">
+                    <td colSpan={12} className="py-24 text-center text-[#677484]">
                       <Inbox size={28} className="mx-auto mb-2 text-[#0070f4]" />
                       Không tìm thấy lệnh sản xuất nào phù hợp
                     </td>
@@ -310,7 +312,8 @@ export default function ProductionOrdersScreen() {
                           <td className="py-2.5 px-3">
                             <div className="font-medium">{o.productName}</div>
                             <div className="text-[11px] text-[#677484]">
-                              {o.productCode} · BOM {o.bomCode}
+                              {o.productCode}
+                              {o.items && o.items.length > 1 ? ` (${o.items.length} thành phẩm)` : ` · BOM ${o.bomCode}`}
                             </div>
                           </td>
                           <td className="py-2.5 px-3 text-right">
@@ -334,12 +337,30 @@ export default function ProductionOrdersScreen() {
                             )}
                           </td>
                           <td className="py-2.5 px-3 text-center">
+                            <input
+                              type="checkbox"
+                              checked={Boolean(o.isFullyIssued)}
+                              readOnly
+                              className="w-4 h-4 rounded border-slate-300 accent-[#0070f4] pointer-events-none"
+                              title={o.isFullyIssued ? 'Đã lập đủ phiếu xuất NVL' : 'Chưa lập đủ phiếu xuất NVL'}
+                            />
+                          </td>
+                          <td className="py-2.5 px-3 text-center">
+                            <input
+                              type="checkbox"
+                              checked={Boolean(o.isFullyReceived)}
+                              readOnly
+                              className="w-4 h-4 rounded border-slate-300 accent-[#16a34a] pointer-events-none"
+                              title={o.isFullyReceived ? 'Đã lập đủ phiếu nhập thành phẩm' : 'Chưa lập đủ phiếu nhập thành phẩm'}
+                            />
+                          </td>
+                          <td className="py-2.5 px-3 text-center">
                             <ProductionStatusTag status={o.status} />
                           </td>
                         </tr>
                         {isExpanded && (
                           <tr>
-                            <td colSpan={10} className="p-0 border-b-2 border-[#0070f4] bg-white">
+                            <td colSpan={12} className="p-0 border-b-2 border-[#0070f4] bg-white">
                               <ProductionOrderDetailPanel
                                 detail={lastDetail && lastDetail.summary.productionOrderId === o.productionOrderId ? lastDetail : null}
                                 loading={!detail}

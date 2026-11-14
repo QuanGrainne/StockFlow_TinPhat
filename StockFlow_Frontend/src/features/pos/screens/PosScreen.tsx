@@ -700,6 +700,13 @@ export default function PosScreen() {
   // Đơn đặt hàng: khách trả trước mặc định 0; hóa đơn: mặc định trả đủ
   const paid = tab.paid ?? (isBooking ? 0 : dueNow);
   const change = paid - dueNow;
+  // Khách trả thừa mà đang nợ cũ: chọn "Tính vào công nợ" → phần thừa trừ nợ cũ (tối đa bằng nợ cũ), phần vượt vẫn trả lại.
+  // Nợ cũ tính cả tiền trả trước của đơn đặt sắp trừ vào hóa đơn (khớp CreatePosOrderCommand).
+  const oldDebt = Math.max(0, (tab.customer?.currentDebt ?? 0) + depositApplied);
+  const canExcessToDebt = !isBooking && !!tab.customer && change > 0 && oldDebt > 0;
+  const excessToDebt = canExcessToDebt && !!tab.excessToDebt;
+  const debtPayment = excessToDebt ? Math.min(change, oldDebt) : 0;
+  const cashChange = change - debtPayment;
   /** Đặt hàng: tiền đã trả trước (khi sửa đơn) + trả thêm lần này không vượt giá trị đơn */
   const bookingPaidTotal = isBooking ? (tab.bookingPaid ?? 0) + paid : 0;
 
@@ -1002,6 +1009,7 @@ export default function PosScreen() {
       bookingOrderId: tab.bookingId ?? undefined,
       createRemainderBooking,
       creditRequestId: tab.creditRequestId ?? undefined,
+      excessAction: excessToDebt ? 'RECORD_DEBT' : 'RETURN_CASH',
       items: tab.lines.map((l) => {
         const c = lineCalc(l);
         // Bán cao hơn đơn giá: gửi giá bán làm đơn giá gốc, không giảm giá (server không nhận giảm giá âm)
@@ -1027,6 +1035,7 @@ export default function PosScreen() {
           `Đã thanh toán hóa đơn ${res.orderCode}`,
           tab.bookingCode ? ` (giao theo đơn ${tab.bookingCode})` : '',
           res.depositAmount ? `. Đã trừ ${fmt(res.depositAmount)} tiền khách trả trước` : '',
+          res.debtPaymentAmount ? `. Đã trừ ${fmt(res.debtPaymentAmount)} vào nợ cũ, dư nợ còn ${fmt(res.customerCurrentDebt ?? 0)}` : '',
           res.changeAmount > 0 ? `. Tiền thừa trả khách: ${fmt(res.changeAmount)}` : '',
           res.remainderBookingCode ? `. Đã tạo đơn chờ ${res.remainderBookingCode} cho phần khách chưa lấy` : '',
         ].join(''),
@@ -1758,10 +1767,59 @@ export default function PosScreen() {
               </>
             ) : (
               <>
-                {change > 0 && (
+                {change > 0 && !canExcessToDebt && (
                   <div className="flex items-center justify-between">
                     <span>Tiền thừa trả khách</span>
                     <span className="font-semibold">{fmt(change)}</span>
+                  </div>
+                )}
+                {/* Như KiotViet: khách trả thừa mà còn nợ cũ → chọn trả lại tiền thừa hoặc tính vào công nợ */}
+                {canExcessToDebt && (
+                  <div className="space-y-2.5">
+                    <label className="flex items-center justify-between gap-2 cursor-pointer">
+                      <span className="flex items-center gap-2">
+                        <input
+                          type="radio"
+                          name={`excess-${tab.id}`}
+                          checked={!excessToDebt}
+                          onChange={() => updateTab({ excessToDebt: false })}
+                          className="h-[18px] w-[18px] accent-[#0070f4] cursor-pointer"
+                        />
+                        Tiền thừa trả khách
+                      </span>
+                      <span className={excessToDebt ? 'text-[#677484]' : 'font-semibold'}>{fmt(change)}</span>
+                    </label>
+                    <label className="flex items-center justify-between gap-2 cursor-pointer">
+                      <span className="flex items-center gap-2">
+                        <input
+                          type="radio"
+                          name={`excess-${tab.id}`}
+                          checked={excessToDebt}
+                          onChange={() => updateTab({ excessToDebt: true })}
+                          className="h-[18px] w-[18px] accent-[#0070f4] cursor-pointer"
+                        />
+                        Tính vào công nợ
+                      </span>
+                      <span className="text-[13px] text-[#677484]">Nợ cũ {fmt(oldDebt)}</span>
+                    </label>
+                    {excessToDebt && (
+                      <div className="rounded-lg bg-[#f7f8fa] px-3 py-2 text-[13px] space-y-1">
+                        <div className="flex justify-between">
+                          <span className="text-[#677484]">Trừ vào nợ cũ</span>
+                          <span className="font-semibold text-[#16a34a]">{fmt(debtPayment)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-[#677484]">Nợ còn lại</span>
+                          <span className="font-semibold">{fmt(oldDebt - debtPayment)}</span>
+                        </div>
+                        {cashChange > 0 && (
+                          <div className="flex justify-between">
+                            <span className="text-[#677484]">Tiền thừa trả khách</span>
+                            <span className="font-semibold">{fmt(cashChange)}</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
                 {change < 0 && (

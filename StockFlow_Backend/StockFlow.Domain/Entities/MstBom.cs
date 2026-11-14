@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace StockFlow.Domain.Entities;
@@ -25,5 +25,7 @@ public partial class MstBom
     public virtual MstProduct Product { get; set; } = null!;
 
     public virtual ICollection<TrxProductionOrder> TrxProductionOrders { get; set; } = new List<TrxProductionOrder>();
+
+    public virtual ICollection<DtlProductionOrderItem> DtlProductionOrderItems { get; set; } = new List<DtlProductionOrderItem>();
 }
 

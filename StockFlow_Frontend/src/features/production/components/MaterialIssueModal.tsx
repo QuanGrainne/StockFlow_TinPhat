@@ -31,12 +31,37 @@ export function MaterialIssueModal({ productionOrderId, supplementary = false, o
   const [isSupplementary, setIsSupplementary] = useState(supplementary);
   const [reason, setReason] = useState('');
   const [inputs, setInputs] = useState<Record<number, string>>({});
+  const [selectedProducts, setSelectedProducts] = useState<Record<number, boolean>>({});
+  const [batchQtys, setBatchQtys] = useState<Record<number, string>>({});
   const [busy, setBusy] = useState(false);
   const [loaded, setLoaded] = useState<{ key: string; detail: ProductionOrderDetail | null; error?: string }>({ key: '', detail: null });
 
   const requestKey = `${productionOrderId}:${warehouseId}`;
   const loading = loaded.key !== requestKey;
   const detail = loaded.detail;
+
+  const orderItems = useMemo(() => {
+    if (!detail) return [];
+    return detail.summary.items && detail.summary.items.length > 0
+      ? detail.summary.items
+      : [
+          {
+            productionOrderItemId: 0,
+            productId: detail.summary.productId,
+            productCode: detail.summary.productCode,
+            productName: detail.summary.productName,
+            unitName: detail.summary.unitName,
+            bomId: detail.summary.bomId,
+            bomCode: detail.summary.bomCode,
+            bomVersion: detail.summary.bomVersion,
+            plannedQuantity: detail.summary.plannedQuantity,
+            receivedQuantity: detail.summary.receivedQuantity,
+            remainingQuantity: Math.max(0, detail.summary.plannedQuantity - detail.summary.receivedQuantity),
+            progressPercent: detail.summary.progressPercent,
+            notes: null,
+          },
+        ];
+  }, [detail]);
 
   useEffect(() => {
     let stale = false;
@@ -45,6 +70,18 @@ export function MaterialIssueModal({ productionOrderId, supplementary = false, o
       .then((d) => {
         if (stale) return;
         setLoaded({ key: requestKey, detail: d });
+        const itemsList =
+          d.summary.items && d.summary.items.length > 0
+            ? d.summary.items
+            : [
+                {
+                  productionOrderItemId: 0,
+                  productId: d.summary.productId,
+                  plannedQuantity: d.summary.plannedQuantity,
+                },
+              ];
+        setSelectedProducts(Object.fromEntries(itemsList.map((it) => [it.productId, true])));
+        setBatchQtys(Object.fromEntries(itemsList.map((it) => [it.productId, String(it.plannedQuantity)])));
         // Gợi ý SL thực xuất = phần còn thiếu, không vượt tồn (xuất chính); xuất bổ sung để trống
         setInputs(
           Object.fromEntries(
@@ -62,6 +99,51 @@ export function MaterialIssueModal({ productionOrderId, supplementary = false, o
       stale = true;
     };
   }, [productionOrderId, warehouseId, requestKey, supplementary]);
+
+  function applyProductBatchSelection(nextSelected: Record<number, boolean>, nextBatchQtys: Record<number, string>) {
+    if (!detail) return;
+    const nextInputs: Record<number, string> = {};
+    for (const m of detail.materials) {
+      const fpId = m.finishedProductId ?? detail.summary.productId;
+      const isChecked = nextSelected[fpId] ?? true;
+      if (!isChecked) {
+        nextInputs[m.requirementId] = '';
+        continue;
+      }
+      if (isSupplementary) {
+        nextInputs[m.requirementId] = inputs[m.requirementId] ?? '';
+        continue;
+      }
+      const batchStr = nextBatchQtys[fpId] ?? '';
+      const batchNum = parseQty(batchStr);
+      const itemInfo = orderItems.find((oi) => oi.productId === fpId);
+      const plannedNum = itemInfo?.plannedQuantity ?? detail.summary.plannedQuantity;
+      const available = Math.max(0, m.availableQty ?? 0);
+      let neededForBatch = m.shortageQty;
+      if (!Number.isNaN(batchNum) && batchNum > 0 && plannedNum > 0) {
+        if (Math.abs(batchNum - plannedNum) < 0.0001) {
+          neededForBatch = m.shortageQty;
+        } else {
+          neededForBatch = round2(batchNum * m.normPerUnit * (1 + m.wastageRate / 100));
+        }
+      }
+      const suggest = Math.max(0, Math.min(neededForBatch, available));
+      nextInputs[m.requirementId] = suggest > 0 ? String(round2(suggest)) : '';
+    }
+    setInputs(nextInputs);
+  }
+
+  function toggleProductSelection(productId: number, checked: boolean) {
+    const nextSelected = { ...selectedProducts, [productId]: checked };
+    setSelectedProducts(nextSelected);
+    applyProductBatchSelection(nextSelected, batchQtys);
+  }
+
+  function changeBatchQty(productId: number, value: string) {
+    const nextBatch = { ...batchQtys, [productId]: value };
+    setBatchQtys(nextBatch);
+    applyProductBatchSelection(selectedProducts, nextBatch);
+  }
 
   const rows = useMemo(
     () =>
@@ -138,25 +220,55 @@ export function MaterialIssueModal({ productionOrderId, supplementary = false, o
       }
     >
       {detail && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-1.5 text-xs text-slate-600 mb-4">
-          <div>
-            <span className="text-slate-400">Thành phẩm: </span>
-            <span className="font-semibold text-slate-800">
-              {detail.summary.productCode} · {detail.summary.productName}
+        <div className="mb-4 border border-slate-200 rounded-[8px] overflow-hidden bg-slate-50/50">
+          <div className="px-3 py-1.5 bg-[#f7f8f9] border-b border-slate-200 flex items-center justify-between text-xs">
+            <span className="font-semibold text-[#15171a]">Lựa chọn thành phẩm muốn xuất kho</span>
+            <span className="text-[11px] text-[#677484]">
+              Nhập &quot;SL sản xuất đợt này&quot; để hệ thống tự tính lượng NVL cần xuất theo đợt
             </span>
           </div>
-          <div>
-            <span className="text-slate-400">SL kế hoạch: </span>
-            <span className="font-semibold text-slate-800">
-              {fmtQty(detail.summary.plannedQuantity)} {detail.summary.unitName}
-            </span>
-          </div>
-          <div>
-            <span className="text-slate-400">BOM: </span>
-            <span className="font-medium text-slate-800">
-              {detail.summary.bomCode} (v{detail.summary.bomVersion})
-            </span>
-          </div>
+          <table className="w-full text-left border-collapse text-xs">
+            <thead className="text-[#677484] border-b border-slate-200 bg-white">
+              <tr>
+                <th className="py-1.5 px-3 w-10 text-center">Chọn</th>
+                <th className="py-1.5 px-3 w-32">Mã thành phẩm</th>
+                <th className="py-1.5 px-3">Tên thành phẩm</th>
+                <th className="py-1.5 px-3 w-16 text-center">ĐVT</th>
+                <th className="py-1.5 px-3 w-28 text-right">SL theo lệnh</th>
+                <th className="py-1.5 px-3 w-36 text-right">SL sản xuất đợt này</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 bg-white">
+              {orderItems.map((oi) => {
+                const checked = selectedProducts[oi.productId] ?? true;
+                return (
+                  <tr key={oi.productId} className={checked ? '' : 'opacity-50'}>
+                    <td className="py-1.5 px-3 text-center">
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={(e) => toggleProductSelection(oi.productId, e.target.checked)}
+                        className="w-3.5 h-3.5 rounded border-slate-300 cursor-pointer"
+                      />
+                    </td>
+                    <td className="py-1.5 px-3 font-mono font-semibold text-[#0070f4]">{oi.productCode}</td>
+                    <td className="py-1.5 px-3 font-medium">{oi.productName}</td>
+                    <td className="py-1.5 px-3 text-center text-slate-500">{oi.unitName}</td>
+                    <td className="py-1.5 px-3 text-right">{fmtQty(oi.plannedQuantity)}</td>
+                    <td className="py-1 px-3">
+                      <input
+                        inputMode="decimal"
+                        disabled={!checked || isSupplementary}
+                        value={batchQtys[oi.productId] ?? ''}
+                        onChange={(e) => changeBatchQty(oi.productId, e.target.value)}
+                        className="w-full h-6 px-2 text-right text-xs border border-slate-300 rounded-[6px] focus:outline-none focus:border-[#0070f4] disabled:bg-slate-50"
+                      />
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       )}
 
@@ -183,12 +295,13 @@ export function MaterialIssueModal({ productionOrderId, supplementary = false, o
       </div>
 
       <div className="border border-slate-200 rounded-[8px] overflow-x-auto">
-        <table className="w-full text-left border-collapse text-xs min-w-[820px]">
+        <table className="w-full text-left border-collapse text-xs min-w-[880px]">
           <thead className="bg-[#f7f8f9] border-b border-slate-200 font-semibold text-[#677484]">
             <tr>
               <th className="py-2 px-3 w-10 text-center">STT</th>
               <th className="py-2 px-3 w-32">Mã NVL</th>
               <th className="py-2 px-3">Tên NVL</th>
+              {orderItems.length > 1 && <th className="py-2 px-3 w-28">Thành phẩm</th>}
               <th className="py-2 px-3 w-14 text-center">ĐVT</th>
               <th className="py-2 px-3 w-24 text-right">Nhu cầu</th>
               <th className="py-2 px-3 w-24 text-right">Đã xuất</th>
@@ -200,46 +313,55 @@ export function MaterialIssueModal({ productionOrderId, supplementary = false, o
           <tbody className="divide-y divide-slate-100">
             {loading ? (
               <tr>
-                <td colSpan={9} className="py-10 text-center text-slate-400">
+                <td colSpan={orderItems.length > 1 ? 10 : 9} className="py-10 text-center text-slate-400">
                   <RefreshCcw size={16} className="animate-spin mx-auto mb-2 text-[#0070f4]" />
                   Đang tải nhu cầu NVL...
                 </td>
               </tr>
             ) : !detail ? (
               <tr>
-                <td colSpan={9} className="py-8 text-center text-[#fb2c36]">
+                <td colSpan={orderItems.length > 1 ? 10 : 9} className="py-8 text-center text-[#fb2c36]">
                   {loaded.error}
                 </td>
               </tr>
             ) : (
-              rows.map(({ m, available, invalid, exceeds }, i) => (
-                <tr key={m.requirementId}>
-                  <td className="py-2 px-3 text-center text-slate-400">{i + 1}</td>
-                  <td className="py-2 px-3 font-mono font-semibold">
-                    <ProductCodeLink code={m.materialCode} productId={m.materialId} />
-                  </td>
-                  <td className="py-2 px-3 font-medium">{m.materialName}</td>
-                  <td className="py-2 px-3 text-center text-slate-500">{m.unitName}</td>
-                  <td className="py-2 px-3 text-right">{fmtQty(m.requiredQty)}</td>
-                  <td className="py-2 px-3 text-right">{fmtQty(m.issuedQty)}</td>
-                  <td className={`py-2 px-3 text-right font-semibold ${m.shortageQty > 0 ? 'text-[#d97706]' : 'text-[#16a34a]'}`}>
-                    {fmtQty(m.shortageQty)}
-                  </td>
-                  <td className={`py-2 px-3 text-right ${available <= 0 ? 'text-[#fb2c36]' : ''}`}>{fmtQty(m.availableQty)}</td>
-                  <td className="py-1.5 px-3">
-                    <input
-                      inputMode="decimal"
-                      value={inputs[m.requirementId] ?? ''}
-                      onChange={(e) => setInputs((prev) => ({ ...prev, [m.requirementId]: e.target.value }))}
-                      placeholder="0"
-                      className={`w-full h-7 px-2 text-right text-xs border rounded-[6px] focus:outline-none ${
-                        invalid ? 'border-[#fb2c36] bg-[#fef2f2]' : exceeds ? 'border-amber-400' : 'border-slate-300 focus:border-[#0070f4]'
-                      }`}
-                      title={invalid ? 'Không được âm và không vượt tồn kho' : exceeds ? 'Luỹ kế vượt nhu cầu' : undefined}
-                    />
-                  </td>
-                </tr>
-              ))
+              rows.map(({ m, available, invalid, exceeds }, i) => {
+                const fpId = m.finishedProductId ?? detail.summary.productId;
+                const fpChecked = selectedProducts[fpId] ?? true;
+                return (
+                  <tr key={m.requirementId} className={fpChecked ? '' : 'opacity-45 bg-slate-50'}>
+                    <td className="py-2 px-3 text-center text-slate-400">{i + 1}</td>
+                    <td className="py-2 px-3 font-mono font-semibold">
+                      <ProductCodeLink code={m.materialCode} productId={m.materialId} />
+                    </td>
+                    <td className="py-2 px-3 font-medium">{m.materialName}</td>
+                    {orderItems.length > 1 && (
+                      <td className="py-2 px-3 font-mono text-[11px] text-[#0070f4]">
+                        {m.finishedProductCode ?? detail.summary.productCode}
+                      </td>
+                    )}
+                    <td className="py-2 px-3 text-center text-slate-500">{m.unitName}</td>
+                    <td className="py-2 px-3 text-right">{fmtQty(m.requiredQty)}</td>
+                    <td className="py-2 px-3 text-right">{fmtQty(m.issuedQty)}</td>
+                    <td className={`py-2 px-3 text-right font-semibold ${m.shortageQty > 0 ? 'text-[#d97706]' : 'text-[#16a34a]'}`}>
+                      {fmtQty(m.shortageQty)}
+                    </td>
+                    <td className={`py-2 px-3 text-right ${available <= 0 ? 'text-[#fb2c36]' : ''}`}>{fmtQty(m.availableQty)}</td>
+                    <td className="py-1.5 px-3">
+                      <input
+                        inputMode="decimal"
+                        value={inputs[m.requirementId] ?? ''}
+                        onChange={(e) => setInputs((prev) => ({ ...prev, [m.requirementId]: e.target.value }))}
+                        placeholder="0"
+                        className={`w-full h-7 px-2 text-right text-xs border rounded-[6px] focus:outline-none ${
+                          invalid ? 'border-[#fb2c36] bg-[#fef2f2]' : exceeds ? 'border-amber-400' : 'border-slate-300 focus:border-[#0070f4]'
+                        }`}
+                        title={invalid ? 'Không được âm và không vượt tồn kho' : exceeds ? 'Luỹ kế vượt nhu cầu' : undefined}
+                      />
+                    </td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>

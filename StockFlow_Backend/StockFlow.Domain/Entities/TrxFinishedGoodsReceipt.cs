@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace StockFlow.Domain.Entities;
@@ -10,6 +10,8 @@ public partial class TrxFinishedGoodsReceipt
     public string? FgrCode { get; set; }
 
     public int ProductionOrderId { get; set; }
+
+    public int? ProductionOrderItemId { get; set; }
 
     public int ReportId { get; set; }
 
@@ -44,6 +46,8 @@ public partial class TrxFinishedGoodsReceipt
     public virtual MstProduct Product { get; set; } = null!;
 
     public virtual TrxProductionOrder ProductionOrder { get; set; } = null!;
+
+    public virtual DtlProductionOrderItem? ProductionOrderItem { get; set; }
 
     public virtual SecUser ReceivedByNavigation { get; set; } = null!;
 
