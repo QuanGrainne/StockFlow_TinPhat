@@ -355,6 +355,57 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                     b.ToTable("dtl_price_book_items", "stockflow");
                 });
 
+            modelBuilder.Entity("StockFlow.Domain.Entities.DtlProductionPlanItem", b =>
+                {
+                    b.Property<int>("ProductionPlanItemId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("production_plan_item_id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("ProductionPlanItemId"));
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("notes");
+
+                    b.Property<DateOnly>("PlannedEndDate")
+                        .HasColumnType("date")
+                        .HasColumnName("planned_end_date");
+
+                    b.Property<decimal>("PlannedQuantity")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("planned_quantity");
+
+                    b.Property<DateOnly>("PlannedStartDate")
+                        .HasColumnType("date")
+                        .HasColumnName("planned_start_date");
+
+                    b.Property<int>("ProductId")
+                        .HasColumnType("integer")
+                        .HasColumnName("product_id");
+
+                    b.Property<int>("ProductionPlanId")
+                        .HasColumnType("integer")
+                        .HasColumnName("production_plan_id");
+
+                    b.Property<int?>("WarehouseId")
+                        .HasColumnType("integer")
+                        .HasColumnName("warehouse_id");
+
+                    b.HasKey("ProductionPlanItemId")
+                        .HasName("dtl_production_plan_items_pkey");
+
+                    b.HasIndex("ProductId");
+
+                    b.HasIndex("ProductionPlanId");
+
+                    b.HasIndex("WarehouseId");
+
+                    b.ToTable("dtl_production_plan_items", "stockflow");
+                });
+
             modelBuilder.Entity("StockFlow.Domain.Entities.DtlPurchaseOrderItem", b =>
                 {
                     b.Property<int>("PoItemId")
@@ -2420,6 +2471,10 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(30)")
                         .HasColumnName("production_order_code");
 
+                    b.Property<int?>("ProductionPlanId")
+                        .HasColumnType("integer")
+                        .HasColumnName("production_plan_id");
+
                     b.Property<DateTime?>("StartDate")
                         .HasColumnType("timestamp without time zone")
                         .HasColumnName("start_date");
@@ -2445,10 +2500,81 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("ProductId");
 
+                    b.HasIndex("ProductionPlanId");
+
                     b.HasIndex(new[] { "ProductionOrderCode" }, "uq_trx_production_orders_1")
                         .IsUnique();
 
                     b.ToTable("trx_production_orders", "stockflow");
+                });
+
+            modelBuilder.Entity("StockFlow.Domain.Entities.TrxProductionPlan", b =>
+                {
+                    b.Property<int>("ProductionPlanId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("production_plan_id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("ProductionPlanId"));
+
+                    b.Property<DateTime?>("ApprovalDate")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("approval_date");
+
+                    b.Property<int?>("ApprovedBy")
+                        .HasColumnType("integer")
+                        .HasColumnName("approved_by");
+
+                    b.Property<int>("CreatedBy")
+                        .HasColumnType("integer")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("notes");
+
+                    b.Property<DateOnly>("PeriodEnd")
+                        .HasColumnType("date")
+                        .HasColumnName("period_end");
+
+                    b.Property<DateOnly>("PeriodStart")
+                        .HasColumnType("date")
+                        .HasColumnName("period_start");
+
+                    b.Property<string>("PlanCode")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("plan_code");
+
+                    b.Property<DateTime>("PlanDate")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("plan_date");
+
+                    b.Property<string>("PlanName")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
+                        .HasColumnName("plan_name");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.HasKey("ProductionPlanId")
+                        .HasName("trx_production_plans_pkey");
+
+                    b.HasIndex("ApprovedBy");
+
+                    b.HasIndex("CreatedBy");
+
+                    b.HasIndex(new[] { "PlanCode" }, "uq_trx_production_plans_code")
+                        .IsUnique();
+
+                    b.ToTable("trx_production_plans", "stockflow");
                 });
 
             modelBuilder.Entity("StockFlow.Domain.Entities.TrxProductionReport", b =>
@@ -3209,6 +3335,32 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                     b.Navigation("Product");
                 });
 
+            modelBuilder.Entity("StockFlow.Domain.Entities.DtlProductionPlanItem", b =>
+                {
+                    b.HasOne("StockFlow.Domain.Entities.MstProduct", "Product")
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .IsRequired()
+                        .HasConstraintName("fk_dtl_production_plan_items_product_id");
+
+                    b.HasOne("StockFlow.Domain.Entities.TrxProductionPlan", "ProductionPlan")
+                        .WithMany("DtlProductionPlanItems")
+                        .HasForeignKey("ProductionPlanId")
+                        .IsRequired()
+                        .HasConstraintName("fk_dtl_production_plan_items_production_plan_id");
+
+                    b.HasOne("StockFlow.Domain.Entities.MstWarehouse", "Warehouse")
+                        .WithMany()
+                        .HasForeignKey("WarehouseId")
+                        .HasConstraintName("fk_dtl_production_plan_items_warehouse_id");
+
+                    b.Navigation("Product");
+
+                    b.Navigation("ProductionPlan");
+
+                    b.Navigation("Warehouse");
+                });
+
             modelBuilder.Entity("StockFlow.Domain.Entities.DtlPurchaseOrderItem", b =>
                 {
                     b.HasOne("StockFlow.Domain.Entities.TrxPurchaseOrder", "Po")
@@ -3904,6 +4056,11 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasConstraintName("fk_trx_production_orders_product_id");
 
+                    b.HasOne("StockFlow.Domain.Entities.TrxProductionPlan", "ProductionPlan")
+                        .WithMany("TrxProductionOrders")
+                        .HasForeignKey("ProductionPlanId")
+                        .HasConstraintName("fk_trx_production_orders_production_plan_id");
+
                     b.Navigation("AssignedToNavigation");
 
                     b.Navigation("Bom");
@@ -3911,6 +4068,26 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                     b.Navigation("CreatedByNavigation");
 
                     b.Navigation("Product");
+
+                    b.Navigation("ProductionPlan");
+                });
+
+            modelBuilder.Entity("StockFlow.Domain.Entities.TrxProductionPlan", b =>
+                {
+                    b.HasOne("StockFlow.Domain.Entities.SecUser", "ApprovedByNavigation")
+                        .WithMany()
+                        .HasForeignKey("ApprovedBy")
+                        .HasConstraintName("fk_trx_production_plans_approved_by");
+
+                    b.HasOne("StockFlow.Domain.Entities.SecUser", "CreatedByNavigation")
+                        .WithMany()
+                        .HasForeignKey("CreatedBy")
+                        .IsRequired()
+                        .HasConstraintName("fk_trx_production_plans_created_by");
+
+                    b.Navigation("ApprovedByNavigation");
+
+                    b.Navigation("CreatedByNavigation");
                 });
 
             modelBuilder.Entity("StockFlow.Domain.Entities.TrxProductionReport", b =>
@@ -4407,6 +4584,13 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                     b.Navigation("TrxProductionReports");
 
                     b.Navigation("TrxStockIssues");
+                });
+
+            modelBuilder.Entity("StockFlow.Domain.Entities.TrxProductionPlan", b =>
+                {
+                    b.Navigation("DtlProductionPlanItems");
+
+                    b.Navigation("TrxProductionOrders");
                 });
 
             modelBuilder.Entity("StockFlow.Domain.Entities.TrxProductionReport", b =>

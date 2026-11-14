@@ -32,6 +32,11 @@ public partial class TrxProductionOrder
     /// <summary>Xưởng phụ trách sản xuất (UC-58 A58.1)</summary>
     public string? Workshop { get; set; }
 
+    /// <summary>Kế hoạch sản xuất sinh ra lệnh này (để trống với lệnh tạo trực tiếp)</summary>
+    public int? ProductionPlanId { get; set; }
+
+    public virtual TrxProductionPlan? ProductionPlan { get; set; }
+
     public virtual SecUser? AssignedToNavigation { get; set; }
 
     public virtual MstBom Bom { get; set; } = null!;
