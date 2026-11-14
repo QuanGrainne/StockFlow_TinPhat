@@ -14,21 +14,21 @@ import PurchaseOrdersScreen from '@/features/purchase-orders/screens/PurchaseOrd
 import PriceBooksScreen from '@/features/price-books/screens/PriceBooksScreen';
 import TransfersScreen from '@/features/transfers/screens/TransfersScreen';
 import StocktakesScreen from '@/features/stocktakes/screens/StocktakesScreen';
+import DisposalsScreen from '@/features/disposals/screens/DisposalsScreen';
 import OrdersScreen from '@/features/orders/screens/OrdersScreen';
 import SalesBookingsScreen from '@/features/sales-bookings/screens/SalesBookingsScreen';
 import SalesReturnsScreen from '@/features/sales-returns/screens/SalesReturnsScreen';
+import ApprovalInboxScreen from '@/features/credit-requests/screens/ApprovalInboxScreen';
 import { OrderSettingsScreen } from '@/features/settings/screens/OrderSettingsScreen';
 import { permissionService } from '@/features/admin/services/permissionService';
 import { SCREEN_PATH_MAP, canOpenScreen, firstAllowedPath } from '@/lib/navigation/navbar';
 import { getStoredRole } from '@/lib/navigation/currentRole';
 
-// Màn hình theo chức năng (navbar dùng chung, xem config/navbar.ts)
-import { BomManagementScreen } from '@/features/bom/screens/BomManagementScreen';
-
-// Production Screens
-import { ProductionTrackingScreen } from '@/features/production/screens/ProductionTrackingScreen';
-import { ProductionPlanImportScreen } from '@/features/production/screens/ProductionPlanImportScreen';
-import { ProductionReferenceLogsScreen } from '@/features/production/screens/ProductionReferenceLogsScreen';
+// Sản xuất: định mức BOM, lệnh sản xuất, xuất NVL, nhập thành phẩm (UC-44–50, UC-57–61)
+import BomManagementScreen from '@/features/production/screens/BomManagementScreen';
+import ProductionOrdersScreen from '@/features/production/screens/ProductionOrdersScreen';
+import MaterialIssuesScreen from '@/features/production/screens/MaterialIssuesScreen';
+import FinishedGoodsReceiptsScreen from '@/features/production/screens/FinishedGoodsReceiptsScreen';
 
 // Admin Screens
 import { AdminDashboard } from '@/features/admin/screens/AdminDashboard';
@@ -44,26 +44,16 @@ interface AppLayoutProps {
   children?: React.ReactNode;
 }
 
-/** Màn hình ban đầu: một số trang nhận thêm tham số trên URL */
-const resolveInitialScreen = (initialScreen: string): string => {
-  if (typeof window === 'undefined') return initialScreen;
-  const params = new URLSearchParams(window.location.search);
-  // /production?report=1: mở sẵn form Nhập báo cáo giấy
-  if (initialScreen === 'production-orders' && params.get('report') === '1') return 'production-open-report-modal';
-  return initialScreen;
-};
-
 export const AppLayout: React.FC<AppLayoutProps> = ({ initialScreen, children }) => {
   const router = useRouter();
   // Đọc vai trò thật ngay khi khởi tạo (AppLayout luôn được load với ssr:false nên có localStorage).
   const [currentRole, setCurrentRole] = useState<UserRole>(() => getStoredRole());
   const [purchaseOrdersKey, setPurchaseOrdersKey] = useState(0);
-  const [activeScreen, setActiveScreen] = useState<string>(() => resolveInitialScreen(initialScreen));
+  const [activeScreen, setActiveScreen] = useState<string>(initialScreen);
   // /roles/permissions?role=ROLE_SALES: mở sẵn cột vai trò được chọn từ Danh mục vai trò
   const [selectedMatrixRole] = useState<string>(() =>
     typeof window === 'undefined' ? 'ROLE_ADMIN' : new URLSearchParams(window.location.search).get('role') || 'ROLE_ADMIN'
   );
-  const [hasImportedProductionPlan, setHasImportedProductionPlan] = useState(false);
   // Chức năng được phép (lấy lần gần nhất để không nháy trống khi chuyển trang)
   const [allowedFeatures, setAllowedFeatures] = useState<Set<string> | null>(() =>
     permissionService.peekAllowedFeatures(`ROLE_${getStoredRole()}`)
@@ -160,38 +150,19 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ initialScreen, children })
       case 'sales-returns':
         return <SalesReturnsScreen />;
 
-      // ─── Định mức BOM ───
+      // Approval Inbox – tab Yêu cầu hạn mức (UC-64)
+      case 'credit-approvals':
+        return <ApprovalInboxScreen />;
+
+      // ─── Sản xuất ───
       case 'manager-bom':
         return <BomManagementScreen />;
-
-      // ─── Production Screens ───
       case 'production-orders':
-        return (
-          <ProductionTrackingScreen
-            onNavigate={handleNavigate}
-            isImportedPlan={hasImportedProductionPlan}
-          />
-        );
-      case 'production-open-report-modal':
-        return (
-          <ProductionTrackingScreen
-            onNavigate={handleNavigate}
-            isImportedPlan={hasImportedProductionPlan}
-            initialOpenDetail={true}
-          />
-        );
-      case 'production-import':
-        return (
-          <ProductionPlanImportScreen
-            onNavigate={handleNavigate}
-            onApprovePlan={() => {
-              setHasImportedProductionPlan(true);
-              handleNavigate('production-orders');
-            }}
-          />
-        );
-      case 'production-logs':
-        return <ProductionReferenceLogsScreen />;
+        return <ProductionOrdersScreen />;
+      case 'production-material-issues':
+        return <MaterialIssuesScreen />;
+      case 'production-finished-goods':
+        return <FinishedGoodsReceiptsScreen />;
 
       // ─── Admin Screens ───
       case 'admin-dashboard':
@@ -268,6 +239,9 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ initialScreen, children })
       case 'stocktakes':
         return <StocktakesScreen />;
 
+      case 'disposals':
+        return <DisposalsScreen />;
+
       case 'transfers':
       case 'admin-transfers':
       case 'manager-transfers':
@@ -292,7 +266,6 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ initialScreen, children })
           currentRole={currentRole}
           activeScreen={activeScreen}
           onNavigate={handleNavigate}
-          productionBadge={hasImportedProductionPlan ? '10' : '4'}
         />
       </div>
 
@@ -307,12 +280,15 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ initialScreen, children })
         activeScreen === 'purchase-orders' ||
         activeScreen === 'sales-booking' ||
         activeScreen === 'sales-returns' ||
+        activeScreen === 'credit-approvals' ||
         activeScreen === 'suppliers' || activeScreen.includes('suppliers') ||
         activeScreen === 'customers' || activeScreen.includes('customers') ||
         activeScreen === 'goods-catalog' || activeScreen === 'products' ||
         activeScreen.includes('goods') || activeScreen.includes('catalog') ||
         activeScreen === 'price-books' || activeScreen === 'admin-price-books' ||
         activeScreen === 'stocktakes' ||
+        activeScreen === 'disposals' ||
+        activeScreen === 'manager-bom' || activeScreen.startsWith('production-') ||
         activeScreen.includes('price-book') ? (
         <main className="flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden bg-transparent">
           {renderActiveScreen()}

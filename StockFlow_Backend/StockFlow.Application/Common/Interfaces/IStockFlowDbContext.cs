@@ -25,8 +25,13 @@ public interface IStockFlowDbContext
     DbSet<TrxPurchaseReturn> TrxPurchaseReturns { get; }
     DbSet<TrxStocktake> TrxStocktakes { get; }
     DbSet<DtlStocktakeItem> DtlStocktakeItems { get; }
+    // Xuất hủy hàng hóa (bảng có từ InitialDatabase)
+    DbSet<TrxInventoryDisposal> TrxInventoryDisposals { get; }
+    DbSet<DtlInventoryDisposalItem> DtlInventoryDisposalItems { get; }
     DbSet<DtlPurchaseReturnItem> DtlPurchaseReturnItems { get; }
     DbSet<TrxFinancialTransaction> TrxFinancialTransactions { get; }
+    // Yêu cầu duyệt vượt hạn mức công nợ (UC-27, UC-64)
+    DbSet<TrxCreditLimitRequest> TrxCreditLimitRequests { get; }
     DbSet<MstPriceBook> MstPriceBooks { get; }
     DbSet<DtlPriceBookItem> DtlPriceBookItems { get; }
 
@@ -39,6 +44,19 @@ public interface IStockFlowDbContext
     DbSet<DtlStockTransferItem> DtlStockTransferItems { get; }
     DbSet<TrxStockIssue> TrxStockIssues { get; }
     DbSet<DtlStockIssueItem> DtlStockIssueItems { get; }
+
+    // Sản xuất: BOM, lệnh sản xuất, nhu cầu NVL, nhập thành phẩm (UC-44–50, UC-57–61)
+    DbSet<MstBom> MstBoms { get; }
+    DbSet<DtlBomItem> DtlBomItems { get; }
+    DbSet<TrxProductionOrder> TrxProductionOrders { get; }
+    DbSet<DtlProductionOrderItem> DtlProductionOrderItems { get; }
+    DbSet<TrxProductionMaterialRequirement> TrxProductionMaterialRequirements { get; }
+    DbSet<TrxProductionReport> TrxProductionReports { get; }
+    DbSet<TrxProductionPlan> TrxProductionPlans { get; }
+    DbSet<DtlProductionPlanItem> DtlProductionPlanItems { get; }
+    DbSet<TrxFinishedGoodsReceipt> TrxFinishedGoodsReceipts { get; }
+    DbSet<MstInventoryLot> MstInventoryLots { get; }
+    DbSet<MstWarehouseLocation> MstWarehouseLocations { get; }
 
     Task<long> GetNextSequenceValueAsync(string sequenceName, CancellationToken cancellationToken = default);
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);

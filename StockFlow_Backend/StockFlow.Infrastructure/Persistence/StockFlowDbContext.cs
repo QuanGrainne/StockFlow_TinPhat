@@ -91,7 +91,13 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
 
     public virtual DbSet<TrxProductionOrder> TrxProductionOrders { get; set; }
 
+    public virtual DbSet<DtlProductionOrderItem> DtlProductionOrderItems { get; set; }
+
     public virtual DbSet<TrxProductionReport> TrxProductionReports { get; set; }
+
+    public virtual DbSet<TrxProductionPlan> TrxProductionPlans { get; set; }
+
+    public virtual DbSet<DtlProductionPlanItem> DtlProductionPlanItems { get; set; }
 
     public virtual DbSet<TrxReturnProcessing> TrxReturnProcessings { get; set; }
 
@@ -555,6 +561,14 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
             entity.ToTable("mst_boms", "stockflow");
 
             entity.Property(e => e.BomId).HasColumnName("bom_id");
+            // Ghi chú kỹ thuật của BOM (UC-57, màn 3.2.2.6–3.2.2.8)
+            entity.Property(e => e.Description)
+                .HasMaxLength(500)
+                .HasColumnName("description");
+            // BR-30: mỗi thành phẩm tối đa một BOM đang áp dụng
+            entity.HasIndex(e => e.ProductId, "uq_mst_boms_active_product")
+                .IsUnique()
+                .HasFilter("is_active");
             entity.Property(e => e.BomName)
                 .HasMaxLength(100)
                 .HasColumnName("bom_name");
@@ -969,9 +983,23 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
                 .HasPrecision(18, 2)
                 .HasColumnName("requested_limit");
             entity.Property(e => e.SalesOrderId).HasColumnName("sales_order_id");
+            // Concurrency token (chỉ cấu hình EF, không đổi DB): UPDATE kèm điều kiện giá trị cũ,
+            // nên hai Manager cùng duyệt / hai hóa đơn cùng dùng một ngoại lệ thì chỉ một bên thành công.
             entity.Property(e => e.Status)
                 .HasMaxLength(20)
-                .HasColumnName("status");
+                .HasColumnName("status")
+                .IsConcurrencyToken();
+            entity.Property(e => e.SalesOrderId).IsConcurrencyToken();
+            entity.Property(e => e.RequestCode)
+                .HasMaxLength(30)
+                .HasColumnName("request_code");
+            entity.Property(e => e.ApprovalType)
+                .HasMaxLength(20)
+                .HasColumnName("approval_type");
+            entity.Property(e => e.ApprovedLimit)
+                .HasPrecision(18, 2)
+                .HasColumnName("approved_limit");
+            entity.HasIndex(e => e.RequestCode, "uq_trx_credit_limit_requests_request_code").IsUnique();
 
             entity.HasOne(d => d.ApprovedByNavigation).WithMany(p => p.TrxCreditLimitRequestApprovedByNavigations)
                 .HasForeignKey(d => d.ApprovedBy)
@@ -1049,6 +1077,12 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
             entity.HasIndex(e => e.ReportId, "uq_trx_finished_goods_receipts_2").IsUnique();
 
             entity.Property(e => e.FgrId).HasColumnName("fgr_id");
+            // Cảnh báo dùng NVL cần Manager xem xét (BR-37)
+            entity.Property(e => e.NeedsReview)
+                .HasColumnName("needs_review");
+            entity.Property(e => e.ReviewNote)
+                .HasMaxLength(500)
+                .HasColumnName("review_note");
             entity.Property(e => e.FgrCode)
                 .HasMaxLength(30)
                 .HasColumnName("fgr_code");
@@ -1059,6 +1093,7 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
                 .HasColumnName("notes");
             entity.Property(e => e.ProductId).HasColumnName("product_id");
             entity.Property(e => e.ProductionOrderId).HasColumnName("production_order_id");
+            entity.Property(e => e.ProductionOrderItemId).HasColumnName("production_order_item_id");
             entity.Property(e => e.Quantity)
                 .HasPrecision(18, 2)
                 .HasColumnName("quantity");
@@ -1089,6 +1124,11 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
                 .HasForeignKey(d => d.ProductionOrderId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("fk_trx_finished_goods_receipts_production_order_id");
+
+            entity.HasOne(d => d.ProductionOrderItem).WithMany(p => p.TrxFinishedGoodsReceipts)
+                .HasForeignKey(d => d.ProductionOrderItemId)
+                .OnDelete(DeleteBehavior.SetNull)
+                .HasConstraintName("fk_trx_finished_goods_receipts_production_order_item_id");
 
             entity.HasOne(d => d.ReceivedByNavigation).WithMany(p => p.TrxFinishedGoodsReceipts)
                 .HasForeignKey(d => d.ReceivedBy)
@@ -1351,6 +1391,13 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("fk_trx_inventory_disposals_processed_by");
 
+            // Người tạo phiếu xuất hủy (người xuất hủy = processed_by)
+            entity.Property(e => e.CreatedBy).HasColumnName("created_by");
+            entity.HasOne(d => d.CreatedByNavigation).WithMany()
+                .HasForeignKey(d => d.CreatedBy)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("fk_trx_inventory_disposals_created_by");
+
             entity.HasOne(d => d.Warehouse).WithMany(p => p.TrxInventoryDisposals)
                 .HasForeignKey(d => d.WarehouseId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
@@ -1515,11 +1562,29 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
             entity.ToTable("trx_production_material_requirements", "stockflow");
 
             entity.Property(e => e.RequirementId).HasColumnName("requirement_id");
+            // Snapshot định mức khi lập lệnh và điều chỉnh định mức trên lệnh (BR-31, BR-51)
+            entity.Property(e => e.SourceBomItemId).HasColumnName("source_bom_item_id");
+            entity.Property(e => e.NormPerUnit)
+                .HasPrecision(18, 4)
+                .HasColumnName("norm_per_unit");
+            entity.Property(e => e.WastageRate)
+                .HasPrecision(5, 2)
+                .HasColumnName("wastage_rate");
+            entity.Property(e => e.IsAdjusted)
+                .HasColumnName("is_adjusted");
+            entity.Property(e => e.AdjustReason)
+                .HasMaxLength(500)
+                .HasColumnName("adjust_reason");
+            entity.Property(e => e.AdjustedBy).HasColumnName("adjusted_by");
+            entity.Property(e => e.AdjustedAt)
+                .HasColumnType("timestamp without time zone")
+                .HasColumnName("adjusted_at");
             entity.Property(e => e.IssuedQty)
                 .HasPrecision(18, 2)
                 .HasColumnName("issued_qty");
             entity.Property(e => e.MaterialId).HasColumnName("material_id");
             entity.Property(e => e.ProductionOrderId).HasColumnName("production_order_id");
+            entity.Property(e => e.ProductionOrderItemId).HasColumnName("production_order_item_id");
             entity.Property(e => e.RequiredQty)
                 .HasPrecision(18, 2)
                 .HasColumnName("required_qty");
@@ -1538,6 +1603,11 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("fk_trx_production_material_requirements_production_order_id");
 
+            entity.HasOne(d => d.ProductionOrderItem).WithMany(p => p.TrxProductionMaterialRequirements)
+                .HasForeignKey(d => d.ProductionOrderItemId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("fk_trx_production_material_requirements_order_item_id");
+
             entity.HasOne(d => d.Unit).WithMany(p => p.TrxProductionMaterialRequirements)
                 .HasForeignKey(d => d.UnitId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
@@ -1553,6 +1623,10 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
             entity.HasIndex(e => e.ProductionOrderCode, "uq_trx_production_orders_1").IsUnique();
 
             entity.Property(e => e.ProductionOrderId).HasColumnName("production_order_id");
+            // Xưởng phụ trách (UC-58 A58.1)
+            entity.Property(e => e.Workshop)
+                .HasMaxLength(200)
+                .HasColumnName("workshop");
             entity.Property(e => e.ActualQuantity)
                 .HasPrecision(18, 2)
                 .HasColumnName("actual_quantity");
@@ -1597,6 +1671,129 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
                 .HasForeignKey(d => d.ProductId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("fk_trx_production_orders_product_id");
+
+            // Kế hoạch sản xuất sinh ra lệnh (tùy chọn). Không cho xóa kế hoạch còn lệnh liên kết.
+            entity.Property(e => e.ProductionPlanId).HasColumnName("production_plan_id");
+            entity.HasOne(d => d.ProductionPlan).WithMany(p => p.TrxProductionOrders)
+                .HasForeignKey(d => d.ProductionPlanId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("fk_trx_production_orders_production_plan_id");
+        });
+
+        modelBuilder.Entity<TrxProductionPlan>(entity =>
+        {
+            entity.HasKey(e => e.ProductionPlanId).HasName("trx_production_plans_pkey");
+
+            entity.ToTable("trx_production_plans", "stockflow");
+
+            entity.HasIndex(e => e.PlanCode, "uq_trx_production_plans_code").IsUnique();
+
+            entity.Property(e => e.ProductionPlanId).HasColumnName("production_plan_id");
+            entity.Property(e => e.PlanCode)
+                .HasMaxLength(30)
+                .HasColumnName("plan_code");
+            entity.Property(e => e.PlanName)
+                .HasMaxLength(150)
+                .HasColumnName("plan_name");
+            entity.Property(e => e.PlanDate)
+                .HasColumnType("timestamp without time zone")
+                .HasColumnName("plan_date");
+            entity.Property(e => e.PeriodStart).HasColumnName("period_start");
+            entity.Property(e => e.PeriodEnd).HasColumnName("period_end");
+            entity.Property(e => e.Status)
+                .HasMaxLength(20)
+                .HasColumnName("status");
+            entity.Property(e => e.CreatedBy).HasColumnName("created_by");
+            entity.Property(e => e.ApprovedBy).HasColumnName("approved_by");
+            entity.Property(e => e.ApprovalDate)
+                .HasColumnType("timestamp without time zone")
+                .HasColumnName("approval_date");
+            entity.Property(e => e.Notes)
+                .HasMaxLength(500)
+                .HasColumnName("notes");
+
+            entity.HasOne(d => d.CreatedByNavigation).WithMany()
+                .HasForeignKey(d => d.CreatedBy)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("fk_trx_production_plans_created_by");
+
+            entity.HasOne(d => d.ApprovedByNavigation).WithMany()
+                .HasForeignKey(d => d.ApprovedBy)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("fk_trx_production_plans_approved_by");
+        });
+
+        modelBuilder.Entity<DtlProductionPlanItem>(entity =>
+        {
+            entity.HasKey(e => e.ProductionPlanItemId).HasName("dtl_production_plan_items_pkey");
+
+            entity.ToTable("dtl_production_plan_items", "stockflow");
+
+            entity.Property(e => e.ProductionPlanItemId).HasColumnName("production_plan_item_id");
+            entity.Property(e => e.ProductionPlanId).HasColumnName("production_plan_id");
+            entity.Property(e => e.ProductId).HasColumnName("product_id");
+            entity.Property(e => e.PlannedQuantity)
+                .HasPrecision(18, 2)
+                .HasColumnName("planned_quantity");
+            entity.Property(e => e.PlannedStartDate).HasColumnName("planned_start_date");
+            entity.Property(e => e.PlannedEndDate).HasColumnName("planned_end_date");
+            entity.Property(e => e.WarehouseId).HasColumnName("warehouse_id");
+            entity.Property(e => e.Notes)
+                .HasMaxLength(500)
+                .HasColumnName("notes");
+
+            entity.HasOne(d => d.ProductionPlan).WithMany(p => p.DtlProductionPlanItems)
+                .HasForeignKey(d => d.ProductionPlanId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("fk_dtl_production_plan_items_production_plan_id");
+
+            entity.HasOne(d => d.Product).WithMany()
+                .HasForeignKey(d => d.ProductId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("fk_dtl_production_plan_items_product_id");
+
+            entity.HasOne(d => d.Warehouse).WithMany()
+                .HasForeignKey(d => d.WarehouseId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("fk_dtl_production_plan_items_warehouse_id");
+        });
+
+        modelBuilder.Entity<DtlProductionOrderItem>(entity =>
+        {
+            entity.HasKey(e => e.ProductionOrderItemId).HasName("dtl_production_order_items_pkey");
+
+            entity.ToTable("dtl_production_order_items", "stockflow");
+
+            entity.HasIndex(e => e.ProductionOrderId, "ix_dtl_production_order_items_order_id");
+
+            entity.Property(e => e.ProductionOrderItemId).HasColumnName("production_order_item_id");
+            entity.Property(e => e.ProductionOrderId).HasColumnName("production_order_id");
+            entity.Property(e => e.ProductId).HasColumnName("product_id");
+            entity.Property(e => e.BomId).HasColumnName("bom_id");
+            entity.Property(e => e.PlannedQuantity)
+                .HasPrecision(18, 2)
+                .HasColumnName("planned_quantity");
+            entity.Property(e => e.ActualQuantity)
+                .HasPrecision(18, 2)
+                .HasColumnName("actual_quantity");
+            entity.Property(e => e.Notes)
+                .HasMaxLength(500)
+                .HasColumnName("notes");
+
+            entity.HasOne(d => d.ProductionOrder).WithMany(p => p.DtlProductionOrderItems)
+                .HasForeignKey(d => d.ProductionOrderId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("fk_dtl_production_order_items_production_order_id");
+
+            entity.HasOne(d => d.Product).WithMany(p => p.DtlProductionOrderItems)
+                .HasForeignKey(d => d.ProductId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("fk_dtl_production_order_items_product_id");
+
+            entity.HasOne(d => d.Bom).WithMany(p => p.DtlProductionOrderItems)
+                .HasForeignKey(d => d.BomId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("fk_dtl_production_order_items_bom_id");
         });
 
         modelBuilder.Entity<TrxProductionReport>(entity =>
@@ -1740,6 +1937,10 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
             entity.HasIndex(e => e.IssueCode, "uq_trx_stock_issues_1").IsUnique();
 
             entity.Property(e => e.StockIssueId).HasColumnName("stock_issue_id");
+            // Lý do xuất bổ sung vượt nhu cầu (BR-34)
+            entity.Property(e => e.Reason)
+                .HasMaxLength(500)
+                .HasColumnName("reason");
             entity.Property(e => e.IsSupplementary).HasColumnName("is_supplementary");
             entity.Property(e => e.IssueCode)
                 .HasMaxLength(30)
@@ -1984,6 +2185,7 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
                 .HasMaxLength(20)
                 .HasColumnName("scope_user_type");
             entity.Property(e => e.ScopeUserIds).HasColumnName("scope_user_ids");
+            entity.Property(e => e.ScopeCustomerIds).HasColumnName("scope_customer_ids");
             entity.Property(e => e.CreatedAt)
                 .HasColumnType("timestamp without time zone")
                 .HasColumnName("created_at");

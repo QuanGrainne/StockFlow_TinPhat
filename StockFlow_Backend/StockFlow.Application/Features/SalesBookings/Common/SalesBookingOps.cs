@@ -6,7 +6,10 @@ namespace StockFlow.Application.Features.SalesBookings.Common;
 
 /// <summary>
 /// Đơn đặt hàng của khách (UC-14, BR-07/08): lưu chung bảng trx_orders với order_type = BOOKING.
-/// Tạo / sửa đơn KHÔNG trừ tồn kho; tồn chỉ bị trừ khi tạo hóa đơn từ đơn (giao 1 phần hoặc toàn bộ — BR-16/17).
+/// Tạo / sửa đơn KHÔNG trừ tồn kho; tồn chỉ bị trừ khi tạo hóa đơn từ đơn.
+/// Mỗi đơn đặt ra đúng 1 hóa đơn: Phiếu tạm → (tạo hóa đơn) Hoàn thành; SL trên đơn chốt bằng SL hóa đơn.
+/// Sau đó hóa đơn là chứng từ độc lập: hủy hóa đơn không mở lại / đổi trạng thái đơn đặt.
+/// Khách lấy thiếu: phần còn lại có thể tách thành 1 đơn đặt mới (Phiếu tạm) — xem SettleWithInvoiceAsync.
 /// Tiền khách trả trước = phiếu thu tham chiếu tới đơn (giảm công nợ ngay), khi tạo hóa đơn được trừ vào hóa đơn.
 /// </summary>
 public static class SalesBookingOps
@@ -14,20 +17,16 @@ public static class SalesBookingOps
     public const string OrderType = "BOOKING";
     public const string InvoiceType = "INVOICE";
 
-    /// <summary>Phiếu tạm</summary>
+    /// <summary>Phiếu tạm: chưa tạo hóa đơn, đang giữ hàng cho khách</summary>
     public const string Draft = "DRAFT";
-    /// <summary>Đã xác nhận</summary>
-    public const string Confirmed = "CONFIRMED";
-    /// <summary>Đang giao hàng: đã tạo hóa đơn cho 1 phần hàng</summary>
-    public const string Delivering = "DELIVERING";
-    /// <summary>Hoàn thành: đã giao đủ hoặc người dùng kết thúc đơn</summary>
+    /// <summary>Hoàn thành: đã tạo hóa đơn giao hàng</summary>
     public const string Finished = "FINISHED";
     public const string Cancelled = "CANCELLED";
 
-    public static readonly string[] AllStatuses = { Draft, Confirmed, Delivering, Finished, Cancelled };
+    public static readonly string[] AllStatuses = { Draft, Finished, Cancelled };
 
-    /// <summary>Trạng thái còn giao tiếp được (tạo hóa đơn, giữ hàng)</summary>
-    public static readonly string[] OpenStatuses = { Draft, Confirmed, Delivering };
+    /// <summary>Trạng thái còn xử lý được (tạo hóa đơn, giữ hàng)</summary>
+    public static readonly string[] OpenStatuses = { Draft };
 
     public static bool IsOpen(string? status) => OpenStatuses.Contains(status ?? "", StringComparer.OrdinalIgnoreCase);
 
@@ -55,32 +54,166 @@ public static class SalesBookingOps
         return Math.Max(0, (booking.PaidAmount ?? 0) - used);
     }
 
+    /// <summary>1 dòng hàng của hóa đơn giao từ đơn đặt (đầu vào của SettleWithInvoice)</summary>
+    public sealed record InvoiceLine(int ProductId, int UnitId, decimal Quantity, decimal OriginalPrice,
+        string DiscountType, decimal DiscountValue, decimal UnitPrice);
+
+    /// <summary>Tiền của hóa đơn giao hàng (đầu vào của SettleWithInvoice)</summary>
+    public sealed record InvoiceMoney(decimal SubTotal, string DiscountType, decimal DiscountValue, decimal DiscountAmount, decimal Total);
+
     /// <summary>
-    /// Cập nhật trạng thái đơn đặt theo số lượng đã giao: chưa giao → giữ Phiếu tạm / Đã xác nhận,
-    /// giao 1 phần → Đang giao hàng, giao đủ mọi mặt hàng → Hoàn thành. Đơn đã hủy / đã kết thúc tay không đổi.
+    /// Chốt đơn đặt khi tạo hóa đơn giao hàng (gọi trong transaction tạo hóa đơn; booking đã Include DtlOrderItems):
+    /// - SL trên đơn sửa bằng đúng SL hóa đơn ("đặt bao nhiêu thì hóa đơn bấy nhiêu"), tiền đơn = tiền hóa đơn, đơn → Hoàn thành.
+    /// - Trả về phần khách chưa lấy (SL đặt − SL hóa đơn, giữ đơn giá của đơn) để tạo đơn chờ nếu người dùng chọn.
     /// </summary>
-    public static async Task RecomputeStatusAsync(IStockFlowDbContext context, int bookingId, int userId, CancellationToken ct)
+    public static List<DtlOrderItem> SettleWithInvoice(
+        IStockFlowDbContext context, TrxOrder booking, IReadOnlyList<InvoiceLine> invoiceLines, InvoiceMoney money, int userId)
     {
-        var booking = await context.TrxOrders.Include(o => o.DtlOrderItems)
-            .FirstOrDefaultAsync(o => o.OrderId == bookingId && o.OrderType == OrderType, ct);
-        if (booking == null || string.Equals(booking.Status, Cancelled, StringComparison.OrdinalIgnoreCase)) return;
-
-        var delivered = (await LoadDeliveredAsync(context, new[] { bookingId }, ct)).GetValueOrDefault(bookingId) ?? new();
-        var ordered = booking.DtlOrderItems.GroupBy(i => i.ProductId).ToDictionary(g => g.Key, g => g.Sum(x => x.Quantity ?? 0));
-        var anyDelivered = delivered.Values.Any(q => q > 0);
-        var allDelivered = ordered.Count > 0 && ordered.All(o => delivered.GetValueOrDefault(o.Key) >= o.Value);
-
-        // Gọi sau khi tạo / hủy hóa đơn của đơn: tính lại từ số liệu (hủy hóa đơn của đơn đã kết thúc → mở lại đơn)
-        var next = allDelivered ? Finished
-            : anyDelivered ? Delivering
-            : string.Equals(booking.Status, Draft, StringComparison.OrdinalIgnoreCase) ? Draft : Confirmed;
-
-        if (!string.Equals(booking.Status, next, StringComparison.OrdinalIgnoreCase))
+        // Ghép từng dòng đơn đặt với các dòng hóa đơn cùng hàng: ưu tiên dòng cùng giá, sau đó dòng khác giá
+        var invLeft = invoiceLines.Select(l => l.Quantity).ToArray();
+        var bookingLines = booking.DtlOrderItems.OrderBy(i => i.OrderItemId).ToList();
+        var taken = bookingLines.ToDictionary(l => l, _ => 0m);
+        foreach (var samePriceOnly in new[] { true, false })
         {
-            booking.Status = next;
-            booking.UpdatedAt = StockFlow.Application.Common.VietnamTime.Now;
-            booking.UpdatedBy = userId;
+            foreach (var line in bookingLines)
+            {
+                for (var k = 0; k < invoiceLines.Count; k++)
+                {
+                    var inv = invoiceLines[k];
+                    if (invLeft[k] <= 0 || inv.ProductId != line.ProductId) continue;
+                    if (samePriceOnly && !SamePrice(line, inv)) continue;
+                    var take = Math.Min((line.Quantity ?? 0) - taken[line], invLeft[k]);
+                    if (take <= 0) continue;
+                    taken[line] += take;
+                    invLeft[k] -= take;
+                }
+            }
         }
+
+        var remainder = new List<DtlOrderItem>();
+        foreach (var line in bookingLines)
+        {
+            var ordered = line.Quantity ?? 0;
+            var take = taken[line];
+            if (ordered - take > 0) remainder.Add(CopyLine(line, ordered - take));
+            if (take > 0) SetQuantity(line, take);
+            else
+            {
+                booking.DtlOrderItems.Remove(line);
+                context.DtlOrderItems.Remove(line);
+            }
+        }
+
+        // Hóa đơn có thêm hàng (không có trên đơn / lấy nhiều hơn đặt) → ghi thêm vào đơn cho khớp hóa đơn:
+        // cùng hàng, cùng đơn giá và giá bán với 1 dòng đang có → cộng vào dòng đó (VD đặt 6 lấy 7 → dòng 7);
+        // khác giá → dòng riêng để tiền đơn vẫn khớp hóa đơn
+        for (var k = 0; k < invoiceLines.Count; k++)
+        {
+            var inv = invoiceLines[k];
+            var extra = invLeft[k];
+            if (extra <= 0) continue;
+            var same = booking.DtlOrderItems.FirstOrDefault(l => l.ProductId == inv.ProductId && SamePrice(l, inv));
+            if (same != null)
+            {
+                SetQuantity(same, (same.Quantity ?? 0) + extra);
+                continue;
+            }
+            var added = new DtlOrderItem
+            {
+                ProductId = inv.ProductId,
+                UnitId = inv.UnitId,
+                OriginalPrice = inv.OriginalPrice,
+                DiscountType = inv.DiscountType,
+                DiscountValue = inv.DiscountValue,
+                UnitPrice = inv.UnitPrice,
+            };
+            SetQuantity(added, extra);
+            booking.DtlOrderItems.Add(added);
+        }
+
+        booking.SubTotal = money.SubTotal;
+        booking.DiscountType = money.DiscountType;
+        booking.DiscountValue = money.DiscountValue;
+        booking.DiscountAmount = money.DiscountAmount;
+        booking.TotalAmount = money.Total;
+        booking.Status = Finished;
+        booking.UpdatedAt = StockFlow.Application.Common.VietnamTime.Now;
+        booking.UpdatedBy = userId;
+        return remainder;
+    }
+
+    /// <summary>
+    /// Đơn chờ cho phần khách chưa lấy: Phiếu tạm, cùng khách / chi nhánh / ngày giao / bảng giá với đơn gốc.
+    /// Giảm giá đơn: theo % thì giữ %, theo tiền thì phần giảm giá chưa dùng ở hóa đơn.
+    /// Tiền trả trước còn dư (chưa trừ vào hóa đơn) chuyển sang đơn mới; công nợ khách giữ nguyên
+    /// (đã giảm khi thu cọc, tức mình vẫn đang nợ khách khoản này).
+    /// </summary>
+    public static TrxOrder BuildRemainderBooking(
+        TrxOrder source, List<DtlOrderItem> remainder, decimal sourceDiscountAmountBefore, decimal invoiceDiscountAmount,
+        decimal leftoverDeposit, string code, int userId)
+    {
+        var subTotal = remainder.Sum(l => l.LineTotal);
+        var isPercent = string.Equals(source.DiscountType, "PERCENT", StringComparison.OrdinalIgnoreCase);
+        var discount = isPercent
+            ? Math.Min(subTotal, Math.Round(subTotal * Math.Min(source.DiscountValue, 100) / 100m, 0))
+            : Math.Min(subTotal, Math.Max(0, sourceDiscountAmountBefore - invoiceDiscountAmount));
+        var total = subTotal - discount;
+
+        var priceBookTag = System.Text.RegularExpressions.Regex.Match(source.Notes ?? "", @"\[Bảng giá:[^\]]*\]").Value;
+        var notes = $"Tách từ đơn {source.OrderCode} (phần khách chưa lấy)";
+        if (leftoverDeposit > 0) notes += $". Tiền trả trước chuyển từ {source.OrderCode}: {leftoverDeposit:N0} đ";
+        if (!string.IsNullOrEmpty(priceBookTag)) notes = $"{priceBookTag} {notes}";
+
+        var next = new TrxOrder
+        {
+            OrderCode = code,
+            OrderType = OrderType,
+            Status = Draft,
+            PartnerId = source.PartnerId,
+            WarehouseId = source.WarehouseId,
+            OrderDate = StockFlow.Application.Common.VietnamTime.Now,
+            DeliveryDate = source.DeliveryDate,
+            SubTotal = subTotal,
+            DiscountType = isPercent ? "PERCENT" : "AMOUNT",
+            DiscountValue = isPercent ? Math.Min(source.DiscountValue, 100) : discount,
+            DiscountAmount = discount,
+            TotalAmount = total,
+            PaidAmount = leftoverDeposit,
+            OutstandingAmount = 0,
+            PaymentStatus = leftoverDeposit <= 0 ? "UNPAID" : (leftoverDeposit >= total ? "PAID" : "PARTIAL"),
+            Notes = notes,
+            CreatedBy = userId,
+        };
+        foreach (var l in remainder) next.DtlOrderItems.Add(l);
+        return next;
+    }
+
+    /// <summary>Dòng đơn đặt và dòng hóa đơn cùng đơn vị, cùng đơn giá và giá bán</summary>
+    private static bool SamePrice(DtlOrderItem line, InvoiceLine inv) =>
+        line.UnitId == inv.UnitId && line.OriginalPrice == inv.OriginalPrice && (line.UnitPrice ?? line.OriginalPrice) == inv.UnitPrice;
+
+    private static DtlOrderItem CopyLine(DtlOrderItem src, decimal qty)
+    {
+        var copy = new DtlOrderItem
+        {
+            ProductId = src.ProductId,
+            UnitId = src.UnitId,
+            OriginalPrice = src.OriginalPrice,
+            DiscountType = src.DiscountType,
+            DiscountValue = src.DiscountValue,
+            UnitPrice = src.UnitPrice,
+        };
+        SetQuantity(copy, qty);
+        return copy;
+    }
+
+    /// <summary>Đổi SL 1 dòng, tính lại giảm giá dòng và thành tiền theo đơn giá đang có</summary>
+    private static void SetQuantity(DtlOrderItem line, decimal qty)
+    {
+        var unitPrice = line.UnitPrice ?? line.OriginalPrice;
+        line.Quantity = qty;
+        line.DiscountAmount = Math.Max(0, line.OriginalPrice - unitPrice) * qty;
+        line.LineTotal = Math.Round(unitPrice * qty, 2);
     }
 
     /// <summary>Hàng khách đặt theo (kho, hàng) — cột "Khách đặt" ở màn Hàng hóa</summary>

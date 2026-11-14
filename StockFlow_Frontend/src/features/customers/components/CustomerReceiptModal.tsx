@@ -10,7 +10,7 @@ import { ExternalLink, Loader2, Trash2, X } from 'lucide-react';
 import { customerService } from '../services/customerService';
 import type { CustomerReceiptDetail } from '../types';
 import { PartnerLink } from '@/components/links/EntityLinks';
-import { invoiceLinkHref } from '@/features/orders/components/InvoicePreviewModal';
+import { invoiceLinkHref } from '@/features/orders';
 import { documentLinkHref, toLinkDate } from '@/lib/navigation/documentLink';
 import type { CustomerReceiptAllocation } from '../types';
 
@@ -20,7 +20,7 @@ const allocHref = (a: CustomerReceiptAllocation) =>
   isBookingAlloc(a)
     ? documentLinkHref('/sales-booking', { code: a.orderCode, id: a.orderId, date: toLinkDate(a.orderDate) })
     : invoiceLinkHref(a);
-import { formatDateTimeVN, toLocalDatetimeInputString } from '@/features/transfers/utils/dateUtils';
+import { formatDateTimeVN, toLocalDatetimeInputString } from '@/lib/utils/date';
 
 type PayMethod = 'CASH' | 'VIETQR';
 

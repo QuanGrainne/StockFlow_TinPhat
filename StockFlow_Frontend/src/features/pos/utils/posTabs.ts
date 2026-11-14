@@ -29,6 +29,8 @@ export interface PosLine {
   /** Trả hàng: dòng hóa đơn gốc, SL còn được trả */
   orderItemId?: number;
   maxQty?: number;
+  /** Trả hàng theo hóa đơn: giá bán trên hóa đơn (cơ sở phân bổ giảm giá hóa đơn) */
+  returnSalePrice?: number;
 }
 
 export interface PosTab {
@@ -50,6 +52,8 @@ export interface PosTab {
   bookingCode?: string | null;
   /** BOOKING (sửa): tiền khách đã trả trước; INVOICE từ đơn: tiền trả trước còn lại được trừ vào hóa đơn */
   bookingPaid?: number;
+  /** INVOICE từ đơn: các dòng hàng đã đặt (so với SL khách lấy để hỏi tạo đơn chờ cho phần còn lại) */
+  bookingItems?: { productId: number; code: string; name: string; unit: string; quantity: number }[];
   /** Chi nhánh xử lý của đơn đặt (hóa đơn từ đơn / sửa đơn phải ở đúng chi nhánh này) */
   warehouseId?: number | null;
   /** Thời gian giao hàng (YYYY-MM-DDTHH:mm) */
@@ -62,8 +66,18 @@ export interface PosTab {
   returnSellerName?: string | null;
   returnFee?: number;
   returnWalkIn?: boolean;
+  /** Trả hàng theo hóa đơn: tổng tiền hàng và giảm giá tổng của hóa đơn gốc (phân bổ giảm giá như KiotViet) */
+  returnInvoiceSubTotal?: number;
+  returnInvoiceDiscount?: number;
+  /** Người dùng đã tự sửa Giảm giá (không còn lấy theo phân bổ) */
+  returnDiscountEdited?: boolean;
+  /** Hóa đơn: khách trả thừa và còn nợ cũ → true = tính phần thừa vào công nợ (trừ nợ cũ) thay vì trả lại tiền */
+  excessToDebt?: boolean;
   /** Trả nhanh: khách quên hóa đơn — tự tìm hàng, tự chọn khách, không giới hạn theo hóa đơn */
   returnQuick?: boolean;
+  /** Ngoại lệ một lần đã được Manager duyệt, gắn vào hóa đơn này khi thanh toán (UC-27/UC-64) */
+  creditRequestId?: number | null;
+  creditRequestCode?: string | null;
 }
 
 export const POS_TABS_KEY = 'stockflow_pos_tabs_v2';

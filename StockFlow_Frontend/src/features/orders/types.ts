@@ -114,6 +114,11 @@ export interface OrderDetail {
   salesRepName: string;
   notes?: string | null;
   priceBookName?: string;
+  /** Hóa đơn tạo từ đơn đặt hàng nào */
+  bookingOrderId?: number | null;
+  bookingOrderCode?: string | null;
+  /** Tiền khách trả trước ở đơn đặt đã trừ vào hóa đơn */
+  depositAmount?: number;
 
   customer: OrderCustomer;
   items: OrderItemDetail[];

@@ -1,5 +1,10 @@
 'use client';
 
+// NGOẠI LỆ RULE 20 MỤC 6 (T17): trang này gọi /api/auth/login bằng fetch trực tiếp, không qua apiClient, vì:
+// - Đăng nhập không cần token; apiClient sẽ gắn token cũ còn trong tab (nếu có) vào request.
+// - apiClient coi 401 là hết phiên (xoá phiên, báo "Phiên đăng nhập đã hết hạn…"), sai ngữ cảnh khi đăng nhập.
+// - Giữ nguyên các thông báo lỗi riêng của trang (sai mật khẩu, không kết nối được máy chủ).
+
 import { tabSession } from '@/lib/auth/tabSession';
 import { useState, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';

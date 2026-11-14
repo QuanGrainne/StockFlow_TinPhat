@@ -14,6 +14,7 @@ import {
   CreateCustomerPaymentPayload,
   CustomerReceiptDetail,
 } from '../types';
+import type { DebtAdjustmentDetail, DebtAdjustPayload, DebtAdjustResult } from '@/components/debt/types';
 
 interface BackendCustomerDto {
   id: string;
@@ -223,6 +224,24 @@ export const customerService = {
   },
 
   /** Tạo phiếu thu nợ khách hàng (PT...), có phân bổ vào hóa đơn còn nợ */
+  /** Điều chỉnh công nợ: tạo phiếu DC..., nợ cần thu = payload.newDebt */
+  async adjustCustomerDebt(partnerId: number, payload: DebtAdjustPayload): Promise<DebtAdjustResult> {
+    return apiClient.post<DebtAdjustResult>(`/api/customers/${partnerId}/debt-adjustments`, payload);
+  },
+
+  async getDebtAdjustment(partnerId: number, code: string): Promise<DebtAdjustmentDetail> {
+    return apiClient.get<DebtAdjustmentDetail>(`/api/customers/${partnerId}/debt-adjustments/${encodeURIComponent(code)}`);
+  },
+
+  /** Sửa phiếu điều chỉnh: payload.newDebt = nợ cần thu ngay sau phiếu */
+  async updateDebtAdjustment(partnerId: number, code: string, payload: DebtAdjustPayload): Promise<void> {
+    await apiClient.put(`/api/customers/${partnerId}/debt-adjustments/${encodeURIComponent(code)}`, payload);
+  },
+
+  async cancelDebtAdjustment(partnerId: number, code: string): Promise<void> {
+    await apiClient.post(`/api/customers/${partnerId}/debt-adjustments/${encodeURIComponent(code)}/cancel`, {});
+  },
+
   async createCustomerPayment(partnerId: number, payload: CreateCustomerPaymentPayload): Promise<CustomerPaymentResult> {
     return apiClient.post<CustomerPaymentResult>(`/api/customers/${partnerId}/payments`, payload);
   },

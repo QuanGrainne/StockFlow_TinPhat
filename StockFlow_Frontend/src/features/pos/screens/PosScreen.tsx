@@ -10,11 +10,14 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { message } from 'antd';
+import { message, Tooltip } from 'antd';
+import { FormHeaderUserBar } from '@/components/layout/FormHeaderUserBar';
 import {
+  ArrowLeft,
   ArrowLeftRight,
   Check,
   ChevronDown,
+  CircleAlert,
   CircleUserRound,
   Info,
   Menu,
@@ -32,7 +35,7 @@ import {
   X,
 } from 'lucide-react';
 import { ProductThumb } from '@/components/ProductThumb';
-import { CustomerFormModal } from '@/features/customers/components/CustomerFormModal';
+import { CustomerFormModal } from '@/features/customers';
 import { customerService } from '@/features/customers/services/customerService';
 import type { CreateCustomerPayload } from '@/features/customers/types';
 import { orderSettingsService } from '@/features/settings/services/orderSettingsService';
@@ -45,6 +48,10 @@ import { tabSession } from '@/lib/auth/tabSession';
 import { posService, type PosSaleRequest } from '../services/posService';
 import { ReturnTabView } from '../components/ReturnTabView';
 import { PickBookingDialog, PickInvoiceDialog } from '../components/PosPickerDialogs';
+import { BookingShortageDialog, type BookingShortageLine } from '../components/BookingShortageDialog';
+import { CreditRequestDialog } from '../components/CreditRequestDialog';
+import { MyCreditRequestsDialog } from '../components/MyCreditRequestsDialog';
+import { isOverCreditLimitError } from '@/features/credit-requests';
 import { salesReturnService } from '@/features/sales-returns/services/salesReturnService';
 import type { PosCustomer, PosPriceBook, PosProduct } from '../types';
 import {
@@ -309,6 +316,12 @@ export default function PosScreen() {
   const [orderDiscountOpen, setOrderDiscountOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  /** Hóa đơn từ đơn đặt, khách lấy thiếu: các dòng thiếu (mở hộp hỏi tạo đơn chờ) */
+  const [shortage, setShortage] = useState<BookingShortageLine[] | null>(null);
+  /** Thanh toán bị chặn vì vượt hạn mức (CUS-008/009) → hộp gửi yêu cầu duyệt (UC-27) */
+  const [creditBlock, setCreditBlock] = useState<{ message: string; expectedNewDebt: number } | null>(null);
+  /** Hộp "Yêu cầu hạn mức của tôi" cho khách đang chọn */
+  const [myCreditOpen, setMyCreditOpen] = useState(false);
   const [now, setNow] = useState(() => new Date());
 
   const productSearchRef = useRef<HTMLInputElement>(null);
@@ -332,6 +345,29 @@ export default function PosScreen() {
   const tab = tabs.find((t) => t.id === activeTabId) ?? tabs[0];
   const defaultPriceBookId = priceBooks.find((p) => p.isDefault)?.priceBookId ?? priceBooks[0]?.priceBookId ?? null;
   const priceBookId = tab.priceBookId ?? defaultPriceBookId;
+
+  // ── Bảng giá dùng được cho chi nhánh + khách đang chọn (phạm vi áp dụng, hiệu lực) ──
+  const saleCustomerId = tab.kind === 'RETURN' ? null : tab.customer?.id ?? null;
+  const saleBooksKey = `${warehouseId}|${saleCustomerId ?? 0}`;
+  const [saleBooks, setSaleBooks] = useState<{ key: string; books: PosPriceBook[] }>({ key: '', books: [] });
+  /** Đã đề xuất bảng giá riêng cho (tab, khách) này chưa: chỉ đề xuất 1 lần, người dùng đổi tay thì giữ */
+  const suggestedBookRef = useRef<string>('');
+  const syncPriceBookRef = useRef<(books: PosPriceBook[], customerId: number | null) => void>(() => {});
+  useEffect(() => {
+    let alive = true;
+    posService
+      .getPriceBooks({ warehouseId, customerId: saleCustomerId ?? undefined, forSale: true })
+      .then((books) => {
+        if (!alive) return;
+        setSaleBooks({ key: saleBooksKey, books });
+        if (books.length > 0) syncPriceBookRef.current(books, saleCustomerId);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [saleBooksKey, warehouseId, saleCustomerId]);
+  // Đang tải / lỗi: tạm hiện danh sách đầy đủ để không trống ô chọn
+  const selectableBooks = saleBooks.key === saleBooksKey && saleBooks.books.length > 0 ? saleBooks.books : priceBooks;
 
   // ── Tải dữ liệu: hàng hóa theo kho làm việc, bảng giá, ma trận giá, thiết lập bán âm ──
   useEffect(() => {
@@ -428,6 +464,7 @@ export default function PosScreen() {
             note: '',
             orderItemId: it.orderItemId,
             maxQty: it.remainingQuantity,
+            returnSalePrice: it.salePrice,
           }));
         if (lines.length === 0) {
           message.warning(`Hóa đơn ${src.invoiceCode} đã được trả hết hàng.`);
@@ -462,6 +499,9 @@ export default function PosScreen() {
           returnSellerName: src.sellerName,
           returnFee: 0,
           returnWalkIn: src.isWalkIn,
+          returnInvoiceSubTotal: src.invoiceSubTotal ?? 0,
+          returnInvoiceDiscount: src.invoiceDiscount ?? 0,
+          returnDiscountEdited: false,
         };
         setTabs((prev) => [...prev.filter((x) => x.lines.length > 0 || x.bookingId || x.returnInvoiceId || x.returnQuick), t]);
         setActiveTabId(t.id);
@@ -484,9 +524,14 @@ export default function PosScreen() {
             message.info(`Đã chuyển chi nhánh làm việc sang ${wh.name} (chi nhánh xử lý của đơn ${b.orderCode}).`);
           }
         }
+        if (kind === 'INVOICE' && b.status !== 'DRAFT') {
+          message.warning(`Đơn ${b.orderCode} đã hoàn thành hoặc đã hủy — không tạo hóa đơn được nữa.`);
+          return;
+        }
         const firstDelivery = b.invoices.every((i) => i.status !== 'COMPLETED');
+        // Mỗi đơn ra đúng 1 hóa đơn: mở đủ SL đặt, người bán sửa theo SL khách lấy thực tế
         const lines: PosLine[] = b.items
-          .map((it) => ({ it, qty: kind === 'BOOKING' ? it.quantity : Math.max(0, it.quantity - it.deliveredQuantity) }))
+          .map((it) => ({ it, qty: it.quantity }))
           .filter((x) => x.qty > 0)
           .map(({ it, qty }) => ({
             key: newId(),
@@ -539,6 +584,17 @@ export default function PosScreen() {
           bookingId: copyId ? null : b.orderId,
           bookingCode: copyId ? null : b.orderCode,
           bookingPaid: copyId ? 0 : kind === 'BOOKING' ? b.paidAmount : b.remainingDeposit,
+          // Hóa đơn từ đơn: nhớ SL đặt để hỏi tạo đơn chờ khi khách lấy thiếu
+          bookingItems:
+            kind === 'INVOICE' && !copyId
+              ? b.items.map((it) => ({
+                  productId: it.productId,
+                  code: it.productCode,
+                  name: it.productName,
+                  unit: it.unit,
+                  quantity: it.quantity,
+                }))
+              : undefined,
           warehouseId: b.warehouseId,
           deliveryDate: toLocalInput(b.deliveryDate),
           orderDate: copyId ? null : toLocalInput(b.orderDate),
@@ -644,6 +700,13 @@ export default function PosScreen() {
   // Đơn đặt hàng: khách trả trước mặc định 0; hóa đơn: mặc định trả đủ
   const paid = tab.paid ?? (isBooking ? 0 : dueNow);
   const change = paid - dueNow;
+  // Khách trả thừa mà đang nợ cũ: chọn "Tính vào công nợ" → phần thừa trừ nợ cũ (tối đa bằng nợ cũ), phần vượt vẫn trả lại.
+  // Nợ cũ tính cả tiền trả trước của đơn đặt sắp trừ vào hóa đơn (khớp CreatePosOrderCommand).
+  const oldDebt = Math.max(0, (tab.customer?.currentDebt ?? 0) + depositApplied);
+  const canExcessToDebt = !isBooking && !!tab.customer && change > 0 && oldDebt > 0;
+  const excessToDebt = canExcessToDebt && !!tab.excessToDebt;
+  const debtPayment = excessToDebt ? Math.min(change, oldDebt) : 0;
+  const cashChange = change - debtPayment;
   /** Đặt hàng: tiền đã trả trước (khi sửa đơn) + trả thêm lần này không vượt giá trị đơn */
   const bookingPaidTotal = isBooking ? (tab.bookingPaid ?? 0) + paid : 0;
 
@@ -735,6 +798,33 @@ export default function PosScreen() {
     }));
   };
 
+  // Chọn khách có bảng giá riêng → tự đề xuất bảng giá đó (1 lần cho mỗi tab + khách).
+  // Bảng giá đang chọn không còn áp dụng (đổi khách / chi nhánh, hết hiệu lực) → về bảng giá chung.
+  useEffect(() => {
+    syncPriceBookRef.current = (books, customerId) => {
+      const selectedId = tab.priceBookId ?? defaultPriceBookId;
+      const own = customerId
+        ? books.find((b) => !b.isDefault && b.scopeCustomerType === 'SPECIFIC' && b.scopeCustomerIds.includes(customerId))
+        : undefined;
+      const key = `${tab.id}:${customerId ?? 0}`;
+      if (own && suggestedBookRef.current !== key) {
+        suggestedBookRef.current = key;
+        if (selectedId !== own.priceBookId) {
+          changePriceBook(own.priceBookId);
+          message.info(`Đã chọn bảng giá "${own.priceBookName}" dành riêng cho khách hàng này.`);
+        }
+        return;
+      }
+      if (selectedId != null && !books.some((b) => b.priceBookId === selectedId)) {
+        const fallback = books.find((b) => b.isDefault) ?? books[0];
+        if (fallback && fallback.priceBookId !== selectedId) {
+          changePriceBook(fallback.priceBookId);
+          message.info(`Bảng giá đang chọn không áp dụng cho khách / chi nhánh này, đã chuyển về "${fallback.priceBookName}".`);
+        }
+      }
+    };
+  });
+
   const productMatches = useMemo(() => {
     const q = productQuery.trim().toLowerCase();
     if (!q) return [];
@@ -778,8 +868,8 @@ export default function PosScreen() {
   // ── Khách hàng ──
   const customerItems = customerResults.q === customerQuery.trim() ? customerResults.items : [];
   const selectCustomer = (c: PosCustomer | null) => {
-    // Chọn / bỏ khách không làm mất số tiền khách trả đã nhập
-    updateTab({ customer: c });
+    // Chọn / bỏ khách không làm mất số tiền khách trả đã nhập; ngoại lệ hạn mức gắn theo khách nên bỏ khi đổi khách
+    updateTab({ customer: c, creditRequestId: null, creditRequestCode: null });
     setCustomerQuery('');
     setCustomerDropdown(false);
   };
@@ -863,7 +953,8 @@ export default function PosScreen() {
   };
 
   // ── Thanh toán ──
-  const handleCheckout = async () => {
+  /** remainderChoice: undefined = chưa hỏi; true/false = đã chọn ở hộp "Khách lấy thiếu" (tạo đơn chờ / chỉ thanh toán) */
+  const handleCheckout = async (remainderChoice?: boolean) => {
     if (tab.kind === 'RETURN') return; // tab Trả hàng có nút TRẢ HÀNG riêng
     if (isBooking) return handleSaveBooking();
     if (submitting) return;
@@ -879,6 +970,26 @@ export default function PosScreen() {
     if (tab.warehouseId && tab.warehouseId !== warehouseId)
       return message.error('Hóa đơn của đơn đặt hàng phải xuất từ chi nhánh xử lý của đơn — hãy đổi chi nhánh làm việc.');
     if (!tab.customer && paid < dueNow) return message.error('Khách lẻ phải thanh toán đủ. Chọn khách hàng để ghi nợ phần còn thiếu.');
+
+    // Hóa đơn từ đơn đặt: khách lấy ít hơn số đặt → hỏi tạo đơn chờ cho phần còn lại hay chỉ thanh toán
+    if (tab.bookingId && tab.bookingItems && remainderChoice === undefined) {
+      const taken = new Map<number, number>();
+      tab.lines.forEach((l) => taken.set(l.productId, (taken.get(l.productId) ?? 0) + l.quantity));
+      const ordered = new Map<number, BookingShortageLine>();
+      tab.bookingItems.forEach((it) => {
+        const cur = ordered.get(it.productId);
+        if (cur) cur.ordered += it.quantity;
+        else ordered.set(it.productId, { productId: it.productId, code: it.code, name: it.name, unit: it.unit, ordered: it.quantity, taken: 0 });
+      });
+      const short = [...ordered.values()]
+        .map((x) => ({ ...x, taken: Math.min(x.ordered, taken.get(x.productId) ?? 0) }))
+        .filter((x) => x.taken < x.ordered);
+      if (short.length > 0) {
+        setShortage(short);
+        return;
+      }
+    }
+    const createRemainderBooking = remainderChoice === true;
 
     const notes = buildNotes();
 
@@ -896,6 +1007,9 @@ export default function PosScreen() {
       clientRequestId: `${tab.id}-${tab.lines.length}-${subTotal}`,
       orderDate: !lockSaleTime && saleTime ? new Date(saleTime).toISOString() : undefined,
       bookingOrderId: tab.bookingId ?? undefined,
+      createRemainderBooking,
+      creditRequestId: tab.creditRequestId ?? undefined,
+      excessAction: excessToDebt ? 'RECORD_DEBT' : 'RETURN_CASH',
       items: tab.lines.map((l) => {
         const c = lineCalc(l);
         // Bán cao hơn đơn giá: gửi giá bán làm đơn giá gốc, không giảm giá (server không nhận giảm giá âm)
@@ -921,14 +1035,26 @@ export default function PosScreen() {
           `Đã thanh toán hóa đơn ${res.orderCode}`,
           tab.bookingCode ? ` (giao theo đơn ${tab.bookingCode})` : '',
           res.depositAmount ? `. Đã trừ ${fmt(res.depositAmount)} tiền khách trả trước` : '',
+          res.debtPaymentAmount ? `. Đã trừ ${fmt(res.debtPaymentAmount)} vào nợ cũ, dư nợ còn ${fmt(res.customerCurrentDebt ?? 0)}` : '',
           res.changeAmount > 0 ? `. Tiền thừa trả khách: ${fmt(res.changeAmount)}` : '',
-        ].join('')
+          res.remainderBookingCode ? `. Đã tạo đơn chờ ${res.remainderBookingCode} cho phần khách chưa lấy` : '',
+        ].join(''),
+        res.remainderBookingCode ? 6 : undefined
       );
+      setShortage(null);
       closeTab(tab.id);
       setSaleTime(null);
       setReloadTick((t) => t + 1); // tồn kho thay đổi
     } catch (err) {
-      message.error(err instanceof Error ? err.message : 'Thanh toán không thành công.');
+      const msg = err instanceof Error ? err.message : 'Thanh toán không thành công.';
+      if (tab.customer && !tab.creditRequestId && isOverCreditLimitError(msg)) {
+        // BR-12: vượt hạn mức → cho gửi yêu cầu duyệt. Nợ mới cộng cả tiền trả trước của đơn đặt
+        // vì server cộng lại phần này vào dư nợ khi so hạn mức.
+        setShortage(null);
+        setCreditBlock({ message: msg, expectedNewDebt: Math.max(0, dueNow - paid) + depositApplied });
+      } else {
+        message.error(msg);
+      }
     } finally {
       setSubmitting(false);
     }
@@ -960,14 +1086,23 @@ export default function PosScreen() {
   const nowLocal = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
 
   return (
-    // Nằm trong khung AppLayout (Header + thanh menu chung) → chiếm trọn vùng nội dung bên dưới
-    <div className="h-full min-h-0 w-full flex flex-col text-[14px] text-[#15171a] select-none overflow-hidden">
-      {/* ═══ 1. THANH CÔNG CỤ — cùng kiểu thanh tiêu đề các trang khác (Khách hàng, Nhà cung cấp...) ═══ */}
-      <header className="min-h-12 shrink-0 bg-white/84 backdrop-blur-[2px] border-b border-slate-200 flex flex-wrap items-center gap-x-3 gap-y-2 px-3 sm:px-4 py-2 relative z-30">
-        <h1 className="text-[20px] font-bold text-[#15171a] leading-7 tracking-tight whitespace-nowrap">Bán hàng</h1>
+    // Trang toàn màn hình kiểu form tạo phiếu (cùng bố cục màn Tạo chuyển hàng / Nhập hàng)
+    <div className="h-screen w-full flex flex-col stockflow-brand-bg text-[13px] text-[#15171a] select-none overflow-hidden font-sans">
+      {/* ═══ 1. THANH TRÊN — quay lại + tiêu đề + tìm hàng + tab hóa đơn + kho làm việc / người dùng ═══ */}
+      <header className="min-h-12 shrink-0 bg-white border-b border-slate-200 flex flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-1.5 relative z-30">
+        <div className="flex items-center gap-3 shrink-0">
+          <Link
+            href="/orders"
+            className="p-1 rounded-[8px] text-[#677484] hover:text-[#15171a] hover:bg-[#f7f8f9] transition cursor-pointer"
+            title="Quay lại danh sách hóa đơn"
+          >
+            <ArrowLeft size={18} className="stroke-[2.5]" />
+          </Link>
+          <span className="text-[20px] font-semibold text-[#15171a] tracking-tight whitespace-nowrap leading-[36px]">Bán hàng</span>
+        </div>
 
         {/* Tìm hàng hóa */}
-        <div ref={productBoxRef} className="relative w-[420px] max-w-full basis-[280px] grow sm:grow-0">
+        <div ref={productBoxRef} className="relative w-[380px] max-w-full basis-[260px] grow sm:grow-0">
           <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#677484] pointer-events-none" />
           <input
             ref={productSearchRef}
@@ -1115,7 +1250,7 @@ export default function PosScreen() {
           </div>
         )}
 
-        {/* Bên phải: xử lý đặt hàng, trả hàng, menu hiển thị (kho làm việc + người dùng đã có ở Header chung) */}
+        {/* Bên phải: xử lý đặt hàng, trả hàng, menu hiển thị, kho làm việc + người dùng */}
         <div className="ml-auto flex flex-wrap items-center gap-2">
           {canInvoice && (
             <button
@@ -1137,6 +1272,7 @@ export default function PosScreen() {
               <span>Trả hàng</span>
             </button>
           )}
+          <FormHeaderUserBar />
           <div ref={menuRef} className="relative">
             <button
               type="button"
@@ -1207,23 +1343,21 @@ export default function PosScreen() {
           }}
         />
       ) : (
-      <div className="flex-1 min-h-0 flex gap-3 p-3">
-        {/* ── Bên trái: giỏ hàng — một thẻ trắng: tiêu đề cột → các dòng hàng → ghi chú đơn ── */}
-        <div className="flex-1 min-w-0 flex flex-col bg-white rounded-xl border border-slate-200/80 shadow-[0_1px_3px_rgba(15,23,42,0.06)] overflow-hidden">
-          {tab.lines.length > 0 && (
-            <div className="shrink-0 h-9 px-4 flex items-center gap-3 bg-[#f7f8f9] border-b border-slate-200 text-[12px] font-semibold text-[#677484]">
-              <span className="w-5 text-center">#</span>
-              <span className="w-[18px] shrink-0" />
-              {prefs.image && <span className="w-12 shrink-0" />}
-              {prefs.code && <span className="w-24 shrink-0">Mã hàng</span>}
-              <span className="flex-1 min-w-[110px]">Tên hàng</span>
-              <span className="w-[84px] shrink-0 text-center">ĐVT</span>
-              <span className="w-[124px] shrink-0 text-center">Số lượng</span>
-              <span className="w-28 shrink-0 text-right">Đơn giá</span>
-              <span className="w-24 shrink-0 text-right">Thành tiền</span>
-              <span className="w-[26px] shrink-0" />
-            </div>
-          )}
+      <div className="flex-1 min-h-0 flex overflow-hidden">
+        {/* ── Bên trái: bảng hàng hóa sát mép (tiêu đề cột xanh nhạt như màn Chuyển hàng / Nhập hàng) ── */}
+        <div className="flex-1 min-w-0 flex flex-col bg-white overflow-hidden">
+          <div className="shrink-0 h-10 px-4 flex items-center gap-3 bg-[#e8f2ff] border-b border-slate-200 text-[13px] font-semibold text-[#15171a]">
+            <span className="w-5 text-center">STT</span>
+            <span className="w-[18px] shrink-0" />
+            {prefs.image && <span className="w-12 shrink-0" />}
+            {prefs.code && <span className="w-24 shrink-0">Mã hàng</span>}
+            <span className="flex-1 min-w-[110px]">Tên hàng</span>
+            <span className="w-[84px] shrink-0 text-center">ĐVT</span>
+            <span className="w-[124px] shrink-0 text-center">Số lượng</span>
+            <span className="w-28 shrink-0 text-right">Đơn giá</span>
+            <span className="w-24 shrink-0 text-right">Thành tiền</span>
+            <span className="w-[26px] shrink-0" />
+          </div>
           <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
             {tab.lines.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center px-6 text-center">
@@ -1391,7 +1525,7 @@ export default function PosScreen() {
         </div>
 
         {/* ── Bên phải: khách hàng & thanh toán ── */}
-        <aside className="w-[420px] max-w-[34vw] shrink-0 bg-white rounded-xl border border-slate-200/80 shadow-[0_1px_3px_rgba(15,23,42,0.06)] flex flex-col p-4">
+        <aside className="w-[400px] max-w-[34vw] shrink-0 bg-white border-l border-slate-200 flex flex-col p-4 text-[14px]">
           {/* Người bán + thời gian */}
           <div className="flex items-center justify-between gap-2">
             <span
@@ -1432,9 +1566,47 @@ export default function PosScreen() {
                   {tab.customer.currentDebt > 0 && (
                     <span className="text-[12px] text-[#fb2c36] shrink-0">Nợ: {fmt(tab.customer.currentDebt)}</span>
                   )}
+                  {/* Hóa đơn: yêu cầu vượt hạn mức đã gửi / chọn ngoại lệ một lần đã duyệt (UC-27) */}
+                  {!isBooking && (
+                    <Tooltip
+                      placement="bottom"
+                      title={
+                        <div className="text-[12px] leading-5">
+                          {tab.customer.creditLimit > 0 ? (
+                            <>
+                              <div>Hạn mức: {fmt(tab.customer.creditLimit)}</div>
+                              <div>Dư nợ: {fmt(tab.customer.currentDebt)}</div>
+                              <div className="font-semibold">
+                                Còn lại: {fmt(Math.max(0, tab.customer.creditLimit - tab.customer.currentDebt))}
+                              </div>
+                            </>
+                          ) : (
+                            <div>Khách chưa được thiết lập hạn mức</div>
+                          )}
+                          {tab.creditRequestCode && <div>Đang dùng ngoại lệ {tab.creditRequestCode}</div>}
+                          <div className="opacity-70">Bấm để xem yêu cầu hạn mức của tôi</div>
+                        </div>
+                      }
+                    >
+                      <button
+                        type="button"
+                        onClick={() => setMyCreditOpen(true)}
+                        aria-label="Hạn mức còn lại"
+                        className={`ml-auto shrink-0 inline-flex items-center justify-center h-6 w-6 rounded-full cursor-pointer ${
+                          tab.creditRequestCode ? 'bg-[#0071BA] text-white' : 'text-[#0071BA] hover:bg-black/5'
+                        }`}
+                      >
+                        <CircleAlert size={15} />
+                      </button>
+                    </Tooltip>
+                  )}
                   {/* Tab gắn với đơn đặt: khách hàng cố định theo đơn */}
                   {!tab.bookingId && (
-                    <button type="button" onClick={() => selectCustomer(null)} className="ml-auto p-0.5 rounded hover:bg-black/5 cursor-pointer">
+                    <button
+                      type="button"
+                      onClick={() => selectCustomer(null)}
+                      className={`${isBooking ? 'ml-auto' : ''} p-0.5 rounded hover:bg-black/5 cursor-pointer`}
+                    >
                       <X size={15} />
                     </button>
                   )}
@@ -1491,9 +1663,10 @@ export default function PosScreen() {
                 onChange={(e) => changePriceBook(Number(e.target.value))}
                 className="h-9 pl-3 pr-8 rounded-lg bg-[#f1f3f6] outline-none appearance-none cursor-pointer max-w-[170px] truncate"
               >
-                {priceBooks.map((p) => (
+                {/* Chỉ bảng giá áp dụng cho chi nhánh + khách đang chọn; bảng giá riêng của khách có đánh dấu ★ */}
+                {selectableBooks.map((p) => (
                   <option key={p.priceBookId} value={p.priceBookId}>
-                    {p.priceBookName}
+                    {p.scopeCustomerType === 'SPECIFIC' ? `★ ${p.priceBookName}` : p.priceBookName}
                   </option>
                 ))}
               </select>
@@ -1614,10 +1787,59 @@ export default function PosScreen() {
               </>
             ) : (
               <>
-                {change > 0 && (
+                {change > 0 && !canExcessToDebt && (
                   <div className="flex items-center justify-between">
                     <span>Tiền thừa trả khách</span>
                     <span className="font-semibold">{fmt(change)}</span>
+                  </div>
+                )}
+                {/* Như KiotViet: khách trả thừa mà còn nợ cũ → chọn trả lại tiền thừa hoặc tính vào công nợ */}
+                {canExcessToDebt && (
+                  <div className="space-y-2.5">
+                    <label className="flex items-center justify-between gap-2 cursor-pointer">
+                      <span className="flex items-center gap-2">
+                        <input
+                          type="radio"
+                          name={`excess-${tab.id}`}
+                          checked={!excessToDebt}
+                          onChange={() => updateTab({ excessToDebt: false })}
+                          className="h-[18px] w-[18px] accent-[#0070f4] cursor-pointer"
+                        />
+                        Tiền thừa trả khách
+                      </span>
+                      <span className={excessToDebt ? 'text-[#677484]' : 'font-semibold'}>{fmt(change)}</span>
+                    </label>
+                    <label className="flex items-center justify-between gap-2 cursor-pointer">
+                      <span className="flex items-center gap-2">
+                        <input
+                          type="radio"
+                          name={`excess-${tab.id}`}
+                          checked={excessToDebt}
+                          onChange={() => updateTab({ excessToDebt: true })}
+                          className="h-[18px] w-[18px] accent-[#0070f4] cursor-pointer"
+                        />
+                        Tính vào công nợ
+                      </span>
+                      <span className="text-[13px] text-[#677484]">Nợ cũ {fmt(oldDebt)}</span>
+                    </label>
+                    {excessToDebt && (
+                      <div className="rounded-lg bg-[#f7f8fa] px-3 py-2 text-[13px] space-y-1">
+                        <div className="flex justify-between">
+                          <span className="text-[#677484]">Trừ vào nợ cũ</span>
+                          <span className="font-semibold text-[#16a34a]">{fmt(debtPayment)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-[#677484]">Nợ còn lại</span>
+                          <span className="font-semibold">{fmt(oldDebt - debtPayment)}</span>
+                        </div>
+                        {cashChange > 0 && (
+                          <div className="flex justify-between">
+                            <span className="text-[#677484]">Tiền thừa trả khách</span>
+                            <span className="font-semibold">{fmt(cashChange)}</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
                 {change < 0 && (
@@ -1662,6 +1884,16 @@ export default function PosScreen() {
           }}
         />
       )}
+      {shortage && tab.bookingCode && (
+        <BookingShortageDialog
+          bookingCode={tab.bookingCode}
+          lines={shortage}
+          leftoverDeposit={Math.max(0, (tab.bookingPaid ?? 0) - depositApplied)}
+          busy={submitting}
+          onClose={() => setShortage(null)}
+          onSubmit={(createRemainder) => void handleCheckout(createRemainder)}
+        />
+      )}
       {picker === 'booking' && (
         <PickBookingDialog
           warehouseId={warehouseId}
@@ -1669,6 +1901,34 @@ export default function PosScreen() {
           onSelect={(id) => {
             setPicker(null);
             openBookingTab(id, 'invoice');
+          }}
+        />
+      )}
+
+      {creditBlock && tab.customer && (
+        <CreditRequestDialog
+          // Cùng mã khách với hóa đơn (partnerId: tab.customer.id khi thanh toán)
+          customer={{ ...tab.customer, partnerId: tab.customer.id }}
+          expectedNewDebt={creditBlock.expectedNewDebt}
+          blockMessage={creditBlock.message}
+          onClose={() => setCreditBlock(null)}
+          onSubmitted={(_, msg) => {
+            setCreditBlock(null);
+            // MSG23: giữ nguyên tab để thanh toán lại sau khi được duyệt
+            message.success(msg, 6);
+          }}
+        />
+      )}
+      {myCreditOpen && tab.customer && (
+        <MyCreditRequestsDialog
+          partnerId={tab.customer.id}
+          customerName={tab.customer.name}
+          selectedId={tab.creditRequestId ?? null}
+          onClose={() => setMyCreditOpen(false)}
+          onSelect={(r) => {
+            updateTab({ creditRequestId: r?.requestId ?? null, creditRequestCode: r ? (r.requestCode ?? `#${r.requestId}`) : null });
+            setMyCreditOpen(false);
+            if (r) message.info(`Hóa đơn này sẽ dùng ngoại lệ ${r.requestCode ?? `#${r.requestId}`} khi thanh toán.`);
           }}
         />
       )}

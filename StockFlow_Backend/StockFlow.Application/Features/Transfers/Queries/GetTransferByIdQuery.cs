@@ -7,6 +7,7 @@ using MediatR;
 using Microsoft.EntityFrameworkCore;
 using StockFlow.Application.Common;
 using StockFlow.Application.Common.Interfaces;
+using StockFlow.Domain.Entities;
 using StockFlow.Application.Features.Transfers.DTOs;
 using StockFlow.Application.Features.Transfers.Helpers;
 
@@ -131,9 +132,9 @@ public class GetTransferByIdQueryHandler : IRequestHandler<GetTransferByIdQuery,
             DestWarehouseName: t.DestWarehouse?.WarehouseName ?? $"Kho #{t.DestWarehouseId}",
             CreatedBy: t.CreatedBy,
             CreatedByName: t.CreatedByNavigation?.FullName ?? t.CreatedByNavigation?.Username ?? "Nhân viên",
-            Status: t.Status ?? "DRAFT",
+            Status: t.Status ?? TransferStatus.Draft,
             TotalQuantity: totalQty,
-            TotalReceivedQuantity: string.Equals(t.Status, "RECEIVED", StringComparison.OrdinalIgnoreCase) ? totalReceived : null,
+            TotalReceivedQuantity: t.IsReceived() ? totalReceived : null,
             TotalAmount: totalAmount,
             Notes: t.Notes,
             Items: itemDtos,

@@ -1,3 +1,4 @@
+using FluentValidation;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using StockFlow.Application.Common;
@@ -6,6 +7,18 @@ using StockFlow.Application.Common.Interfaces;
 namespace StockFlow.Application.Features.Admin.Commands;
 
 public record ResetStaffPasswordCommand(int UserId, string? NewPassword = null) : IRequest<Result<string>>;
+
+public class ResetStaffPasswordCommandValidator : AbstractValidator<ResetStaffPasswordCommand>
+{
+    public ResetStaffPasswordCommandValidator()
+    {
+        // BR-35: mật khẩu Admin tự đặt phải đủ mạnh; để trống → mật khẩu mặc định TinPhat@2026 (đã đạt BR-35)
+        RuleFor(x => x.NewPassword!)
+            .Cascade(CascadeMode.Stop)
+            .StrongPassword("Mật khẩu mới")
+            .When(x => !string.IsNullOrWhiteSpace(x.NewPassword));
+    }
+}
 
 public class ResetStaffPasswordCommandHandler : IRequestHandler<ResetStaffPasswordCommand, Result<string>>
 {

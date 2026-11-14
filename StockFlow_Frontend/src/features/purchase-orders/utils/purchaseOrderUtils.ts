@@ -2,7 +2,7 @@
 // Nhãn trạng thái và xuất Excel Phiếu đặt hàng nhập
 
 import * as XLSX from 'xlsx';
-import { formatDateTimeVN } from '@/features/transfers/utils/dateUtils';
+import { formatDateTimeVN } from '@/lib/utils/date';
 import type { PurchaseOrderDetail, PurchaseOrderListItem, PurchaseOrderStatus } from '../types';
 
 export const PO_STATUS: Record<PurchaseOrderStatus, { label: string; cls: string }> = {

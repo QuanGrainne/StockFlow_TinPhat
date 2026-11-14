@@ -46,8 +46,7 @@ public class UpdateTransferNotesCommandHandler : IRequestHandler<UpdateTransferN
         if (req.ReceiveNotes != null)
         {
             // Chi nhánh nhận ghi chú được từ lúc hàng đang chuyển tới (chưa bấm Nhận hàng) và sau khi đã nhận
-            if (!string.Equals(transfer.Status, "IN_TRANSIT", StringComparison.OrdinalIgnoreCase) &&
-                !string.Equals(transfer.Status, "RECEIVED", StringComparison.OrdinalIgnoreCase))
+            if (!transfer.CanEditReceiveNotes())
                 return Result.Failure<TransferDetailDto>("Chỉ ghi chú nhận được khi phiếu đang chuyển hoặc đã nhận hàng.");
             if (!await _currentUser.HasWarehouseAccessAsync(transfer.DestWarehouseId, ct))
                 return Result.Failure<TransferDetailDto>("Chỉ chi nhánh nhận được sửa ghi chú nhận.");

@@ -47,6 +47,10 @@ public class GetProductStockCardQueryHandler : IRequestHandler<GetProductStockCa
         ["COST_UPDATE"] = "Cập nhật giá vốn",
         ["ADJUSTMENT_IN"] = "Điều chỉnh tồn kho",
         ["ADJUSTMENT_OUT"] = "Điều chỉnh tồn kho",
+        ["PRODUCTION_ISSUE"] = "Xuất NVL sản xuất",
+        ["PRODUCTION_RECEIPT"] = "Nhập thành phẩm",
+        ["DISPOSAL"] = "Xuất hủy",
+        ["DISPOSAL_CANCEL"] = "Hủy phiếu xuất hủy",
     };
 
     public async Task<Result<List<StockCardEntryDto>>> Handle(GetProductStockCardQuery request, CancellationToken ct)
@@ -142,6 +146,20 @@ public class GetProductStockCardQueryHandler : IRequestHandler<GetProductStockCa
             .Select(i => new { i.ReturnRequestId, i.ReturnPrice })
             .ToListAsync(ct);
 
+        // Phiếu nhập thành phẩm (luồng sản xuất): mã phiếu, đối tượng = mã lệnh sản xuất
+        var fgrIds = IdsOf("FINISHED_GOODS_RECEIPT");
+        var finishedGoods = await _context.TrxFinishedGoodsReceipts.AsNoTracking()
+            .Where(f => fgrIds.Contains(f.FgrId))
+            .Select(f => new { f.FgrId, f.FgrCode, OrderCode = f.ProductionOrder.ProductionOrderCode })
+            .ToDictionaryAsync(f => f.FgrId, ct);
+
+        // Phiếu xuất hủy: mã phiếu XH...
+        var dispIds = IdsOf("DISPOSAL");
+        var disposals = await _context.TrxInventoryDisposals.AsNoTracking()
+            .Where(d => dispIds.Contains(d.DisposalId))
+            .Select(d => new { d.DisposalId, d.DisposalCode })
+            .ToDictionaryAsync(d => d.DisposalId, ct);
+
         // ── Tồn cuối: dòng mới đã lưu sẵn BalanceAfter; dòng cũ tính lùi từ tồn hiện tại của kho ──
         var running = await _context.TrxInventoryBalances.AsNoTracking()
             .Where(b => b.ProductId == request.ProductId && b.WarehouseId == request.WarehouseId)
@@ -213,6 +231,18 @@ public class GetProductStockCardQueryHandler : IRequestHandler<GetProductStockCa
                     }
                     // Giá GD = giá nhập lại trên phiếu trả hàng
                     price = salesReturnPrices.FirstOrDefault(p => p.ReturnRequestId == refId)?.ReturnPrice ?? price;
+                    break;
+                case "FINISHED_GOODS_RECEIPT" when refId.HasValue:
+                    if (finishedGoods.TryGetValue(refId.Value, out var fg))
+                    {
+                        code = fg.FgrCode ?? $"NTP{refId:D6}";
+                        partner = fg.OrderCode;
+                    }
+                    break;
+                case "DISPOSAL" when refId.HasValue:
+                    code = disposals.TryGetValue(refId.Value, out var dp) && dp.DisposalCode != null
+                        ? dp.DisposalCode
+                        : $"XH{refId:D6}";
                     break;
                 case "COST_UPDATE" when refId.HasValue:
                     code = $"CB{refId:D6}";

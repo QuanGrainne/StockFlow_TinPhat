@@ -89,7 +89,7 @@ public class CreateTransferCommandHandler : IRequestHandler<CreateTransferComman
             }
         }
 
-        var isComplete = string.Equals(req.Status, "IN_TRANSIT", StringComparison.OrdinalIgnoreCase) ||
+        var isComplete = string.Equals(req.Status, TransferStatus.InTransit, StringComparison.OrdinalIgnoreCase) ||
                          string.Equals(req.Status, "COMPLETE", StringComparison.OrdinalIgnoreCase);
 
         var transferDate = TransferHelper.GetVietnamTime(req.TransferDate);
@@ -105,7 +105,7 @@ public class CreateTransferCommandHandler : IRequestHandler<CreateTransferComman
             DestWarehouseId = req.DestWarehouseId,
             CreatedBy = command.UserId,
             TransferDate = transferDate,
-            Status = "DRAFT",
+            Status = TransferStatus.Draft,
             Notes = req.Notes?.Trim()
         };
 

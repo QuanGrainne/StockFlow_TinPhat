@@ -8,6 +8,8 @@ using MediatR;
 using Microsoft.EntityFrameworkCore;
 using StockFlow.Application.Common;
 using StockFlow.Application.Common.Interfaces;
+using StockFlow.Application.Features.Customers.Helpers;
+using StockFlow.Application.Features.CreditRequests.Common;
 using StockFlow.Application.Features.Orders.DTOs;
 using StockFlow.Application.Features.SalesBookings.Common;
 using StockFlow.Domain.Entities;
@@ -187,7 +189,7 @@ public class CreatePosOrderCommandHandler : IRequestHandler<CreatePosOrderComman
         TrxOrder? booking = null;
         if (req.BookingOrderId is > 0)
         {
-            booking = await _context.TrxOrders
+            booking = await _context.TrxOrders.Include(o => o.DtlOrderItems)
                 .FirstOrDefaultAsync(o => o.OrderId == req.BookingOrderId.Value && o.OrderType == SalesBookingOps.OrderType, cancellationToken);
             if (booking == null)
                 return Result<PosOrderResultDto>.Failure("Không tìm thấy đơn đặt hàng để tạo hóa đơn.");
@@ -369,9 +371,10 @@ public class CreatePosOrderCommandHandler : IRequestHandler<CreatePosOrderComman
                      || (customer.PartnerName != null && customer.PartnerName.Contains("Khách lẻ"));
 
         // Hóa đơn từ đơn đặt hàng: tiền khách đã trả trước (còn dư) được trừ vào hóa đơn
-        decimal depositApplied = booking != null
-            ? Math.Min(finalTotal, await SalesBookingOps.RemainingDepositAsync(_context, booking, cancellationToken))
+        decimal depositBefore = booking != null
+            ? await SalesBookingOps.RemainingDepositAsync(_context, booking, cancellationToken)
             : 0;
+        decimal depositApplied = Math.Min(finalTotal, depositBefore);
         decimal dueNow = finalTotal - depositApplied;
 
         bool isRecordDebtExcess = !isWalkIn && string.Equals(req.ExcessAction, "RECORD_DEBT", StringComparison.OrdinalIgnoreCase);
@@ -379,13 +382,18 @@ public class CreatePosOrderCommandHandler : IRequestHandler<CreatePosOrderComman
         decimal actualReceived;
         decimal changeAmount;
         decimal outstanding;
+        // "Tính vào công nợ": phần khách trả thừa dùng trả nợ cũ (như màn Thu nợ), tối đa bằng nợ cũ;
+        // nợ cũ tính cả tiền trả trước của đơn đặt sắp trừ vào hóa đơn này (phần đó cộng lại vào nợ ở bước 11)
+        decimal oldDebt = Math.Max(0, (customer.CurrentDebt ?? 0) + depositApplied);
+        decimal debtPayment = 0;
 
         if (req.PaidAmount >= dueNow)
         {
-            if (isRecordDebtExcess && rawChangeAmount > 0)
+            if (isRecordDebtExcess && rawChangeAmount > 0 && isCompleted)
             {
-                actualReceived = req.PaidAmount; // Thu ngân thực nhận toàn bộ tiền khách đưa để trừ công nợ
-                changeAmount = 0; // Không thối lại tiền mặt
+                debtPayment = Math.Min(rawChangeAmount, oldDebt);
+                actualReceived = dueNow; // Phiếu thu của hóa đơn này chỉ đúng số tiền hóa đơn
+                changeAmount = rawChangeAmount - debtPayment; // Thừa cả sau khi trả hết nợ cũ: vẫn thối lại
                 outstanding = 0;
             }
             else
@@ -409,11 +417,14 @@ public class CreatePosOrderCommandHandler : IRequestHandler<CreatePosOrderComman
         }
 
         // Kiểm tra hạn mức tín dụng nếu có phát sinh công nợ
+        // Ngoại lệ một lần đã duyệt (UC-27/UC-64): chỉ gắn vào hóa đơn khi thực sự ghi nợ
+        TrxCreditLimitRequest? creditRequest = null;
         if (outstanding > 0 && isCompleted)
         {
             decimal currentDebt = customer.CurrentDebt ?? 0;
             decimal creditLimit = customer.CreditLimit ?? 0;
 
+            // Hạn mức = 0: vẫn chặn cứng, kể cả khi có yêu cầu (SRS chưa đặc tả)
             if (creditLimit <= 0)
             {
                 return Result<PosOrderResultDto>.Failure(
@@ -424,13 +435,33 @@ public class CreatePosOrderCommandHandler : IRequestHandler<CreatePosOrderComman
             currentDebt += depositApplied;
             decimal remainingCredit = Math.Max(0, creditLimit - currentDebt);
 
-            if (currentDebt >= creditLimit)
+            if (req.CreditRequestId is > 0)
+            {
+                // BR-12: có ngoại lệ được Manager duyệt → so với mức đã duyệt thay cho hạn mức (CUS-008/009)
+                creditRequest = await _context.TrxCreditLimitRequests
+                    .FirstOrDefaultAsync(r => r.RequestId == req.CreditRequestId.Value, cancellationToken);
+                if (creditRequest == null)
+                    return Result<PosOrderResultDto>.Failure(CreditRequestMessages.NotFound);
+
+                string code = creditRequest.RequestCode ?? $"#{creditRequest.RequestId}";
+                if (creditRequest.PartnerId != customer.PartnerId)
+                    return Result<PosOrderResultDto>.Failure(CreditRequestMessages.UseWrongCustomer(code));
+                if (!creditRequest.IsOneTimeApproved())
+                    return Result<PosOrderResultDto>.Failure(CreditRequestMessages.UseNotOneTime(code));
+                if (creditRequest.IsUsed())
+                    return Result<PosOrderResultDto>.Failure(CreditRequestMessages.UseAlreadyUsed(code));
+
+                decimal approvedCeiling = creditRequest.OneTimeCeiling();
+                if (currentDebt + outstanding > approvedCeiling)
+                    return Result<PosOrderResultDto>.Failure(
+                        CreditRequestMessages.UseOverApproved(code, approvedCeiling, currentDebt + outstanding));
+            }
+            else if (currentDebt >= creditLimit)
             {
                 return Result<PosOrderResultDto>.Failure(
                     $"Khách hàng '{customer.PartnerName}' đã sử dụng hết hạn mức tín dụng (Hạn mức: {creditLimit:N0} đ, Dư nợ hiện tại: {currentDebt:N0} đ). Không thể phát sinh thêm nợ {outstanding:N0} đ (CUS-008).");
             }
-
-            if (currentDebt + outstanding > creditLimit)
+            else if (currentDebt + outstanding > creditLimit)
             {
                 decimal excess = (currentDebt + outstanding) - creditLimit;
                 return Result<PosOrderResultDto>.Failure(
@@ -496,6 +527,23 @@ public class CreatePosOrderCommandHandler : IRequestHandler<CreatePosOrderComman
 
             _context.TrxOrders.Add(order);
             await _context.SaveChangesAsync(cancellationToken);
+
+            // Gắn ngoại lệ một lần vào hóa đơn ngay khi có OrderId (cùng transaction).
+            // SalesOrderId là concurrency token: hóa đơn khác đã dùng trước → UPDATE không khớp → hủy cả giao dịch.
+            if (creditRequest != null)
+            {
+                creditRequest.MarkUsed(order.OrderId);
+                try
+                {
+                    await _context.SaveChangesAsync(cancellationToken);
+                }
+                catch (DbUpdateConcurrencyException)
+                {
+                    await transaction.RollbackAsync(cancellationToken);
+                    return Result<PosOrderResultDto>.Failure(
+                        CreditRequestMessages.UseAlreadyUsed(creditRequest.RequestCode ?? $"#{creditRequest.RequestId}"));
+                }
+            }
 
             // 9. Thêm chi tiết đơn hàng DtlOrderItems kèm chiết khấu cấp dòng
             var addedOrderItems = new List<(DtlOrderItem OrderItem, PosOrderItemRequest RequestItem, MstProduct Product)>();
@@ -602,11 +650,8 @@ public class CreatePosOrderCommandHandler : IRequestHandler<CreatePosOrderComman
                     // Khách trả thiếu -> Ghi nợ phát sinh
                     debtDelta += outstanding;
                 }
-                else if (isRecordDebtExcess && rawChangeAmount > 0)
-                {
-                    // Khách trả thừa và chọn "Tính vào công nợ" -> Ghi có giảm nợ cũ hoặc cọc đơn sau
-                    debtDelta -= rawChangeAmount;
-                }
+                // Khách trả thừa và chọn "Tính vào công nợ": phần trả nợ cũ làm giảm dư nợ
+                debtDelta -= debtPayment;
                 if (debtDelta != 0) customer.CurrentDebt = (customer.CurrentDebt ?? 0) + debtDelta;
             }
 
@@ -631,12 +676,46 @@ CreatedBy = currentUserId,
                 });
             }
 
+            // 12b. Tiền thừa "Tính vào công nợ": phiếu thu trả nợ cũ (hóa đơn còn nợ cũ nhất trước, phần còn lại phiếu PT)
+            var debtPaymentCodes = new List<string>();
+            if (debtPayment > 0 && isCompleted)
+            {
+                debtPaymentCodes = await CustomerDebtPaymentOps.ApplyAsync(
+                    _context, customer.PartnerId, debtPayment, order.OrderId, req.PaymentMethod, finalOrderDate,
+                    currentUserId, cancellationToken);
+            }
+
             await _context.SaveChangesAsync(cancellationToken);
 
-            // Đơn đặt hàng: cập nhật SL đã giao → Đang giao hàng / Hoàn thành
+            // Đơn đặt hàng: chốt SL đơn = SL hóa đơn → Hoàn thành; khách lấy thiếu thì (nếu chọn) tách đơn chờ cho phần còn lại
+            TrxOrder? remainderBooking = null;
             if (booking != null && isCompleted)
             {
-                await SalesBookingOps.RecomputeStatusAsync(_context, booking.OrderId, currentUserId, cancellationToken);
+                var sourceDiscountBefore = booking.DiscountAmount;
+                var remainder = SalesBookingOps.SettleWithInvoice(
+                    _context,
+                    booking,
+                    calculatedItems.Select(c => new SalesBookingOps.InvoiceLine(
+                        c.RequestItem.ProductId,
+                        c.RequestItem.UnitId > 0 ? c.RequestItem.UnitId : c.Product.BaseUnitId,
+                        c.RequestItem.Quantity,
+                        c.OriginalPrice,
+                        c.DiscountType,
+                        c.DiscountValue,
+                        c.UnitPrice)).ToList(),
+                    new SalesBookingOps.InvoiceMoney(serverSubTotal, orderDiscountType, orderDiscountValue, orderDiscountAmount, finalTotal),
+                    currentUserId);
+
+                if (req.CreateRemainderBooking && remainder.Count > 0)
+                {
+                    // Tiền trả trước chưa trừ vào hóa đơn → chuyển sang đơn chờ (công nợ khách không đổi)
+                    var leftoverDeposit = Math.Max(0, depositBefore - depositApplied);
+                    remainderBooking = SalesBookingOps.BuildRemainderBooking(
+                        booking, remainder, sourceDiscountBefore, orderDiscountAmount, leftoverDeposit,
+                        await _codeGenerator.GenerateCodeAsync("BOOKING", settings, cancellationToken), currentUserId);
+                    _context.TrxOrders.Add(remainderBooking);
+                    if (leftoverDeposit > 0) booking.PaidAmount = Math.Max(0, (booking.PaidAmount ?? 0) - leftoverDeposit);
+                }
                 await _context.SaveChangesAsync(cancellationToken);
             }
 
@@ -645,8 +724,8 @@ CreatedBy = currentUserId,
                 await transaction.CommitAsync(cancellationToken);
             }
 
-            string excessNote = isRecordDebtExcess && rawChangeAmount > 0
-                ? $" (Đã giảm {rawChangeAmount:N0} đ nợ cho khách, dư nợ mới: {customer.CurrentDebt:N0} đ)"
+            string excessNote = debtPayment > 0
+                ? $" (Tiền thừa trả nợ cũ {debtPayment:N0} đ — phiếu thu {string.Join(", ", debtPaymentCodes)}, dư nợ mới: {customer.CurrentDebt:N0} đ)"
                 : (outstanding > 0 ? $" (Ghi nợ {outstanding:N0} đ, dư nợ mới: {customer.CurrentDebt:N0} đ)" : "");
             string stockIssueMsg = stockIssue != null ? $" kèm phiếu xuất kho {stockIssue.IssueCode}" : "";
 
@@ -663,6 +742,8 @@ CreatedBy = currentUserId,
                 TotalAmount = finalTotal,
                 PaidAmount = totalPaid,
                 DepositAmount = depositApplied,
+                RemainderBookingId = remainderBooking?.OrderId,
+                RemainderBookingCode = remainderBooking?.OrderCode,
                 ChangeAmount = changeAmount,
                 OutstandingAmount = outstanding,
                 PaymentStatus = paymentStatus,
@@ -671,7 +752,8 @@ CreatedBy = currentUserId,
                 StockIssueId = stockIssue?.StockIssueId,
                 StockIssueCode = stockIssue?.IssueCode,
                 CustomerCurrentDebt = customer.CurrentDebt ?? 0,
-                Message = $"Tạo đơn hàng POS thành công{stockIssueMsg}!{excessNote}"
+                DebtPaymentAmount = debtPayment,
+                Message =$"Tạo đơn hàng POS thành công{stockIssueMsg}!{excessNote}"
             });
         }
         catch

@@ -154,6 +154,7 @@ public class SalesReturnQueryHandler :
             o.OrderId, o.OrderCode ?? "", o.OrderDate, warehouseId.Value, warehouseName,
             o.PartnerId, o.Partner?.PartnerCode ?? "", o.Partner?.PartnerName ?? "", o.Partner?.Phone,
             o.Partner?.CurrentDebt ?? 0, isWalkIn,
-            o.CreatedByNavigation?.FullName ?? o.CreatedByNavigation?.Username ?? "", items));
+            o.CreatedByNavigation?.FullName ?? o.CreatedByNavigation?.Username ?? "", items,
+            SalesReturnOps.InvoiceSubTotal(o), o.DiscountAmount));
     }
 }

@@ -33,14 +33,29 @@ public class PriceBooksController : ControllerBase
     public async Task<IActionResult> GetPriceBooks(
         [FromQuery] string? search,
         [FromQuery] bool? isActive,
-        [FromQuery] int? warehouseId)
+        [FromQuery] int? warehouseId,
+        [FromQuery] int? customerId,
+        [FromQuery] bool forSale = false)
     {
-        var result = await _mediator.Send(new GetPriceBooksQuery(search, isActive, warehouseId));
+        var result = await _mediator.Send(new GetPriceBooksQuery(search, isActive, warehouseId, customerId, forSale));
         if (!result.IsSuccess)
         {
             return BadRequest(new { message = result.Error });
         }
         return Ok(result.Value);
+    }
+
+    /// <summary>
+    /// Gợi ý khách hàng cho phạm vi "Khách hàng cụ thể" (mã, tên, điện thoại; khách đang hoạt động, không gồm khách lẻ).
+    /// </summary>
+    [HttpGet("customer-options")]
+    [ProducesResponseType(typeof(List<PriceBookCustomerRefDto>), StatusCodes.Status200OK)]
+    [RequirePermission("GOODS_READ")]
+    [RequireFeature("feat-price-books")]
+    public async Task<IActionResult> GetCustomerOptions([FromQuery] string? search)
+    {
+        var result = await _mediator.Send(new GetPriceBookCustomerOptionsQuery(search));
+        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { message = result.Error });
     }
 
     /// <summary>

@@ -95,7 +95,8 @@ export default function PriceBooksClient() {
     return [defaultBookId, ...customIds];
   }, [selectedPriceBookIds, defaultBookId]);
 
-  const loadPriceBooks = async () => {
+  // Khai báo dạng function để dùng được trong useEffect ở trên (const arrow chưa tồn tại lúc effect được khai báo)
+  async function loadPriceBooks() {
     try {
       const data = await priceBookService.getPriceBooks();
       setPriceBooks(data);
@@ -113,7 +114,7 @@ export default function PriceBooksClient() {
         description: 'Không thể tải danh sách bảng giá từ máy chủ.',
       });
     }
-  };
+  }
 
   // Fetch Matrix Data
   const loadMatrix = useCallback(async () => {
@@ -193,7 +194,7 @@ export default function PriceBooksClient() {
           const items = JSON.parse(storedStr);
           if (Array.isArray(items)) {
             let changed = false;
-            items.forEach((it: any) => {
+            items.forEach((it: { productId?: number; id?: number; standardPrice?: number }) => {
               const k = `${it.productId || it.id}_${defaultBookId}`;
               if (editedPrices[k] !== undefined) {
                 it.standardPrice = editedPrices[k];
@@ -448,7 +449,7 @@ export default function PriceBooksClient() {
         key: `price_book_${bookId}`,
         width: 220,
         align: 'right',
-        render: (_, record, index) => {
+        render: (_, record) => {
           const isAutoUpdate = !isDefaultBook && Boolean(book?.formulaBaseType);
 
           // 1. Nếu đang BẬT "Tự động cập nhật theo giá chung" (isAutoUpdate = true):
@@ -837,8 +838,10 @@ export default function PriceBooksClient() {
       </main>
       </div>
 
-      {/* CREATE / EDIT PRICE BOOK MODAL */}
+      {/* CREATE / EDIT PRICE BOOK MODAL – chỉ gắn khi mở, key theo bảng giá để mỗi lần mở là form mới */}
+      {isModalOpen && (
       <CreatePriceBookModal
+        key={editingPriceBook?.priceBookId ?? 'new'}
         isOpen={isModalOpen}
         onClose={() => {
           setIsModalOpen(false);
@@ -858,6 +861,7 @@ export default function PriceBooksClient() {
         editingPriceBook={editingPriceBook}
         existingPriceBooks={priceBooks}
       />
+      )}
 
       {/* MODAL CHỌN NHÓM HÀNG VÀO BẢNG GIÁ */}
       <AddCategoryToPriceBookModal

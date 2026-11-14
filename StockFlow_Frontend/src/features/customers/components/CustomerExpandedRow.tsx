@@ -4,10 +4,12 @@
 //   [Thông tin] [Lịch sử bán/trả hàng] [Nợ cần thu từ khách]
 
 import React, { useMemo, useState } from 'react';
-import { ChevronDown, CircleDollarSign, FileUp, Loader2, Lock, Pencil, Trash2, Unlock, UserRound } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, CircleDollarSign, FileUp, Loader2, Lock, Pencil, SlidersHorizontal, Trash2, Unlock, UserRound } from 'lucide-react';
 import CustomerPaymentModal from './CustomerPaymentModal';
 import CustomerReceiptModal from './CustomerReceiptModal';
-import InvoicePreviewModal from '@/features/orders/components/InvoicePreviewModal';
+import DebtAdjustModal from '@/components/debt/DebtAdjustModal';
+import { customerService } from '../services/customerService';
+import { InvoicePreviewModal } from '@/features/orders';
 import { Customer, CustomerDebtLedgerEntry, CustomerDetail } from '../types';
 import { exportCustomerBookingsToXLSX, exportCustomerLedgerToXLSX, exportCustomerOrdersToXLSX, GENDER_LABEL } from '../utils/exportExcel';
 import { BOOKING_STATUS } from '@/features/sales-bookings/utils/salesBookingUtils';
@@ -32,13 +34,16 @@ interface CustomerExpandedRowProps {
 }
 
 type TabKey = 'info' | 'orders' | 'bookings' | 'debts';
-type LedgerFilter = 'ALL' | 'SALE' | 'PAYMENT';
+type LedgerFilter = 'ALL' | 'SALE' | 'PAYMENT' | 'ADJUST';
 
 const LEDGER_FILTER_OPTIONS: { value: LedgerFilter; label: string }[] = [
   { value: 'ALL', label: 'Tất cả giao dịch' },
   { value: 'SALE', label: 'Bán hàng' },
   { value: 'PAYMENT', label: 'Thanh toán' },
+  { value: 'ADJUST', label: 'Điều chỉnh' },
 ];
+
+const LEDGER_PAGE_SIZE = 10;
 
 const ORDER_STATUS: Record<string, { label: string; cls: string }> = {
   COMPLETED: { label: 'Hoàn thành', cls: 'bg-[#e6f8ec] text-[#16a34a] border-[#bbf7d0]' },
@@ -98,6 +103,8 @@ export default function CustomerExpandedRow({
   /** Popup xem nhanh hóa đơn / phiếu thu khi bấm mã */
   const [previewOrderId, setPreviewOrderId] = useState<number | null>(null);
   const [receiptCode, setReceiptCode] = useState<string | null>(null);
+  /** Điều chỉnh công nợ: '' = tạo phiếu mới, mã DC... = mở phiếu đã có, null = đóng */
+  const [adjustCode, setAdjustCode] = useState<string | null>(null);
   const c = detail ?? customer;
   const orders = useMemo(() => detail?.recentOrders ?? [], [detail]);
   const ledger: CustomerDebtLedgerEntry[] = useMemo(() => detail?.debtLedger ?? [], [detail]);
@@ -105,6 +112,11 @@ export default function CustomerExpandedRow({
     () => (ledgerFilter === 'ALL' ? ledger : ledger.filter((l) => l.type === ledgerFilter)),
     [ledger, ledgerFilter]
   );
+  // Phân trang sổ công nợ (mới nhất trước): mỗi trang LEDGER_PAGE_SIZE chứng từ
+  const [ledgerPage, setLedgerPage] = useState(1);
+  const ledgerPageCount = Math.max(1, Math.ceil(filteredLedger.length / LEDGER_PAGE_SIZE));
+  const safeLedgerPage = Math.min(ledgerPage, ledgerPageCount);
+  const pagedLedger = filteredLedger.slice((safeLedgerPage - 1) * LEDGER_PAGE_SIZE, safeLedgerPage * LEDGER_PAGE_SIZE);
   const isActive = customer.status === 'ACTIVE';
   const currentDebt = c.currentDebt || 0;
   // Hóa đơn hoàn thành còn nợ, cũ nhất trước (để phân bổ phiếu thu)
@@ -366,7 +378,10 @@ export default function CustomerExpandedRow({
                       <div className="relative w-56">
                         <select
                           value={ledgerFilter}
-                          onChange={(e) => setLedgerFilter(e.target.value as LedgerFilter)}
+                          onChange={(e) => {
+                            setLedgerFilter(e.target.value as LedgerFilter);
+                            setLedgerPage(1);
+                          }}
                           className="w-full h-8 pl-3 pr-8 rounded-[8px] border border-slate-300 bg-white text-[13px] focus:outline-none focus:border-[#0070f4] cursor-pointer appearance-none"
                         >
                           {LEDGER_FILTER_OPTIONS.map((opt) => (
@@ -398,7 +413,7 @@ export default function CustomerExpandedRow({
                               </td>
                             </tr>
                           ) : (
-                            filteredLedger.map((l, i) => (
+                            pagedLedger.map((l, i) => (
                               <tr key={`${l.type}-${l.code}-${i}`} className="hover:bg-[#f7f8f9]">
                                 <td className="py-2.5 px-3 font-medium">
                                   <button
@@ -416,7 +431,9 @@ export default function CustomerExpandedRow({
                                               '_blank',
                                               'noopener,noreferrer'
                                             )
-                                          : setReceiptCode(l.code)
+                                          : l.type === 'ADJUST'
+                                            ? setAdjustCode(l.code)
+                                            : setReceiptCode(l.code)
                                     }
                                     className="text-[#0070f4] hover:underline cursor-pointer"
                                     title={
@@ -424,7 +441,9 @@ export default function CustomerExpandedRow({
                                         ? `Xem hóa đơn ${l.code}`
                                         : l.type === 'RETURN' || l.type === 'REFUND'
                                           ? `Xem phiếu trả hàng`
-                                          : `Xem phiếu thu ${l.code}`
+                                          : l.type === 'ADJUST'
+                                            ? `Xem phiếu điều chỉnh ${l.code}`
+                                            : `Xem phiếu thu ${l.code}`
                                     }
                                   >
                                     {l.code}
@@ -440,6 +459,37 @@ export default function CustomerExpandedRow({
                         </tbody>
                       </table>
                     </div>
+
+                    {/* Phân trang khi nhiều chứng từ */}
+                    {filteredLedger.length > LEDGER_PAGE_SIZE && (
+                      <div className="flex items-center justify-end gap-2 text-[12px] text-[#677484]">
+                        <span>
+                          {(safeLedgerPage - 1) * LEDGER_PAGE_SIZE + 1} -{' '}
+                          {Math.min(safeLedgerPage * LEDGER_PAGE_SIZE, filteredLedger.length)} trên {filteredLedger.length} chứng từ
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setLedgerPage(safeLedgerPage - 1)}
+                          disabled={safeLedgerPage <= 1}
+                          className="p-1 rounded-[6px] border border-slate-300 bg-white hover:bg-[#f7f8f9] cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                          aria-label="Trang trước"
+                        >
+                          <ChevronLeft size={14} />
+                        </button>
+                        <span className="min-w-[48px] text-center text-[#15171a] font-medium">
+                          {safeLedgerPage} / {ledgerPageCount}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setLedgerPage(safeLedgerPage + 1)}
+                          disabled={safeLedgerPage >= ledgerPageCount}
+                          className="p-1 rounded-[6px] border border-slate-300 bg-white hover:bg-[#f7f8f9] cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                          aria-label="Trang sau"
+                        >
+                          <ChevronRight size={14} />
+                        </button>
+                      </div>
+                    )}
                   </div>
                   <div className="px-5 py-3 border-t border-slate-200 flex items-center justify-between">
                     <button
@@ -451,16 +501,28 @@ export default function CustomerExpandedRow({
                       <FileUp size={15} />
                       <span>Xuất file công nợ</span>
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => setShowPayment(true)}
-                      disabled={currentDebt <= 0}
-                      title={currentDebt <= 0 ? 'Khách hàng không còn nợ cần thu' : 'Tạo phiếu thu nợ của khách'}
-                      className={`${primaryBtnCls} disabled:opacity-50 disabled:cursor-not-allowed`}
-                    >
-                      <CircleDollarSign size={15} />
-                      <span>Thanh toán</span>
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowPayment(true)}
+                        disabled={currentDebt <= 0}
+                        title={currentDebt <= 0 ? 'Khách hàng không còn nợ cần thu' : 'Tạo phiếu thu nợ của khách'}
+                        className={`${primaryBtnCls} disabled:opacity-50 disabled:cursor-not-allowed`}
+                      >
+                        <CircleDollarSign size={15} />
+                        <span>Thanh toán</span>
+                      </button>
+                      {/* Luôn bấm được, kể cả khi nợ = 0: tạo khách nợ mình (dương) hoặc mình nợ khách (âm) */}
+                      <button
+                        type="button"
+                        onClick={() => setAdjustCode('')}
+                        title="Đặt nợ cần thu của khách: dương = khách nợ, âm = cửa hàng nợ khách, 0 = hết nợ"
+                        className={outlineBtnCls}
+                      >
+                        <SlidersHorizontal size={15} />
+                        <span>Điều chỉnh</span>
+                      </button>
+                    </div>
                   </div>
                 </>
               )}
@@ -476,6 +538,24 @@ export default function CustomerExpandedRow({
             onSuccess={(result) => {
               setShowPayment(false);
               onPaymentCreated?.(customer.id, result.voucherCode);
+            }}
+          />
+        )}
+        {adjustCode !== null && (
+          <DebtAdjustModal
+            kind="customer"
+            currentDebt={currentDebt}
+            code={adjustCode || null}
+            api={{
+              get: (code) => customerService.getDebtAdjustment(customer.id, code),
+              create: (payload) => customerService.adjustCustomerDebt(customer.id, payload),
+              update: (code, payload) => customerService.updateDebtAdjustment(customer.id, code, payload),
+              cancel: (code) => customerService.cancelDebtAdjustment(customer.id, code),
+            }}
+            onClose={() => setAdjustCode(null)}
+            onSuccess={() => {
+              setAdjustCode(null);
+              onDataChanged?.(customer.id);
             }}
           />
         )}

@@ -41,6 +41,21 @@ public class TransactionCodeGenerator : ITransactionCodeGenerator
                 prefix = "XK";
                 sequenceName = "stockflow.seq_stock_issue_code";
                 break;
+            case "PRODUCTION_ORDER":
+                // Lệnh sản xuất (UC-59)
+                prefix = "LSX";
+                sequenceName = "stockflow.seq_production_order_code";
+                break;
+            case "FINISHED_GOODS_RECEIPT":
+                // Phiếu nhập thành phẩm (UC-49)
+                prefix = "NTP";
+                sequenceName = "stockflow.seq_fgr_code";
+                break;
+            case "CREDIT_REQUEST":
+                // Yêu cầu duyệt vượt hạn mức công nợ (UC-27): YCHM00001
+                prefix = "YCHM";
+                sequenceName = "stockflow.seq_credit_request_code";
+                break;
             case "ORDER":
             case "POS":
             default:

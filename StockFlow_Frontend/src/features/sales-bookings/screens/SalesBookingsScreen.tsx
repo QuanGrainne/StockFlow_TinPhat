@@ -24,7 +24,7 @@ import {
   BOOKING_STATUS_OPTIONS,
   exportBookingsToXLSX,
 } from '@/features/sales-bookings/utils/salesBookingUtils';
-import { formatDateTimeVN } from '@/features/transfers/utils/dateUtils';
+import { formatDateTimeVN } from '@/lib/utils/date';
 import { getTimeRangeForPreset } from '@/components/filters/TimeRangeFilter';
 import { PartnerLink } from '@/components/links/EntityLinks';
 import { readDocumentLink, scrollToWhenReady } from '@/lib/navigation/documentLink';
@@ -147,8 +147,8 @@ export default function SalesBookingsScreen() {
   const selectedRows = rows.filter((r) => selectedIds.includes(r.orderId));
   const mergeError = (() => {
     if (selectedRows.length < 2) return 'Cần chọn ít nhất 2 đơn để gộp.';
-    const bad = selectedRows.find((r) => (r.status !== 'DRAFT' && r.status !== 'CONFIRMED') || r.deliveredQuantity > 0);
-    if (bad) return `Đơn ${bad.orderCode} (${BOOKING_STATUS[bad.status].label}) không gộp được: chỉ gộp đơn Phiếu tạm / Đã xác nhận chưa giao hàng.`;
+    const bad = selectedRows.find((r) => r.status !== 'DRAFT');
+    if (bad) return `Đơn ${bad.orderCode} (${BOOKING_STATUS[bad.status].label}) không gộp được: chỉ gộp đơn ở trạng thái Phiếu tạm.`;
     if (new Set(selectedRows.map((r) => r.partnerId)).size > 1) return 'Chỉ gộp được các đơn của cùng 1 khách hàng.';
     if (new Set(selectedRows.map((r) => r.warehouseId)).size > 1) return 'Chỉ gộp được các đơn cùng chi nhánh xử lý.';
     return null;

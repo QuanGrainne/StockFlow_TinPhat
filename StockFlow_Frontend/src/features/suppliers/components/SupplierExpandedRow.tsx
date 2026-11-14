@@ -5,12 +5,14 @@
 // Giữ các thông tin cũ (phân bổ công nợ theo kho, tổng kết tài chính, lọc phiếu theo kho).
 
 import React, { useMemo, useState } from 'react';
-import { Pencil, Lock, Unlock, Trash2, Loader2, FileUp, ChevronDown, CircleDollarSign } from 'lucide-react';
+import { Pencil, Lock, Unlock, Trash2, Loader2, FileUp, ChevronDown, ChevronLeft, ChevronRight, CircleDollarSign, SlidersHorizontal } from 'lucide-react';
 import SupplierPaymentModal from './SupplierPaymentModal';
+import DebtAdjustModal from '@/components/debt/DebtAdjustModal';
+import { supplierService } from '../services/supplierService';
 import { Supplier, SupplierDetail, SupplierRecentReceipt, SupplierDebtLedgerEntry } from '../types';
 import { getSupplierStatusBadge } from '../utils/status';
 import { exportSupplierLedgerToXLSX, exportSupplierReceiptsToXLSX } from '../utils/exportExcel';
-import { formatDateOnlyVN, formatDateTimeVN } from '@/features/transfers/utils/dateUtils';
+import { formatDateOnlyVN, formatDateTimeVN } from '@/lib/utils/date';
 import { DocumentCodeLink } from '@/components/links/EntityLinks';
 import { toLinkDate } from '@/lib/navigation/documentLink';
 
@@ -24,17 +26,23 @@ interface SupplierExpandedRowProps {
   onDelete: (supplier: Supplier) => void;
   /** Gọi sau khi tạo phiếu chi thành công để tải lại chi tiết + danh sách */
   onPaymentCreated?: (partnerId: number, voucherCode: string) => void;
+  /** Gọi sau khi tạo / sửa / xóa phiếu điều chỉnh công nợ để tải lại chi tiết + danh sách */
+  onDataChanged?: (partnerId: number) => void;
 }
 
 type TabKey = 'info' | 'receipts' | 'debts';
 
 /** Bộ lọc loại giao dịch ở tab Nợ cần trả. SUPPLIER_RETURN gồm cả phiếu trả hàng nhập và tiền NCC trả lại. */
-type LedgerFilter = 'ALL' | 'GOODS_RECEIPT' | 'SUPPLIER_RETURN';
+type LedgerFilter = 'ALL' | 'GOODS_RECEIPT' | 'SUPPLIER_RETURN' | 'ADJUST';
 const LEDGER_FILTER_OPTIONS: { value: LedgerFilter; label: string }[] = [
   { value: 'ALL', label: 'Tất cả giao dịch' },
   { value: 'GOODS_RECEIPT', label: 'Nhập hàng' },
   { value: 'SUPPLIER_RETURN', label: 'Trả hàng nhà cung cấp' },
+  { value: 'ADJUST', label: 'Điều chỉnh' },
 ];
+
+/** Số chứng từ mỗi trang ở sổ Nợ cần trả */
+const LEDGER_PAGE_SIZE = 10;
 
 const currencyFormatter = new Intl.NumberFormat('vi-VN');
 
@@ -146,11 +154,15 @@ export default function SupplierExpandedRow({
   onToggleStatus,
   onDelete,
   onPaymentCreated,
+  onDataChanged,
 }: SupplierExpandedRowProps) {
   const [activeTab, setActiveTab] = useState<TabKey>('info');
   const [receiptWarehouseFilter, setReceiptWarehouseFilter] = useState<number | 'ALL'>('ALL');
   const [ledgerFilter, setLedgerFilter] = useState<LedgerFilter>('ALL');
   const [showPayment, setShowPayment] = useState(false);
+  /** Điều chỉnh công nợ: '' = tạo phiếu mới, mã DC... = mở phiếu đã có, null = đóng */
+  const [adjustCode, setAdjustCode] = useState<string | null>(null);
+  const [ledgerPage, setLedgerPage] = useState(1);
   const currentPayable = detail?.currentPayable ?? supplier.currentPayable ?? 0;
 
   const ledger: SupplierDebtLedgerEntry[] = useMemo(() => detail?.debtLedger ?? [], [detail]);
@@ -168,6 +180,10 @@ export default function SupplierExpandedRow({
     () => (ledgerFilter === 'ALL' ? ledger : ledger.filter((l) => l.type === ledgerFilter || (ledgerFilter === 'SUPPLIER_RETURN' && l.type === 'SUPPLIER_REFUND'))),
     [ledger, ledgerFilter]
   );
+  // Phân trang sổ công nợ (mới nhất trước)
+  const ledgerPageCount = Math.max(1, Math.ceil(filteredLedger.length / LEDGER_PAGE_SIZE));
+  const safeLedgerPage = Math.min(ledgerPage, ledgerPageCount);
+  const pagedLedger = filteredLedger.slice((safeLedgerPage - 1) * LEDGER_PAGE_SIZE, safeLedgerPage * LEDGER_PAGE_SIZE);
 
   const tabs: { key: TabKey; label: string }[] = [
     { key: 'info', label: 'Thông tin' },
@@ -330,7 +346,10 @@ export default function SupplierExpandedRow({
                       <div className="relative w-56">
                         <select
                           value={ledgerFilter}
-                          onChange={(e) => setLedgerFilter(e.target.value as LedgerFilter)}
+                          onChange={(e) => {
+                            setLedgerFilter(e.target.value as LedgerFilter);
+                            setLedgerPage(1);
+                          }}
                           className="w-full h-8 pl-3 pr-8 rounded-[8px] border border-slate-300 bg-white text-[13px] text-[#15171a] focus:outline-none focus:border-[#0070f4] cursor-pointer appearance-none"
                         >
                           {LEDGER_FILTER_OPTIONS.map((opt) => (
@@ -367,7 +386,7 @@ export default function SupplierExpandedRow({
                               </td>
                             </tr>
                           ) : (
-                            filteredLedger.map((l, i) => (
+                            pagedLedger.map((l, i) => (
                               <tr key={`${l.type}-${l.code}-${i}`} className="hover:bg-[#f7f8f9]">
                                 <td
                                   className={`py-2.5 px-3 font-medium ${
@@ -381,6 +400,15 @@ export default function SupplierExpandedRow({
                                       id={l.referenceId}
                                       date={toLinkDate(l.date)}
                                     />
+                                  ) : l.type === 'ADJUST' ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => setAdjustCode(l.code)}
+                                      className="text-[#0070f4] hover:underline cursor-pointer"
+                                      title={`Xem phiếu điều chỉnh ${l.code}`}
+                                    >
+                                      {l.code}
+                                    </button>
                                   ) : (
                                     l.code
                                   )}
@@ -401,6 +429,37 @@ export default function SupplierExpandedRow({
                         </tbody>
                       </table>
                     </div>
+
+                    {/* Phân trang khi nhiều chứng từ */}
+                    {filteredLedger.length > LEDGER_PAGE_SIZE && (
+                      <div className="flex items-center justify-end gap-2 text-[12px] text-[#677484]">
+                        <span>
+                          {(safeLedgerPage - 1) * LEDGER_PAGE_SIZE + 1} -{' '}
+                          {Math.min(safeLedgerPage * LEDGER_PAGE_SIZE, filteredLedger.length)} trên {filteredLedger.length} chứng từ
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setLedgerPage(safeLedgerPage - 1)}
+                          disabled={safeLedgerPage <= 1}
+                          className="p-1 rounded-[6px] border border-slate-300 bg-white hover:bg-[#f7f8f9] cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                          aria-label="Trang trước"
+                        >
+                          <ChevronLeft size={14} />
+                        </button>
+                        <span className="min-w-[48px] text-center text-[#15171a] font-medium">
+                          {safeLedgerPage} / {ledgerPageCount}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setLedgerPage(safeLedgerPage + 1)}
+                          disabled={safeLedgerPage >= ledgerPageCount}
+                          className="p-1 rounded-[6px] border border-slate-300 bg-white hover:bg-[#f7f8f9] cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                          aria-label="Trang sau"
+                        >
+                          <ChevronRight size={14} />
+                        </button>
+                      </div>
+                    )}
                   </div>
                   <div className="px-5 py-3 border-t border-slate-200 flex items-center justify-between">
                     <button
@@ -412,16 +471,28 @@ export default function SupplierExpandedRow({
                       <FileUp size={15} />
                       <span>Xuất file</span>
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => setShowPayment(true)}
-                      disabled={currentPayable <= 0}
-                      title={currentPayable <= 0 ? 'Nhà cung cấp không còn nợ cần trả' : 'Tạo phiếu chi thanh toán nợ'}
-                      className={`${primaryBtnCls} disabled:opacity-50 disabled:cursor-not-allowed`}
-                    >
-                      <CircleDollarSign size={15} />
-                      <span>Thanh toán</span>
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowPayment(true)}
+                        disabled={currentPayable <= 0}
+                        title={currentPayable <= 0 ? 'Nhà cung cấp không còn nợ cần trả' : 'Tạo phiếu chi thanh toán nợ'}
+                        className={`${primaryBtnCls} disabled:opacity-50 disabled:cursor-not-allowed`}
+                      >
+                        <CircleDollarSign size={15} />
+                        <span>Thanh toán</span>
+                      </button>
+                      {/* Luôn bấm được, kể cả khi nợ = 0: cửa hàng nợ NCC (dương) hoặc NCC nợ cửa hàng (âm) */}
+                      <button
+                        type="button"
+                        onClick={() => setAdjustCode('')}
+                        title="Đặt nợ cần trả nhà cung cấp: dương = cửa hàng nợ NCC, âm = NCC nợ cửa hàng, 0 = hết nợ"
+                        className={outlineBtnCls}
+                      >
+                        <SlidersHorizontal size={15} />
+                        <span>Điều chỉnh</span>
+                      </button>
+                    </div>
                   </div>
                 </>
               )}
@@ -429,6 +500,24 @@ export default function SupplierExpandedRow({
           )}
         </div>
 
+        {adjustCode !== null && (
+          <DebtAdjustModal
+            kind="supplier"
+            currentDebt={currentPayable}
+            code={adjustCode || null}
+            api={{
+              get: (code) => supplierService.getDebtAdjustment(supplier.partnerId, code),
+              create: (payload) => supplierService.adjustSupplierDebt(supplier.partnerId, payload),
+              update: (code, payload) => supplierService.updateDebtAdjustment(supplier.partnerId, code, payload),
+              cancel: (code) => supplierService.cancelDebtAdjustment(supplier.partnerId, code),
+            }}
+            onClose={() => setAdjustCode(null)}
+            onSuccess={() => {
+              setAdjustCode(null);
+              onDataChanged?.(supplier.partnerId);
+            }}
+          />
+        )}
         {showPayment && (
           <SupplierPaymentModal
             supplier={supplier}

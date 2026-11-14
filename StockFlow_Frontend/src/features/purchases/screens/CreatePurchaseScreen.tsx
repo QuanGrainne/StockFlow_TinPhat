@@ -36,7 +36,7 @@ import { purchaseService } from '@/features/purchases/services/purchaseService';
 import { purchaseOrderService } from '@/features/purchase-orders/services/purchaseOrderService';
 import type { PurchaseOrderItem } from '@/features/purchase-orders/types';
 import { PO_STATUS } from '@/features/purchase-orders/utils/purchaseOrderUtils';
-import { toLocalDatetimeInputString } from '@/features/transfers/utils/dateUtils';
+import { toLocalDatetimeInputString } from '@/lib/utils/date';
 import { QuickAddSupplierModal } from '@/features/purchases/components/QuickAddSupplierModal';
 import { AddFromCategoryPopover } from '@/features/purchases/components/AddFromCategoryPopover';
 import { NumberInput } from '@/components/inputs/NumberInput';
@@ -203,7 +203,7 @@ export default function CreatePurchaseScreen({ mode = 'receipt' }: CreatePurchas
             setUserDisplay(matched.name || (u?.fullName || u?.username || 'Quản trị viên Hệ thống'));
           }
         }
-      });
+      }).catch(() => undefined); // T18: getStaffList ném lỗi khi API lỗi; ở đây chỉ để lấy avatar nên bỏ qua.
     } catch {
       // ignore
     }

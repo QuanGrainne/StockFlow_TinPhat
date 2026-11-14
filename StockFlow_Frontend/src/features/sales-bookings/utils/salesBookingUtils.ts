@@ -2,24 +2,22 @@
 // Nhãn trạng thái và xuất Excel Đơn đặt hàng
 
 import * as XLSX from 'xlsx';
-import { formatDateTimeVN } from '@/features/transfers/utils/dateUtils';
+import { formatDateTimeVN } from '@/lib/utils/date';
 import type { SalesBookingDetail, SalesBookingListItem, SalesBookingStatus } from '../types';
 
 export const BOOKING_STATUS: Record<SalesBookingStatus, { label: string; cls: string }> = {
   DRAFT: { label: 'Phiếu tạm', cls: 'bg-[#fffbeb] text-[#d97706] border-[#fde68a]' },
-  CONFIRMED: { label: 'Đã xác nhận', cls: 'bg-[#e6f1fe] text-[#0070f4] border-[#0070f4]/25' },
-  DELIVERING: { label: 'Đang giao hàng', cls: 'bg-[#f3e8ff] text-[#7c3aed] border-[#ddd6fe]' },
   FINISHED: { label: 'Hoàn thành', cls: 'bg-[#e6f8ec] text-[#16a34a] border-[#bbf7d0]' },
   CANCELLED: { label: 'Đã hủy', cls: 'bg-[#fef2f2] text-[#fb2c36] border-[#fecaca]' },
 };
 
-export const BOOKING_STATUS_OPTIONS: SalesBookingStatus[] = ['DRAFT', 'CONFIRMED', 'DELIVERING', 'FINISHED', 'CANCELLED'];
+export const BOOKING_STATUS_OPTIONS: SalesBookingStatus[] = ['DRAFT', 'FINISHED', 'CANCELLED'];
 
 /** Mặc định như KiotViet: ẩn đơn đã hủy */
-export const BOOKING_DEFAULT_STATUSES: SalesBookingStatus[] = ['DRAFT', 'CONFIRMED', 'DELIVERING', 'FINISHED'];
+export const BOOKING_DEFAULT_STATUSES: SalesBookingStatus[] = ['DRAFT', 'FINISHED'];
 
-/** Đơn còn tạo hóa đơn giao hàng được */
-export const isBookingOpen = (s: SalesBookingStatus) => s === 'DRAFT' || s === 'CONFIRMED' || s === 'DELIVERING';
+/** Đơn còn tạo hóa đơn được (Phiếu tạm) */
+export const isBookingOpen = (s: SalesBookingStatus) => s === 'DRAFT';
 
 export const PAY_METHOD_LABEL: Record<string, string> = { CASH: 'Tiền mặt', VIETQR: 'Chuyển khoản' };
 

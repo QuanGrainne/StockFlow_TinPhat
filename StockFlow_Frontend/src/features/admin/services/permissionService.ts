@@ -11,18 +11,14 @@ import {
   RoleDefinition,
   PermissionMatrixModule,
 } from '../types';
-import {
-  INITIAL_WAREHOUSE_FACILITIES,
-  INITIAL_ROLE_DEFINITIONS,
-  INITIAL_PERMISSION_MODULES,
-  INITIAL_STAFF_ACCOUNTS,
-} from '../data/mockData';
+// CÒN DỰ PHÒNG MOCK KHI API LỖI – chỉ dùng cho getPermissionMatrix (chưa có màn hình gọi).
+import { INITIAL_PERMISSION_MODULES } from '../data/mockData';
 
 const WAREHOUSE_STORAGE_KEY = 'stockflow_warehouses_cache';
 
-let staffAccounts = [...INITIAL_STAFF_ACCOUNTS];
-let warehouseFacilities = [...INITIAL_WAREHOUSE_FACILITIES];
-let roleDefinitions = [...INITIAL_ROLE_DEFINITIONS];
+// T18: kho và vai trò không còn khởi tạo từ dữ liệu giả; mảng chỉ giữ dữ liệu thật đã tải từ server.
+let warehouseFacilities: WarehouseFacility[] = [];
+let roleDefinitions: RoleDefinition[] = [];
 
 let permissionMatrices: Record<string, PermissionMatrixModule[]> = {
   ROLE_ADMIN: JSON.parse(JSON.stringify(INITIAL_PERMISSION_MODULES)),
@@ -88,7 +84,7 @@ export const permissionService = {
         return mapped;
       }
     } catch (err) {
-      console.warn('API getWarehouseFacilities failed, falling back to cache/mock:', err);
+      console.warn('API getWarehouseFacilities failed, falling back to cache:', err);
     }
 
     // Fallback: check localStorage cache
@@ -107,9 +103,11 @@ export const permissionService = {
       }
     }
 
+    // Không có cache: trả dữ liệu thật đã tải trong phiên này (rỗng nếu chưa tải được), không dùng kho giả.
     return [...warehouseFacilities];
   },
 
+  // CÒN DỰ PHÒNG KHI API LỖI (trả toàn bộ kho) – chưa có màn hình gọi.
   async getMyWarehouseFacilities(): Promise<WarehouseFacility[]> {
     try {
       const token = typeof window !== 'undefined' ? tabSession.get('stockflow_token') ?? undefined : undefined;
@@ -307,14 +305,7 @@ export const permissionService = {
       }
     }
 
-    const idx = staffAccounts.findIndex((s) => s.id === staffId);
-    if (idx !== -1) {
-      staffAccounts[idx] = {
-        ...staffAccounts[idx],
-        assignedWarehouses,
-      };
-      return staffAccounts[idx];
-    }
+    // Màn hình không dùng giá trị trả về (tải lại danh sách từ server); giữ kiểu StaffAccount.
     return {
       id: staffId,
       code: staffId,
@@ -332,15 +323,12 @@ export const permissionService = {
 
   // ─── 2. Roles & RBAC Matrix (Danh mục vai trò & Ma trận quyền) ───────────
   async getRoleDefinitions(): Promise<RoleDefinition[]> {
-    try {
-      const token = typeof window !== 'undefined' ? tabSession.get('stockflow_token') ?? undefined : undefined;
-      const data = await apiClient.get<RoleDefinition[]>('/api/Roles', token);
-      if (Array.isArray(data) && data.length > 0) {
-        roleDefinitions = data;
-        return data;
-      }
-    } catch (e) {
-      console.warn('API getRoleDefinitions failed, fallback to local data:', e);
+    // API lỗi thì ném lỗi (các màn gọi đều có try/catch), không trả vai trò giả.
+    const token = typeof window !== 'undefined' ? tabSession.get('stockflow_token') ?? undefined : undefined;
+    const data = await apiClient.get<RoleDefinition[]>('/api/Roles', token);
+    if (Array.isArray(data) && data.length > 0) {
+      roleDefinitions = data;
+      return data;
     }
     return [...roleDefinitions];
   },
@@ -384,6 +372,7 @@ export const permissionService = {
     }
   },
 
+  // CÒN DỰ PHÒNG MOCK KHI API LỖI – getPermissionMatrix / savePermissionMatrix / getAllowedModuleKeys chưa có màn hình gọi.
   async getPermissionMatrix(roleCode: string): Promise<PermissionMatrixModule[]> {
     try {
       const token = typeof window !== 'undefined' ? tabSession.get('stockflow_token') ?? undefined : undefined;
@@ -590,18 +579,20 @@ export const NAVBAR_FEATURES: NavFeatureConfig[] = NAV_ITEMS_FLAT.map((i) => ({
 }));
 
 const GOODS_FEATS = ['feat-goods', 'feat-price-books'];
-const STOCK_FEATS = ['feat-transfers', 'feat-stocktake'];
+const STOCK_FEATS = ['feat-transfers', 'feat-stocktake', 'feat-disposal'];
 const SALES_FEATS = ['feat-pos', 'feat-sales-booking', 'feat-invoices', 'feat-sales-returns'];
 const PURCHASE_FEATS = ['feat-purchase-orders', 'feat-purchase', 'feat-purchase-returns', 'feat-suppliers'];
-const PROD_FEATS = ['feat-prod', 'feat-prod-import', 'feat-prod-logs'];
+const PROD_FEATS = ['feat-prod', 'feat-prod-plan', 'feat-prod-issue', 'feat-prod-receipt'];
+/** Kế toán sản xuất: xem lệnh, xuất NVL, nhập thành phẩm; không lập lệnh, không sửa BOM (SRS 3.1.6) */
+const PROD_ACCOUNTANT_FEATS = ['feat-prod', 'feat-prod-issue', 'feat-prod-receipt'];
 
 export const DEFAULT_ROLE_FEATURE_PERMS: Record<string, string[]> = {
   ROLE_ADMIN: NAVBAR_FEATURES.map((f) => f.id),
-  ROLE_MANAGER: [...GOODS_FEATS, ...STOCK_FEATS, 'feat-customers', ...SALES_FEATS, ...PURCHASE_FEATS, ...PROD_FEATS, 'feat-bom'],
+  ROLE_MANAGER: [...GOODS_FEATS, ...STOCK_FEATS, 'feat-customers', ...SALES_FEATS, 'feat-credit-approvals', ...PURCHASE_FEATS, ...PROD_FEATS, 'feat-bom'],
   ROLE_SALES: ['feat-goods', 'feat-customers', ...SALES_FEATS],
   // UC-33: nhân viên kho lập phiếu chuyển và xác nhận nhận hàng
-  ROLE_WAREHOUSE: ['feat-goods', ...STOCK_FEATS, ...PURCHASE_FEATS, 'feat-bom'],
-  ROLE_PRODUCTION: ['feat-goods', ...PROD_FEATS, 'feat-bom'],
+  ROLE_WAREHOUSE: ['feat-goods', ...STOCK_FEATS, ...PURCHASE_FEATS],
+  ROLE_PRODUCTION: ['feat-goods', ...PROD_ACCOUNTANT_FEATS],
 };
 
 /**
@@ -622,7 +613,6 @@ function migrateFeatureList(role: string, feats: string[]): string[] {
   addIf('feat-roles', ['feat-role-matrix']);
   // Phân quyền kho: gộp "Danh sách quyền kho" + "Cơ sở kho" thành 1 mục
   addIf('feat-warehouse-facilities', ['feat-warehouse-perms']);
-  addIf('feat-prod', ['feat-prod-import', 'feat-prod-logs']);
   if (role === 'ROLE_ADMIN') out.add('feat-dashboard');
   const valid = new Set(NAVBAR_FEATURES.map((f) => f.id));
   return [...out].filter((id) => valid.has(id));

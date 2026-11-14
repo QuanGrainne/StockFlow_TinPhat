@@ -3,7 +3,7 @@
 
 import * as XLSX from 'xlsx';
 import { Supplier, SupplierRecentReceipt, SupplierDebtLedgerEntry } from '../types';
-import { formatDateTimeVN } from '@/features/transfers/utils/dateUtils';
+import { formatDateTimeVN } from '@/lib/utils/date';
 
 const RECEIPT_STATUS_LABEL: Record<string, string> = {
   COMPLETED: 'Đã nhập hàng',

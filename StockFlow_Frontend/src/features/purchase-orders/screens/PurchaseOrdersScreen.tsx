@@ -20,7 +20,7 @@ import type { PurchaseOrderListFilter, PurchaseOrderListItem } from '@/features/
 import { exportPurchaseOrdersToXLSX, PO_STATUS, PO_STATUS_OPTIONS } from '@/features/purchase-orders/utils/purchaseOrderUtils';
 import { supplierService } from '@/features/suppliers/services/supplierService';
 import type { Supplier } from '@/features/suppliers/types';
-import { formatDateTimeVN } from '@/features/transfers/utils/dateUtils';
+import { formatDateTimeVN } from '@/lib/utils/date';
 import { getTimeRangeForPreset } from '@/components/filters/TimeRangeFilter';
 import { PartnerLink } from '@/components/links/EntityLinks';
 import { readDocumentLink, scrollToWhenReady } from '@/lib/navigation/documentLink';

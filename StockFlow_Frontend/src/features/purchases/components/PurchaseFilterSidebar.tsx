@@ -21,7 +21,7 @@ import {
   formatDateOnlyVN,
   parseISODate,
   getDateRangeForPreset,
-} from '@/features/transfers/utils/dateUtils';
+} from '@/lib/utils/date';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -38,6 +38,8 @@ type PurchaseFilterSidebarProps = {
   hideSupplierFilter?: boolean;
   /** Ẩn bộ lọc Chi nhánh (VD Phiếu kiểm kho: luôn theo Kho làm việc) */
   hideWarehouseFilter?: boolean;
+  /** Ẩn một số trạng thái không có ở màn dùng chung (VD Xuất hủy không có "Đã hủy") */
+  hiddenStatuses?: PurchaseStatus[];
 };
 
 // ─── Status options ───────────────────────────────────────────────────────────
@@ -95,6 +97,7 @@ export default function PurchaseFilterSidebar({
   statusLabels,
   hideSupplierFilter = false,
   hideWarehouseFilter = false,
+  hiddenStatuses,
 }: PurchaseFilterSidebarProps) {
   const [mounted, setMounted] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -603,7 +606,7 @@ export default function PurchaseFilterSidebar({
               Trạng thái
             </div>
             <div className="space-y-2">
-              {STATUS_OPTIONS.map((opt) => {
+              {STATUS_OPTIONS.filter((opt) => !hiddenStatuses?.includes(opt.value)).map((opt) => {
                 const isChecked = state.statuses.includes(opt.value);
                 return (
                   <label

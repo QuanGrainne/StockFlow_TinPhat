@@ -140,6 +140,19 @@ public class SalesReturnCommandHandler :
 
         var totalGoods = lines.Sum(l => Math.Round(l.Quantity * l.ReturnPrice, 2));
         var discount = Math.Min(totalGoods, req.DiscountAmount);
+
+        // Hóa đơn có giảm giá tổng: hàng trả phải chịu phần giảm giá phân bổ (như KiotViet),
+        // để không trả khách nhiều hơn số tiền khách đã thực trả cho hàng đó.
+        if (invoice != null && invoice.DiscountAmount > 0)
+        {
+            var goodsAtSalePrice = resolved.Sum(r => Math.Round(r.Line.Quantity * r.SalePrice, 2));
+            var allocated = SalesReturnOps.AllocateInvoiceDiscount(
+                SalesReturnOps.InvoiceSubTotal(invoice), invoice.DiscountAmount, goodsAtSalePrice);
+            var minDiscount = Math.Min(allocated, totalGoods);
+            if (discount < minDiscount)
+                return Fail($"Hóa đơn {invoice.OrderCode} được giảm giá {invoice.DiscountAmount:N0}: hàng trả phải trừ giảm giá tối thiểu " +
+                            $"{minDiscount:N0} (phân bổ theo giá trị hàng trả), không trả khách nhiều hơn số đã thanh toán.");
+        }
         var fee = Math.Min(totalGoods - discount, req.ReturnFee);
         var total = totalGoods - discount - fee;
         if (req.RefundAmount > total) return Fail($"Tiền trả khách ({req.RefundAmount:N0}) vượt quá số cần trả khách ({total:N0}).");

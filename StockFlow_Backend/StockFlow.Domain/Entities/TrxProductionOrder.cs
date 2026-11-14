@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace StockFlow.Domain.Entities;
@@ -29,6 +29,14 @@ public partial class TrxProductionOrder
 
     public string? Notes { get; set; }
 
+    /// <summary>Xưởng phụ trách sản xuất (UC-58 A58.1)</summary>
+    public string? Workshop { get; set; }
+
+    /// <summary>Kế hoạch sản xuất sinh ra lệnh này (để trống với lệnh tạo trực tiếp)</summary>
+    public int? ProductionPlanId { get; set; }
+
+    public virtual TrxProductionPlan? ProductionPlan { get; set; }
+
     public virtual SecUser? AssignedToNavigation { get; set; }
 
     public virtual MstBom Bom { get; set; } = null!;
@@ -36,6 +44,8 @@ public partial class TrxProductionOrder
     public virtual SecUser CreatedByNavigation { get; set; } = null!;
 
     public virtual MstProduct Product { get; set; } = null!;
+
+    public virtual ICollection<DtlProductionOrderItem> DtlProductionOrderItems { get; set; } = new List<DtlProductionOrderItem>();
 
     public virtual ICollection<TrxFinishedGoodsReceipt> TrxFinishedGoodsReceipts { get; set; } = new List<TrxFinishedGoodsReceipt>();
 

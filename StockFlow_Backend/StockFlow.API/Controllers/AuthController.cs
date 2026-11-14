@@ -59,6 +59,29 @@ public class AuthController(IMediator mediator) : ControllerBase
     }
 
     /// <summary>
+    /// Đổi mật khẩu của chính tài khoản đang đăng nhập (UC-50, BR-35..BR-38).
+    /// Mọi tài khoản đã đăng nhập đều dùng được (tự phục vụ, giống /me), nên không gắn mã quyền phân hệ.
+    /// Token hiện tại vẫn dùng tiếp sau khi đổi.
+    /// </summary>
+    [HttpPost("change-password")]
+    [Authorize]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordRequest request)
+    {
+        var result = await mediator.Send(new ChangePasswordCommand(
+            request.CurrentPassword, request.NewPassword, request.ConfirmNewPassword));
+
+        if (!result.IsSuccess)
+        {
+            return BadRequest(new { message = result.Error });
+        }
+
+        return Ok(new { message = "Đổi mật khẩu thành công." });
+    }
+
+    /// <summary>
     /// Lấy danh sách mã quyền phân hệ (Permissions) của tài khoản đang đăng nhập.
     /// </summary>
     [HttpGet("permissions")]

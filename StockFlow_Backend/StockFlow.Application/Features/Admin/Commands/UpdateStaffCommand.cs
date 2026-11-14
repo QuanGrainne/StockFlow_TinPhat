@@ -1,3 +1,4 @@
+using FluentValidation;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using StockFlow.Application.Common;
@@ -9,6 +10,18 @@ using StockFlow.Domain.Entities;
 namespace StockFlow.Application.Features.Admin.Commands;
 
 public record UpdateStaffCommand(int UserId, UpdateStaffRequest Request) : IRequest<Result<StaffDto>>;
+
+public class UpdateStaffCommandValidator : AbstractValidator<UpdateStaffCommand>
+{
+    public UpdateStaffCommandValidator()
+    {
+        // BR-35: Admin đổi mật khẩu cho nhân viên thì mật khẩu mới phải đủ mạnh; để trống = giữ mật khẩu cũ
+        RuleFor(x => x.Request.Password!)
+            .Cascade(CascadeMode.Stop)
+            .StrongPassword("Mật khẩu mới")
+            .When(x => !string.IsNullOrWhiteSpace(x.Request.Password));
+    }
+}
 
 public class UpdateStaffCommandHandler : IRequestHandler<UpdateStaffCommand, Result<StaffDto>>
 {

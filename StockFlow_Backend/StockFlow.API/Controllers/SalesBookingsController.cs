@@ -89,11 +89,6 @@ public class SalesBookingsController : ControllerBase
         return result.IsSuccess ? Ok(new { success = true }) : BadRequest(new { message = result.Error });
     }
 
-    [HttpPost("{id:int}/confirm")]
-    [RequirePermission("SALES_UPDATE")]
-    [RequireFeature("feat-sales-booking")]
-    public Task<IActionResult> Confirm(int id) => RunAction(id, "CONFIRM");
-
     /// <summary>
     /// Hủy đơn chưa giao. keepDeposit=false: hoàn tiền trả trước (phiếu thu hủy, công nợ tăng lại);
     /// keepDeposit=true: giữ tiền làm khoản khách trả trước.
@@ -102,12 +97,6 @@ public class SalesBookingsController : ControllerBase
     [RequirePermission("SALES_DELETE")]
     [RequireFeature("feat-sales-booking")]
     public Task<IActionResult> Cancel(int id, [FromQuery] bool keepDeposit = false) => RunAction(id, "CANCEL", keepDeposit);
-
-    /// <summary>Kết thúc đơn đang giao 1 phần: không giao phần còn lại</summary>
-    [HttpPost("{id:int}/finish")]
-    [RequirePermission("SALES_UPDATE")]
-    [RequireFeature("feat-sales-booking")]
-    public Task<IActionResult> Finish(int id) => RunAction(id, "FINISH");
 
     /// <summary>Gộp các đơn cùng khách, cùng chi nhánh, chưa giao thành 1 đơn mới; đơn gốc chuyển Đã hủy (BR-09)</summary>
     [HttpPost("merge")]

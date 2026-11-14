@@ -15,7 +15,7 @@ import type { OrderListItem } from '@/features/orders/types';
 import { salesBookingService } from '@/features/sales-bookings/services/salesBookingService';
 import type { SalesBookingListItem } from '@/features/sales-bookings/types';
 import { BOOKING_STATUS } from '@/features/sales-bookings/utils/salesBookingUtils';
-import { formatDateTimeVN } from '@/features/transfers/utils/dateUtils';
+import { formatDateTimeVN } from '@/lib/utils/date';
 
 const fmt = (n: number) => Math.round(n || 0).toLocaleString('vi-VN');
 const pad = (n: number) => String(n).padStart(2, '0');
@@ -307,8 +307,8 @@ export function PickBookingDialog({
     salesBookingService
       .getBookings({
         warehouseIds: [warehouseId],
-        // Chỉ đơn còn giao được: Phiếu tạm, Đã xác nhận, Đang giao hàng
-        statuses: ['DRAFT', 'CONFIRMED', 'DELIVERING'],
+        // Chỉ đơn còn tạo hóa đơn được: Phiếu tạm
+        statuses: ['DRAFT'],
         search: q.code || q.customer || q.notes || undefined,
         productSearch: q.productCode || q.productName || undefined,
         fromDate: q.from || undefined,

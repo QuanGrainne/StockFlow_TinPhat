@@ -56,7 +56,7 @@ import type { PurchaseFilterState } from '@/features/purchases/types';
 import { useActiveWarehouse } from '@/lib/warehouse/useActiveWarehouse';
 import { supplierService } from '@/features/suppliers/services/supplierService';
 import { Supplier } from '@/features/suppliers/types';
-import { getDateRangeForPreset } from '@/features/transfers/utils/dateUtils';
+import { getDateRangeForPreset } from '@/lib/utils/date';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 // PurchaseStatus, PurchaseFilterState: xem features/purchases/types/filterTypes.ts

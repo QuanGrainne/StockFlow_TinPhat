@@ -35,6 +35,12 @@ export interface PosSaleRequest {
   orderDate?: string;
   /** Hóa đơn giao hàng tạo từ đơn đặt hàng: server trừ tiền khách đã trả trước của đơn */
   bookingOrderId?: number;
+  /** Hóa đơn từ đơn, khách lấy thiếu: true = tạo đơn đặt mới (Phiếu tạm) cho phần còn lại */
+  createRemainderBooking?: boolean;
+  /** Ngoại lệ một lần đã duyệt (vượt hạn mức): server kiểm đúng khách, chưa dùng, không vượt mức đã duyệt */
+  creditRequestId?: number;
+  /** Tiền khách trả thừa: RETURN_CASH = trả lại khách; RECORD_DEBT = trừ vào nợ cũ của khách */
+  excessAction?: 'RETURN_CASH' | 'RECORD_DEBT';
   items: {
     productId: number;
     quantity: number;
@@ -59,6 +65,12 @@ export interface PosSaleResult {
   outstandingAmount: number;
   /** Tiền trả trước của đơn đặt hàng đã trừ vào hóa đơn */
   depositAmount?: number;
+  /** Đơn đặt mới tạo cho phần khách chưa lấy */
+  remainderBookingId?: number | null;
+  remainderBookingCode?: string | null;
+  /** Tiền thừa đã trừ vào nợ cũ (Tính vào công nợ) và dư nợ khách sau thanh toán */
+  debtPaymentAmount?: number;
+  customerCurrentDebt?: number;
   message?: string;
 }
 
@@ -67,7 +79,7 @@ export const posService = {
   submitSale(req: PosSaleRequest): Promise<PosSaleResult> {
     return apiClient.post<PosSaleResult>('/api/orders/pos', {
       ...req,
-      excessAction: 'RETURN_CASH',
+      excessAction: req.excessAction ?? 'RETURN_CASH',
       vatAmount: 0,
       deliveryFee: 0,
       deliveryType: 'COUNTER',
@@ -144,32 +156,37 @@ export const posService = {
   },
 
   /**
-   * Lấy danh sách bảng giá bán thực tế từ database
+   * Danh sách bảng giá từ database.
+   * forSale = true: chỉ bảng giá dùng được lúc này cho chi nhánh + khách (đang áp dụng, trong hiệu lực, đúng phạm vi);
+   * bảng giá chung luôn có. Lỗi thì trả rỗng (không dùng dữ liệu giả).
    */
-  async getPriceBooks(): Promise<PosPriceBook[]> {
+  async getPriceBooks(params?: { warehouseId?: number; customerId?: number; forSale?: boolean }): Promise<PosPriceBook[]> {
+    type PriceBookApi = {
+      priceBookId: number;
+      priceBookCode: string | null;
+      priceBookName: string | null;
+      isActive: boolean;
+      isDefault: boolean;
+      scopeCustomerType: string | null;
+      scopeCustomerIds: number[] | null;
+    };
+    const qs = new URLSearchParams();
+    if (params?.forSale) qs.set('forSale', 'true');
+    if (params?.warehouseId) qs.set('warehouseId', String(params.warehouseId));
+    if (params?.customerId) qs.set('customerId', String(params.customerId));
     try {
-      const data = await apiClient.get<any[]>('/api/price-books');
-      if (Array.isArray(data)) {
-        return data.map((pb) => ({
-          priceBookId: Number(pb.priceBookId),
-          priceBookCode: pb.priceBookCode || '',
-          priceBookName: pb.priceBookName || '',
-          isActive: Boolean(pb.isActive),
-          isDefault: Boolean(pb.isDefault),
-        }));
-      }
+      const data = await apiClient.get<PriceBookApi[]>(`/api/price-books${qs.toString() ? `?${qs.toString()}` : ''}`);
+      return (Array.isArray(data) ? data : []).map((pb) => ({
+        priceBookId: Number(pb.priceBookId),
+        priceBookCode: pb.priceBookCode || '',
+        priceBookName: pb.priceBookName || '',
+        isActive: Boolean(pb.isActive),
+        isDefault: Boolean(pb.isDefault),
+        scopeCustomerType: pb.scopeCustomerType === 'SPECIFIC' ? 'SPECIFIC' : 'ALL',
+        scopeCustomerIds: Array.isArray(pb.scopeCustomerIds) ? pb.scopeCustomerIds : [],
+      }));
+    } catch {
       return [];
-    } catch (e) {
-      console.error('Lỗi khi tải danh sách bảng giá POS:', e);
-      return [
-        {
-          priceBookId: 1,
-          priceBookCode: 'BG000001',
-          priceBookName: 'Bảng giá chung',
-          isActive: true,
-          isDefault: true,
-        },
-      ];
     }
   },
 

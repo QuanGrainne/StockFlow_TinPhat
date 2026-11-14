@@ -30,7 +30,7 @@ import { supplierService } from '@/features/suppliers/services/supplierService';
 import type { Supplier } from '@/features/suppliers/types';
 import { purchaseReturnService } from '@/features/purchase-returns/services/purchaseReturnService';
 import type { ReturnSource, SavePurchaseReturnPayload } from '@/features/purchase-returns/types';
-import { toLocalDatetimeInputString } from '@/features/transfers/utils/dateUtils';
+import { toLocalDatetimeInputString } from '@/lib/utils/date';
 import { NumberInput } from '@/components/inputs/NumberInput';
 import { ProductThumb } from '@/components/ProductThumb';
 import { DiscountInput, discountAmount, type DiscountType } from '@/components/inputs/DiscountInput';

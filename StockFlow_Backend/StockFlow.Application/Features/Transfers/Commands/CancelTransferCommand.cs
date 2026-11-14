@@ -41,13 +41,13 @@ public class CancelTransferCommandHandler : IRequestHandler<CancelTransferComman
             return Result.Failure<bool>("Bạn không có quyền hủy phiếu chuyển hàng của kho xuất này.");
         }
 
-        if (string.Equals(transfer.Status, "CANCELLED", StringComparison.OrdinalIgnoreCase))
+        if (!transfer.CanCancel())
         {
             return Result.Failure<bool>("Phiếu chuyển hàng này đã bị hủy trước đó.");
         }
 
-        var isInTransit = string.Equals(transfer.Status, "IN_TRANSIT", StringComparison.OrdinalIgnoreCase);
-        var isReceived = string.Equals(transfer.Status, "RECEIVED", StringComparison.OrdinalIgnoreCase);
+        var isInTransit = transfer.IsInTransit();
+        var isReceived = transfer.IsReceived();
 
         // Hủy phiếu đã nhận sẽ trừ lại tồn kho nhận → cần quyền trên cả kho nhận
         if (isReceived && !await _currentUserService.HasWarehouseAccessAsync(transfer.DestWarehouseId, cancellationToken))
@@ -85,7 +85,7 @@ public class CancelTransferCommandHandler : IRequestHandler<CancelTransferComman
             }
         }
 
-        transfer.Status = "CANCELLED";
+        transfer.MarkCancelled();
         if (!string.IsNullOrWhiteSpace(command.Reason))
         {
             transfer.Notes = string.IsNullOrWhiteSpace(transfer.Notes)

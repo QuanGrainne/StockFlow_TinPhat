@@ -5,9 +5,25 @@ import {
   CreatePriceBookPayload,
   UpdatePriceBookPayload,
   UpdateProductPriceItemPayload,
+  PriceBookCustomerRef,
+  PriceBookWarehouseOption,
 } from '../types';
 
 export const priceBookService = {
+  /** Chi nhánh đang hoạt động (dữ liệu thật /api/warehouses) cho phạm vi "Chi nhánh cụ thể" */
+  async getActiveWarehouses(): Promise<PriceBookWarehouseOption[]> {
+    const data = await apiClient.get<PriceBookWarehouseOption[]>('/api/warehouses');
+    return (Array.isArray(data) ? data : []).filter((w) => w.status === 'ACTIVE');
+  },
+
+  /** Gợi ý khách hàng cho phạm vi "Khách hàng cụ thể" (mã, tên, điện thoại) */
+  async searchCustomers(search: string): Promise<PriceBookCustomerRef[]> {
+    const q = new URLSearchParams();
+    if (search.trim()) q.append('search', search.trim());
+    const data = await apiClient.get<PriceBookCustomerRef[]>(`/api/price-books/customer-options?${q.toString()}`);
+    return Array.isArray(data) ? data : [];
+  },
+
   async getPriceBooks(params?: {
     search?: string;
     isActive?: boolean;

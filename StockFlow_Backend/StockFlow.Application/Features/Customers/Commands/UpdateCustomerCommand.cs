@@ -65,10 +65,8 @@ public class UpdateCustomerCommandHandler : IRequestHandler<UpdateCustomerComman
         partner.Facebook = CustomerProfileHelper.Clean(req.Facebook, 255);
         partner.Notes = CustomerProfileHelper.Clean(req.Notes, 500);
 
-        if (req.CreditLimit.HasValue)
-        {
-            partner.CreditLimit = req.CreditLimit.Value;
-        }
+        // Hạn mức không sửa ở đây: chỉ Kế toán trưởng đổi qua duyệt yêu cầu hạn mức (UC-64).
+        // req.CreditLimit (nếu client cũ còn gửi) bị bỏ qua.
 
         if (req.CurrentDebt.HasValue)
         {
