@@ -6,6 +6,7 @@ import type {
   PurchaseOrderDetail,
   PurchaseOrderListFilter,
   PurchaseOrderListItem,
+  ReceivePurchaseOrderPayload,
   SavePurchaseOrderPayload,
 } from '../types';
 
@@ -55,5 +56,10 @@ export const purchaseOrderService = {
   /** Kết thúc phiếu đang nhập một phần: không nhập thêm phần còn thiếu */
   async finishPurchaseOrder(id: number): Promise<void> {
     await apiClient.post(`/api/purchase-orders/${id}/finish`, {});
+  },
+
+  /** Nhập hàng ngay trong phiếu đặt: tự sinh phiếu nhập Hoàn thành, trả về phiếu đặt sau khi cập nhật */
+  receivePurchaseOrder(id: number, payload: ReceivePurchaseOrderPayload): Promise<PurchaseOrderDetail> {
+    return apiClient.post<PurchaseOrderDetail>(`/api/purchase-orders/${id}/receive`, payload);
   },
 };

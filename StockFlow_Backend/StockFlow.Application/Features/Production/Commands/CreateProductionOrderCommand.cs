@@ -54,23 +54,28 @@ public class CreateProductionOrderCommandHandler : IRequestHandler<CreateProduct
         await using var tx = await _context.BeginTransactionAsync(ct);
 
         var now = VietnamTime.Now;
-        var code = await ProductionHelper.NextCodeAsync(_context, _codeGenerator, "PRODUCTION_ORDER",
-            (c, token) => _context.TrxProductionOrders.AnyAsync(o => o.ProductionOrderCode == c, token), ct);
 
         var order = new TrxProductionOrder
         {
-            ProductionOrderCode = code,
             ActualQuantity = 0,
             Status = ProductionOrderStatus.NotStarted,
             CreatedBy = userId,
             StartDate = now,
             EndDate = req.Deadline?.Date,
             Workshop = string.IsNullOrWhiteSpace(req.Workshop) ? null : req.Workshop.Trim(),
-            Notes = string.IsNullOrWhiteSpace(req.Notes) ? null : req.Notes.Trim(),
         };
 
+        // Nhu cầu NVL tính đúng theo công thức BOM đang áp dụng (BR-31)
         var populateError = await ProductionOrderRules.PopulateItemsAndRequirementsAsync(_context, order, req, userId, now, ct);
         if (populateError != null) return Result.Failure<ProductionOrderDetailDto>(populateError);
+
+        // Thiếu NVL tại kho đang chọn: hỏi xác nhận, đã xác nhận thì ghi cảnh báo vào ghi chú lệnh
+        var shortageError = await ProductionOrderRules.ApplyShortageCheckAsync(_context, _currentUser, order, req, now, ct);
+        if (shortageError != null) return Result.Failure<ProductionOrderDetailDto>(shortageError);
+
+        // Sinh mã sau khi qua kiểm tra để không bỏ phí số thứ tự khi phải hỏi xác nhận
+        order.ProductionOrderCode = await ProductionHelper.NextCodeAsync(_context, _codeGenerator, "PRODUCTION_ORDER",
+            (c, token) => _context.TrxProductionOrders.AnyAsync(o => o.ProductionOrderCode == c, token), ct);
 
         _context.TrxProductionOrders.Add(order);
 

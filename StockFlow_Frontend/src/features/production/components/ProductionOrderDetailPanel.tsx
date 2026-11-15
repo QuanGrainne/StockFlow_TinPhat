@@ -3,10 +3,11 @@
 // Chi tiết lệnh sản xuất mở dưới dòng (UC-44 bước 5, UC-45, UC-60, UC-61):
 // - Tab Thông tin & NVL: nhu cầu / đã xuất / còn thiếu / tồn tại kho đang chọn (A45.1), định mức đã điều chỉnh (BR-51).
 // - Tab Phiếu xuất NVL, tab Nhập thành phẩm (cờ cần xem xét BR-37).
-// Nút thao tác hiện theo chức năng được phân quyền: Lập lệnh (Manager) / Xuất NVL / Nhập thành phẩm.
+// Nút thao tác hiện theo chức năng được phân quyền: Lập lệnh / Duyệt hoàn thành (Manager) / Xuất NVL.
+// Phiếu nhập thành phẩm do hệ thống tự sinh khi Manager Duyệt hoàn thành (không nhập tay).
 
 import React, { useState } from 'react';
-import { AlertTriangle, Ban, CheckCircle2, PackageMinus, PackagePlus, Pencil, RefreshCcw, Sliders } from 'lucide-react';
+import { AlertTriangle, Ban, BadgeCheck, CheckCircle2, PackageMinus, Pencil, RefreshCcw, Sliders } from 'lucide-react';
 import { ProductCodeLink } from '@/components/links/EntityLinks';
 import type { WarehouseItem } from '@/lib/warehouse/useActiveWarehouse';
 import type { ProductionOrderDetail } from '../types';
@@ -16,7 +17,7 @@ import { ProductionStatusTag, ProgressBar, SmallTag } from './ProductionStatusTa
 
 type Tab = 'info' | 'issues' | 'receipts';
 
-export type ProductionOrderAction = 'edit' | 'adjust' | 'close' | 'cancel' | 'issue' | 'supplement' | 'receive';
+export type ProductionOrderAction = 'edit' | 'adjust' | 'close' | 'cancel' | 'issue' | 'supplement' | 'approve';
 
 interface ProductionOrderDetailPanelProps {
   detail: ProductionOrderDetail | null;
@@ -435,10 +436,15 @@ export function ProductionOrderDetailPanel({
               <span>Xuất NVL</span>
             </button>
           )}
-          {features.canReceive && inProgress && (
-            <button type="button" onClick={() => onAction('receive')} className={primaryBtn}>
-              <PackagePlus size={13} />
-              <span>Nhập thành phẩm</span>
+          {features.canPlan && inProgress && (
+            <button
+              type="button"
+              onClick={() => onAction('approve')}
+              className="flex items-center gap-1.5 px-4 py-1.5 text-xs bg-[#16a34a] hover:bg-[#15803d] text-white rounded-[8px] font-semibold cursor-pointer"
+              title="Nhập SL thực tế, hệ thống tự sinh phiếu nhập thành phẩm và đóng lệnh"
+            >
+              <BadgeCheck size={13} />
+              <span>Duyệt hoàn thành</span>
             </button>
           )}
         </div>

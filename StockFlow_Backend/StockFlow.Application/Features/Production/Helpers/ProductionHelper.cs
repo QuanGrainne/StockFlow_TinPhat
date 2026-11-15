@@ -19,6 +19,10 @@ public static class ProductionMessages
     public const string MaterialUsageWarning =
         "Số thành phẩm cần nhiều NVL hơn số đã xuất theo BOM. Vui lòng nhập ghi chú để tiếp tục."; // MSG43
     public const string NoWarehouseAccess = "Bạn không có quyền thao tác trên kho này."; // MSG04, BR-04
+    public const string MustFollowBom =
+        "Lệnh sản xuất phải theo đúng công thức BOM đang áp dụng. Muốn đổi định mức, vui lòng cập nhật BOM trước.";
+    /// <summary>Tiền tố đánh dấu FE cần hỏi xác nhận khi thiếu NVL (cùng kiểu [CONFIRM_EXCEED_PLAN])</summary>
+    public const string ConfirmShortagePrefix = "[CONFIRM_SHORTAGE]";
 }
 
 public static class ProductionHelper

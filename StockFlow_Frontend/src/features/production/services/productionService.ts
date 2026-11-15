@@ -4,6 +4,7 @@
 import { apiClient } from '@/lib/api/client';
 import type {
   AdjustNormLine,
+  ApproveProductionOrderPayload,
   BomDetail,
   BomSummary,
   CreateFinishedGoodsReceiptPayload,
@@ -107,6 +108,11 @@ export const productionService = {
 
   closeOrder(id: number, reason: string): Promise<ProductionOrderDetail> {
     return apiClient.post<ProductionOrderDetail>(`/api/production/orders/${id}/close`, { reason });
+  },
+
+  /** Duyệt hoàn thành: tự sinh phiếu nhập thành phẩm theo SL thực tế và đóng lệnh */
+  approveOrder(id: number, payload: ApproveProductionOrderPayload): Promise<ProductionOrderDetail> {
+    return apiClient.post<ProductionOrderDetail>(`/api/production/orders/${id}/approve`, payload);
   },
 
   adjustNorms(id: number, reason: string, lines: AdjustNormLine[]): Promise<ProductionOrderDetail> {

@@ -42,6 +42,8 @@ public class CreatePurchaseCommandHandler : IRequestHandler<CreatePurchaseComman
 
         foreach (var item in req.Items)
         {
+            var defectError = PurchaseItemMapper.ValidateDefect(item);
+            if (defectError != null) return Result.Failure<PurchaseDetailDto>(defectError);
             if (item.Quantity <= 0)
             {
                 return Result.Failure<PurchaseDetailDto>($"Số lượng nhập của sản phẩm ID #{item.ProductId} phải lớn hơn 0.");
@@ -180,23 +182,9 @@ public class CreatePurchaseCommandHandler : IRequestHandler<CreatePurchaseComman
 
             foreach (var line in pricing.Lines)
             {
-                var reqItem = line.Request;
-
-                var dtl = new DtlGoodsReceiptItem
-                {
-                    Gr = goodsReceipt,
-                    ProductId = reqItem.ProductId,
-                    OrderedQty = reqItem.Quantity,
-                    ReceivedQty = reqItem.Quantity,
-                    AcceptedQty = reqItem.Quantity,
-                    DefectiveQty = 0,
-                    DamagedQty = 0,
-                    ShortageQty = 0,
-                    UnitLandedCost = line.LandedCost,
-                    UnitPrice = reqItem.UnitPrice,
-                    DiscountPercent = Math.Clamp(reqItem.DiscountPercent, 0, 100),
-                    LotId = reqItem.LotId
-                };
+                // SL đạt vào kho + tính tiền; SL lỗi chỉ ghi nhận trên phiếu
+                var dtl = PurchaseItemMapper.NewItem(line.Request, line.LandedCost);
+                dtl.Gr = goodsReceipt;
 
                 receiptItems.Add(dtl);
                 _context.DtlGoodsReceiptItems.Add(dtl);
@@ -286,7 +274,8 @@ public class CreatePurchaseCommandHandler : IRequestHandler<CreatePurchaseComman
                     0,
                     qty * price,
                     i.LotId,
-                    null
+                    null,
+                    i.DefectiveQty ?? 0
                 );
             }).ToList();
 

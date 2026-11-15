@@ -14,7 +14,24 @@ public record PurchaseItemDto(
     decimal DiscountPercent,
     decimal TotalPrice,
     int? LotId,
-    string? LotNumber
+    string? LotNumber,
+    decimal DefectQuantity = 0 // SL lỗi khi nhận hàng: không vào tồn kho, không tính tiền trả NCC
+);
+
+/// <summary>
+/// Cách tính giá vốn bình quân gia quyền của 1 dòng phiếu nhập đã hoàn thành (lấy từ thẻ kho):
+/// Giá vốn sau = (Tồn trước × Giá vốn trước + SL nhập × Giá nhập) / (Tồn trước + SL nhập).
+/// </summary>
+public record PurchaseCostingDto(
+    int ProductId,
+    string ProductCode,
+    string ProductName,
+    decimal QtyBefore,
+    decimal CostBefore,
+    decimal QtyIn,
+    decimal PriceIn,
+    decimal QtyAfter,
+    decimal CostAfter
 );
 
 public record PurchaseListDto(
@@ -66,7 +83,8 @@ public record PurchaseDetailDto(
     decimal DiscountAmount = 0,     // Giảm giá phiếu
     List<PurchasePaymentDto>? Payments = null,
     List<PurchaseReturnSummaryDto>? Returns = null,
-    decimal ReturnOffsetAmount = 0  // Trả hàng nhập được trừ vào công nợ của phiếu này
+    decimal ReturnOffsetAmount = 0, // Trả hàng nhập được trừ vào công nợ của phiếu này
+    List<PurchaseCostingDto>? Costing = null // Cách tính giá vốn BQ gia quyền (chỉ phiếu đã hoàn thành)
 );
 
 /// <summary>Lịch sử trả hàng của phiếu nhập (các phiếu trả hàng nhập THN lập từ phiếu này).</summary>
@@ -95,7 +113,8 @@ public record CreatePurchaseItemRequest(
     decimal UnitPrice,
     decimal DiscountPercent = 0,
     int? LotId = null,
-    string? LotNumber = null
+    string? LotNumber = null,
+    decimal DefectQuantity = 0 // SL lỗi: Quantity là SL đạt (vào kho, tính tiền); SL thực nhận = Quantity + DefectQuantity
 );
 
 public record CreatePurchaseRequest(

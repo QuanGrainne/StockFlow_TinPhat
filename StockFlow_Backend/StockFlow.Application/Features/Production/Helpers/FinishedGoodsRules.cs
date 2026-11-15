@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using StockFlow.Application.Common.Interfaces;
+using StockFlow.Application.Common.Inventory;
 using StockFlow.Application.Features.Production.DTOs;
 using StockFlow.Domain.Entities;
 using StockFlow.Domain.Services;
@@ -59,5 +60,109 @@ public static class FinishedGoodsRules
             .Where(x => x.Needed > x.r.Issued)
             .Select(x => new MaterialUsageWarningDto(x.r.Code, x.r.Name, x.r.Unit, x.Needed, x.r.Issued))
             .ToList();
+    }
+
+    /// <summary>Thông tin 1 lần nhập thành phẩm (dùng chung cho nhập thủ công và Duyệt hoàn thành).</summary>
+    public sealed record ReceiveInput(
+        TrxProductionOrder Order,
+        DtlProductionOrderItem? Item,
+        MstProduct Product,
+        int WarehouseId,
+        int? LocationId,
+        string LotNumber,
+        DateOnly? ProductionDate,
+        decimal AcceptedQuantity,
+        decimal DefectQuantity,
+        string? DefectReason,
+        string? Notes,
+        bool NeedsReview,
+        string? ReviewNote);
+
+    /// <summary>
+    /// Ghi nhận 1 phiếu nhập thành phẩm (UC-49): lô, báo cáo sản xuất (SL đạt / lỗi), phiếu nhập,
+    /// cộng tồn kho SL đạt theo giá vốn NVL đã xuất (BR-36) và cộng luỹ kế SL thực tế của lệnh / dòng.
+    /// Không đổi trạng thái lệnh và không mở transaction — handler gọi tự quyết định.
+    /// </summary>
+    public static async Task<TrxFinishedGoodsReceipt> ReceiveAsync(
+        IStockFlowDbContext context, ITransactionCodeGenerator codeGenerator, IInventoryLedger ledger,
+        ReceiveInput input, int userId, DateTime now, CancellationToken ct)
+    {
+        var order = input.Order;
+        var item = input.Item;
+        var product = input.Product;
+        var lotNumber = input.LotNumber.Trim();
+
+        // Lô thành phẩm: dùng lại lô cùng số của sản phẩm nếu đã có
+        var lot = await context.MstInventoryLots.FirstOrDefaultAsync(l => l.ProductId == product.ProductId && l.LotNumber == lotNumber, ct)
+                  ?? context.MstInventoryLots.Local.FirstOrDefault(l => l.ProductId == product.ProductId && l.LotNumber == lotNumber);
+        if (lot == null)
+        {
+            lot = new MstInventoryLot
+            {
+                ProductId = product.ProductId,
+                LotNumber = lotNumber,
+                MfgDate = input.ProductionDate ?? DateOnly.FromDateTime(now),
+            };
+            context.MstInventoryLots.Add(lot);
+        }
+
+        var report = new TrxProductionReport
+        {
+            ProductionOrderId = order.ProductionOrderId,
+            ReportedBy = userId,
+            BatchNo = lotNumber,
+            ProducedQty = input.AcceptedQuantity,
+            DefectQty = input.DefectQuantity,
+            WastageQty = 0,
+            ReportDate = now,
+            Notes = input.DefectQuantity > 0 && !string.IsNullOrWhiteSpace(input.DefectReason) ? input.DefectReason.Trim() : null,
+        };
+        context.TrxProductionReports.Add(report);
+
+        var code = await ProductionHelper.NextCodeAsync(context, codeGenerator, "FINISHED_GOODS_RECEIPT",
+            (c, token) => context.TrxFinishedGoodsReceipts.AnyAsync(f => f.FgrCode == c, token), ct);
+
+        var receipt = new TrxFinishedGoodsReceipt
+        {
+            FgrCode = code,
+            ProductionOrderId = order.ProductionOrderId,
+            ProductionOrderItemId = item?.ProductionOrderItemId,
+            Report = report,
+            WarehouseId = input.WarehouseId,
+            LocationId = input.LocationId,
+            ProductId = product.ProductId,
+            Lot = lot,
+            Quantity = input.AcceptedQuantity,
+            ReceivedBy = userId,
+            ReceivedDate = now,
+            Status = "COMPLETED",
+            Notes = string.IsNullOrWhiteSpace(input.Notes) ? null : input.Notes.Trim(),
+            NeedsReview = input.NeedsReview,
+            ReviewNote = input.NeedsReview ? input.ReviewNote : null,
+        };
+        context.TrxFinishedGoodsReceipts.Add(receipt);
+        await context.SaveChangesAsync(ct);
+
+        // BR-36: chỉ SL đạt vào tồn kho, theo giá vốn từ NVL đã xuất
+        var planned = item?.PlannedQuantity ?? order.PlannedQuantity ?? 0;
+        var materialValue = await ProductionStockOps.IssuedMaterialValueAsync(context, order.ProductionOrderId, ct);
+        var unitCost = ProductionPolicy.CalculateFinishedGoodsUnitCost(materialValue, order.PlannedQuantity ?? planned);
+        await ProductionStockOps.ReceiveAsync(ledger, input.WarehouseId, input.LocationId, lot.LotId, product,
+            input.AcceptedQuantity, unitCost,
+            new StockRef(ProductionStockOps.ReceiptTransactionType, ProductionStockOps.ReceiptReferenceType, receipt.FgrId, userId),
+            now, ct);
+
+        // Luỹ kế SL thực tế của dòng / lệnh
+        if (item != null)
+        {
+            item.ActualQuantity += input.AcceptedQuantity;
+            order.ActualQuantity = order.DtlProductionOrderItems.Sum(i => i.ActualQuantity);
+        }
+        else
+        {
+            order.ActualQuantity = (order.ActualQuantity ?? 0) + input.AcceptedQuantity;
+        }
+
+        return receipt;
     }
 }

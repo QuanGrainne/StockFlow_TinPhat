@@ -21,7 +21,7 @@ import { ConfirmDialog } from '../components/ProductionDialog';
 import { ReasonDialog } from '../components/ReasonDialog';
 import { AdjustNormModal } from '../components/AdjustNormModal';
 import { MaterialIssueModal } from '../components/MaterialIssueModal';
-import { FinishedGoodsReceiptModal } from '../components/FinishedGoodsReceiptModal';
+import { ApproveCompletionModal } from '../components/ApproveCompletionModal';
 
 const STATUS_OPTIONS = [
   { value: 'NOT_STARTED', label: 'Chưa bắt đầu' },
@@ -31,8 +31,8 @@ const STATUS_OPTIONS = [
 ];
 
 type Dialog =
-  | { kind: 'cancel' | 'close' | 'adjust'; detail: ProductionOrderDetail }
-  | { kind: 'issue' | 'supplement' | 'receive'; orderId: number }
+  | { kind: 'cancel' | 'close' | 'adjust' | 'approve'; detail: ProductionOrderDetail }
+  | { kind: 'issue' | 'supplement'; orderId: number }
   | null;
 
 export default function ProductionOrdersScreen() {
@@ -135,11 +135,11 @@ export default function ProductionOrdersScreen() {
       case 'cancel':
       case 'close':
       case 'adjust':
+      case 'approve':
         setDialog({ kind: action, detail: lastDetail });
         break;
       case 'issue':
       case 'supplement':
-      case 'receive':
         setDialog({ kind: action, orderId: id });
         break;
     }
@@ -433,9 +433,9 @@ export default function ProductionOrdersScreen() {
           }}
         />
       )}
-      {dialog?.kind === 'receive' && (
-        <FinishedGoodsReceiptModal
-          productionOrderId={dialog.orderId}
+      {dialog?.kind === 'approve' && (
+        <ApproveCompletionModal
+          detail={dialog.detail}
           onClose={() => setDialog(null)}
           onDone={() => {
             setDialog(null);
