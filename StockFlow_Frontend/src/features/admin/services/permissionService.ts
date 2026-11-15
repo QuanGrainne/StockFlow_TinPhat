@@ -582,9 +582,19 @@ const GOODS_FEATS = ['feat-goods', 'feat-price-books'];
 const STOCK_FEATS = ['feat-transfers', 'feat-stocktake', 'feat-disposal'];
 const SALES_FEATS = ['feat-pos', 'feat-sales-booking', 'feat-invoices', 'feat-sales-returns'];
 const PURCHASE_FEATS = ['feat-purchase-orders', 'feat-purchase', 'feat-purchase-returns', 'feat-suppliers'];
-const PROD_FEATS = ['feat-prod', 'feat-prod-plan', 'feat-prod-issue', 'feat-prod-receipt'];
-/** Kế toán sản xuất: xem lệnh, xuất NVL, nhập thành phẩm; không lập lệnh, không sửa BOM (SRS 3.1.6) */
-const PROD_ACCOUNTANT_FEATS = ['feat-prod', 'feat-prod-issue', 'feat-prod-receipt'];
+const PROD_FEATS = [
+  'feat-production-plans',
+  'feat-production-plan-approval',
+  'feat-prod',
+  'feat-prod-plan',
+  'feat-prod-issue',
+  'feat-prod-receipt',
+];
+/**
+ * Kế toán sản xuất: xem lệnh, xuất NVL, nhập thành phẩm; không lập lệnh, không sửa BOM (SRS 3.1.6).
+ * Được lập / gửi duyệt kế hoạch sản xuất, không duyệt (khớp FeatureConstants backend).
+ */
+const PROD_ACCOUNTANT_FEATS = ['feat-production-plans', 'feat-prod', 'feat-prod-issue', 'feat-prod-receipt'];
 
 export const DEFAULT_ROLE_FEATURE_PERMS: Record<string, string[]> = {
   ROLE_ADMIN: NAVBAR_FEATURES.map((f) => f.id),
