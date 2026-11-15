@@ -29,6 +29,7 @@ import BomManagementScreen from '@/features/production/screens/BomManagementScre
 import ProductionOrdersScreen from '@/features/production/screens/ProductionOrdersScreen';
 import MaterialIssuesScreen from '@/features/production/screens/MaterialIssuesScreen';
 import FinishedGoodsReceiptsScreen from '@/features/production/screens/FinishedGoodsReceiptsScreen';
+import ProductionPlansScreen from '@/features/production/screens/ProductionPlansScreen';
 
 // Admin Screens
 import { AdminDashboard } from '@/features/admin/screens/AdminDashboard';
@@ -163,6 +164,11 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ initialScreen, children })
         return <MaterialIssuesScreen />;
       case 'production-finished-goods':
         return <FinishedGoodsReceiptsScreen />;
+      // Kế hoạch sản xuất (UC-PP-01..06): cùng màn, mục Duyệt mặc định lọc Chờ duyệt
+      case 'production-plans':
+        return <ProductionPlansScreen key="plans" mode="plans" />;
+      case 'production-plan-approvals':
+        return <ProductionPlansScreen key="approvals" mode="approvals" />;
 
       // ─── Admin Screens ───
       case 'admin-dashboard':

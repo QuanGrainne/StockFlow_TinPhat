@@ -193,6 +193,8 @@ export const productionService = {
     warehouseId?: number | null;
     activeBomOnly?: boolean;
     productType?: string;
+    /** Nhiều loại hàng (VD FINISHED, SEMI_FINISHED) */
+    productTypes?: string[];
     limit?: number;
   }): Promise<ProductionProductLookup[]> {
     return asList(
@@ -202,6 +204,7 @@ export const productionService = {
           warehouseId: params.warehouseId,
           activeBomOnly: params.activeBomOnly || undefined,
           productType: params.productType || undefined,
+          productTypes: params.productTypes?.length ? params.productTypes.join(',') : undefined,
           limit: params.limit,
         })}`
       )

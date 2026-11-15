@@ -117,6 +117,8 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
 
     public virtual DbSet<MstDebtWarningSetting> MstDebtWarningSettings { get; set; }
 
+    public virtual DbSet<TrxCreditLimitHistory> TrxCreditLimitHistories { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema("stockflow");
@@ -1680,6 +1682,14 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
                 .HasForeignKey(d => d.ProductionPlanId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("fk_trx_production_orders_production_plan_id");
+
+            // Chống tạo trùng lệnh khi lập từ kế hoạch (Q-V6): mỗi mã yêu cầu chỉ sinh một lệnh
+            entity.Property(e => e.ClientRequestId)
+                .HasMaxLength(64)
+                .HasColumnName("client_request_id");
+            entity.HasIndex(e => e.ClientRequestId, "uq_trx_production_orders_client_request_id")
+                .IsUnique()
+                .HasFilter("client_request_id IS NOT NULL");
         });
 
         modelBuilder.Entity<TrxProductionPlan>(entity =>
@@ -1723,6 +1733,16 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
                 .HasForeignKey(d => d.ApprovedBy)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("fk_trx_production_plans_approved_by");
+
+            // Lưu vết lần ghi gần nhất + mã phiên bản phát hiện sửa đồng thời (Q-V5, G3)
+            entity.Property(e => e.UpdatedAt)
+                .HasColumnType("timestamp without time zone")
+                .HasColumnName("updated_at");
+            entity.Property(e => e.UpdatedBy).HasColumnName("updated_by");
+            entity.HasOne(d => d.UpdatedByNavigation).WithMany()
+                .HasForeignKey(d => d.UpdatedBy)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("fk_trx_production_plans_updated_by");
         });
 
         modelBuilder.Entity<DtlProductionPlanItem>(entity =>
@@ -2283,6 +2303,9 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
             entity.Property(e => e.DebtDaysThreshold).HasColumnName("debt_days_threshold");
             entity.Property(e => e.DebtDaysFrom).HasMaxLength(20).HasColumnName("debt_days_from");
             entity.Property(e => e.AllowDebtOverLimit).HasColumnName("allow_debt_over_limit");
+            entity.Property(e => e.DefaultCreditLimit)
+                .HasPrecision(18, 2)
+                .HasColumnName("default_credit_limit");
             entity.Property(e => e.UpdatedAt).HasColumnType("timestamp with time zone").HasColumnName("updated_at");
             entity.Property(e => e.UpdatedBy).HasColumnName("updated_by");
 
@@ -2291,6 +2314,37 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
                 .HasForeignKey(e => e.UpdatedBy)
                 .OnDelete(DeleteBehavior.SetNull)
                 .HasConstraintName("fk_mst_debt_warning_settings_updated_by");
+        });
+
+        // Nhật ký thay đổi hạn mức công nợ khách hàng
+        modelBuilder.Entity<TrxCreditLimitHistory>(entity =>
+        {
+            entity.HasKey(e => e.HistoryId).HasName("trx_credit_limit_histories_pkey");
+            entity.ToTable("trx_credit_limit_histories", "stockflow");
+            entity.HasIndex(e => new { e.PartnerId, e.ChangedAt }, "ix_trx_credit_limit_histories_partner_changed");
+
+            entity.Property(e => e.HistoryId).HasColumnName("history_id");
+            entity.Property(e => e.PartnerId).HasColumnName("partner_id");
+            entity.Property(e => e.OldLimit).HasPrecision(18, 2).HasColumnName("old_limit");
+            entity.Property(e => e.NewLimit).HasPrecision(18, 2).HasColumnName("new_limit");
+            entity.Property(e => e.Source).HasMaxLength(30).HasColumnName("source");
+            entity.Property(e => e.Reason).HasMaxLength(500).HasColumnName("reason");
+            entity.Property(e => e.RequestId).HasColumnName("request_id");
+            entity.Property(e => e.ChangedBy).HasColumnName("changed_by");
+            entity.Property(e => e.ChangedAt).HasColumnType("timestamp without time zone").HasColumnName("changed_at");
+
+            entity.HasOne(e => e.Partner).WithMany()
+                .HasForeignKey(e => e.PartnerId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("fk_trx_credit_limit_histories_partner");
+            entity.HasOne<TrxCreditLimitRequest>().WithMany()
+                .HasForeignKey(e => e.RequestId)
+                .OnDelete(DeleteBehavior.SetNull)
+                .HasConstraintName("fk_trx_credit_limit_histories_request");
+            entity.HasOne<SecUser>().WithMany()
+                .HasForeignKey(e => e.ChangedBy)
+                .OnDelete(DeleteBehavior.SetNull)
+                .HasConstraintName("fk_trx_credit_limit_histories_changed_by");
         });
 
         // Trả hàng nhập (trả hàng cho nhà cung cấp)
@@ -2382,6 +2436,15 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
 
     public Task<Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction> BeginTransactionAsync(CancellationToken cancellationToken = default)
         => Database.BeginTransactionAsync(cancellationToken);
+
+    public async Task AcquireTransactionLockAsync(string lockKey, CancellationToken cancellationToken = default)
+    {
+        // Khóa tư vấn theo transaction tự nhả khi commit / rollback; ngoài transaction sẽ nhả ngay nên không có tác dụng.
+        if (Database.CurrentTransaction == null)
+            throw new InvalidOperationException("AcquireTransactionLockAsync phải được gọi trong transaction.");
+        await Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT pg_advisory_xact_lock(hashtext({lockKey}))", cancellationToken);
+    }
 
     partial void OnModelCreatingPartial(ModelBuilder modelBuilder);
 }

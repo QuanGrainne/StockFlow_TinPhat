@@ -74,6 +74,10 @@ public static class ProductionOrderRules
             if (it.PlannedQuantity <= 0 || !ProductionHelper.HasMaxScale(it.PlannedQuantity, ProductionPolicy.QuantityScale))
                 return "Số lượng kế hoạch của từng thành phẩm phải lớn hơn 0 và có tối đa 2 chữ số thập phân.";
         }
+        // V-04: số lượng từng dòng và tổng (cột numeric(18,2) của lệnh) không vượt giới hạn lưu trữ, tránh lỗi 500 khi lưu
+        if (items.Any(i => i.PlannedQuantity > ProductionPolicy.MaxStoredQuantity)
+            || items.Sum(i => i.PlannedQuantity) > ProductionPolicy.MaxStoredQuantity)
+            return ProductionMessages.QuantityLimit;
 
         var productIds = items.Select(i => i.ProductId).ToList();
         var products = await context.MstProducts.AsNoTracking()
@@ -111,6 +115,11 @@ public static class ProductionOrderRules
                 Notes = string.IsNullOrWhiteSpace(it.Notes) ? null : it.Notes.Trim(),
             };
             context.DtlProductionOrderItems.Add(orderItem);
+
+            // V-04: nhu cầu tính ra phải lưu được vào numeric(18,2)
+            if (bom.DtlBomItems.Any(b => !ProductionPolicy.TryCalculateRequirement(
+                    it.PlannedQuantity, b.Quantity ?? 0, b.WastageRate ?? 0, out _)))
+                return ProductionMessages.QuantityLimit;
 
             // BR-31: nhu cầu NVL = SL kế hoạch × định mức BOM × (1 + hao hụt %)
             AddRequirementsFromBom(context, order, bom, it.PlannedQuantity, orderItem);

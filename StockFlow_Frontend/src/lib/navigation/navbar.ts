@@ -6,6 +6,7 @@ import type { LucideIcon } from 'lucide-react';
 import {
   ArrowDownToLine,
   Building2,
+  CalendarRange,
   ClipboardCheck,
   ClipboardList,
   ClipboardPlus,
@@ -307,6 +308,26 @@ export const NAV_GROUPS: NavGroup[] = [
     label: 'Sản xuất',
     icon: Factory,
     items: [
+      {
+        // UC-PP-01..06 (mã tạm): lập, gửi duyệt kế hoạch, lập lệnh từ kế hoạch (Manager + Kế toán sản xuất)
+        screen: 'production-plans',
+        path: '/production/plans',
+        featureId: 'feat-production-plans',
+        title: 'Kế hoạch sản xuất',
+        desc: 'Lập kế hoạch theo kỳ, nhu cầu NVL dự kiến, lập lệnh từ kế hoạch',
+        icon: CalendarRange,
+        backendModule: 'PROD',
+      },
+      {
+        // UC-PP-04, UC-PP-06: duyệt / từ chối, điều chỉnh sau duyệt, đóng kế hoạch (Manager)
+        screen: 'production-plan-approvals',
+        path: '/production/plan-approvals',
+        featureId: 'feat-production-plan-approval',
+        title: 'Duyệt kế hoạch sản xuất',
+        desc: 'Duyệt / từ chối kế hoạch chờ duyệt, điều chỉnh và đóng kế hoạch',
+        icon: ClipboardCheck,
+        backendModule: 'PROD',
+      },
       {
         // UC-44 / UC-58–61: xem lệnh, NVL, thành phẩm (Manager + Kế toán sản xuất)
         screen: 'production-orders',

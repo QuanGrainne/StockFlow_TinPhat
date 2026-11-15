@@ -23,6 +23,8 @@ public static class ProductionMessages
         "Lệnh sản xuất phải theo đúng công thức BOM đang áp dụng. Muốn đổi định mức, vui lòng cập nhật BOM trước.";
     /// <summary>Tiền tố đánh dấu FE cần hỏi xác nhận khi thiếu NVL (cùng kiểu [CONFIRM_EXCEED_PLAN])</summary>
     public const string ConfirmShortagePrefix = "[CONFIRM_SHORTAGE]";
+    public const string QuantityLimit =
+        "Số lượng hoặc nhu cầu nguyên vật liệu vượt giới hạn lưu trữ của hệ thống. Vui lòng giảm số lượng hoặc kiểm tra định mức."; // V-04
 }
 
 public static class ProductionHelper

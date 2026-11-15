@@ -94,6 +94,9 @@ export interface ProductionOrderSummary {
   isFullyReceived?: boolean;
   /** Danh sách thành phẩm trong lệnh (1..N) */
   items?: ProductionOrderProductItem[];
+  /** Kế hoạch sản xuất sinh ra lệnh (null = lệnh lập trực tiếp) */
+  productionPlanId?: number | null;
+  productionPlanCode?: string | null;
 }
 
 export interface ProductionMaterial {
@@ -199,6 +202,9 @@ export interface SaveProductionOrderPayload {
   warehouseId?: number | null;
   /** Đã xác nhận "vẫn lưu" khi thiếu NVL ([CONFIRM_SHORTAGE]) */
   confirmShortage?: boolean;
+  adjustReason?: string | null;
+  /** Mã yêu cầu chống tạo trùng — chỉ dùng khi lập lệnh từ kế hoạch */
+  clientRequestId?: string | null;
 }
 
 export interface AdjustNormLine {
@@ -322,3 +328,6 @@ export interface ProductionListFilter {
   /** Chỉ phiếu / lệnh cần Manager xem xét (BR-37) */
   needsReviewOnly: boolean;
 }
+
+// ─── Kế hoạch sản xuất (UC-PP-01..06) ────────────────────────────────────────
+export * from './productionPlan';

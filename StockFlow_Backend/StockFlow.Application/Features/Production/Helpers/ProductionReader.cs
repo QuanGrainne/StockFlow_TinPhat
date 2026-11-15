@@ -28,7 +28,7 @@ public static class ProductionReader
             b.DtlBomItems.Count,
             b.CreatedAt,
             b.Description,
-            b.TrxProductionOrders.Any()));
+            b.TrxProductionOrders.Any() || b.DtlProductionOrderItems.Any()));
 
     public static async Task<BomDetailDto?> BomDetailAsync(IStockFlowDbContext context, int bomId, CancellationToken ct)
     {
@@ -66,7 +66,7 @@ public static class ProductionReader
         int BomId, string? BomCode, string? BomVersion, decimal? Planned, decimal? Received, decimal Defect,
         DateTime? StartDate, DateTime? EndDate, string? Workshop, string? Status, string? CreatorFullName,
         string? CreatorUsername, int RequirementCount, int ShortageLines, int ReviewFlags, string? Notes,
-        List<OrderItemRow> Items);
+        List<OrderItemRow> Items, int? ProductionPlanId, string? ProductionPlanCode);
 
     private static IQueryable<OrderRow> OrderRows(IQueryable<TrxProductionOrder> orders) =>
         orders.AsNoTracking().Select(o => new OrderRow(
@@ -106,7 +106,9 @@ public static class ProductionReader
                     i.PlannedQuantity,
                     i.ActualQuantity,
                     i.Notes))
-                .ToList()));
+                .ToList(),
+            o.ProductionPlanId,
+            o.ProductionPlan != null ? o.ProductionPlan.PlanCode : null));
 
     private static ProductionOrderSummaryDto ToSummary(OrderRow o)
     {
@@ -185,7 +187,9 @@ public static class ProductionReader
             o.ReviewFlags,
             isFullyIssued,
             isFullyReceived,
-            items);
+            items,
+            o.ProductionPlanId,
+            o.ProductionPlanCode);
     }
 
     public static async Task<List<ProductionOrderSummaryDto>> OrderSummariesAsync(

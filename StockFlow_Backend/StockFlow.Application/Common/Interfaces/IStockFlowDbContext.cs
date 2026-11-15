@@ -37,6 +37,7 @@ public interface IStockFlowDbContext
 
     DbSet<MstOrderSetting> MstOrderSettings { get; }
     DbSet<MstDebtWarningSetting> MstDebtWarningSettings { get; }
+    DbSet<TrxCreditLimitHistory> TrxCreditLimitHistories { get; }
     DbSet<TrxOrder> TrxOrders { get; }
     DbSet<TrxReturnRequest> TrxReturnRequests { get; }
     DbSet<DtlReturnRequestItem> DtlReturnRequestItems { get; }
@@ -64,4 +65,12 @@ public interface IStockFlowDbContext
 
     /// <summary>Mở transaction trên DbContext; handler dùng hàm này thay cho việc ép kiểu về DbContext.</summary>
     Task<IDbContextTransaction> BeginTransactionAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Khóa theo khóa chuỗi trong phạm vi transaction đang mở (PostgreSQL pg_advisory_xact_lock):
+    /// request khác cùng khóa phải chờ tới khi transaction này commit / rollback.
+    /// Dùng để chạy tuần tự các thao tác ghi lên cùng một chứng từ (VD lập lệnh từ cùng một kế hoạch sản xuất).
+    /// Bắt buộc gọi sau BeginTransactionAsync.
+    /// </summary>
+    Task AcquireTransactionLockAsync(string lockKey, CancellationToken cancellationToken = default);
 }

@@ -42,7 +42,7 @@ public class UpdateBomCommandHandler : IRequestHandler<UpdateBomCommand, Result<
             .FirstOrDefaultAsync(b => b.BomId == command.BomId, ct);
         if (bom == null) return Result.Failure<BomDetailDto>(ProductionMessages.BomNotFound);
 
-        if (await _context.TrxProductionOrders.AnyAsync(o => o.BomId == bom.BomId, ct))
+        if (await BomRules.IsUsedAsync(_context, bom.BomId, ct))
             return Result.Failure<BomDetailDto>(
                 "BOM đã được dùng cho lệnh sản xuất nên không sửa được. Vui lòng tạo phiên bản mới.");
 

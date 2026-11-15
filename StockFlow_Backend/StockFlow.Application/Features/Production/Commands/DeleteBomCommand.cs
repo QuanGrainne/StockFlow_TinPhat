@@ -27,7 +27,7 @@ public class DeleteBomCommandHandler : IRequestHandler<DeleteBomCommand, Result>
             .FirstOrDefaultAsync(b => b.BomId == command.BomId, ct);
         if (bom == null) return Result.Failure(ProductionMessages.BomNotFound);
 
-        if (await _context.TrxProductionOrders.AnyAsync(o => o.BomId == bom.BomId, ct))
+        if (await BomRules.IsUsedAsync(_context, bom.BomId, ct))
             return Result.Failure("BOM đã được dùng cho lệnh sản xuất nên không xoá được. Bạn có thể ngừng áp dụng BOM.");
 
         _context.DtlBomItems.RemoveRange(bom.DtlBomItems);

@@ -58,6 +58,11 @@ public class UpdateProductionOrderCommandHandler : IRequestHandler<UpdateProduct
 
         await using var tx = await _context.BeginTransactionAsync(ct);
 
+        // Lệnh thuộc kế hoạch: chạy tuần tự với các thao tác khác trên cùng kế hoạch (UC-PP-05)
+        if (order.ProductionPlanId is int planId)
+            await _context.AcquireTransactionLockAsync(ProductionPlanRules.LockKey(planId), ct);
+
+        Dictionary<int, decimal> finalQuantities;
         if (req.Items is { Count: > 0 } || req.CustomMaterials is { Count: > 0 } || order.ProductId != req.ProductId || order.DtlProductionOrderItems.Count > 1)
         {
             _context.TrxProductionMaterialRequirements.RemoveRange(order.TrxProductionMaterialRequirements.ToList());
@@ -65,19 +70,33 @@ public class UpdateProductionOrderCommandHandler : IRequestHandler<UpdateProduct
             var populateError = await ProductionOrderRules.PopulateItemsAndRequirementsAsync(
                 _context, order, req, userId, VietnamTime.Now, ct);
             if (populateError != null) return Result.Failure<ProductionOrderDetailDto>(populateError);
+            // PopulateItemsAndRequirementsAsync đã chặn trùng thành phẩm nên ToDictionary an toàn
+            finalQuantities = ProductionOrderRules.NormalizeItems(req).ToDictionary(i => i.ProductId, i => i.PlannedQuantity);
         }
         else
         {
             var singleItem = order.DtlProductionOrderItems.FirstOrDefault();
+            finalQuantities = new Dictionary<int, decimal> { [singleItem?.ProductId ?? order.ProductId] = req.PlannedQuantity };
+            if (req.PlannedQuantity > ProductionPolicy.MaxStoredQuantity)
+                return Result.Failure<ProductionOrderDetailDto>(ProductionMessages.QuantityLimit); // V-04
             if (singleItem != null) singleItem.PlannedQuantity = req.PlannedQuantity;
             foreach (var r in order.TrxProductionMaterialRequirements)
             {
                 // Lệnh Chưa bắt đầu chưa có phiếu xuất nên số đã xuất = 0
-                var required = ProductionPolicy.CalculateRequirement(req.PlannedQuantity, r.NormPerUnit ?? 0, r.WastageRate ?? 0);
+                if (!ProductionPolicy.TryCalculateRequirement(req.PlannedQuantity, r.NormPerUnit ?? 0, r.WastageRate ?? 0, out var required))
+                    return Result.Failure<ProductionOrderDetailDto>(ProductionMessages.QuantityLimit); // V-04
                 r.RequiredQty = required;
                 r.ShortageQty = ProductionPolicy.CalculateShortage(required, r.IssuedQty ?? 0);
             }
             order.PlannedQuantity = req.PlannedQuantity;
+        }
+
+        // BR-PP-20: lệnh thuộc kế hoạch chỉ chứa thành phẩm của kế hoạch và không vượt số còn lại (không tính chính lệnh này)
+        if (order.ProductionPlanId is int linkedPlanId)
+        {
+            var planError = await ProductionPlanRules.ValidateOrderQuantitiesAsync(
+                _context, linkedPlanId, finalQuantities, order.ProductionOrderId, ct);
+            if (planError != null) return Result.Failure<ProductionOrderDetailDto>(planError);
         }
 
         order.EndDate = req.Deadline?.Date;

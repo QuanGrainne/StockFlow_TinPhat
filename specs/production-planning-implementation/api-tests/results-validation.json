@@ -1,0 +1,134 @@
+﻿[
+    {
+        "Id":  "VT-01",
+        "Name":  "Thiếu ngày kỳ và ngày dòng → 400, không lưu (V-01)",
+        "Pass":  true,
+        "Actual":  "400 Dữ liệu không hợp lệ. | Vui lòng chọn ngày bắt đầu kỳ kế hoạch. | Vui lòng chọn ngày kết thúc kỳ kế hoạch. | Vui lòng chọn ngày bắt đầu của dòng. | Vui lòng chọn ngày kết thúc của dòng. | KH 11→11"
+    },
+    {
+        "Id":  "VT-02",
+        "Name":  "Ngày không tồn tại 31/02 → 400 (frontend dịch thông báo, V-11)",
+        "Pass":  true,
+        "Actual":  "400"
+    },
+    {
+        "Id":  "VT-03",
+        "Name":  "Năm 0001 / 9999 → 400 (Q-V8)",
+        "Pass":  true,
+        "Actual":  "400 Dữ liệu không hợp lệ. | Ngày phải nằm trong khoảng năm 2000 – 2100. | Ngày phải nằm trong khoảng năm 2000 – 2100. | Ngày phải nằm trong khoảng năm 2000 – 2100."
+    },
+    {
+        "Id":  "VT-04",
+        "Name":  "Số lượng 1e17 → 400 thay vì 500 (Q-V7)",
+        "Pass":  true,
+        "Actual":  "400 Dữ liệu không hợp lệ. | Số lượng kế hoạch mỗi thành phẩm tối đa 999.999.999,99."
+    },
+    {
+        "Id":  "VT-05",
+        "Name":  "Số lượng 1.000.000.000 → 400 (Q-V7)",
+        "Pass":  true,
+        "Actual":  "400 Dữ liệu không hợp lệ. | Số lượng kế hoạch mỗi thành phẩm tối đa 999.999.999,99."
+    },
+    {
+        "Id":  "VT-06",
+        "Name":  "Lập lệnh từ KH: nhu cầu tràn numeric(18,2) → 400 thay vì 500 (V-04)",
+        "Pass":  true,
+        "Actual":  "400 Số lượng hoặc nhu cầu nguyên vật liệu vượt giới hạn lưu trữ của hệ thống. Vui lòng giảm số lượng hoặc kiểm tra định mức."
+    },
+    {
+        "Id":  "VT-07",
+        "Name":  "Lập lệnh trực tiếp (UC-59): nhu cầu tràn → 400 thay vì 500 (V-04)",
+        "Pass":  true,
+        "Actual":  "400 Số lượng hoặc nhu cầu nguyên vật liệu vượt giới hạn lưu trữ của hệ thống. Vui lòng giảm số lượng hoặc kiểm tra định mức."
+    },
+    {
+        "Id":  "VT-08",
+        "Name":  "Tên 150 ký tự + dấu cách hai đầu → lưu được, tên đã trim (V-10)",
+        "Pass":  true,
+        "Actual":  "200 len=150"
+    },
+    {
+        "Id":  "VT-09",
+        "Name":  "Nguyên vật liệu không đưa vào kế hoạch được, báo mã hàng (Q-V2)",
+        "Pass":  true,
+        "Actual":  "400 Chỉ được đưa thành phẩm hoặc bán thành phẩm vào kế hoạch, không đưa nguyên vật liệu: P5MAT."
+    },
+    {
+        "Id":  "VT-10",
+        "Name":  "Bán thành phẩm đưa vào kế hoạch được (Q-V2)",
+        "Pass":  true,
+        "Actual":  "200"
+    },
+    {
+        "Id":  "VT-11",
+        "Name":  "Tra cứu productTypes=FINISHED,SEMI_FINISHED không trả NVL, có bán thành phẩm",
+        "Pass":  true,
+        "Actual":  "200 P5FG,P5FGBIG,P5SEMI"
+    },
+    {
+        "Id":  "VT-12",
+        "Name":  "Kỳ đã qua, không ghi chú → 400 (Q-V1)",
+        "Pass":  true,
+        "Actual":  "400 Dữ liệu không hợp lệ. | Kỳ kế hoạch đã kết thúc trước hôm nay. Vui lòng ghi lý do vào ô Ghi chú."
+    },
+    {
+        "Id":  "VT-13",
+        "Name":  "Kỳ đã qua có lý do → lưu được (Q-V1)",
+        "Pass":  true,
+        "Actual":  "200"
+    },
+    {
+        "Id":  "VT-14",
+        "Name":  "Gửi duyệt kế hoạch kỳ đã qua mà mất ghi chú → 400 (Q-V1)",
+        "Pass":  true,
+        "Actual":  "400 Kỳ kế hoạch đã kết thúc trước hôm nay. Vui lòng ghi lý do vào ô Ghi chú."
+    },
+    {
+        "Id":  "VT-15",
+        "Name":  "Kế toán SX không sửa / gửi duyệt kế hoạch nháp của người khác; actions khớp (Q-V4)",
+        "Pass":  true,
+        "Actual":  "sửa=400 Chỉ người lập kế hoạch hoặc người có quyền duyệt mới được sửa kế hoạch này. | gửi=400 | canEdit=False"
+    },
+    {
+        "Id":  "VT-16",
+        "Name":  "Người lưu sau với bản cũ bị từ chối, không ghi đè (Q-V5)",
+        "Pass":  true,
+        "Actual":  "A=200 B=400 Kế hoạch đã được Phạm Văn Sản Xuất cập nhật lúc 15/11/2026 10:32:12. Vui lòng tải lại kế hoạch rồi sửa tiếp. | DB SL=10.00"
+    },
+    {
+        "Id":  "VT-17",
+        "Name":  "Sửa với phiên bản mới nhất → lưu được; chi tiết có người / thời điểm cập nhật",
+        "Pass":  true,
+        "Actual":  "200 by=Phạm Văn Sản Xuất at=2026-11-15T10:32:12.885246"
+    },
+    {
+        "Id":  "VT-18",
+        "Name":  "Hàng ngừng hoạt động sau khi lưu nháp → gửi duyệt báo lỗi nêu mã (V-08)",
+        "Pass":  true,
+        "Actual":  "khóa hàng=200 | 400 Thành phẩm không tồn tại hoặc đã ngừng hoạt động: P5FGOFF."
+    },
+    {
+        "Id":  "VT-19",
+        "Name":  "Bấm lập lệnh 2 lần (30 / còn 100) cùng mã yêu cầu → 1 lệnh, cả hai nhận cùng lệnh (Q-V6)",
+        "Pass":  true,
+        "Actual":  "codes=200,200 ids=12,12 lệnh=1"
+    },
+    {
+        "Id":  "VT-20",
+        "Name":  "Gửi lại sau đó với cùng mã → trả lệnh cũ, không tạo thêm",
+        "Pass":  true,
+        "Actual":  "200 id=12 lệnh=1"
+    },
+    {
+        "Id":  "VT-21",
+        "Name":  "Dùng lại mã yêu cầu cho kế hoạch khác → 400",
+        "Pass":  true,
+        "Actual":  "400 Mã yêu cầu đã được dùng cho lệnh sản xuất khác."
+    },
+    {
+        "Id":  "VT-22",
+        "Name":  "Mã yêu cầu mới → tạo lệnh mới bình thường",
+        "Pass":  true,
+        "Actual":  "200 lệnh=2"
+    }
+]

@@ -162,6 +162,9 @@ public class CreateCustomerCommandHandler : IRequestHandler<CreateCustomerComman
 
         var isActive = string.IsNullOrWhiteSpace(req.Status) || !req.Status.Equals("INACTIVE", StringComparison.OrdinalIgnoreCase);
 
+        // Hạn mức mặc định do Manager cài trong "Thiết lập công nợ"; form không gửi hạn mức.
+        var defaultLimit = await CustomerCreditPolicy.GetDefaultCreditLimitAsync(_context, cancellationToken);
+
         var partner = new MstBusinessPartner
         {
             PartnerCode = codeNormalized,
@@ -170,8 +173,7 @@ public class CreateCustomerCommandHandler : IRequestHandler<CreateCustomerComman
             Phone = normalizedPhone,
             Email = normalizedEmail,
             Address = normalizedAddress,
-            // Hạn mức mặc định; không nhận giá trị từ form (chỉ đổi qua duyệt yêu cầu hạn mức, UC-64)
-            CreditLimit = CustomerCreditPolicy.DefaultCreditLimit,
+            CreditLimit = defaultLimit,
             CurrentDebt = 0,
             CurrentPayable = 0,
             IsActive = isActive,
@@ -189,6 +191,17 @@ public class CreateCustomerCommandHandler : IRequestHandler<CreateCustomerComman
         try
         {
             await _context.MstBusinessPartners.AddAsync(partner, cancellationToken);
+            // Dòng đầu tiên của lịch sử hạn mức (cùng SaveChanges với khách → cùng transaction)
+            _context.TrxCreditLimitHistories.Add(new TrxCreditLimitHistory
+            {
+                Partner = partner,
+                OldLimit = 0,
+                NewLimit = defaultLimit,
+                Source = CreditLimitChangeSource.Initial,
+                Reason = "Hạn mức mặc định khi tạo khách hàng",
+                ChangedBy = _currentUser.UserId,
+                ChangedAt = VietnamTime.Now,
+            });
             await _context.SaveChangesAsync(cancellationToken);
         }
         catch (DbUpdateException ex)
