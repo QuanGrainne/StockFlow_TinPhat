@@ -32,6 +32,12 @@ public static class FeatureConstants
 
     private static readonly string[] None = Array.Empty<string>();
 
+    /// <summary>Xem, lập, sửa, gửi duyệt kế hoạch sản xuất.</summary>
+    public const string ProductionPlans = "feat-production-plans";
+
+    /// <summary>Duyệt / từ chối, sửa kế hoạch đã duyệt, hủy, đóng kế hoạch sản xuất.</summary>
+    public const string ProductionPlanApproval = "feat-production-plan-approval";
+
     public static readonly List<FeatureDefinition> Features = new()
     {
         new("feat-dashboard", "Tổng quan", "AUTH", None),
@@ -65,6 +71,10 @@ public static class FeatureConstants
         new("feat-prod-plan", "Lập lệnh sản xuất", "PROD", None),
         new("feat-prod-issue", "Xuất NVL sản xuất", "PROD", None),
         new("feat-prod-receipt", "Nhập thành phẩm", "PROD", None),
+        // Kế hoạch sản xuất (UC-PP-01..06): lập / gửi duyệt (Manager, Production Accountant); duyệt, đóng, sửa sau duyệt (Manager).
+        // Tách bằng chức năng vì mọi chức năng phân hệ PROD đều được đủ PROD_* (DeriveModulePermissionCodes).
+        new(ProductionPlans, "Kế hoạch sản xuất", "PROD", None),
+        new(ProductionPlanApproval, "Duyệt kế hoạch sản xuất", "PROD", None),
 
         new("feat-bom", "Định mức BOM", "BOM", None),
     };
@@ -76,9 +86,13 @@ public static class FeatureConstants
     private static readonly string[] StockFeats = { "feat-transfers", "feat-stocktake", "feat-disposal" };
     private static readonly string[] SalesFeats = { "feat-pos", "feat-sales-booking", "feat-invoices", "feat-sales-returns" };
     private static readonly string[] PurchaseFeats = { "feat-purchase-orders", "feat-purchase", "feat-purchase-returns", "feat-suppliers" };
-    private static readonly string[] ProdFeats = { "feat-prod", "feat-prod-plan", "feat-prod-issue", "feat-prod-receipt" };
-    /// <summary>Production Accountant: xem lệnh, xuất NVL, nhập thành phẩm; không lập lệnh, không sửa BOM (bảng 3.1.6)</summary>
-    private static readonly string[] ProdAccountantFeats = { "feat-prod", "feat-prod-issue", "feat-prod-receipt" };
+    private static readonly string[] ProdFeats =
+        { "feat-prod", "feat-prod-plan", "feat-prod-issue", "feat-prod-receipt", ProductionPlans, ProductionPlanApproval };
+    /// <summary>
+    /// Production Accountant: xem lệnh, xuất NVL, nhập thành phẩm; không lập lệnh, không sửa BOM (bảng 3.1.6).
+    /// Được lập / gửi duyệt kế hoạch sản xuất, không duyệt (Q1, Q2 chốt 14/11/2026).
+    /// </summary>
+    private static readonly string[] ProdAccountantFeats = { "feat-prod", "feat-prod-issue", "feat-prod-receipt", ProductionPlans };
 
     public static string ToCode(string featureId)
     {

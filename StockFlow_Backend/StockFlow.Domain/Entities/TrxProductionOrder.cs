@@ -35,6 +35,9 @@ public partial class TrxProductionOrder
     /// <summary>Kế hoạch sản xuất sinh ra lệnh này (để trống với lệnh tạo trực tiếp)</summary>
     public int? ProductionPlanId { get; set; }
 
+    /// <summary>Mã yêu cầu do client sinh khi lập lệnh từ kế hoạch, chống tạo trùng khi gửi lại (Q-V6)</summary>
+    public string? ClientRequestId { get; set; }
+
     public virtual TrxProductionPlan? ProductionPlan { get; set; }
 
     public virtual SecUser? AssignedToNavigation { get; set; }

@@ -92,7 +92,10 @@ public record ProductionOrderSummaryDto(
     bool IsFullyIssued = false,
     /// <summary>Đã lập đủ phiếu nhập thành phẩm (mọi thành phẩm trong lệnh đều đã nhập đủ SL kế hoạch)</summary>
     bool IsFullyReceived = false,
-    List<ProductionOrderProductItemDto>? Items = null
+    List<ProductionOrderProductItemDto>? Items = null,
+    /// <summary>Kế hoạch sản xuất sinh ra lệnh (null = lệnh lập trực tiếp, Q4)</summary>
+    int? ProductionPlanId = null,
+    string? ProductionPlanCode = null
 );
 
 public record ProductionMaterialDto(
@@ -203,7 +206,9 @@ public record SaveProductionOrderRequest(
     string? Notes,
     List<SaveProductionOrderItemInput>? Items = null,
     List<SaveProductionOrderMaterialInput>? CustomMaterials = null,
-    string? AdjustReason = null
+    string? AdjustReason = null,
+    /// <summary>Mã yêu cầu do client sinh, chống tạo trùng. Chỉ dùng khi lập lệnh từ kế hoạch (Q-V6); lập lệnh trực tiếp bỏ qua.</summary>
+    string? ClientRequestId = null
 );
 
 public record CloseProductionOrderRequest(string? Reason);

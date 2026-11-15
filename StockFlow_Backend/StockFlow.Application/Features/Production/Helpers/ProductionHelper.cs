@@ -19,6 +19,8 @@ public static class ProductionMessages
     public const string MaterialUsageWarning =
         "Số thành phẩm cần nhiều NVL hơn số đã xuất theo BOM. Vui lòng nhập ghi chú để tiếp tục."; // MSG43
     public const string NoWarehouseAccess = "Bạn không có quyền thao tác trên kho này."; // MSG04, BR-04
+    public const string QuantityLimit =
+        "Số lượng hoặc nhu cầu nguyên vật liệu vượt giới hạn lưu trữ của hệ thống. Vui lòng giảm số lượng hoặc kiểm tra định mức."; // V-04
 }
 
 public static class ProductionHelper

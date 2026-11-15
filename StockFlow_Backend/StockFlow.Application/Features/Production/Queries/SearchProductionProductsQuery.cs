@@ -11,7 +11,9 @@ namespace StockFlow.Application.Features.Production.Queries;
 /// Tra cứu mặt hàng cho form BOM và form lập lệnh sản xuất: mã, tên, đơn vị cơ sở, đã có BOM đang áp dụng chưa,
 /// tồn tại kho đang chọn (nếu được quyền kho). Không trả giá (BR-39).
 /// </summary>
-public record SearchProductionProductsQuery(string? Search, int? WarehouseId, bool ActiveBomOnly, int Limit, string? ProductType = null)
+/// <param name="ProductTypes">Lọc nhiều loại hàng (VD FINISHED, SEMI_FINISHED cho form kế hoạch sản xuất); áp dụng thêm cùng ProductType nếu có</param>
+public record SearchProductionProductsQuery(
+    string? Search, int? WarehouseId, bool ActiveBomOnly, int Limit, string? ProductType = null, List<string>? ProductTypes = null)
     : IRequest<Result<List<ProductionProductLookupDto>>>;
 
 public class SearchProductionProductsQueryHandler
@@ -40,6 +42,13 @@ public class SearchProductionProductsQueryHandler
         {
             var pt = query.ProductType.Trim().ToUpper();
             q = q.Where(p => p.ProductType != null && p.ProductType.ToUpper() == pt);
+        }
+        if (query.ProductTypes is { Count: > 0 })
+        {
+            // Hàng chưa có loại coi là thành phẩm (giống danh mục hàng hóa)
+            var types = query.ProductTypes.Select(t => t.Trim().ToUpper()).ToList();
+            var includeUntyped = types.Contains("FINISHED");
+            q = q.Where(p => (p.ProductType == null && includeUntyped) || (p.ProductType != null && types.Contains(p.ProductType.ToUpper())));
         }
 
         var limit = query.Limit is > 0 and <= 100 ? query.Limit : 30;
