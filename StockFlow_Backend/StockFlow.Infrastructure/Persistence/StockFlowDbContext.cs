@@ -1680,6 +1680,14 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
                 .HasForeignKey(d => d.ProductionPlanId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("fk_trx_production_orders_production_plan_id");
+
+            // Chống tạo trùng lệnh khi lập từ kế hoạch (Q-V6): mỗi mã yêu cầu chỉ sinh một lệnh
+            entity.Property(e => e.ClientRequestId)
+                .HasMaxLength(64)
+                .HasColumnName("client_request_id");
+            entity.HasIndex(e => e.ClientRequestId, "uq_trx_production_orders_client_request_id")
+                .IsUnique()
+                .HasFilter("client_request_id IS NOT NULL");
         });
 
         modelBuilder.Entity<TrxProductionPlan>(entity =>
@@ -1723,6 +1731,16 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
                 .HasForeignKey(d => d.ApprovedBy)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("fk_trx_production_plans_approved_by");
+
+            // Lưu vết lần ghi gần nhất + mã phiên bản phát hiện sửa đồng thời (Q-V5, G3)
+            entity.Property(e => e.UpdatedAt)
+                .HasColumnType("timestamp without time zone")
+                .HasColumnName("updated_at");
+            entity.Property(e => e.UpdatedBy).HasColumnName("updated_by");
+            entity.HasOne(d => d.UpdatedByNavigation).WithMany()
+                .HasForeignKey(d => d.UpdatedBy)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("fk_trx_production_plans_updated_by");
         });
 
         modelBuilder.Entity<DtlProductionPlanItem>(entity =>
@@ -2382,6 +2400,15 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
 
     public Task<Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction> BeginTransactionAsync(CancellationToken cancellationToken = default)
         => Database.BeginTransactionAsync(cancellationToken);
+
+    public async Task AcquireTransactionLockAsync(string lockKey, CancellationToken cancellationToken = default)
+    {
+        // Khóa tư vấn theo transaction tự nhả khi commit / rollback; ngoài transaction sẽ nhả ngay nên không có tác dụng.
+        if (Database.CurrentTransaction == null)
+            throw new InvalidOperationException("AcquireTransactionLockAsync phải được gọi trong transaction.");
+        await Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT pg_advisory_xact_lock(hashtext({lockKey}))", cancellationToken);
+    }
 
     partial void OnModelCreatingPartial(ModelBuilder modelBuilder);
 }

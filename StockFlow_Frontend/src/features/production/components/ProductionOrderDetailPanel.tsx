@@ -113,6 +113,12 @@ export function ProductionOrderDetailPanel({
                 <span className="text-slate-400">Người lập: </span>
                 <span className="font-medium text-slate-800">{s.createdByName}</span>
               </div>
+              {s.productionPlanCode && (
+                <div>
+                  <span className="text-slate-400">Kế hoạch sản xuất: </span>
+                  <span className="font-mono font-semibold text-[#0070f4]">{s.productionPlanCode}</span>
+                </div>
+              )}
               <div>
                 <span className="text-slate-400">Ngày lập: </span>
                 <span className="font-medium text-slate-800">{fmtDateTime(s.createdDate)}</span>

@@ -15,6 +15,27 @@ public static class ProductionPolicy
     /// <summary>Số chữ số thập phân của định mức NVL trên 1 đơn vị thành phẩm.</summary>
     public const int NormScale = 4;
 
+    /// <summary>Giá trị lớn nhất lưu được ở cột numeric(18,2) (số lượng, nhu cầu, số đã xuất).</summary>
+    public const decimal MaxStoredQuantity = 9_999_999_999_999_999.99m;
+
+    /// <summary>
+    /// Nhu cầu NVL theo BR-31, trả false nếu kết quả vượt <see cref="MaxStoredQuantity"/> hoặc tràn kiểu decimal
+    /// (dùng trước khi lưu để báo lỗi rõ thay vì lỗi cơ sở dữ liệu).
+    /// </summary>
+    public static bool TryCalculateRequirement(decimal plannedQuantity, decimal normPerUnit, decimal wastageRatePercent, out decimal required)
+    {
+        try
+        {
+            required = CalculateRequirement(plannedQuantity, normPerUnit, wastageRatePercent);
+            return required <= MaxStoredQuantity;
+        }
+        catch (OverflowException)
+        {
+            required = 0;
+            return false;
+        }
+    }
+
     /// <summary>Làm tròn số lượng về độ chính xác lưu trữ (half-up).</summary>
     public static decimal RoundQuantity(decimal value) =>
         Math.Round(value, QuantityScale, MidpointRounding.AwayFromZero);

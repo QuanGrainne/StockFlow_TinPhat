@@ -200,11 +200,13 @@ public class ProductionController : ControllerBase
     [HttpGet("lookups/products")]
     [ProducesResponseType(typeof(List<ProductionProductLookupDto>), StatusCodes.Status200OK)]
     [RequirePermission("PROD_READ")]
-    [RequireFeature("feat-bom", "feat-prod-plan")]
+    [RequireFeature("feat-bom", "feat-prod-plan", "feat-production-plans", "feat-production-plan-approval")]
     public async Task<IActionResult> SearchProducts(
-        [FromQuery] string? search, [FromQuery] int? warehouseId, [FromQuery] bool activeBomOnly = false, [FromQuery] int limit = 30, [FromQuery] string? productType = null)
+        [FromQuery] string? search, [FromQuery] int? warehouseId, [FromQuery] bool activeBomOnly = false, [FromQuery] int limit = 30,
+        [FromQuery] string? productType = null, [FromQuery] string? productTypes = null)
     {
-        var result = await _mediator.Send(new SearchProductionProductsQuery(search, warehouseId, activeBomOnly, limit, productType));
+        var result = await _mediator.Send(new SearchProductionProductsQuery(
+            search, warehouseId, activeBomOnly, limit, productType, SplitStrings(productTypes)));
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { message = result.Error });
     }
 

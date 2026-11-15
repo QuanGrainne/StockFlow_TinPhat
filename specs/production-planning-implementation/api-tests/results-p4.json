@@ -1,0 +1,104 @@
+﻿[
+    {
+        "Id":  "IT-01",
+        "Name":  "Kế hoạch 25 thành phẩm → 1 lệnh 25 dòng, 25 dòng nhu cầu NVL, còn lại 0",
+        "Pass":  true,
+        "Actual":  "200 items=25 reqs=25"
+    },
+    {
+        "Id":  "IT-02",
+        "Name":  "Nhu cầu NVL 25 thành phẩm cộng dồn 1 dòng = 250; theo số còn lại = 0",
+        "Pass":  true,
+        "Actual":  "200 req=250.00 remaining=0"
+    },
+    {
+        "Id":  "IT-03",
+        "Name":  "BOM ngừng sau khi duyệt: lập lệnh bị chặn, không có lệnh / nhu cầu NVL dở dang (rollback)",
+        "Pass":  true,
+        "Actual":  "400 Thành phẩm chưa có BOM đang áp dụng. Vui lòng thiết lập BOM trước. (P4FGR) | lệnh 8→8, nhu cầu 39→39"
+    },
+    {
+        "Id":  "IT-04",
+        "Name":  "Bấm lập lệnh 2 lần cùng lúc: chỉ 1 lệnh được tạo",
+        "Pass":  true,
+        "Actual":  "codes=400,200 lệnh=1"
+    },
+    {
+        "Id":  "IT-05",
+        "Name":  "Hai người đồng thời lập 6 + 6 trên kế hoạch 10: 1 thành công, tổng đã lập 6",
+        "Pass":  true,
+        "Actual":  "codes=200,400 tổng=6.00"
+    },
+    {
+        "Id":  "IT-06",
+        "Name":  "Hai người duyệt cùng lúc: 1 thành công, 1 bị báo sai trạng thái",
+        "Pass":  true,
+        "Actual":  "codes=400,200 db=APPROVED|1"
+    },
+    {
+        "Id":  "IT-07",
+        "Name":  "Đầu-cuối: lập → gửi duyệt → duyệt → lập lệnh → xuất NVL → nhập TP → lệnh COMPLETED → đóng KH; tồn TP kho K002 +10",
+        "Pass":  true,
+        "Actual":  "submit=PENDING_APPROVAL approve=APPROVED order=200 issue=200 receipt=200 orderStatus=COMPLETED received=10.00 pct=100 close=CLOSED tồn=10.00"
+    },
+    {
+        "Id":  "IT-08",
+        "Name":  "Lý do quá 200 ký tự bị chặn",
+        "Pass":  true,
+        "Actual":  "400 Lý do tối đa 200 ký tự."
+    },
+    {
+        "Id":  "IT-09",
+        "Name":  "Lập lệnh với hạn hoàn thành trong quá khứ bị chặn",
+        "Pass":  true,
+        "Actual":  "400 Hạn hoàn thành không được trước ngày hôm nay."
+    },
+    {
+        "Id":  "IT-10",
+        "Name":  "Lập lệnh số lượng 0 bị chặn",
+        "Pass":  true,
+        "Actual":  "400 Số lượng kế hoạch của từng thành phẩm phải lớn hơn 0 và có tối đa 2 chữ số thập phân."
+    },
+    {
+        "Id":  "IT-11",
+        "Name":  "Kế hoạch không tồn tại: xem / duyệt báo không tìm thấy",
+        "Pass":  true,
+        "Actual":  "400 Không tìm thấy kế hoạch sản xuất. | 400 Không tìm thấy kế hoạch sản xuất."
+    },
+    {
+        "Id":  "IT-12",
+        "Name":  "Manager chọn kho nhận không được phân quyền (K004) bị chặn",
+        "Pass":  true,
+        "Actual":  "400 Bạn không có quyền thao tác trên kho này."
+    },
+    {
+        "Id":  "IT-13",
+        "Name":  "Sửa lệnh thuộc kế hoạch sang thành phẩm ngoài kế hoạch bị chặn",
+        "Pass":  true,
+        "Actual":  "400 Thành phẩm không thuộc kế hoạch sản xuất của lệnh."
+    },
+    {
+        "Id":  "IT-14",
+        "Name":  "Chưa đăng nhập → 401",
+        "Pass":  true,
+        "Actual":  "401"
+    },
+    {
+        "Id":  "IT-15",
+        "Name":  "Ma trận đã cấu hình bỏ tick Kế hoạch SX: Kế toán SX bị chặn xem / lập (403)",
+        "Pass":  true,
+        "Actual":  "lưu=200 xem=403 lập=403"
+    },
+    {
+        "Id":  "IT-16",
+        "Name":  "Tick lại Kế hoạch SX: lập được; vẫn không duyệt được (403)",
+        "Pass":  true,
+        "Actual":  "lưu=200 lập=200 duyệt=403"
+    },
+    {
+        "Id":  "IT-17",
+        "Name":  "Tài khoản bị khóa (token cũ) không xem được kế hoạch",
+        "Pass":  true,
+        "Actual":  "khóa=200 xem=403 mở=200"
+    }
+]

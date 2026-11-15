@@ -17,6 +17,10 @@ export interface ProductionFeatures {
   canReceive: boolean;
   /** Định mức BOM (Manager) */
   canManageBom: boolean;
+  /** Kế hoạch sản xuất: xem, lập, gửi duyệt (Manager, Production Accountant) */
+  canPlanProduction: boolean;
+  /** Duyệt / từ chối, sửa sau duyệt, đóng kế hoạch sản xuất (Manager) */
+  canApprovePlans: boolean;
 }
 
 function toFeatures(set: Set<string> | null): ProductionFeatures {
@@ -25,6 +29,8 @@ function toFeatures(set: Set<string> | null): ProductionFeatures {
     canIssue: !!set?.has('feat-prod-issue'),
     canReceive: !!set?.has('feat-prod-receipt'),
     canManageBom: !!set?.has('feat-bom'),
+    canPlanProduction: !!set?.has('feat-production-plans'),
+    canApprovePlans: !!set?.has('feat-production-plan-approval'),
   };
 }
 

@@ -31,9 +31,16 @@ public partial class TrxProductionPlan
 
     public string? Notes { get; set; }
 
+    /// <summary>Lần ghi gần nhất (lập, sửa, đổi trạng thái); dùng làm mã phiên bản để phát hiện sửa đồng thời (Q-V5)</summary>
+    public DateTime? UpdatedAt { get; set; }
+
+    public int? UpdatedBy { get; set; }
+
     public virtual SecUser CreatedByNavigation { get; set; } = null!;
 
     public virtual SecUser? ApprovedByNavigation { get; set; }
+
+    public virtual SecUser? UpdatedByNavigation { get; set; }
 
     public virtual ICollection<DtlProductionPlanItem> DtlProductionPlanItems { get; set; } = new List<DtlProductionPlanItem>();
 

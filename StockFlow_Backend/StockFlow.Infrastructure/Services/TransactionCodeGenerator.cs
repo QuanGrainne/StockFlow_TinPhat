@@ -46,6 +46,11 @@ public class TransactionCodeGenerator : ITransactionCodeGenerator
                 prefix = "LSX";
                 sequenceName = "stockflow.seq_production_order_code";
                 break;
+            case "PRODUCTION_PLAN":
+                // Kế hoạch sản xuất (UC-PP-02): KHSX00001...
+                prefix = "KHSX";
+                sequenceName = "stockflow.seq_production_plan_code";
+                break;
             case "FINISHED_GOODS_RECEIPT":
                 // Phiếu nhập thành phẩm (UC-49)
                 prefix = "NTP";

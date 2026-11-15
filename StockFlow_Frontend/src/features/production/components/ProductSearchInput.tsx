@@ -15,6 +15,8 @@ interface ProductSearchInputProps {
   activeBomOnly?: boolean;
   /** Lọc theo loại mặt hàng: FINISHED (Thành phẩm) hoặc RAW_MATERIAL (Nguyên vật liệu) */
   productType?: 'FINISHED' | 'RAW_MATERIAL';
+  /** Lọc nhiều loại hàng cùng lúc (VD kế hoạch sản xuất: FINISHED + SEMI_FINISHED); dùng thay cho productType */
+  productTypes?: string[];
   /** Kho để hiện tồn (tuỳ chọn) */
   warehouseId?: number | null;
   /** Mặt hàng không được chọn (đã có trên form) */
@@ -28,6 +30,7 @@ export function ProductSearchInput({
   onSelect,
   activeBomOnly,
   productType,
+  productTypes,
   warehouseId,
   excludeIds = [],
   autoFocus,
@@ -40,10 +43,12 @@ export function ProductSearchInput({
   const boxRef = useRef<HTMLDivElement>(null);
 
   const effectiveType = includeAllTypes ? undefined : productType;
+  const typesKey = productTypes?.join(',') ?? '';
   const requestKey = JSON.stringify({
     text: text.trim(),
     activeBomOnly: !!activeBomOnly,
     productType: effectiveType ?? null,
+    productTypes: typesKey,
     warehouseId: warehouseId ?? null,
   });
   const loading = open && result.key !== requestKey;
@@ -53,7 +58,14 @@ export function ProductSearchInput({
     let stale = false;
     const timer = setTimeout(() => {
       productionService
-        .searchProducts({ search: text, activeBomOnly, productType: effectiveType, warehouseId, limit: 20 })
+        .searchProducts({
+          search: text,
+          activeBomOnly,
+          productType: effectiveType,
+          productTypes: typesKey ? typesKey.split(',') : undefined,
+          warehouseId,
+          limit: 20,
+        })
         .then((items) => {
           if (!stale) setResult({ key: requestKey, items });
         })
@@ -138,7 +150,7 @@ export function ProductSearchInput({
                       p.productType === 'RAW_MATERIAL' ? 'bg-amber-50 text-amber-700' : 'bg-blue-50 text-[#0070f4]'
                     }`}
                   >
-                    {p.productType === 'RAW_MATERIAL' ? 'NVL' : 'Thành phẩm'}
+                    {p.productType === 'RAW_MATERIAL' ? 'NVL' : p.productType === 'SEMI_FINISHED' ? 'Bán TP' : 'Thành phẩm'}
                   </span>
                 </div>
                 {p.availableQty !== null ? (

@@ -2583,6 +2583,11 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("bom_id");
 
+                    b.Property<string>("ClientRequestId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("client_request_id");
+
                     b.Property<int>("CreatedBy")
                         .HasColumnType("integer")
                         .HasColumnName("created_by");
@@ -2644,6 +2649,10 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                     b.HasIndex(new[] { "ProductionOrderCode" }, "uq_trx_production_orders_1")
                         .IsUnique();
 
+                    b.HasIndex(new[] { "ClientRequestId" }, "uq_trx_production_orders_client_request_id")
+                        .IsUnique()
+                        .HasFilter("client_request_id IS NOT NULL");
+
                     b.ToTable("trx_production_orders", "stockflow");
                 });
 
@@ -2703,12 +2712,22 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(20)")
                         .HasColumnName("status");
 
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<int?>("UpdatedBy")
+                        .HasColumnType("integer")
+                        .HasColumnName("updated_by");
+
                     b.HasKey("ProductionPlanId")
                         .HasName("trx_production_plans_pkey");
 
                     b.HasIndex("ApprovedBy");
 
                     b.HasIndex("CreatedBy");
+
+                    b.HasIndex("UpdatedBy");
 
                     b.HasIndex(new[] { "PlanCode" }, "uq_trx_production_plans_code")
                         .IsUnique();
@@ -4284,9 +4303,16 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasConstraintName("fk_trx_production_plans_created_by");
 
+                    b.HasOne("StockFlow.Domain.Entities.SecUser", "UpdatedByNavigation")
+                        .WithMany()
+                        .HasForeignKey("UpdatedBy")
+                        .HasConstraintName("fk_trx_production_plans_updated_by");
+
                     b.Navigation("ApprovedByNavigation");
 
                     b.Navigation("CreatedByNavigation");
+
+                    b.Navigation("UpdatedByNavigation");
                 });
 
             modelBuilder.Entity("StockFlow.Domain.Entities.TrxProductionReport", b =>
