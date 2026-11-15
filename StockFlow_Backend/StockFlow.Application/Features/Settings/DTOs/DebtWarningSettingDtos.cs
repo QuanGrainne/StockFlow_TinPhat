@@ -12,6 +12,8 @@ public class DebtWarningSettingDto
     /// <summary>FIRST_DEBT | LAST_TRANSACTION</summary>
     public string DebtDaysFrom { get; set; } = "FIRST_DEBT";
     public bool AllowDebtOverLimit { get; set; }
+    /// <summary>Hạn mức công nợ mặc định cho khách tạo mới.</summary>
+    public decimal DefaultCreditLimit { get; set; }
     /// <summary>Khách lẻ luôn phải thanh toán đủ (PAY-009) — chỉ để hiển thị, không đổi được.</summary>
     public bool NoDebtForWalkIn { get; set; } = true;
 
@@ -27,4 +29,6 @@ public class UpdateDebtWarningSettingDto
     public int DebtDaysThreshold { get; set; }
     public string DebtDaysFrom { get; set; } = "FIRST_DEBT";
     public bool AllowDebtOverLimit { get; set; }
+    /// <summary>Bỏ trống (client cũ) = giữ nguyên hạn mức mặc định đang lưu.</summary>
+    public decimal? DefaultCreditLimit { get; set; }
 }

@@ -5,6 +5,7 @@ using MediatR;
 using Microsoft.EntityFrameworkCore;
 using StockFlow.Application.Common;
 using StockFlow.Application.Common.Interfaces;
+using StockFlow.Application.Features.Customers.Helpers;
 using StockFlow.Application.Features.Settings.DTOs;
 using StockFlow.Application.Features.Settings.Queries;
 using StockFlow.Domain.Entities;
@@ -37,6 +38,9 @@ public class UpdateDebtWarningSettingsCommandHandler : IRequestHandler<UpdateDeb
         if (dto.DebtDaysThreshold < 0 || dto.DebtDaysThreshold > 3650)
             return Result<DebtWarningSettingDto>.Failure("Số ngày nợ cảnh báo phải trong khoảng 0 – 3650 ngày.");
 
+        if (dto.DefaultCreditLimit is < 0 or > CustomerCreditPolicy.MaxCreditLimit)
+            return Result<DebtWarningSettingDto>.Failure("Hạn mức mặc định phải trong khoảng 0 – 999.999.999.999 đ.");
+
         var from = dto.DebtDaysFrom?.Trim().ToUpperInvariant();
         if (from != MstDebtWarningSetting.FromFirstDebt && from != MstDebtWarningSetting.FromLastTransaction)
             return Result<DebtWarningSettingDto>.Failure("Mốc tính số ngày nợ không hợp lệ (FIRST_DEBT hoặc LAST_TRANSACTION).");
@@ -54,6 +58,9 @@ public class UpdateDebtWarningSettingsCommandHandler : IRequestHandler<UpdateDeb
         setting.DebtDaysThreshold = dto.DebtDaysThreshold;
         setting.DebtDaysFrom = from;
         setting.AllowDebtOverLimit = dto.AllowDebtOverLimit;
+        // Chỉ áp dụng cho khách tạo sau thời điểm này; khách cũ giữ hạn mức (đổi bằng điều chỉnh hạn mức).
+        if (dto.DefaultCreditLimit.HasValue)
+            setting.DefaultCreditLimit = dto.DefaultCreditLimit.Value;
         setting.UpdatedAt = DateTime.UtcNow;
         setting.UpdatedBy = _currentUserService.UserId;
 
