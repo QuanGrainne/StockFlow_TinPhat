@@ -61,6 +61,7 @@ Mã BR giữ nguyên theo Report 3 để truy vết.
 | FR-CRD-05 | Theo dõi đơn đặt hàng (`BOOKING`) và hóa đơn (`INVOICE`) theo khách, giá trị, trạng thái | Một phần | Xem qua màn Đặt hàng và Hóa đơn |
 | FR-CRD-06 | Duyệt yêu cầu tín dụng khi công nợ vượt hạn mức: duyệt giao dịch một lần, duyệt hạn mức mới, từ chối kèm lý do | Chưa có | Đang triển khai (bảng `trx_credit_limit_requests` đã có) |
 | FR-CRD-07 | Theo dõi tiến độ giao hàng của đơn đặt (SL đặt, đã giao, còn lại) trên màn Manager | Chưa có | — |
+| FR-CRD-08 | Manager (Kế toán trưởng) cài hạn mức mặc định cho khách mới; điều chỉnh hạn mức từng khách hoặc hàng loạt (đặt cố định, tăng/giảm %, về mặc định), bắt buộc lý do; xem lịch sử thay đổi hạn mức | Có (15/11/2026) | Thiết lập công nợ có ô "Hạn mức mặc định cho khách mới"; màn Khách hàng có nút "Điều chỉnh hạn mức" (chi tiết khách và thanh chọn nhiều) và tab "Lịch sử hạn mức". Quyền `SALES_APPROVE` + chức năng `feat-credit-approvals` |
 
 ## 7. Non-functional Requirements
 
@@ -77,6 +78,8 @@ Mã BR giữ nguyên theo Report 3 để truy vết.
 |---|---|---|
 | Từ chối | Phải có lý do | Chưa có |
 | Hạn mức mới | Không thấp hơn hạn mức hiện tại | Chưa có |
+| Điều chỉnh hạn mức (FR-CRD-08) | 0 – 999.999.999.999 đ; không thấp hơn dư nợ hiện tại (kiểm trong câu UPDATE); không áp cho khách lẻ KH00000; bắt buộc lý do ≤ 500 ký tự; % khác 0, trong (-100, 1000], làm tròn 1.000 đ; hàng loạt tối đa 500 khách, khách không đổi được thì bỏ qua và báo lý do | FE + BE |
+| Hạn mức mặc định | 0 – 999.999.999.999 đ; chỉ áp cho khách tạo sau khi lưu | FE + BE |
 | Yêu cầu | Phải còn ở trạng thái chờ | Chưa có |
 
 ## 9. Main Flow
@@ -110,6 +113,10 @@ Chỉ liệt kê API đang có trong code. Dòng "—" là yêu cầu chưa có 
 | GET | /api/customers | PARTNER_READ | Danh sách khách kèm dư nợ, hạn mức, lọc theo tình trạng nợ | Một phần |
 | GET | /api/customers/{id} | PARTNER_READ | Hồ sơ khách, lịch sử | Một phần |
 | GET | /api/customers/stats | PARTNER_READ | Số liệu tổng hợp | Ngoài tài liệu |
+| PATCH | /api/customers/{id}/credit-limit | SALES_APPROVE | Điều chỉnh hạn mức một khách (FR-CRD-08) | Có |
+| PATCH | /api/customers/credit-limit/batch | SALES_APPROVE | Điều chỉnh hạn mức hàng loạt: `SET`, `PERCENT`, `RESET_DEFAULT` | Có |
+| GET | /api/customers/{id}/credit-limit-history | PARTNER_READ | Lịch sử thay đổi hạn mức | Có |
+| GET / PUT | /api/settings/debt-warning | PARTNER_READ / SALES_APPROVE | Thiết lập công nợ, gồm `defaultCreditLimit` | Có |
 | — | Ghi chú nhắc nợ | — | A29.1 | Chưa có |
 | — | Danh sách và quyết định yêu cầu tín dụng | — | UC-64 | Chưa có |
 
@@ -122,6 +129,8 @@ Mọi bảng thuộc schema `stockflow`. SPEC này không đề xuất bảng ha
 | mst_business_partners | Hạn mức, dư nợ | Thiếu kỳ hạn thanh toán (BR-18) |
 | trx_credit_limit_requests | Yêu cầu tín dụng và quyết định | Có bảng, không có code |
 | trx_orders, trx_financial_transactions | Hóa đơn còn nợ, phiếu thu | Có |
+| trx_credit_limit_histories | Lịch sử đổi hạn mức: cũ, mới, nguồn (`INITIAL`, `MANUAL`, `BULK`, `REQUEST_APPROVED`), lý do, người đổi, thời gian (BR-49 cho hạn mức) | Có (migration AddCreditLimitHistoryAndDefaultLimitSetting) |
+| mst_debt_warning_settings.default_credit_limit | Hạn mức mặc định cho khách mới, mặc định 200.000.000 đ | Có |
 
 ## 14. Acceptance Criteria
 

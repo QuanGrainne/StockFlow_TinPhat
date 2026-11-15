@@ -1041,6 +1041,11 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("debt_days_threshold");
 
+                    b.Property<decimal>("DefaultCreditLimit")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("default_credit_limit");
+
                     b.Property<bool>("EnableDebtAmountWarning")
                         .HasColumnType("boolean")
                         .HasColumnName("enable_debt_amount_warning");
@@ -1766,6 +1771,64 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("sec_users", "stockflow");
+                });
+
+            modelBuilder.Entity("StockFlow.Domain.Entities.TrxCreditLimitHistory", b =>
+                {
+                    b.Property<long>("HistoryId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("history_id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("HistoryId"));
+
+                    b.Property<DateTime>("ChangedAt")
+                        .HasColumnType("timestamp without time zone")
+                        .HasColumnName("changed_at");
+
+                    b.Property<int?>("ChangedBy")
+                        .HasColumnType("integer")
+                        .HasColumnName("changed_by");
+
+                    b.Property<decimal>("NewLimit")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("new_limit");
+
+                    b.Property<decimal>("OldLimit")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("old_limit");
+
+                    b.Property<int>("PartnerId")
+                        .HasColumnType("integer")
+                        .HasColumnName("partner_id");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("reason");
+
+                    b.Property<int?>("RequestId")
+                        .HasColumnType("integer")
+                        .HasColumnName("request_id");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("source");
+
+                    b.HasKey("HistoryId")
+                        .HasName("trx_credit_limit_histories_pkey");
+
+                    b.HasIndex("ChangedBy");
+
+                    b.HasIndex("RequestId");
+
+                    b.HasIndex(new[] { "PartnerId", "ChangedAt" }, "ix_trx_credit_limit_histories_partner_changed");
+
+                    b.ToTable("trx_credit_limit_histories", "stockflow");
                 });
 
             modelBuilder.Entity("StockFlow.Domain.Entities.TrxCreditLimitRequest", b =>
@@ -3895,6 +3958,30 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_mst_warehouse_locations_warehouse_id");
 
                     b.Navigation("Warehouse");
+                });
+
+            modelBuilder.Entity("StockFlow.Domain.Entities.TrxCreditLimitHistory", b =>
+                {
+                    b.HasOne("StockFlow.Domain.Entities.SecUser", null)
+                        .WithMany()
+                        .HasForeignKey("ChangedBy")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_trx_credit_limit_histories_changed_by");
+
+                    b.HasOne("StockFlow.Domain.Entities.MstBusinessPartner", "Partner")
+                        .WithMany()
+                        .HasForeignKey("PartnerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_trx_credit_limit_histories_partner");
+
+                    b.HasOne("StockFlow.Domain.Entities.TrxCreditLimitRequest", null)
+                        .WithMany()
+                        .HasForeignKey("RequestId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_trx_credit_limit_histories_request");
+
+                    b.Navigation("Partner");
                 });
 
             modelBuilder.Entity("StockFlow.Domain.Entities.TrxCreditLimitRequest", b =>
