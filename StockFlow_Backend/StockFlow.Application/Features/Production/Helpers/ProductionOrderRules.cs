@@ -72,6 +72,10 @@ public static class ProductionOrderRules
             if (it.PlannedQuantity <= 0 || !ProductionHelper.HasMaxScale(it.PlannedQuantity, ProductionPolicy.QuantityScale))
                 return "Số lượng kế hoạch của từng thành phẩm phải lớn hơn 0 và có tối đa 2 chữ số thập phân.";
         }
+        // V-04: số lượng từng dòng và tổng (cột numeric(18,2) của lệnh) không vượt giới hạn lưu trữ, tránh lỗi 500 khi lưu
+        if (items.Any(i => i.PlannedQuantity > ProductionPolicy.MaxStoredQuantity)
+            || items.Sum(i => i.PlannedQuantity) > ProductionPolicy.MaxStoredQuantity)
+            return ProductionMessages.QuantityLimit;
 
         var productIds = items.Select(i => i.ProductId).ToList();
         var products = await context.MstProducts.AsNoTracking()
@@ -112,6 +116,10 @@ public static class ProductionOrderRules
 
             if (it.CustomMaterials is not { Count: > 0 })
             {
+                // V-04: nhu cầu tính ra phải lưu được vào numeric(18,2)
+                if (bom.DtlBomItems.Any(b => !ProductionPolicy.TryCalculateRequirement(
+                        it.PlannedQuantity, b.Quantity ?? 0, b.WastageRate ?? 0, out _)))
+                    return ProductionMessages.QuantityLimit;
                 AddRequirementsFromBom(context, order, bom, it.PlannedQuantity, orderItem);
                 continue;
             }
@@ -149,7 +157,8 @@ public static class ProductionOrderRules
                 var mat = matMap[cm.MaterialId];
                 var hasBomLine = bomByMaterial.TryGetValue(cm.MaterialId, out var bi);
                 var lineChanged = !hasBomLine || (bi!.Quantity ?? 0) != cm.NormPerUnit || (bi.WastageRate ?? 0) != cm.WastageRate;
-                var required = ProductionPolicy.CalculateRequirement(it.PlannedQuantity, cm.NormPerUnit, cm.WastageRate);
+                if (!ProductionPolicy.TryCalculateRequirement(it.PlannedQuantity, cm.NormPerUnit, cm.WastageRate, out var required))
+                    return ProductionMessages.QuantityLimit; // V-04
                 var adjustNote = lineChanged && !string.IsNullOrWhiteSpace(reason)
                     ? (hasBomLine
                         ? $"{reason} (định mức {bi!.Quantity ?? 0:0.####} → {cm.NormPerUnit:0.####}, hao hụt {bi.WastageRate ?? 0:0.##}% → {cm.WastageRate:0.##}%)"

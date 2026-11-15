@@ -139,13 +139,21 @@ export function ProductionFilterSidebar({
                 <input
                   type="date"
                   value={state.dateFrom ?? ''}
-                  onChange={(e) => onChange({ dateFrom: e.target.value || undefined })}
+                  max={state.dateTo}
+                  onChange={(e) => {
+                    const newFrom = e.target.value || undefined;
+                    onChange({
+                      dateFrom: newFrom,
+                      ...(newFrom && state.dateTo && newFrom > state.dateTo ? { dateTo: newFrom } : {}),
+                    });
+                  }}
                   className="h-8 px-2 text-xs border border-slate-300 rounded-[8px] focus:outline-none focus:border-[#0070f4]"
                   title="Từ ngày"
                 />
                 <input
                   type="date"
                   value={state.dateTo ?? ''}
+                  min={state.dateFrom}
                   onChange={(e) => onChange({ dateTo: e.target.value || undefined })}
                   className="h-8 px-2 text-xs border border-slate-300 rounded-[8px] focus:outline-none focus:border-[#0070f4]"
                   title="Đến ngày"

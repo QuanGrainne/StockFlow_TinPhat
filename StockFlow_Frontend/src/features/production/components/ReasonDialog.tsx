@@ -12,9 +12,11 @@ interface ReasonDialogProps {
   busy: boolean;
   onCancel: () => void;
   onConfirm: (reason: string) => void;
+  /** Số ký tự tối đa của lý do (mặc định 300; lý do từ chối / hủy kế hoạch sản xuất là 200) */
+  maxLength?: number;
 }
 
-export function ReasonDialog({ title, description, confirmText, busy, onCancel, onConfirm }: ReasonDialogProps) {
+export function ReasonDialog({ title, description, confirmText, busy, onCancel, onConfirm, maxLength = 300 }: ReasonDialogProps) {
   const [reason, setReason] = useState('');
   const [touched, setTouched] = useState(false);
   const missing = !reason.trim();
@@ -50,7 +52,7 @@ export function ReasonDialog({ title, description, confirmText, busy, onCancel, 
       <textarea
         value={reason}
         onChange={(e) => setReason(e.target.value)}
-        maxLength={300}
+        maxLength={maxLength}
         rows={3}
         autoFocus
         className={`w-full px-2.5 py-1.5 text-[13px] border rounded-[6px] focus:outline-none ${
