@@ -28,27 +28,30 @@ public static class BomRules
         if (req.Items == null || req.Items.Count == 0)
             return ("BOM phải có ít nhất một nguyên vật liệu.", product, empty);
 
-        if (req.Items.Select(i => i.MaterialId).Distinct().Count() != req.Items.Count)
-            return ("Một nguyên vật liệu chỉ được xuất hiện một lần trong BOM.", product, empty);
-
-        if (req.Items.Any(i => i.MaterialId == req.ProductId))
-            return ("Thành phẩm không được là nguyên vật liệu trong BOM của chính nó.", product, empty);
-
-        foreach (var i in req.Items)
+        // Báo lỗi kèm số dòng (đếm từ 1, theo thứ tự người dùng nhập) để dễ tìm dòng sai khi BOM nhiều NVL.
+        var firstSeen = new Dictionary<int, int>();
+        for (var idx = 0; idx < req.Items.Count; idx++)
         {
+            var i = req.Items[idx];
+            var row = idx + 1;
+            if (i.MaterialId == req.ProductId)
+                return ($"Dòng {row}: thành phẩm không được là nguyên vật liệu trong BOM của chính nó.", product, empty);
+            if (!firstSeen.TryAdd(i.MaterialId, row))
+                return ($"Dòng {row}: nguyên vật liệu trùng với dòng {firstSeen[i.MaterialId]}, một nguyên vật liệu chỉ được xuất hiện một lần trong BOM.", product, empty);
             if (i.Quantity <= 0 || !ProductionHelper.HasMaxScale(i.Quantity, QuantityScale))
-                return ($"Định mức phải lớn hơn 0 và có tối đa {QuantityScale} chữ số thập phân.", product, empty);
+                return ($"Dòng {row}: định mức phải lớn hơn 0 và có tối đa {QuantityScale} chữ số thập phân.", product, empty);
             if (i.WastageRate < 0 || i.WastageRate > 100 || !ProductionHelper.HasMaxScale(i.WastageRate, WastageScale))
-                return ($"Tỷ lệ hao hụt phải từ 0 đến 100% và có tối đa {WastageScale} chữ số thập phân.", product, empty);
+                return ($"Dòng {row}: tỷ lệ hao hụt phải từ 0 đến 100% và có tối đa {WastageScale} chữ số thập phân.", product, empty);
         }
 
         var ids = req.Items.Select(i => i.MaterialId).ToList();
         var materials = await context.MstProducts.Where(p => ids.Contains(p.ProductId)).ToDictionaryAsync(p => p.ProductId, ct);
         var lines = new List<(SaveBomItemRequest, MstProduct)>();
-        foreach (var i in req.Items)
+        for (var idx = 0; idx < req.Items.Count; idx++)
         {
+            var i = req.Items[idx];
             if (!materials.TryGetValue(i.MaterialId, out var m) || m.IsActive == false)
-                return ("Nguyên vật liệu không tồn tại hoặc đã ngừng kinh doanh.", product, empty);
+                return ($"Dòng {idx + 1}: nguyên vật liệu không tồn tại hoặc đã ngừng kinh doanh.", product, empty);
             lines.Add((i, m));
         }
         return (null, product, lines);
