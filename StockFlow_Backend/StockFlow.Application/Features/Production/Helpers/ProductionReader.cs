@@ -28,7 +28,7 @@ public static class ProductionReader
             b.DtlBomItems.Count,
             b.CreatedAt,
             b.Description,
-            b.TrxProductionOrders.Any()));
+            b.TrxProductionOrders.Any() || b.DtlProductionOrderItems.Any()));
 
     public static async Task<BomDetailDto?> BomDetailAsync(IStockFlowDbContext context, int bomId, CancellationToken ct)
     {

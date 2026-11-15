@@ -54,6 +54,14 @@ public static class BomRules
         return (null, product, lines);
     }
 
+    /// <summary>
+    /// BOM đã được dùng trong lệnh sản xuất chưa (BR-06). Lệnh nhiều thành phẩm chỉ lưu BOM thành phẩm đầu
+    /// ở <c>trx_production_orders.bom_id</c>; BOM các thành phẩm còn lại nằm ở <c>dtl_production_order_items.bom_id</c>.
+    /// </summary>
+    public static async Task<bool> IsUsedAsync(IStockFlowDbContext context, int bomId, CancellationToken ct) =>
+        await context.TrxProductionOrders.AnyAsync(o => o.BomId == bomId, ct)
+        || await context.DtlProductionOrderItems.AnyAsync(i => i.BomId == bomId, ct);
+
     /// <summary>Phiên bản tiếp theo của BOM thành phẩm (1, 2, 3...) khi người dùng không nhập.</summary>
     public static async Task<string> NextVersionAsync(IStockFlowDbContext context, int productId, CancellationToken ct)
     {
