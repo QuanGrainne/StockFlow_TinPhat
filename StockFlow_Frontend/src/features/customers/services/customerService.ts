@@ -14,6 +14,10 @@ import {
   CreateCustomerPaymentPayload,
   CustomerReceiptDetail,
   DebtWarningSettings,
+  BatchCreditLimitResult,
+  CreditLimitBatchMode,
+  CreditLimitChange,
+  CreditLimitHistoryItem,
 } from '../types';
 import type { DebtAdjustmentDetail, DebtAdjustPayload, DebtAdjustResult } from '@/components/debt/types';
 
@@ -309,6 +313,25 @@ export const customerService = {
   },
 
   /** Thiết lập cảnh báo công nợ khách hàng */
+  /** Manager điều chỉnh hạn mức một khách (không được thấp hơn dư nợ hiện tại) */
+  async updateCreditLimit(partnerId: number, newLimit: number, reason: string): Promise<CreditLimitChange> {
+    return apiClient.patch<CreditLimitChange>(`/api/customers/${partnerId}/credit-limit`, { newLimit, reason });
+  },
+
+  /** Manager điều chỉnh hạn mức hàng loạt; khách không đổi được trả về trong `skipped` */
+  async batchUpdateCreditLimit(
+    partnerIds: number[],
+    mode: CreditLimitBatchMode,
+    value: number,
+    reason: string
+  ): Promise<BatchCreditLimitResult> {
+    return apiClient.patch<BatchCreditLimitResult>('/api/customers/credit-limit/batch', { partnerIds, mode, value, reason });
+  },
+
+  async getCreditLimitHistory(partnerId: number): Promise<CreditLimitHistoryItem[]> {
+    return apiClient.get<CreditLimitHistoryItem[]>(`/api/customers/${partnerId}/credit-limit-history`);
+  },
+
   async getDebtWarningSettings(): Promise<DebtWarningSettings> {
     return apiClient.get<DebtWarningSettings>('/api/settings/debt-warning');
   },

@@ -7,6 +7,7 @@
 import React, { useEffect, useState } from 'react';
 import { ChevronDown, ChevronUp, UserRound, X } from 'lucide-react';
 import { useActiveWarehouse } from '@/lib/warehouse/useActiveWarehouse';
+import { customerService } from '../services/customerService';
 import { CreateCustomerPayload, Customer, CustomerGender } from '../types';
 
 interface CustomerFormModalProps {
@@ -18,8 +19,8 @@ interface CustomerFormModalProps {
   onSuccess: (payload: CreateCustomerPayload) => Promise<void> | void;
 }
 
-/** Hạn mức mặc định khách mới — khớp CustomerCreditPolicy.DefaultCreditLimit ở backend */
-const DEFAULT_CREDIT_LIMIT = 200_000_000;
+/** Chỉ dùng khi chưa tải được thiết lập: backend tự gán hạn mức mặc định đang cài */
+const FALLBACK_DEFAULT_CREDIT_LIMIT = 200_000_000;
 
 const labelCls = 'block text-[13px] text-[#15171a] mb-1.5';
 const inputCls =
@@ -48,9 +49,23 @@ function CustomerFormBody({
   const [email, setEmail] = useState(customer?.email ?? '');
   const [facebook, setFacebook] = useState(customer?.facebook ?? '');
   const [address, setAddress] = useState(customer?.address ?? '');
-  // Hạn mức chỉ xem: khách mới mặc định 200.000.000 đ (CustomerCreditPolicy ở backend);
-  // chỉ Kế toán trưởng đổi qua duyệt yêu cầu hạn mức (UC-64)
-  const creditLimit = isEditing ? customer?.creditLimit ?? 0 : DEFAULT_CREDIT_LIMIT;
+  // Hạn mức chỉ xem trên form: khách mới nhận hạn mức mặc định Manager cài trong "Thiết lập công nợ";
+  // đổi hạn mức bằng "Điều chỉnh hạn mức" (Manager) hoặc duyệt yêu cầu hạn mức (UC-64)
+  const [defaultLimit, setDefaultLimit] = useState(FALLBACK_DEFAULT_CREDIT_LIMIT);
+  useEffect(() => {
+    if (isEditing) return;
+    let stale = false;
+    customerService
+      .getDebtWarningSettings()
+      .then((s) => {
+        if (!stale && typeof s.defaultCreditLimit === 'number') setDefaultLimit(s.defaultCreditLimit);
+      })
+      .catch(() => undefined);
+    return () => {
+      stale = true;
+    };
+  }, [isEditing]);
+  const creditLimit = isEditing ? customer?.creditLimit ?? 0 : defaultLimit;
   const [notes, setNotes] = useState(customer?.notes ?? '');
   const [addressOpen, setAddressOpen] = useState(true);
   const [otherOpen, setOtherOpen] = useState(true);
@@ -227,11 +242,13 @@ function CustomerFormBody({
                   <input
                     readOnly
                     value={creditLimit.toLocaleString('vi-VN')}
-                    title="Chỉ Kế toán trưởng thay đổi hạn mức qua duyệt yêu cầu hạn mức"
+                    title="Hạn mức do Kế toán trưởng (Manager) điều chỉnh"
                     className={`${inputCls} text-right bg-[#f7f8f9] text-[#677484] cursor-not-allowed`}
                   />
                   <div className="mt-1 text-[11px] text-[#677484]">
-                    {isEditing ? 'Đổi hạn mức: gửi yêu cầu duyệt từ màn Bán hàng.' : 'Mặc định cho khách mới.'}
+                    {isEditing
+                      ? 'Đổi hạn mức: Manager dùng "Điều chỉnh hạn mức", hoặc gửi yêu cầu duyệt từ màn Bán hàng.'
+                      : 'Mặc định cho khách mới (Manager cài trong Thiết lập công nợ).'}
                   </div>
                 </div>
                 <div>

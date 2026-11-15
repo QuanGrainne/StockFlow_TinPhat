@@ -1,6 +1,7 @@
 // src/features/customers/components/DebtWarningSettingsModal.tsx
 // Popup "Thiết lập cảnh báo công nợ khách hàng" (Manager / Kế toán trưởng / Admin) — mở từ màn Khách hàng.
 // Số tiền nợ / số ngày nợ chỉ là ngưỡng CẢNH BÁO chung, không thay hạn mức riêng của từng khách.
+// "Hạn mức mặc định" chỉ áp cho khách tạo mới; khách cũ đổi bằng "Điều chỉnh hạn mức".
 
 'use client';
 
@@ -42,6 +43,7 @@ export function DebtWarningSettingsModal({ open, onClose, onSaved }: Props) {
   const [days, setDays] = useState('15');
   const [daysFrom, setDaysFrom] = useState<DebtDaysFrom>('FIRST_DEBT');
   const [allowOver, setAllowOver] = useState(false);
+  const [defaultLimit, setDefaultLimit] = useState('200000000');
 
   useEffect(() => {
     if (!open) return;
@@ -56,6 +58,7 @@ export function DebtWarningSettingsModal({ open, onClose, onSaved }: Props) {
         setDays(String(s.debtDaysThreshold || 0));
         setDaysFrom(s.debtDaysFrom === 'LAST_TRANSACTION' ? 'LAST_TRANSACTION' : 'FIRST_DEBT');
         setAllowOver(s.allowDebtOverLimit);
+        setDefaultLimit(String(Math.round(s.defaultCreditLimit ?? 200000000)));
       })
       .catch((e: unknown) => setError(e instanceof Error ? e.message : 'Không tải được thiết lập.'))
       .finally(() => setLoading(false));
@@ -88,6 +91,7 @@ export function DebtWarningSettingsModal({ open, onClose, onSaved }: Props) {
         debtDaysThreshold: daysNum,
         debtDaysFrom: daysFrom,
         allowDebtOverLimit: allowOver,
+        defaultCreditLimit: Number(defaultLimit || 0),
       });
       onSaved?.(saved);
       onClose();
@@ -179,6 +183,27 @@ export function DebtWarningSettingsModal({ open, onClose, onSaved }: Props) {
                     <option value="LAST_TRANSACTION">Giao dịch cuối cùng</option>
                   </select>
                 </div>
+              </section>
+
+              <section className="space-y-2">
+                <p className="font-semibold">Hạn mức công nợ</p>
+                <div className="flex items-center gap-3 flex-wrap">
+                  <span className="flex items-center gap-2 w-[180px]">
+                    Hạn mức mặc định cho khách mới
+                  </span>
+                  <div className="flex items-center h-9 w-[190px] rounded-[8px] border border-slate-300 overflow-hidden bg-white focus-within:border-[#0070f4]">
+                    <input
+                      inputMode="numeric"
+                      value={defaultLimit ? fmt.format(Number(defaultLimit)) : ''}
+                      onChange={(e) => setDefaultLimit(digitsOnly(e.target.value).slice(0, 12))}
+                      className="flex-1 min-w-0 h-full px-3 bg-transparent outline-none text-right"
+                    />
+                    <span className="px-3 h-full flex items-center border-l border-slate-200 text-[#677484]">đ</span>
+                  </div>
+                </div>
+                <p className="text-[12px] text-[#677484]">
+                  Chỉ áp dụng cho khách tạo sau khi lưu. Khách hiện có: chọn khách ở danh sách → &quot;Điều chỉnh hạn mức&quot;.
+                </p>
               </section>
 
               <section className="space-y-2.5">
