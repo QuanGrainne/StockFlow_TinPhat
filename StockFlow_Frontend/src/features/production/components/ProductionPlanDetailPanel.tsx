@@ -6,7 +6,7 @@
 // Nút thao tác hiện theo detail.actions do backend tính (không tự suy ra từ trạng thái).
 
 import React, { useState } from 'react';
-import { Ban, CheckCircle2, ClipboardPlus, Lock, Pencil, RefreshCcw, Send, XCircle } from 'lucide-react';
+import { Ban, CheckCircle2, ClipboardPlus, Lock, Pencil, RefreshCcw, Send, ShoppingCart, XCircle } from 'lucide-react';
 import { ProductCodeLink } from '@/components/links/EntityLinks';
 import type { WarehouseItem } from '@/lib/warehouse/useActiveWarehouse';
 import type { ProductionPlanDetail } from '../types';
@@ -19,7 +19,15 @@ import { PlanMaterialRequirementsPanel } from './PlanMaterialRequirementsPanel';
 
 type Tab = 'info' | 'materials' | 'orders';
 
-export type ProductionPlanAction = 'edit' | 'submit' | 'approve' | 'reject' | 'createOrder' | 'close' | 'cancel';
+export type ProductionPlanAction =
+  | 'edit'
+  | 'submit'
+  | 'approve'
+  | 'reject'
+  | 'createOrder'
+  | 'close'
+  | 'cancel'
+  | 'purchaseOrder';
 
 interface ProductionPlanDetailPanelProps {
   detail: ProductionPlanDetail | null;
@@ -27,6 +35,8 @@ interface ProductionPlanDetailPanelProps {
   warehouses: WarehouseItem[];
   defaultWarehouseId: number | null;
   onAction: (action: ProductionPlanAction) => void;
+  /** Hiện nút "Đặt hàng nhập" (đặt NVL theo kế hoạch); màn hình cha quyết định theo chức năng và trạng thái */
+  canOrderMaterials?: boolean;
 }
 
 const actionBtn =
@@ -36,7 +46,14 @@ const primaryBtn =
 const dangerBtn =
   'flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-[8px] border border-[#fecaca] text-[#fb2c36] bg-white hover:bg-[#fef2f2] cursor-pointer';
 
-export function ProductionPlanDetailPanel({ detail, loading, warehouses, defaultWarehouseId, onAction }: ProductionPlanDetailPanelProps) {
+export function ProductionPlanDetailPanel({
+  detail,
+  loading,
+  warehouses,
+  defaultWarehouseId,
+  onAction,
+  canOrderMaterials,
+}: ProductionPlanDetailPanelProps) {
   const [tab, setTab] = useState<Tab>('info');
 
   if (!detail) {
@@ -136,7 +153,7 @@ export function ProductionPlanDetailPanel({ detail, loading, warehouses, default
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
             {[
-              { label: 'Tổng kế hoạch', value: s.totalPlannedQuantity, cls: '' },
+              { label: 'Tổng SL kế hoạch', value: s.totalPlannedQuantity, cls: '' },
               { label: 'Đã lập lệnh', value: s.totalOrderedQuantity, cls: 'text-[#0070f4]' },
               { label: 'Còn lại chưa lập lệnh', value: totalRemaining, cls: 'text-[#d97706]' },
               { label: 'Đã nhập kho', value: totalReceived, cls: 'text-[#16a34a]' },
@@ -158,7 +175,7 @@ export function ProductionPlanDetailPanel({ detail, loading, warehouses, default
                   <th className="py-1.5 px-3 w-14 text-center">ĐVT</th>
                   <th className="py-1.5 px-3 w-44">Thời gian</th>
                   <th className="py-1.5 px-3 w-36">Kho nhận</th>
-                  <th className="py-1.5 px-3 w-24 text-right">Kế hoạch</th>
+                  <th className="py-1.5 px-3 w-24 text-right">SL kế hoạch</th>
                   <th className="py-1.5 px-3 w-24 text-right">Đã lập lệnh</th>
                   <th className="py-1.5 px-3 w-24 text-right">Còn lại</th>
                   <th className="py-1.5 px-3 w-24 text-right">Đã nhập kho</th>
@@ -217,7 +234,7 @@ export function ProductionPlanDetailPanel({ detail, loading, warehouses, default
                 <th className="py-1.5 px-3 w-28">Mã lệnh</th>
                 <th className="py-1.5 px-3 w-32">Ngày lập</th>
                 <th className="py-1.5 px-3">Thành phẩm</th>
-                <th className="py-1.5 px-3 w-24 text-right">Kế hoạch</th>
+                <th className="py-1.5 px-3 w-24 text-right">SL kế hoạch</th>
                 <th className="py-1.5 px-3 w-24 text-right">Đã nhập</th>
                 <th className="py-1.5 px-3 w-28">Hạn hoàn thành</th>
                 <th className="py-1.5 px-3 w-32">Người lập</th>
@@ -277,6 +294,16 @@ export function ProductionPlanDetailPanel({ detail, loading, warehouses, default
         {a.canReject && (
           <button type="button" onClick={() => onAction('reject')} className={dangerBtn}>
             <XCircle size={14} /> Từ chối
+          </button>
+        )}
+        {canOrderMaterials && (
+          <button
+            type="button"
+            onClick={() => onAction('purchaseOrder')}
+            className={actionBtn}
+            title="Mở phiếu đặt hàng nhập, điền sẵn nguyên vật liệu theo toàn bộ nhu cầu của kế hoạch"
+          >
+            <ShoppingCart size={14} /> Đặt hàng nhập
           </button>
         )}
         {a.canSubmit && (

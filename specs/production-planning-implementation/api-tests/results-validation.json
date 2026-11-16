@@ -93,13 +93,13 @@
         "Id":  "VT-16",
         "Name":  "Người lưu sau với bản cũ bị từ chối, không ghi đè (Q-V5)",
         "Pass":  true,
-        "Actual":  "A=200 B=400 Kế hoạch đã được Phạm Văn Sản Xuất cập nhật lúc 15/11/2026 10:32:12. Vui lòng tải lại kế hoạch rồi sửa tiếp. | DB SL=10.00"
+        "Actual":  "A=200 B=400 Kế hoạch đã được Phạm Văn Sản Xuất cập nhật lúc 15/11/2026 19:55:44. Vui lòng tải lại kế hoạch rồi sửa tiếp. | DB SL=10.00"
     },
     {
         "Id":  "VT-17",
         "Name":  "Sửa với phiên bản mới nhất → lưu được; chi tiết có người / thời điểm cập nhật",
         "Pass":  true,
-        "Actual":  "200 by=Phạm Văn Sản Xuất at=2026-11-15T10:32:12.885246"
+        "Actual":  "200 by=Phạm Văn Sản Xuất at=2026-11-15T19:55:44.71576"
     },
     {
         "Id":  "VT-18",

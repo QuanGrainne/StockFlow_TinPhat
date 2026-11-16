@@ -268,6 +268,30 @@ public static class ProductionPlanRules
         return null;
     }
 
+    /// <summary>
+    /// Kế hoạch đủ điều kiện chuyển bước (gửi duyệt, duyệt): có ít nhất một dòng; thành phẩm còn hoạt động, đúng loại
+    /// (V-08, Q-V2); mọi thành phẩm có BOM đang áp dụng (BR-PP-09). Dùng chung cho gửi duyệt và duyệt (R-05) để
+    /// kế hoạch đã duyệt luôn lập lệnh được. Trả về thông báo lỗi (nêu mã hàng) hoặc null.
+    /// </summary>
+    public static async Task<string?> ValidateReadyForApprovalAsync(
+        IStockFlowDbContext context, IReadOnlyCollection<int> productIds, CancellationToken ct)
+    {
+        if (productIds.Count == 0) return "Kế hoạch phải có ít nhất một thành phẩm.";
+
+        var productError = await ValidatePlanProductsAsync(context, productIds, ct);
+        if (productError != null) return productError;
+
+        var withoutBom = await ProductsWithoutActiveBomAsync(context, productIds, ct);
+        if (withoutBom.Count == 0) return null;
+        var ids = withoutBom.ToList();
+        var codes = await context.MstProducts.AsNoTracking()
+            .Where(p => ids.Contains(p.ProductId))
+            .OrderBy(p => p.ProductCode)
+            .Select(p => p.ProductCode)
+            .ToListAsync(ct);
+        return $"{ProductionMessages.NoActiveBom} ({string.Join(", ", codes)})";
+    }
+
     /// <summary>Thành phẩm chưa có BOM đang áp dụng (có ít nhất một dòng NVL) trong danh sách.</summary>
     public static async Task<HashSet<int>> ProductsWithoutActiveBomAsync(
         IStockFlowDbContext context, IEnumerable<int> productIds, CancellationToken ct)

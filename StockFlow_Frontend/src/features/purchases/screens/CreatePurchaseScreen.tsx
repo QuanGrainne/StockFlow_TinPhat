@@ -153,8 +153,10 @@ export default function CreatePurchaseScreen({ mode = 'receipt' }: CreatePurchas
   const copyPurchaseId = editPurchaseId ? null : searchParams.get('copy');
   const sourcePurchaseId = editPurchaseId || copyPurchaseId;
   // Nhập hàng từ danh mục hàng hóa: ?products=1,2,3 → thêm sẵn các hàng đã chọn vào phiếu mới;
-  // kèm số lượng ?products=1:5,2:2.5 (VD đặt hàng nhập NVL còn thiếu từ màn Lập lệnh sản xuất)
+  // kèm số lượng ?products=1:5,2:2.5 (VD đặt hàng nhập NVL còn thiếu từ màn Lập lệnh sản xuất,
+  // hoặc NVL theo kế hoạch sản xuất từ màn Duyệt kế hoạch); ?notes= điền sẵn ghi chú phiếu.
   const prefillProductIds = sourcePurchaseId ? null : searchParams.get('products');
+  const prefillNotes = sourcePurchaseId ? null : searchParams.get('notes');
   // Nhập hàng theo phiếu đặt hàng nhập: ?po=<id> → nạp phần chưa nhập của phiếu đặt
   const fromPoId = isOrder || sourcePurchaseId ? null : searchParams.get('po');
 
@@ -228,7 +230,7 @@ export default function CreatePurchaseScreen({ mode = 'receipt' }: CreatePurchas
   const [orderDiscountType, setOrderDiscountType] = useState<DiscountType>('VND');
   const [paidAmount, setPaidAmount] = useState<number>(0);
   const [paymentMethod, setPaymentMethod] = useState<'CASH' | 'BANK_TRANSFER'>('CASH');
-  const [notes, setNotes] = useState('');
+  const [notes, setNotes] = useState(() => prefillNotes?.slice(0, 500) ?? '');
   const [status, setStatus] = useState<'DRAFT' | 'COMPLETED'>('DRAFT');
   // Trạng thái gốc của phiếu đang mở để sửa (null = phiếu mới / sao chép)
   const [originalStatus, setOriginalStatus] = useState<'DRAFT' | 'COMPLETED' | null>(null);
@@ -263,7 +265,7 @@ export default function CreatePurchaseScreen({ mode = 'receipt' }: CreatePurchas
       ...(isOrder ? [] : ([['80px', 80]] as [string, number][])), // SL lỗi
       ['110px', 110], // Đơn giá
       ['90px', 90], // Giảm giá
-      ['110px', 110], // Thành tiền
+      ['140px', 140], // Thành tiền (đủ cho 999.999.999.999; số dài hơn thu nhỏ chữ)
     ];
     return {
       gridTemplate: cols.map((c) => c[0]).join(' '),
@@ -1244,6 +1246,7 @@ export default function CreatePurchaseScreen({ mode = 'receipt' }: CreatePurchas
                 <div>
                   {items.map((row, index) => {
                     const priceAboveSale = row.unitPrice > row.salePrice;
+                    const lineTotalText = formatVnd(row.lineTotal);
                     return (
                       <div
                         key={row.productId}
@@ -1388,9 +1391,15 @@ export default function CreatePurchaseScreen({ mode = 'receipt' }: CreatePurchas
                         </div>
 
                         {/* Thành tiền */}
-                        <div className="px-1">
-                          <div className="h-8 px-2.5 flex items-center justify-end rounded-[8px] border border-slate-300 bg-white text-[#15171a]">
-                            {Math.round(row.lineTotal).toLocaleString('vi-VN')}
+                        {/* min-w-0 + overflow-hidden: số dài không tràn ra ngoài ô; quá 15 ký tự thì thu nhỏ chữ, rê chuột xem đủ */}
+                        <div className="px-1 min-w-0">
+                          <div
+                            title={lineTotalText}
+                            className={`h-8 px-2 flex items-center justify-end rounded-[8px] border border-slate-300 bg-white text-[#15171a] overflow-hidden whitespace-nowrap tabular-nums ${
+                              lineTotalText.length > 15 ? 'text-[11px]' : ''
+                            }`}
+                          >
+                            {lineTotalText}
                           </div>
                         </div>
                       </div>

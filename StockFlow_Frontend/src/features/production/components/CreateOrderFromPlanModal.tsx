@@ -125,7 +125,7 @@ export function CreateOrderFromPlanModal({ detail, onClose, onCreated }: CreateO
                   <th className="py-1.5 px-2 w-10 text-center" />
                   <th className="py-1.5 px-2">Thành phẩm</th>
                   <th className="py-1.5 px-2 w-28">Thời gian KH</th>
-                  <th className="py-1.5 px-2 w-24 text-right">Kế hoạch</th>
+                  <th className="py-1.5 px-2 w-24 text-right">SL kế hoạch</th>
                   <th className="py-1.5 px-2 w-24 text-right">Đã lập lệnh</th>
                   <th className="py-1.5 px-2 w-24 text-right">Còn lại</th>
                   <th className="py-1.5 px-2 w-32 text-right">SL lập lệnh *</th>

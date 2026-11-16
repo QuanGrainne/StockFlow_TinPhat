@@ -10,6 +10,8 @@ namespace StockFlow.Application.Features.Production.Commands;
 /// <summary>
 /// UC-PP-04 bước 4–5: người có quyền duyệt duyệt kế hoạch Chờ duyệt → Đã duyệt, ghi người duyệt và thời điểm.
 /// Thiếu NVL chỉ cảnh báo, không chặn duyệt (BR-PP-15). Người lập được tự duyệt (Q2).
+/// R-05 (Q-R2 chốt 15/11/2026: chặn): kiểm lại như lúc gửi duyệt — thành phẩm mất BOM đang áp dụng, ngừng hoạt động
+/// hoặc không còn là thành phẩm / bán thành phẩm trong lúc chờ duyệt thì không cho duyệt, để kế hoạch đã duyệt luôn lập lệnh được.
 /// </summary>
 public record ApproveProductionPlanCommand(int ProductionPlanId) : IRequest<Result<ProductionPlanDetailDto>>;
 
@@ -36,12 +38,19 @@ public class ApproveProductionPlanCommandHandler : IRequestHandler<ApproveProduc
         await _context.AcquireTransactionLockAsync(ProductionPlanRules.LockKey(command.ProductionPlanId), ct);
 
         var plan = await _context.TrxProductionPlans
+            .Include(p => p.DtlProductionPlanItems)
             .FirstOrDefaultAsync(p => p.ProductionPlanId == command.ProductionPlanId, ct);
         if (plan == null) return Result.Failure<ProductionPlanDetailDto>(ProductionPlanMessages.PlanNotFound);
 
         var user = await ProductionPlanPermissions.LoadAsync(_permissions, userId, ct);
         var error = ProductionPlanPermissions.CheckApproveOrReject(plan, user);
         if (error != null) return Result.Failure<ProductionPlanDetailDto>(error);
+
+        // R-05: chặn duyệt nếu thành phẩm / BOM đã thay đổi sau khi gửi duyệt
+        var readyError = await ProductionPlanRules.ValidateReadyForApprovalAsync(
+            _context, plan.DtlProductionPlanItems.Select(i => i.ProductId).ToList(), ct);
+        if (readyError != null)
+            return Result.Failure<ProductionPlanDetailDto>($"Không duyệt được kế hoạch. {readyError}");
 
         var now = VietnamTime.Now;
         plan.MarkApproved();

@@ -87,7 +87,7 @@
         "Id":  "PP-15",
         "Name":  "Gửi duyệt → PENDING_APPROVAL",
         "Pass":  true,
-        "Actual":  "200 {\"summary\":{\"productionPlanId\":1,\"planCode\":\"KHSX00001\",\"planName\":\"Ke hoach thang 12\",\"planDate\":\"2026-11-15T10:32:07.410901\",\"periodStart\":\"2026-11-15\",\"perio"
+        "Actual":  "200 {\"summary\":{\"productionPlanId\":1,\"planCode\":\"KHSX00001\",\"planName\":\"Ke hoach thang 12\",\"planDate\":\"2026-11-15T19:55:38.862783\",\"periodStart\":\"2026-11-15\",\"perio"
     },
     {
         "Id":  "PP-16",
@@ -123,7 +123,7 @@
         "Id":  "PP-21",
         "Name":  "Từ chối có lý do → REJECTED, lý do ghi vào ghi chú",
         "Pass":  true,
-        "Actual":  "200 REJECTED | Ghi chu ban dau\n[Từ chối 15/11/2026 10:32 - Nguyễn Văn Quản Lý] Can xem lai so luong FG2"
+        "Actual":  "200 REJECTED | Ghi chu ban dau\n[Từ chối 15/11/2026 19:55 - Nguyễn Văn Quản Lý] Can xem lai so luong FG2"
     },
     {
         "Id":  "PP-22",
@@ -135,7 +135,7 @@
         "Id":  "PP-23",
         "Name":  "Manager duyệt → APPROVED, ghi người duyệt và thời điểm",
         "Pass":  true,
-        "Actual":  "APPROVED by=2 at=2026-11-15T10:32:07.741585"
+        "Actual":  "APPROVED by=2 at=2026-11-15T19:55:39.199747"
     },
     {
         "Id":  "PP-24",
@@ -243,7 +243,7 @@
         "Id":  "PP-41",
         "Name":  "Manager tăng FG1 lên 120 và thêm FG5 → vẫn APPROVED, FG1 còn 30",
         "Pass":  true,
-        "Actual":  "200 {\"summary\":{\"productionPlanId\":1,\"planCode\":\"KHSX00001\",\"planName\":\"Ke hoach thang 12\",\"planDate\":\"2026-11-15T10:32:07.410901\",\"periodStart\":\"2026-11-15\",\"perio còn=30.00"
+        "Actual":  "200 {\"summary\":{\"productionPlanId\":1,\"planCode\":\"KHSX00001\",\"planName\":\"Ke hoach thang 12\",\"planDate\":\"2026-11-15T19:55:38.862783\",\"periodStart\":\"2026-11-15\",\"perio còn=30.00"
     },
     {
         "Id":  "PP-42",
@@ -261,7 +261,7 @@
         "Id":  "PP-44",
         "Name":  "Hai người lập lệnh đồng thời: chỉ 2/5 thành công, không vượt kế hoạch",
         "Pass":  true,
-        "Actual":  "codes=400,200,400,200,400 ordered=110.00"
+        "Actual":  "codes=400,400,200,200,400 ordered=110.00"
     },
     {
         "Id":  "PP-45",
@@ -285,13 +285,13 @@
         "Id":  "PP-48",
         "Name":  "Người lập hủy kế hoạch nháp của mình → CANCELLED, lý do vào ghi chú",
         "Pass":  true,
-        "Actual":  "200 {\"summary\":{\"productionPlanId\":3,\"planCode\":\"KHSX00003\",\"planName\":\"KH cua prodstaff\",\"planDate\":\"2026-11-15T10:32:08.592912\",\"periodStart\":\"2026-11-15\",\"period"
+        "Actual":  "200 {\"summary\":{\"productionPlanId\":3,\"planCode\":\"KHSX00003\",\"planName\":\"KH cua prodstaff\",\"planDate\":\"2026-11-15T19:55:40.194595\",\"periodStart\":\"2026-11-15\",\"period"
     },
     {
         "Id":  "PP-49",
         "Name":  "Hủy kế hoạch đã duyệt khi mọi lệnh đã hủy → CANCELLED",
         "Pass":  true,
-        "Actual":  "200 {\"summary\":{\"productionPlanId\":2,\"planCode\":\"KHSX00002\",\"planName\":\"KH cua manager\",\"planDate\":\"2026-11-15T10:32:08.573318\",\"periodStart\":\"2026-11-15\",\"periodEn"
+        "Actual":  "200 {\"summary\":{\"productionPlanId\":2,\"planCode\":\"KHSX00002\",\"planName\":\"KH cua manager\",\"planDate\":\"2026-11-15T19:55:40.157829\",\"periodStart\":\"2026-11-15\",\"periodEn"
     },
     {
         "Id":  "PP-50",

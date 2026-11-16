@@ -133,7 +133,7 @@ export function ProductionOrderDetailPanel({
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
             {[
-              { label: 'Kế hoạch', value: s.plannedQuantity, cls: '' },
+              { label: 'SL kế hoạch', value: s.plannedQuantity, cls: '' },
               { label: 'Đã nhập kho', value: s.receivedQuantity, cls: 'text-[#16a34a]' },
               { label: 'Còn lại', value: Math.max(0, s.plannedQuantity - s.receivedQuantity), cls: 'text-[#0070f4]' },
               { label: 'Lỗi / phế phẩm', value: s.defectQuantity, cls: 'text-[#fb2c36]' },
@@ -164,7 +164,7 @@ export function ProductionOrderDetailPanel({
                       <th className="py-1.5 px-3">Tên thành phẩm</th>
                       <th className="py-1.5 px-3 w-14 text-center">ĐVT</th>
                       <th className="py-1.5 px-3 w-36">Định mức BOM</th>
-                      <th className="py-1.5 px-3 w-24 text-right">Kế hoạch</th>
+                      <th className="py-1.5 px-3 w-24 text-right">SL kế hoạch</th>
                       <th className="py-1.5 px-3 w-24 text-right">Đã nhập</th>
                       <th className="py-1.5 px-3 w-24 text-right">Còn lại</th>
                       <th className="py-1.5 px-3 w-36">Tiến độ</th>
