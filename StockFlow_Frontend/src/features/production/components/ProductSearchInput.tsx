@@ -1,6 +1,8 @@
 'use client';
 
-// Ô tìm mặt hàng cho form BOM / lập lệnh sản xuất (API tra cứu riêng của Sản xuất, không trả giá — BR-39).
+// Ô tìm mặt hàng cho form BOM / lập lệnh / kế hoạch sản xuất (API tra cứu riêng của Sản xuất, không trả giá — BR-39).
+// variant="catalog": giống ô tìm của màn Hàng hóa — chỉ hiện gợi ý khi đã gõ, dòng 2 tầng (tên + ĐVT / mã • tồn),
+// không có nhãn loại hàng, chọn bằng phím ↑ ↓ Enter.
 
 import React, { useEffect, useRef, useState } from 'react';
 import { Search } from 'lucide-react';
@@ -23,6 +25,8 @@ interface ProductSearchInputProps {
   excludeIds?: number[];
   autoFocus?: boolean;
   disabled?: boolean;
+  /** Kiểu hiển thị gợi ý (mặc định: dòng 1 tầng có nhãn loại hàng, mở khi bấm vào ô) */
+  variant?: 'default' | 'catalog';
 }
 
 export function ProductSearchInput({
@@ -35,12 +39,17 @@ export function ProductSearchInput({
   excludeIds = [],
   autoFocus,
   disabled,
+  variant = 'default',
 }: ProductSearchInputProps) {
+  const catalog = variant === 'catalog';
   const [text, setText] = useState('');
   const [open, setOpen] = useState(false);
   const [includeAllTypes, setIncludeAllTypes] = useState(false);
+  const [activeIdx, setActiveIdx] = useState(0);
   const [result, setResult] = useState<{ key: string; items: ProductionProductLookup[] }>({ key: '', items: [] });
   const boxRef = useRef<HTMLDivElement>(null);
+  /** Kiểu catalog: toạ độ ô tìm để đặt danh sách position:fixed (không bị khung cuộn của popup cắt) */
+  const [anchor, setAnchor] = useState<{ top: number; left: number; width: number } | null>(null);
 
   const effectiveType = includeAllTypes ? undefined : productType;
   const typesKey = productTypes?.join(',') ?? '';
@@ -51,10 +60,12 @@ export function ProductSearchInput({
     productTypes: typesKey,
     warehouseId: warehouseId ?? null,
   });
-  const loading = open && result.key !== requestKey;
+  // Kiểu catalog: chỉ tìm / hiện gợi ý khi đã gõ
+  const showList = open && !disabled && (!catalog || text.trim() !== '');
+  const loading = showList && result.key !== requestKey;
 
   useEffect(() => {
-    if (!open) return;
+    if (!showList) return;
     let stale = false;
     const timer = setTimeout(() => {
       productionService
@@ -79,7 +90,7 @@ export function ProductSearchInput({
     };
     // requestKey gom đủ tham số tìm kiếm
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [requestKey, open]);
+  }, [requestKey, showList]);
 
   useEffect(() => {
     const onDown = (e: MouseEvent) => {
@@ -89,7 +100,30 @@ export function ProductSearchInput({
     return () => document.removeEventListener('mousedown', onDown);
   }, []);
 
+  // Kiểu catalog: bám theo vị trí ô tìm khi cuộn / đổi kích thước cửa sổ
+  useEffect(() => {
+    if (!catalog || !showList) return;
+    const update = () => {
+      const r = boxRef.current?.getBoundingClientRect();
+      if (r) setAnchor({ top: r.bottom + 6, left: r.left, width: r.width });
+    };
+    update();
+    window.addEventListener('scroll', update, true);
+    window.addEventListener('resize', update);
+    return () => {
+      window.removeEventListener('scroll', update, true);
+      window.removeEventListener('resize', update);
+    };
+  }, [catalog, showList]);
+
   const items = result.items.filter((p) => !excludeIds.includes(p.productId));
+
+  const pick = (p: ProductionProductLookup) => {
+    onSelect(p);
+    setText('');
+    setOpen(false);
+    setActiveIdx(0);
+  };
 
   return (
     <div className="relative" ref={boxRef}>
@@ -102,13 +136,34 @@ export function ProductSearchInput({
         onChange={(e) => {
           setText(e.target.value);
           setOpen(true);
+          setActiveIdx(0);
         }}
         onFocus={() => setOpen(true)}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape') setOpen(false);
+          if (!catalog || !showList || loading || items.length === 0) return;
+          if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            setActiveIdx((i) => Math.min(i + 1, items.length - 1));
+          } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            setActiveIdx((i) => Math.max(i - 1, 0));
+          } else if (e.key === 'Enter') {
+            e.preventDefault();
+            const picked = items[activeIdx];
+            if (picked) pick(picked);
+          }
+        }}
         placeholder={placeholder}
-        className="w-full h-8 pl-8 pr-3 rounded-full bg-[#f7f8f9] border border-slate-300 text-[13px] placeholder-[#677484] focus:outline-none focus:border-[#0070f4] focus:bg-white transition disabled:opacity-60"
+        className={`w-full h-8 pl-8 pr-3 rounded-full bg-[#f7f8f9] border ${catalog ? 'border-slate-200' : 'border-slate-300'} text-[13px] placeholder-[#677484] focus:outline-none focus:border-[#0070f4] focus:bg-white transition disabled:opacity-60`}
       />
-      {open && !disabled && (
-        <div className="absolute left-0 right-0 top-full mt-1.5 bg-white border border-slate-200 rounded-[8px] shadow-[rgba(169,180,203,0.32)_0px_8px_20px_0px] z-50 max-h-72 overflow-y-auto divide-y divide-slate-100">
+      {showList && (
+        <div
+          className={`bg-white border border-slate-200 rounded-[8px] shadow-[rgba(169,180,203,0.32)_0px_8px_20px_0px] overflow-y-auto divide-y divide-slate-100 ${
+            catalog ? 'fixed z-[60] max-h-[360px]' : 'absolute left-0 right-0 top-full mt-1.5 z-50 max-h-72'
+          }`}
+          style={catalog && anchor ? { top: anchor.top, left: anchor.left, width: anchor.width } : undefined}
+        >
           {productType === 'RAW_MATERIAL' && (
             <label className="px-2.5 py-1.5 bg-slate-50 flex items-center justify-between text-[11px] text-[#677484] cursor-pointer select-none">
               <span>Mặc định lọc Nguyên vật liệu</span>
@@ -127,18 +182,49 @@ export function ProductSearchInput({
             <div className="p-4 text-center text-[#677484] italic">Đang tìm hàng hóa...</div>
           ) : items.length === 0 ? (
             <div className="p-4 text-center text-[#677484]">
-              {activeBomOnly ? 'Không có thành phẩm có BOM đang áp dụng phù hợp' : 'Không tìm thấy hàng hóa phù hợp'}
+              {activeBomOnly
+                ? 'Không có thành phẩm có BOM đang áp dụng phù hợp'
+                : catalog
+                  ? <>Không tìm thấy hàng hóa phù hợp với &quot;{text.trim()}&quot;</>
+                  : 'Không tìm thấy hàng hóa phù hợp'}
             </div>
+          ) : catalog ? (
+            // Giống gợi ý ô tìm của màn Hàng hóa: tên + ĐVT, dòng dưới mã • tồn (không nhãn loại hàng)
+            items.map((p, idx) => (
+              <button
+                type="button"
+                key={p.productId}
+                onMouseEnter={() => setActiveIdx(idx)}
+                onClick={() => pick(p)}
+                className={`w-full text-left px-3 py-2 cursor-pointer transition ${idx === activeIdx ? 'bg-[#eff6ff]' : 'bg-white'}`}
+              >
+                <div className="text-[13px] font-bold text-[#15171a] truncate">
+                  {p.productName} <span className="font-medium text-[#0070f4]">{p.unitName}</span>
+                </div>
+                <div className="text-[12px] text-[#677484] truncate">
+                  {p.productCode}
+                  {p.availableQty !== null && (
+                    <>
+                      <span className="mx-1">•</span>
+                      Tồn:{' '}
+                      <span className={p.availableQty > 0 ? 'text-[#00b63e] font-semibold' : ''}>{fmtQty(p.availableQty)}</span>
+                    </>
+                  )}
+                  {p.hasActiveBom && (
+                    <>
+                      <span className="mx-1">•</span>
+                      <span className="text-[#16a34a]">Có BOM</span>
+                    </>
+                  )}
+                </div>
+              </button>
+            ))
           ) : (
             items.map((p) => (
               <button
                 type="button"
                 key={p.productId}
-                onClick={() => {
-                  onSelect(p);
-                  setText('');
-                  setOpen(false);
-                }}
+                onClick={() => pick(p)}
                 className="w-full text-left p-2.5 hover:bg-[#eff6ff] flex items-center justify-between gap-3 cursor-pointer group"
               >
                 <div className="flex items-center gap-2 min-w-0">

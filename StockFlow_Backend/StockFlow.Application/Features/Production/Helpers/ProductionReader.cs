@@ -368,11 +368,16 @@ public static class ProductionReader
             })
             .ToListAsync(ct);
 
-        return rows.Select(f => new FinishedGoodsReceiptDto(
-            f.FgrId, f.FgrCode ?? "", f.ReceivedDate, f.ProductionOrderId, f.OrderCode ?? "", f.ProductId,
-            f.ProductCode ?? "", f.ProductName ?? "", f.UnitName ?? "", f.WarehouseId, f.WarehouseName ?? "",
-            f.LocationName, f.LotNumber, f.MfgDate, f.Accepted, f.Defect, f.DefectReason, f.NeedsReview,
-            f.ReviewNote, f.Notes, !string.IsNullOrWhiteSpace(f.FullName) ? f.FullName! : f.Username ?? "")).ToList();
+        return rows.Select(f =>
+        {
+            // Vị trí chọn từ danh mục Hàng hóa được lưu dạng thẻ đầu ghi chú (FinishedGoodsRules.WithLocationTag)
+            var (tagLocation, notes) = FinishedGoodsRules.SplitLocationTag(f.Notes);
+            return new FinishedGoodsReceiptDto(
+                f.FgrId, f.FgrCode ?? "", f.ReceivedDate, f.ProductionOrderId, f.OrderCode ?? "", f.ProductId,
+                f.ProductCode ?? "", f.ProductName ?? "", f.UnitName ?? "", f.WarehouseId, f.WarehouseName ?? "",
+                f.LocationName ?? tagLocation, f.LotNumber, f.MfgDate, f.Accepted, f.Defect, f.DefectReason, f.NeedsReview,
+                f.ReviewNote, notes, !string.IsNullOrWhiteSpace(f.FullName) ? f.FullName! : f.Username ?? "");
+        }).ToList();
     }
 
     // ─── Nhu cầu NVL dự kiến từ BOM đang áp dụng ───────────────────────────

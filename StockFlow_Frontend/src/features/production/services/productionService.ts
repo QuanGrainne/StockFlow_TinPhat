@@ -17,8 +17,6 @@ import type {
   ProductionProductLookup,
   RequirementPreview,
   SaveBomPayload,
-  SaveProductionOrderPayload,
-  WarehouseLocation,
 } from '../types';
 
 function qs(params: Record<string, string | number | boolean | undefined | null>): string {
@@ -92,14 +90,6 @@ export const productionService = {
     return apiClient.get<RequirementPreview>(
       `/api/production/orders/requirement-preview${qs({ productId, plannedQuantity, warehouseId })}`
     );
-  },
-
-  createOrder(payload: SaveProductionOrderPayload): Promise<ProductionOrderDetail> {
-    return apiClient.post<ProductionOrderDetail>('/api/production/orders', payload);
-  },
-
-  updateOrder(id: number, payload: SaveProductionOrderPayload): Promise<ProductionOrderDetail> {
-    return apiClient.put<ProductionOrderDetail>(`/api/production/orders/${id}`, payload);
   },
 
   cancelOrder(id: number): Promise<ProductionOrderDetail> {
@@ -211,7 +201,8 @@ export const productionService = {
     );
   },
 
-  async getLocations(warehouseId: number): Promise<WarehouseLocation[]> {
-    return asList(await apiClient.get<WarehouseLocation[]>(`/api/production/lookups/locations${qs({ warehouseId })}`));
+  /** Các giá trị "Vị trí" đang dùng trong danh mục Hàng hóa (chọn vị trí lưu kho khi Duyệt hoàn thành) */
+  async getLocations(): Promise<string[]> {
+    return asList(await apiClient.get<string[]>('/api/production/lookups/locations'));
   },
 };

@@ -200,8 +200,6 @@ export interface SaveProductionOrderPayload {
   items?: SaveProductionOrderItemInput[] | null;
   /** Kho làm việc để kiểm tra thiếu NVL (BR-31) */
   warehouseId?: number | null;
-  /** Đã xác nhận "vẫn lưu" khi thiếu NVL ([CONFIRM_SHORTAGE]) */
-  confirmShortage?: boolean;
   adjustReason?: string | null;
   /** Mã yêu cầu chống tạo trùng — chỉ dùng khi lập lệnh từ kế hoạch */
   clientRequestId?: string | null;
@@ -281,6 +279,8 @@ export interface ApproveProductionOrderPayload {
   reviewNote: string | null;
   lines: ApproveProductionOrderLine[];
   confirmExceedPlan?: boolean;
+  /** Vị trí lưu kho chọn từ trường "Vị trí" của danh mục Hàng hóa (không bắt buộc) */
+  locationName?: string | null;
 }
 
 export interface MaterialUsageWarning {
@@ -308,12 +308,6 @@ export interface ProductionProductLookup {
   productType: string | null;
   hasActiveBom: boolean;
   availableQty: number | null;
-}
-
-export interface WarehouseLocation {
-  locationId: number;
-  locationCode: string | null;
-  locationName: string | null;
 }
 
 // ─── Bộ lọc danh sách ─────────────────────────────────────────────────────────

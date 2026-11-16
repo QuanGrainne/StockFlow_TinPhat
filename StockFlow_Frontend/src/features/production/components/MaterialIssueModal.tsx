@@ -12,7 +12,7 @@ import { useActiveWarehouse } from '@/lib/warehouse/useActiveWarehouse';
 import { ProductCodeLink } from '@/components/links/EntityLinks';
 import { productionService } from '../services/productionService';
 import type { MaterialIssue, ProductionOrderDetail } from '../types';
-import { errorText, fmtQty, parseQty } from '../utils/productionFormat';
+import { errorText, fmtQty, parseQty, producibleFromIssued } from '../utils/productionFormat';
 import { ProductionDialog, btnPrimary, btnSecondary, inputCls, labelCls } from './ProductionDialog';
 
 interface MaterialIssueModalProps {
@@ -158,6 +158,14 @@ export function MaterialIssueModal({ productionOrderId, supplementary = false, o
     [detail, inputs]
   );
 
+  // Xem trước số thành phẩm làm được: theo NVL đã xuất, và sau khi xuất thêm SL thực xuất đang nhập
+  const extraIssued = useMemo(
+    () => Object.fromEntries(rows.filter((r) => !r.invalid && r.qty > 0).map((r) => [r.m.requirementId, r.qty])),
+    [rows]
+  );
+  const producibleOf = (oi: { productionOrderItemId: number; plannedQuantity: number }, withExtra: boolean): number | null =>
+    detail ? producibleFromIssued(detail.materials, oi.plannedQuantity, oi.productionOrderItemId || null, withExtra ? extraIssued : undefined) : null;
+
   const anyInvalid = rows.some((r) => r.invalid);
   const anyExceeds = rows.some((r) => r.exceeds && r.qty > 0);
   const totalQty = rows.reduce((s, r) => s + (r.invalid ? 0 : r.qty), 0);
@@ -235,6 +243,12 @@ export function MaterialIssueModal({ productionOrderId, supplementary = false, o
                 <th className="py-1.5 px-3">Tên thành phẩm</th>
                 <th className="py-1.5 px-3 w-16 text-center">ĐVT</th>
                 <th className="py-1.5 px-3 w-28 text-right">SL theo lệnh</th>
+                <th className="py-1.5 px-3 w-28 text-right" title="Số thành phẩm làm được từ NVL đã xuất trước đợt này">
+                  Đủ SX hiện tại
+                </th>
+                <th className="py-1.5 px-3 w-32 text-right" title="Số thành phẩm làm được sau khi xuất thêm SL thực xuất bên dưới">
+                  Đủ SX sau đợt này
+                </th>
                 <th className="py-1.5 px-3 w-36 text-right">SL sản xuất đợt này</th>
               </tr>
             </thead>
@@ -255,6 +269,10 @@ export function MaterialIssueModal({ productionOrderId, supplementary = false, o
                     <td className="py-1.5 px-3 font-medium">{oi.productName}</td>
                     <td className="py-1.5 px-3 text-center text-slate-500">{oi.unitName}</td>
                     <td className="py-1.5 px-3 text-right">{fmtQty(oi.plannedQuantity)}</td>
+                    <td className="py-1.5 px-3 text-right text-[#677484]">{fmtQty(producibleOf(oi, false) ?? oi.plannedQuantity)}</td>
+                    <td className="py-1.5 px-3 text-right font-semibold text-[#16a34a]">
+                      {fmtQty(producibleOf(oi, true) ?? oi.plannedQuantity)}
+                    </td>
                     <td className="py-1 px-3">
                       <input
                         inputMode="decimal"

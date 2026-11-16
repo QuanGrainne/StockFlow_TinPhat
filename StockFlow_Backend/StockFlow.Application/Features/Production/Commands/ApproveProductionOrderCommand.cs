@@ -13,7 +13,8 @@ namespace StockFlow.Application.Features.Production.Commands;
 
 /// <summary>
 /// Duyệt hoàn thành lệnh sản xuất (Manager): nhập SL thực tế (đạt / lỗi) của từng thành phẩm,
-/// hệ thống TỰ SINH phiếu nhập thành phẩm (UC-49) vào kho thành phẩm rồi đóng lệnh (Hoàn thành) — một transaction.
+/// hệ thống TỰ SINH phiếu nhập thành phẩm (UC-49) vào kho thành phẩm — một transaction.
+/// Lệnh chỉ chuyển Hoàn thành khi đã nhập đủ SL kế hoạch (BR-38); chưa đủ thì vẫn Đang sản xuất, duyệt nhập tiếp được.
 /// Giữ các luật của nhập thành phẩm: BR-04 quyền kho, BR-42 hàng đang kiểm kho, BR-35 vượt kế hoạch (xác nhận),
 /// BR-36 chỉ SL đạt vào tồn kho, BR-37 cảnh báo dùng NVL (bắt buộc ghi chú).
 /// </summary>
@@ -26,7 +27,8 @@ public class ApproveProductionOrderCommandValidator : AbstractValidator<ApproveP
     {
         RuleFor(x => x.Request.WarehouseId).GreaterThan(0).WithMessage("Vui lòng chọn kho nhận thành phẩm.");
         RuleFor(x => x.Request.LotNumber).MaximumLength(50).WithMessage("Số lô tối đa 50 ký tự.");
-        RuleFor(x => x.Request.Notes).MaximumLength(500).WithMessage("Ghi chú tối đa 500 ký tự.");
+        RuleFor(x => x.Request.Notes).MaximumLength(400).WithMessage("Ghi chú tối đa 400 ký tự.");
+        RuleFor(x => x.Request.LocationName).MaximumLength(90).WithMessage("Vị trí tối đa 90 ký tự.");
         RuleFor(x => x.Request.ReviewNote).MaximumLength(500).WithMessage("Ghi chú cảnh báo tối đa 500 ký tự.");
         RuleFor(x => x.Request.Lines).NotEmpty().WithMessage("Vui lòng nhập số lượng thực tế của thành phẩm.");
         RuleFor(x => x.Request.Lines)
@@ -88,9 +90,6 @@ public class ApproveProductionOrderCommandHandler : IRequestHandler<ApproveProdu
             return Result.Failure<ProductionOrderDetailDto>("Kho thành phẩm không tồn tại hoặc đã ngừng hoạt động.");
         if (!await _currentUser.HasWarehouseAccessAsync(req.WarehouseId, ct))
             return Result.Failure<ProductionOrderDetailDto>(ProductionMessages.NoWarehouseAccess);
-        if (req.LocationId.HasValue && !await _context.MstWarehouseLocations.AnyAsync(
-                l => l.LocationId == req.LocationId && l.WarehouseId == req.WarehouseId && l.IsActive != false, ct))
-            return Result.Failure<ProductionOrderDetailDto>("Vị trí lưu kho không thuộc kho thành phẩm đã chọn.");
 
         // Ghép từng dòng nhập với dòng thành phẩm của lệnh (lệnh cũ không có dòng → 1 thành phẩm của lệnh)
         var targets = new List<(ApproveProductionOrderLine Line, DtlProductionOrderItem? Item, int ProductId, decimal Planned, decimal Received)>();
@@ -125,20 +124,32 @@ public class ApproveProductionOrderCommandHandler : IRequestHandler<ApproveProdu
         var stocktakeError = await StocktakeGuard.CheckAsync(_context, req.WarehouseId, productIds, ct);
         if (stocktakeError != null) return Result.Failure<ProductionOrderDetailDto>(stocktakeError);
 
-        // BR-37: thành phẩm cần nhiều NVL hơn số đã xuất → bắt buộc ghi chú, phiếu gắn cờ cho Manager xem
-        var needsReview = new Dictionary<int, bool>();
+        // Chỉ duyệt tối đa số thành phẩm làm được từ NVL ĐÃ XUẤT (quyết định nhóm 17/11/2026, thay cảnh báo BR-37):
+        // SL đạt + lỗi của đợt này ≤ số sản xuất được từ NVL đã xuất − số đã nhập (đạt + lỗi) trước đó.
+        // Thiếu NVL thì phải "Xuất bổ sung" trước rồi mới duyệt tiếp.
         foreach (var t in targets)
         {
+            var producible = await FinishedGoodsRules.ProducibleAsync(
+                _context, order, ct, t.Item?.ProductionOrderItemId, t.Planned);
+            if (producible is not decimal maxProducible) continue;
+
             var (acceptedSoFar, defectSoFar) = await FinishedGoodsRules.ProducedSoFarAsync(
                 _context, order.ProductionOrderId, ct, t.Item?.ProductionOrderItemId);
-            var warnings = await FinishedGoodsRules.MaterialWarningsAsync(
-                _context, order, acceptedSoFar + defectSoFar + t.Line.AcceptedQuantity + t.Line.DefectQuantity, ct,
-                t.Item?.ProductionOrderItemId, t.Planned);
-            needsReview[t.Item?.ProductionOrderItemId ?? 0] = warnings.Count > 0;
+            var room = Math.Max(0, maxProducible - acceptedSoFar - defectSoFar);
+            if (t.Line.AcceptedQuantity + t.Line.DefectQuantity > room)
+            {
+                var p = products[t.ProductId];
+                var unit = await _context.MstUnits.AsNoTracking()
+                    .Where(u => u.UnitId == p.BaseUnitId).Select(u => u.UnitName).FirstOrDefaultAsync(ct) ?? "";
+                return Result.Failure<ProductionOrderDetailDto>(
+                    $"Thành phẩm {p.ProductCode}: NVL đã xuất chỉ đủ sản xuất tối đa {maxProducible:0.##} {unit}, "
+                    + $"đã nhập {acceptedSoFar + defectSoFar:0.##} (đạt + lỗi) nên đợt này duyệt được tối đa {room:0.##} {unit}. "
+                    + "Vui lòng Xuất bổ sung NVL trước khi duyệt thêm.");
+            }
         }
-        var reviewNote = string.IsNullOrWhiteSpace(req.ReviewNote) ? null : req.ReviewNote.Trim();
-        if (needsReview.Values.Any(v => v) && reviewNote == null)
-            return Result.Failure<ProductionOrderDetailDto>(ProductionMessages.MaterialUsageWarning);
+        // Đã chặn theo NVL đã xuất nên không còn phiếu "dùng NVL vượt số đã xuất" cần gắn cờ xem xét (BR-37)
+        var needsReview = targets.ToDictionary(t => t.Item?.ProductionOrderItemId ?? 0, _ => false);
+        string? reviewNote = null;
 
         var lotNumber = string.IsNullOrWhiteSpace(req.LotNumber) ? order.ProductionOrderCode ?? $"LSX{order.ProductionOrderId}" : req.LotNumber.Trim();
         var now = VietnamTime.Now;
@@ -150,19 +161,29 @@ public class ApproveProductionOrderCommandHandler : IRequestHandler<ApproveProdu
         foreach (var t in targets)
         {
             var receipt = await FinishedGoodsRules.ReceiveAsync(_context, _codeGenerator, _ledger,
-                new FinishedGoodsRules.ReceiveInput(order, t.Item, products[t.ProductId], req.WarehouseId, req.LocationId,
+                // Vị trí lấy từ danh mục Hàng hóa (chuỗi) → không gắn location_id, ghi thẻ vị trí vào ghi chú phiếu
+                new FinishedGoodsRules.ReceiveInput(order, t.Item, products[t.ProductId], req.WarehouseId, null,
                     lotNumber, req.ProductionDate, t.Line.AcceptedQuantity, t.Line.DefectQuantity, t.Line.DefectReason,
-                    req.Notes, needsReview[t.Item?.ProductionOrderItemId ?? 0], reviewNote),
+                    FinishedGoodsRules.WithLocationTag(req.LocationName, req.Notes),
+                    needsReview[t.Item?.ProductionOrderItemId ?? 0], reviewNote),
                 userId, now, ct);
             if (!string.IsNullOrEmpty(receipt.FgrCode)) codes.Add(receipt.FgrCode);
         }
 
-        // Duyệt = đóng lệnh (Hoàn thành), ghi vết người duyệt + các phiếu nhập đã sinh vào ghi chú lệnh
+        // BR-38: chỉ chuyển Hoàn thành khi mọi thành phẩm đã nhập đủ SL kế hoạch (cùng luật với nhập thủ công).
+        // Nhập chưa đủ → lệnh vẫn Đang sản xuất để duyệt nhập tiếp đợt sau; muốn kết thúc sớm thì dùng "Đóng lệnh".
+        var fullyReceived = order.DtlProductionOrderItems.Count > 0
+            ? order.DtlProductionOrderItems.All(i => i.ActualQuantity >= i.PlannedQuantity)
+            : (order.ActualQuantity ?? 0) >= (order.PlannedQuantity ?? 0);
+
+        // Ghi vết người duyệt + các phiếu nhập đã sinh vào ghi chú lệnh
         var approver = ProductionHelper.UserName(await _context.SecUsers.AsNoTracking().FirstOrDefaultAsync(u => u.UserId == userId, ct));
-        var approveNote = $"[Duyệt hoàn thành {now:dd/MM/yyyy HH:mm} - {approver}] Phiếu nhập thành phẩm: {string.Join(", ", codes)}";
+        var approveNote = fullyReceived
+            ? $"[Duyệt hoàn thành {now:dd/MM/yyyy HH:mm} - {approver}] Phiếu nhập thành phẩm: {string.Join(", ", codes)}"
+            : $"[Duyệt nhập thành phẩm {now:dd/MM/yyyy HH:mm} - {approver}] Phiếu nhập thành phẩm: {string.Join(", ", codes)} (chưa đủ kế hoạch)";
         var notes = string.IsNullOrWhiteSpace(order.Notes) ? approveNote : $"{order.Notes}\n{approveNote}";
         order.Notes = notes.Length > NotesMaxLength ? notes[^NotesMaxLength..] : notes;
-        order.MarkCompleted();
+        if (fullyReceived) order.MarkCompleted();
 
         await _context.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);

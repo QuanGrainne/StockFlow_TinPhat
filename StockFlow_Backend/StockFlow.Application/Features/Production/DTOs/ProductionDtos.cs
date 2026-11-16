@@ -239,7 +239,9 @@ public record ApproveProductionOrderRequest(
     string? ReviewNote,
     List<ApproveProductionOrderLine> Lines,
     /// <summary>Đã xác nhận nhập vượt SL kế hoạch</summary>
-    bool ConfirmExceedPlan = false);
+    bool ConfirmExceedPlan = false,
+    /// <summary>Vị trí lưu kho chọn từ trường "Vị trí" của danh mục Hàng hóa (không bắt buộc)</summary>
+    string? LocationName = null);
 
 public record AdjustMaterialNormLine(
     /// <summary>Dòng nhu cầu đang có; null = thêm NVL mới vào lệnh</summary>
@@ -332,4 +334,3 @@ public record ProductionProductLookupDto(
     decimal? AvailableQty
 );
 
-public record WarehouseLocationDto(int LocationId, string? LocationCode, string? LocationName);

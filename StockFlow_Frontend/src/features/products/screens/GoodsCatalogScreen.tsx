@@ -2257,8 +2257,10 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
         </div>
       )}
 
-      {/* 1. Header Toolbar Bar */}
-      <header className="min-h-12 bg-white/84 backdrop-blur-[2px] border-b border-slate-200 px-3 sm:px-4 py-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 shrink-0">
+      {/* 1. Header Toolbar Bar
+          relative z-[25]: cao hơn sidebar lọc và tiêu đề bảng (sticky z-20) để dropdown gợi ý tìm kiếm không bị đè,
+          nhưng thấp hơn thanh menu chính (Sidebar.tsx, z-30) để menu xổ xuống không bị header đè */}
+      <header className="relative z-[25] min-h-12 bg-white/84 backdrop-blur-[2px] border-b border-slate-200 px-3 sm:px-4 py-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 shrink-0">
         {/* Left: Title & Search bar */}
         <div className="flex items-center gap-4 flex-1 basis-[320px] min-w-[260px] max-w-xl">
           <h1 className="text-[20px] font-bold text-[#15171a] leading-7 tracking-tight whitespace-nowrap">

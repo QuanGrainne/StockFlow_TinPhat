@@ -9,7 +9,6 @@ import {
   CalendarRange,
   ClipboardCheck,
   ClipboardList,
-  ClipboardPlus,
   DollarSign,
   Factory,
   LayoutGrid,
@@ -336,16 +335,6 @@ export const NAV_GROUPS: NavGroup[] = [
         title: 'Lệnh sản xuất',
         desc: 'Theo dõi lệnh, nhu cầu NVL và tiến độ nhập thành phẩm',
         icon: Layers,
-        backendModule: 'PROD',
-      },
-      {
-        // UC-59 / BR-51: lập, sửa, hủy, đóng lệnh, điều chỉnh định mức (Manager)
-        screen: 'production-create',
-        path: '/production/create',
-        featureId: 'feat-prod-plan',
-        title: 'Lập lệnh sản xuất',
-        desc: 'Lập lệnh từ BOM đang áp dụng, điều hành lệnh',
-        icon: ClipboardPlus,
         backendModule: 'PROD',
       },
       {

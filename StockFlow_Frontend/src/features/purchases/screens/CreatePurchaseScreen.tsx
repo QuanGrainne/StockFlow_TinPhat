@@ -1613,10 +1613,26 @@ export default function CreatePurchaseScreen({ mode = 'receipt' }: CreatePurchas
 
               {/* Tiền trả nhà cung cấp + hình thức thanh toán */}
               {!isOrder && (
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <span>Tiền trả nhà cung cấp</span>
-                  <div className="mt-1.5 inline-flex rounded-[6px] border border-slate-300 overflow-hidden text-[12px]">
+              // Hai hàng: [nhãn | ô tiền] rồi [Tiền mặt | Chuyển khoản] — để chung một hàng thì nút bị ô nhập đè khi khung hẹp
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="shrink-0">Tiền trả nhà cung cấp</span>
+                  {isCompletedEdit ? (
+                    // Phiếu đã nhập: tiền đã trả không sửa tại đây (thanh toán thêm qua phiếu chi ở NCC)
+                    <span className="w-44 text-right" title="Thanh toán thêm tại Nhà cung cấp → Thanh toán">
+                      {Math.round(paidAmount).toLocaleString('vi-VN')}
+                    </span>
+                  ) : (
+                    <NumberInput
+                      inputRef={paidInputRef}
+                      value={paidAmount}
+                      onChange={setPaidAmount}
+                      className="w-44"
+                    />
+                  )}
+                </div>
+                <div className="flex justify-end">
+                  <div className="inline-flex rounded-[6px] border border-slate-300 overflow-hidden text-[12px]">
                     {([
                       ['CASH', 'Tiền mặt'],
                       ['BANK_TRANSFER', 'Chuyển khoản'],
@@ -1637,19 +1653,6 @@ export default function CreatePurchaseScreen({ mode = 'receipt' }: CreatePurchas
                     ))}
                   </div>
                 </div>
-                {isCompletedEdit ? (
-                  // Phiếu đã nhập: tiền đã trả không sửa tại đây (thanh toán thêm qua phiếu chi ở NCC)
-                  <span className="w-44 text-right" title="Thanh toán thêm tại Nhà cung cấp → Thanh toán">
-                    {Math.round(paidAmount).toLocaleString('vi-VN')}
-                  </span>
-                ) : (
-                  <NumberInput
-                    inputRef={paidInputRef}
-                    value={paidAmount}
-                    onChange={setPaidAmount}
-                    className="w-44"
-                  />
-                )}
               </div>
 
               )}

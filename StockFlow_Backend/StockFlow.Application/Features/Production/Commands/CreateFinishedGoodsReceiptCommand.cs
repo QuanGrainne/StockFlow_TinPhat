@@ -112,6 +112,19 @@ public class CreateFinishedGoodsReceiptCommandHandler
         // BR-37: cảnh báo dùng NVL → bắt buộc ghi chú, gắn cờ cho Manager
         var (acceptedSoFar, defectSoFar) = await FinishedGoodsRules.ProducedSoFarAsync(
             _context, order.ProductionOrderId, ct, targetItem?.ProductionOrderItemId);
+
+        // Cùng luật với Duyệt hoàn thành (17/11/2026): không nhập quá số thành phẩm làm được từ NVL đã xuất
+        var producible = await FinishedGoodsRules.ProducibleAsync(_context, order, ct, targetItem?.ProductionOrderItemId, planned);
+        if (producible is decimal maxProducible)
+        {
+            var room = Math.Max(0, maxProducible - acceptedSoFar - defectSoFar);
+            if (req.AcceptedQuantity + req.DefectQuantity > room)
+                return Result.Failure<FinishedGoodsReceiptDto>(
+                    $"Thành phẩm {product.ProductCode}: NVL đã xuất chỉ đủ sản xuất tối đa {maxProducible:0.##}, "
+                    + $"đã nhập {acceptedSoFar + defectSoFar:0.##} (đạt + lỗi) nên phiếu này nhập được tối đa {room:0.##}. "
+                    + "Vui lòng Xuất bổ sung NVL trước.");
+        }
+
         var warnings = await FinishedGoodsRules.MaterialWarningsAsync(
             _context, order, acceptedSoFar + defectSoFar + req.AcceptedQuantity + req.DefectQuantity, ct,
             targetItem?.ProductionOrderItemId, planned);
