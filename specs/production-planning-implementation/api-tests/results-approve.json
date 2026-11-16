@@ -1,0 +1,38 @@
+﻿[
+    {
+        "Id":  "RT-01",
+        "Name":  "BOM bị ngừng sau khi gửi duyệt → chặn duyệt, nêu mã, vẫn Chờ duyệt",
+        "Pass":  true,
+        "Actual":  "400 Không duyệt được kế hoạch. Thành phẩm chưa có BOM đang áp dụng. Vui lòng thiết lập BOM trước. (P6FGA) | DB=PENDING_APPROVAL"
+    },
+    {
+        "Id":  "RT-02",
+        "Name":  "Kích hoạt lại BOM → duyệt được",
+        "Pass":  true,
+        "Actual":  "200"
+    },
+    {
+        "Id":  "RT-03",
+        "Name":  "Thành phẩm bị ngừng hoạt động sau khi gửi duyệt → chặn duyệt, nêu mã",
+        "Pass":  true,
+        "Actual":  "khóa hàng=200 | 400 Không duyệt được kế hoạch. Thành phẩm không tồn tại hoặc đã ngừng hoạt động: P6FGOFF."
+    },
+    {
+        "Id":  "RT-04",
+        "Name":  "Kế hoạch bị chặn duyệt vẫn từ chối được để người lập sửa",
+        "Pass":  true,
+        "Actual":  "200"
+    },
+    {
+        "Id":  "RT-05",
+        "Name":  "Đổi sang BOM phiên bản mới trong lúc chờ duyệt → vẫn duyệt được",
+        "Pass":  true,
+        "Actual":  "200"
+    },
+    {
+        "Id":  "RT-06",
+        "Name":  "Kế hoạch vừa duyệt lập lệnh được cho mọi thành phẩm",
+        "Pass":  true,
+        "Actual":  "200"
+    }
+]
