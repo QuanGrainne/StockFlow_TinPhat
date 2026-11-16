@@ -150,8 +150,10 @@ export default function CreatePurchaseScreen({ mode = 'receipt' }: CreatePurchas
   // Sao chép: nạp hàng hóa / NCC / giảm giá của phiếu nguồn vào một phiếu MỚI
   const copyPurchaseId = editPurchaseId ? null : searchParams.get('copy');
   const sourcePurchaseId = editPurchaseId || copyPurchaseId;
-  // Nhập hàng từ danh mục hàng hóa: ?products=1,2,3 → thêm sẵn các hàng đã chọn vào phiếu mới
+  // Nhập hàng từ danh mục hàng hóa: ?products=1,2,3 → thêm sẵn các hàng đã chọn vào phiếu mới (SL 1).
+  // Có thể kèm số lượng: ?products=1:600,2:50 (đặt NVL theo kế hoạch sản xuất); ?notes= điền sẵn ghi chú.
   const prefillProductIds = sourcePurchaseId ? null : searchParams.get('products');
+  const prefillNotes = sourcePurchaseId ? null : searchParams.get('notes');
   // Nhập hàng theo phiếu đặt hàng nhập: ?po=<id> → nạp phần chưa nhập của phiếu đặt
   const fromPoId = isOrder || sourcePurchaseId ? null : searchParams.get('po');
 
@@ -225,7 +227,7 @@ export default function CreatePurchaseScreen({ mode = 'receipt' }: CreatePurchas
   const [orderDiscountType, setOrderDiscountType] = useState<DiscountType>('VND');
   const [paidAmount, setPaidAmount] = useState<number>(0);
   const [paymentMethod, setPaymentMethod] = useState<'CASH' | 'BANK_TRANSFER'>('CASH');
-  const [notes, setNotes] = useState('');
+  const [notes, setNotes] = useState(() => prefillNotes?.slice(0, 500) ?? '');
   const [status, setStatus] = useState<'DRAFT' | 'COMPLETED'>('DRAFT');
   // Trạng thái gốc của phiếu đang mở để sửa (null = phiếu mới / sao chép)
   const [originalStatus, setOriginalStatus] = useState<'DRAFT' | 'COMPLETED' | null>(null);
@@ -259,7 +261,7 @@ export default function CreatePurchaseScreen({ mode = 'receipt' }: CreatePurchas
       ['90px', 90], // Số lượng
       ['110px', 110], // Đơn giá
       ['90px', 90], // Giảm giá
-      ['110px', 110], // Thành tiền
+      ['140px', 140], // Thành tiền (đủ cho 999.999.999.999; số dài hơn thu nhỏ chữ)
     ];
     return {
       gridTemplate: cols.map((c) => c[0]).join(' '),
@@ -500,22 +502,28 @@ export default function CreatePurchaseScreen({ mode = 'receipt' }: CreatePurchas
     const key = `${prefillProductIds}@${activeWarehouse.warehouseId}`;
     if (loadedPrefillRef.current === key) return;
     loadedPrefillRef.current = key;
-    const ids = prefillProductIds
+    // Mỗi phần tử "id" hoặc "id:số lượng"; số lượng là số nguyên dương (ô số lượng của phiếu chỉ nhận số nguyên), sai thì lấy 1
+    const entries = prefillProductIds
       .split(',')
-      .map((s) => Number(s.trim()))
-      .filter((n) => Number.isInteger(n) && n > 0);
-    if (ids.length === 0) return;
+      .map((s) => {
+        const [idText, qtyText] = s.split(':');
+        const qty = qtyText === undefined ? 1 : Number(qtyText.trim());
+        return { id: Number(idText.trim()), qty: Number.isInteger(qty) && qty > 0 ? qty : 1 };
+      })
+      .filter((e) => Number.isInteger(e.id) && e.id > 0);
+    if (entries.length === 0) return;
     async function loadPrefill() {
       try {
         const prods = await productService.getProducts({ warehouseId: activeWarehouse.warehouseId });
         const byId = new Map(prods.map((p) => [p.productId, p]));
         // Giữ thứ tự như lúc chọn; bỏ qua hàng không còn tồn tại / ngừng kinh doanh
-        const picked = ids
-          .map((id) => byId.get(id))
-          .filter((p): p is BackendProduct => Boolean(p) && p?.status !== 'INACTIVE');
-        setItems(picked.map(buildRowFromProduct));
-        if (picked.length < ids.length) {
-          showToast(`${ids.length - picked.length} hàng hóa không còn kinh doanh nên không được thêm`, 'warning');
+        const picked = entries.flatMap((e) => {
+          const p = byId.get(e.id);
+          return p && p.status !== 'INACTIVE' ? [{ prod: p, qty: e.qty }] : [];
+        });
+        setItems(picked.map(({ prod, qty }) => recalcRow({ ...buildRowFromProduct(prod), quantity: qty })));
+        if (picked.length < entries.length) {
+          showToast(`${entries.length - picked.length} hàng hóa không còn kinh doanh nên không được thêm`, 'warning');
         }
       } catch (err) {
         console.error('Lỗi nạp hàng hóa đã chọn:', err);
@@ -1213,6 +1221,7 @@ export default function CreatePurchaseScreen({ mode = 'receipt' }: CreatePurchas
                 <div>
                   {items.map((row, index) => {
                     const priceAboveSale = row.unitPrice > row.salePrice;
+                    const lineTotalText = formatVnd(row.lineTotal);
                     return (
                       <div
                         key={row.productId}
@@ -1345,9 +1354,15 @@ export default function CreatePurchaseScreen({ mode = 'receipt' }: CreatePurchas
                         </div>
 
                         {/* Thành tiền */}
-                        <div className="px-1">
-                          <div className="h-8 px-2.5 flex items-center justify-end rounded-[8px] border border-slate-300 bg-white text-[#15171a]">
-                            {Math.round(row.lineTotal).toLocaleString('vi-VN')}
+                        {/* min-w-0 + overflow-hidden: số dài không tràn ra ngoài ô; quá 15 ký tự thì thu nhỏ chữ, rê chuột xem đủ */}
+                        <div className="px-1 min-w-0">
+                          <div
+                            title={lineTotalText}
+                            className={`h-8 px-2 flex items-center justify-end rounded-[8px] border border-slate-300 bg-white text-[#15171a] overflow-hidden whitespace-nowrap tabular-nums ${
+                              lineTotalText.length > 15 ? 'text-[11px]' : ''
+                            }`}
+                          >
+                            {lineTotalText}
                           </div>
                         </div>
                       </div>

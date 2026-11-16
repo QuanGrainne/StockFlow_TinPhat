@@ -7,6 +7,7 @@
 // Nút thao tác theo detail.actions do backend tính.
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { message } from 'antd';
 import * as XLSX from 'xlsx';
 import { FileDown, Inbox, Plus, RefreshCcw, Search } from 'lucide-react';
@@ -34,6 +35,23 @@ interface ProductionPlansScreenProps {
   mode?: 'plans' | 'approvals';
 }
 
+/** Trạng thái kế hoạch được đặt hàng nhập NVL từ màn Duyệt kế hoạch */
+const ORDERABLE_STATUSES: string[] = ['PENDING_APPROVAL', 'APPROVED'];
+
+/**
+ * Danh sách hàng cho trang đặt hàng nhập: "id:số lượng" theo toàn bộ nhu cầu NVL của kế hoạch (BOM đang áp dụng).
+ * Gộp theo NVL; làm tròn lên số nguyên vì ô số lượng của phiếu đặt chỉ nhận số nguyên (không đặt thiếu).
+ */
+function purchaseItemsParam(materials: { materialId: number; requiredQty: number }[]): string {
+  const byMaterial = new Map<number, number>();
+  for (const m of materials) byMaterial.set(m.materialId, (byMaterial.get(m.materialId) ?? 0) + m.requiredQty);
+  return Array.from(byMaterial.entries())
+    .map(([id, qty]) => [id, Math.ceil(Number(qty.toFixed(2)))] as const)
+    .filter(([, qty]) => qty > 0)
+    .map(([id, qty]) => `${id}:${qty}`)
+    .join(',');
+}
+
 function initialFilter(mode: 'plans' | 'approvals'): ProductionListFilter {
   return {
     statuses: mode === 'approvals' ? ['PENDING_APPROVAL'] : ['DRAFT', 'PENDING_APPROVAL', 'APPROVED', 'REJECTED'],
@@ -46,6 +64,7 @@ function initialFilter(mode: 'plans' | 'approvals'): ProductionListFilter {
 }
 
 export default function ProductionPlansScreen({ mode = 'plans' }: ProductionPlansScreenProps) {
+  const router = useRouter();
   const features = useProductionFeatures();
   const { activeWarehouse, warehouses } = useActiveWarehouse();
 
@@ -130,7 +149,43 @@ export default function ProductionPlansScreen({ mode = 'plans' }: ProductionPlan
 
   function handleAction(action: ProductionPlanAction) {
     if (!lastDetail) return;
+    if (action === 'purchaseOrder') {
+      void orderMaterials(lastDetail);
+      return;
+    }
     setDialog({ kind: action, detail: lastDetail });
+  }
+
+  // Màn Duyệt kế hoạch: người có quyền Đặt hàng nhập được đặt NVL cho kế hoạch Chờ duyệt / Đã duyệt
+  const canOrderMaterials = (d: ProductionPlanDetail | null): boolean =>
+    mode === 'approvals' && features.canOrderPurchase && !!d && ORDERABLE_STATUSES.includes(d.summary.status);
+
+  /** Mở trang đặt hàng nhập, điền sẵn NVL theo toàn bộ nhu cầu của kế hoạch (không trừ tồn) và ghi chú mã kế hoạch */
+  async function orderMaterials(d: ProductionPlanDetail) {
+    if (runningRef.current) return;
+    runningRef.current = true;
+    setBusy(true);
+    try {
+      const req = await productionPlanService.getMaterialRequirements(d.summary.productionPlanId, null);
+      const missingBom = req.productsWithoutBom.map((p) => p.productCode).join(', ');
+      const products = purchaseItemsParam(req.materials);
+      if (!products) {
+        message.warning(
+          missingBom
+            ? `Các thành phẩm chưa có BOM đang áp dụng (${missingBom}) nên kế hoạch chưa có nguyên vật liệu để đặt hàng.`
+            : 'Kế hoạch không có nhu cầu nguyên vật liệu để đặt hàng.'
+        );
+        return;
+      }
+      if (missingBom) message.warning(`Chưa có BOM đang áp dụng, không tính nguyên vật liệu cho: ${missingBom}.`);
+      const notes = `Đặt NVL cho kế hoạch sản xuất ${d.summary.planCode}`;
+      router.push(`/purchase-orders/create?products=${products}&notes=${encodeURIComponent(notes)}`);
+    } catch (err) {
+      message.error(planErrorText(err, 'Không tải được nhu cầu nguyên vật liệu của kế hoạch'));
+    } finally {
+      runningRef.current = false;
+      setBusy(false);
+    }
   }
 
   async function run(label: string, fn: () => Promise<ProductionPlanDetail>, success: (d: ProductionPlanDetail) => string) {
@@ -159,7 +214,7 @@ export default function ProductionPlansScreen({ mode = 'plans' }: ProductionPlan
       'Ngày lập': fmtDateTime(p.planDate),
       'Người lập': p.createdByName,
       'Số thành phẩm': p.itemCount,
-      'Tổng kế hoạch': p.totalPlannedQuantity,
+      'Tổng SL kế hoạch': p.totalPlannedQuantity,
       'Đã lập lệnh': p.totalOrderedQuantity,
       'Đã lập lệnh (%)': p.orderedPercent,
       'Số lệnh': p.orderCount,
@@ -239,7 +294,7 @@ export default function ProductionPlansScreen({ mode = 'plans' }: ProductionPlan
                   <th className={th}>Ngày lập</th>
                   <th className={th}>Người lập</th>
                   <th className={`${th} text-right`}>Số TP</th>
-                  <th className={`${th} text-right`}>Tổng kế hoạch</th>
+                  <th className={`${th} text-right`}>Tổng SL kế hoạch</th>
                   <th className={th}>Đã lập lệnh</th>
                   <th className={`${th} text-right`}>Số lệnh</th>
                   <th className={`${th} text-center`}>Trạng thái</th>
@@ -308,6 +363,7 @@ export default function ProductionPlansScreen({ mode = 'plans' }: ProductionPlan
                                 warehouses={warehouses}
                                 defaultWarehouseId={activeWarehouse.warehouseId}
                                 onAction={handleAction}
+                                canOrderMaterials={canOrderMaterials(lastDetail)}
                               />
                             </td>
                           </tr>

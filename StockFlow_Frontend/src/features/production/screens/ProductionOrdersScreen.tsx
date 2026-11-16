@@ -259,7 +259,7 @@ export default function ProductionOrdersScreen() {
                   <th className={th}>Mã lệnh</th>
                   <th className={th}>Ngày lập</th>
                   <th className={th}>Thành phẩm</th>
-                  <th className={`${th} text-right`}>Kế hoạch</th>
+                  <th className={`${th} text-right`}>SL kế hoạch</th>
                   <th className={`${th} text-right`}>Đã nhập</th>
                   <th className={th}>Tiến độ</th>
                   <th className={th}>Hạn hoàn thành</th>
