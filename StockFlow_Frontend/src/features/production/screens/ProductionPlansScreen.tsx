@@ -7,20 +7,21 @@
 // Nút thao tác theo detail.actions do backend tính.
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { readDocumentLink, scrollToWhenReady } from '@/lib/navigation/documentLink';
 import { message } from 'antd';
 import * as XLSX from 'xlsx';
 import { FileDown, Inbox, Plus, RefreshCcw, Search } from 'lucide-react';
 import { useActiveWarehouse } from '@/lib/warehouse/useActiveWarehouse';
 import { productionPlanService } from '../services/productionPlanService';
-import type { ProductionListFilter, ProductionPlanDetail, ProductionPlanSummary } from '../types';
+import type { PlanMaterialRequirementLine, ProductionListFilter, ProductionPlanDetail, ProductionPlanSummary } from '../types';
 import { useProductionFeatures } from '../hooks/useProductionFeatures';
 import { fmtDateTime, fmtQty } from '../utils/productionFormat';
 import { PLAN_REASON_MAX, PLAN_STATUS_LABEL, PLAN_STATUS_OPTIONS, fmtDateOnly, planErrorText } from '../utils/productionPlanFormat';
 import { ProductionFilterSidebar, SidebarToggle } from '../components/ProductionFilterSidebar';
 import { ProgressBar } from '../components/ProductionStatusTag';
 import { ProductionPlanStatusTag } from '../components/ProductionPlanStatusTag';
-import { ProductionPlanDetailPanel, type ProductionPlanAction } from '../components/ProductionPlanDetailPanel';
+import { ProductionPlanDetailPanel, planShortageQty, type ProductionPlanAction } from '../components/ProductionPlanDetailPanel';
 import { ProductionPlanFormModal } from '../components/ProductionPlanFormModal';
 import { CreateOrderFromPlanModal } from '../components/CreateOrderFromPlanModal';
 import { ConfirmDialog } from '../components/ProductionDialog';
@@ -39,12 +40,16 @@ interface ProductionPlansScreenProps {
 const ORDERABLE_STATUSES: string[] = ['PENDING_APPROVAL', 'APPROVED'];
 
 /**
- * Danh sách hàng cho trang đặt hàng nhập: "id:số lượng" theo toàn bộ nhu cầu NVL của kế hoạch (BOM đang áp dụng).
- * Gộp theo NVL; làm tròn lên số nguyên vì ô số lượng của phiếu đặt chỉ nhận số nguyên (không đặt thiếu).
+ * Danh sách hàng cho trang đặt hàng nhập: "id:số lượng" — CHỈ các NVL đang thiếu so với tồn tại kho làm việc,
+ * số lượng = phần thiếu (theo số còn lại chưa lập lệnh nếu có). Gộp theo NVL; làm tròn lên số nguyên
+ * vì ô số lượng của phiếu đặt chỉ nhận số nguyên (không đặt thiếu).
  */
-function purchaseItemsParam(materials: { materialId: number; requiredQty: number }[]): string {
+function purchaseItemsParam(materials: PlanMaterialRequirementLine[]): string {
   const byMaterial = new Map<number, number>();
-  for (const m of materials) byMaterial.set(m.materialId, (byMaterial.get(m.materialId) ?? 0) + m.requiredQty);
+  for (const m of materials) {
+    const shortage = planShortageQty(m);
+    if (shortage > 0) byMaterial.set(m.materialId, (byMaterial.get(m.materialId) ?? 0) + shortage);
+  }
   return Array.from(byMaterial.entries())
     .map(([id, qty]) => [id, Math.ceil(Number(qty.toFixed(2)))] as const)
     .filter(([, qty]) => qty > 0)
@@ -54,7 +59,8 @@ function purchaseItemsParam(materials: { materialId: number; requiredQty: number
 
 function initialFilter(mode: 'plans' | 'approvals'): ProductionListFilter {
   return {
-    statuses: mode === 'approvals' ? ['PENDING_APPROVAL'] : ['DRAFT', 'PENDING_APPROVAL', 'APPROVED', 'REJECTED'],
+    // Duyệt kế hoạch: mặc định Nháp + Chờ duyệt + Đã duyệt (16/11/2026, theo yêu cầu nhóm)
+    statuses: mode === 'approvals' ? ['DRAFT', 'PENDING_APPROVAL', 'APPROVED'] : ['DRAFT', 'PENDING_APPROVAL', 'APPROVED', 'REJECTED'],
     timeRange: 'all',
     dateFrom: undefined,
     dateTo: undefined,
@@ -68,11 +74,23 @@ export default function ProductionPlansScreen({ mode = 'plans' }: ProductionPlan
   const features = useProductionFeatures();
   const { activeWarehouse, warehouses } = useActiveWarehouse();
 
-  const [query, setQuery] = useState('');
-  const [filter, setFilter] = useState<ProductionListFilter>(() => initialFilter(mode));
+  // Link mở thẳng 1 kế hoạch (?code=KHSX00004&id=4, VD bấm mã kế hoạch ở chi tiết Lệnh sản xuất):
+  // điền mã vào ô tìm, hiện mọi trạng thái, mở sẵn chi tiết và cuộn tới dòng đó
+  const searchParams = useSearchParams();
+  const [docLink] = useState(() => readDocumentLink(searchParams));
+
+  const [query, setQuery] = useState(() => docLink?.code ?? '');
+  const [filter, setFilter] = useState<ProductionListFilter>(() =>
+    docLink ? { ...initialFilter(mode), statuses: PLAN_STATUS_OPTIONS.map((o) => o.value) } : initialFilter(mode)
+  );
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [reloadTick, setReloadTick] = useState(0);
-  const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [expandedId, setExpandedId] = useState<number | null>(() => docLink?.id ?? null);
+
+  useEffect(() => {
+    if (!docLink?.id) return;
+    return scrollToWhenReady(`[data-doc-row="${docLink.id}"]`);
+  }, [docLink]);
   const [details, setDetails] = useState<Record<string, ProductionPlanDetail>>({});
   const [dialog, setDialog] = useState<Dialog>(null);
   const [busy, setBusy] = useState(false);
@@ -160,25 +178,30 @@ export default function ProductionPlansScreen({ mode = 'plans' }: ProductionPlan
   const canOrderMaterials = (d: ProductionPlanDetail | null): boolean =>
     mode === 'approvals' && features.canOrderPurchase && !!d && ORDERABLE_STATUSES.includes(d.summary.status);
 
-  /** Mở trang đặt hàng nhập, điền sẵn NVL theo toàn bộ nhu cầu của kế hoạch (không trừ tồn) và ghi chú mã kế hoạch */
+  /**
+   * Mở trang đặt hàng nhập, điền sẵn CHỈ các NVL đang thiếu so với tồn tại kho làm việc (số lượng = phần thiếu)
+   * và ghi chú mã kế hoạch. Không thiếu NVL nào → báo, không mở trang đặt hàng.
+   */
   async function orderMaterials(d: ProductionPlanDetail) {
     if (runningRef.current) return;
     runningRef.current = true;
     setBusy(true);
     try {
-      const req = await productionPlanService.getMaterialRequirements(d.summary.productionPlanId, null);
+      const warehouseId = activeWarehouse.warehouseId;
+      const warehouseName = warehouses.find((w) => w.warehouseId === warehouseId)?.name ?? 'kho làm việc';
+      const req = await productionPlanService.getMaterialRequirements(d.summary.productionPlanId, warehouseId);
       const missingBom = req.productsWithoutBom.map((p) => p.productCode).join(', ');
       const products = purchaseItemsParam(req.materials);
       if (!products) {
-        message.warning(
+        message.info(
           missingBom
-            ? `Các thành phẩm chưa có BOM đang áp dụng (${missingBom}) nên kế hoạch chưa có nguyên vật liệu để đặt hàng.`
-            : 'Kế hoạch không có nhu cầu nguyên vật liệu để đặt hàng.'
+            ? `Các thành phẩm chưa có BOM đang áp dụng (${missingBom}) nên chưa tính được nguyên vật liệu cần đặt.`
+            : `Không thiếu nguyên vật liệu nào tại ${warehouseName}, không cần đặt hàng nhập.`
         );
         return;
       }
       if (missingBom) message.warning(`Chưa có BOM đang áp dụng, không tính nguyên vật liệu cho: ${missingBom}.`);
-      const notes = `Đặt NVL cho kế hoạch sản xuất ${d.summary.planCode}`;
+      const notes = `Đặt NVL còn thiếu tại ${warehouseName} cho kế hoạch sản xuất ${d.summary.planCode}`;
       router.push(`/purchase-orders/create?products=${products}&notes=${encodeURIComponent(notes)}`);
     } catch (err) {
       message.error(planErrorText(err, 'Không tải được nhu cầu nguyên vật liệu của kế hoạch'));
@@ -323,7 +346,7 @@ export default function ProductionPlansScreen({ mode = 'plans' }: ProductionPlan
                   <tr>
                     <td colSpan={10} className="py-24 text-center text-[#677484]">
                       <Inbox size={28} className="mx-auto mb-2 text-[#0070f4]" />
-                      {mode === 'approvals' ? 'Không có kế hoạch nào đang chờ duyệt' : 'Không tìm thấy kế hoạch sản xuất nào phù hợp'}
+                      Không tìm thấy kế hoạch sản xuất nào phù hợp
                     </td>
                   </tr>
                 ) : (
@@ -332,6 +355,7 @@ export default function ProductionPlansScreen({ mode = 'plans' }: ProductionPlan
                     return (
                       <React.Fragment key={p.productionPlanId}>
                         <tr
+                          data-doc-row={p.productionPlanId}
                           onClick={() => setExpandedId(isExpanded ? null : p.productionPlanId)}
                           className={`cursor-pointer text-[13px] ${isExpanded ? 'bg-[#e6f1fe]/80' : 'hover:bg-[#f7f8f9]'}`}
                         >
@@ -364,6 +388,8 @@ export default function ProductionPlansScreen({ mode = 'plans' }: ProductionPlan
                                 defaultWarehouseId={activeWarehouse.warehouseId}
                                 onAction={handleAction}
                                 canOrderMaterials={canOrderMaterials(lastDetail)}
+                                // Màn Kế hoạch sản xuất không có nút Duyệt; duyệt ở màn Duyệt kế hoạch sản xuất
+                                allowApprove={mode === 'approvals'}
                               />
                             </td>
                           </tr>

@@ -1,7 +1,9 @@
 'use client';
 
 // Duyệt hoàn thành lệnh sản xuất (Manager): nhập SL thực tế đạt / lỗi của từng thành phẩm,
-// hệ thống TỰ SINH phiếu nhập thành phẩm vào kho đã chọn rồi chuyển lệnh sang Hoàn thành.
+// hệ thống TỰ SINH phiếu nhập thành phẩm vào kho đã chọn. Nhập đủ kế hoạch thì lệnh chuyển Hoàn thành;
+// chưa đủ thì lệnh vẫn Đang sản xuất để duyệt nhập tiếp đợt sau (BR-38).
+// Vị trí lưu kho: chọn từ trường "Vị trí" của danh mục Hàng hóa, không bắt buộc.
 // Giữ luật của nhập thành phẩm: BR-35 vượt kế hoạch hỏi [Có]/[Không], BR-36 chỉ SL đạt vào tồn,
 // BR-37 cần nhiều NVL hơn số đã xuất → bắt buộc ghi chú (phiếu gắn cờ xem xét).
 
@@ -10,8 +12,8 @@ import { message } from 'antd';
 import { AlertTriangle } from 'lucide-react';
 import { useActiveWarehouse } from '@/lib/warehouse/useActiveWarehouse';
 import { productionService } from '../services/productionService';
-import type { ProductionOrderDetail, WarehouseLocation } from '../types';
-import { errorText, fmtQty, parseQty, todayIso } from '../utils/productionFormat';
+import type { ProductionOrderDetail } from '../types';
+import { errorText, fmtQty, parseQty, producedSoFar, producibleFromIssued, todayIso } from '../utils/productionFormat';
 import { ProductionDialog, btnPrimary, btnSecondary, inputCls, labelCls } from './ProductionDialog';
 
 interface ApproveCompletionModalProps {
@@ -27,6 +29,8 @@ interface LineDraft {
   unitName: string;
   planned: number;
   received: number;
+  /** Tối đa duyệt được đợt này theo NVL đã xuất (đạt + lỗi); null = không giới hạn */
+  maxApprovable: number | null;
   accepted: string;
   defect: string;
   defectReason: string;
@@ -43,8 +47,9 @@ export function ApproveCompletionModal({ detail, onClose, onDone }: ApproveCompl
   const s = detail.summary;
   const { activeWarehouse, warehouses } = useActiveWarehouse();
   const [warehouseId, setWarehouseId] = useState<number>(activeWarehouse.warehouseId);
-  const [locations, setLocations] = useState<{ warehouseId: number; items: WarehouseLocation[] }>({ warehouseId: 0, items: [] });
-  const [locationId, setLocationId] = useState<number | null>(null);
+  /** Các vị trí đang dùng trong danh mục Hàng hóa (trường "Vị trí") */
+  const [locations, setLocations] = useState<string[]>([]);
+  const [locationName, setLocationName] = useState('');
   const [lotNumber, setLotNumber] = useState(s.code);
   const [productionDate, setProductionDate] = useState(todayIso());
   const [notes, setNotes] = useState('');
@@ -53,7 +58,7 @@ export function ApproveCompletionModal({ detail, onClose, onDone }: ApproveCompl
   const [needReviewNote, setNeedReviewNote] = useState(false);
   const [reviewNote, setReviewNote] = useState('');
 
-  // Mỗi thành phẩm của lệnh 1 dòng, mặc định SL đạt = phần còn lại theo kế hoạch
+  // Mỗi thành phẩm của lệnh 1 dòng, mặc định SL đạt = phần còn lại theo kế hoạch, không vượt số làm được từ NVL đã xuất
   const [lines, setLines] = useState<LineDraft[]>(() => {
     const items =
       s.items && s.items.length > 0
@@ -61,6 +66,11 @@ export function ApproveCompletionModal({ detail, onClose, onDone }: ApproveCompl
         : [{ ...s, id: null, plannedQuantity: s.plannedQuantity, receivedQuantity: s.receivedQuantity }];
     return items.map((it) => {
       const remaining = Math.max(0, it.plannedQuantity - it.receivedQuantity);
+      // Số làm được từ NVL đã xuất − đã nhập (đạt + lỗi) = tối đa duyệt đợt này (backend chặn cùng luật)
+      const producible = producibleFromIssued(detail.materials, it.plannedQuantity, it.id);
+      const maxApprovable =
+        producible == null ? null : Math.max(0, Math.round((producible - producedSoFar(detail.receipts, it.productId)) * 100) / 100);
+      const suggest = maxApprovable == null ? remaining : Math.min(remaining, maxApprovable);
       return {
         productionOrderItemId: it.id,
         productCode: it.productCode,
@@ -68,7 +78,8 @@ export function ApproveCompletionModal({ detail, onClose, onDone }: ApproveCompl
         unitName: it.unitName,
         planned: it.plannedQuantity,
         received: it.receivedQuantity,
-        accepted: remaining > 0 ? String(remaining) : '0',
+        maxApprovable,
+        accepted: suggest > 0 ? String(suggest) : '0',
         defect: '',
         defectReason: '',
       };
@@ -78,17 +89,17 @@ export function ApproveCompletionModal({ detail, onClose, onDone }: ApproveCompl
   useEffect(() => {
     let stale = false;
     productionService
-      .getLocations(warehouseId)
+      .getLocations()
       .then((items) => {
-        if (!stale) setLocations({ warehouseId, items });
+        if (!stale) setLocations(items);
       })
       .catch(() => {
-        if (!stale) setLocations({ warehouseId, items: [] });
+        if (!stale) setLocations([]);
       });
     return () => {
       stale = true;
     };
-  }, [warehouseId]);
+  }, []);
 
   const parsed = useMemo(
     () =>
@@ -102,6 +113,9 @@ export function ApproveCompletionModal({ detail, onClose, onDone }: ApproveCompl
           defectBad: badQty(defect),
           reasonMissing: !badQty(defect) && defect > 0 && !l.defectReason.trim(),
           exceeds: !badQty(accepted) && l.received + accepted > l.planned,
+          // Vượt số làm được từ NVL đã xuất → không cho duyệt
+          overMaterial:
+            l.maxApprovable != null && !badQty(accepted) && !badQty(defect) && accepted + defect > l.maxApprovable + 1e-9,
         };
       }),
     [lines]
@@ -117,6 +131,14 @@ export function ApproveCompletionModal({ detail, onClose, onDone }: ApproveCompl
     const badIdx = parsed.findIndex((p) => p.acceptedBad || p.defectBad);
     if (badIdx >= 0) {
       message.error(`Số lượng của thành phẩm ${lines[badIdx].productCode} phải ≥ 0 và tối đa 2 chữ số thập phân.`);
+      return false;
+    }
+    const overIdx = parsed.findIndex((p) => p.overMaterial);
+    if (overIdx >= 0) {
+      const l = lines[overIdx];
+      message.error(
+        `Thành phẩm ${l.productCode}: NVL đã xuất chỉ đủ duyệt tối đa ${fmtQty(l.maxApprovable)} ${l.unitName} (đạt + lỗi). Vui lòng Xuất bổ sung NVL trước.`
+      );
       return false;
     }
     const reasonIdx = parsed.findIndex((p) => p.reasonMissing);
@@ -137,7 +159,8 @@ export function ApproveCompletionModal({ detail, onClose, onDone }: ApproveCompl
     try {
       const result = await productionService.approveOrder(s.productionOrderId, {
         warehouseId,
-        locationId,
+        locationId: null,
+        locationName: locationName || null,
         lotNumber: lotNumber.trim() || null,
         productionDate: productionDate || null,
         notes: notes.trim() || null,
@@ -150,7 +173,11 @@ export function ApproveCompletionModal({ detail, onClose, onDone }: ApproveCompl
           defectReason: parsed[i].defect > 0 ? l.defectReason.trim() : null,
         })),
       });
-      message.success(`Đã duyệt hoàn thành lệnh ${s.code} và tự sinh phiếu nhập thành phẩm.`);
+      message.success(
+        result.summary.status === 'COMPLETED'
+          ? `Đã duyệt hoàn thành lệnh ${s.code} và tự sinh phiếu nhập thành phẩm.`
+          : `Đã nhập thành phẩm cho lệnh ${s.code}. Chưa đủ kế hoạch nên lệnh vẫn Đang sản xuất, có thể duyệt nhập tiếp.`
+      );
       onDone(result);
     } catch (err) {
       const msg = errorText(err, 'Không duyệt hoàn thành được lệnh sản xuất');
@@ -188,7 +215,9 @@ export function ApproveCompletionModal({ detail, onClose, onDone }: ApproveCompl
         <div className="space-y-4">
           <p className="text-xs text-[#677484] leading-relaxed">
             Nhập số lượng <b>thực tế</b> sản xuất được. Hệ thống tự sinh phiếu nhập thành phẩm (chỉ SL đạt vào tồn kho, giá vốn theo NVL đã
-            xuất) và chuyển lệnh sang <b>Hoàn thành</b>. Sau khi duyệt không xuất NVL / nhập thêm cho lệnh này được nữa.
+            xuất). Nhập <b>đủ kế hoạch</b> thì lệnh chuyển sang <b>Hoàn thành</b>; chưa đủ thì lệnh vẫn <b>Đang sản xuất</b> để duyệt nhập tiếp
+            (muốn kết thúc sớm dùng &quot;Đóng lệnh&quot;). Chỉ duyệt được tối đa số thành phẩm làm được từ <b>NVL đã xuất</b> (cột
+            &quot;Tối đa duyệt&quot;, tính cả SL lỗi); muốn duyệt thêm thì Xuất bổ sung NVL trước.
           </p>
 
           <div className="border border-slate-200 rounded-[8px] overflow-x-auto">
@@ -199,6 +228,9 @@ export function ApproveCompletionModal({ detail, onClose, onDone }: ApproveCompl
                   <th className="py-1.5 px-3">Tên thành phẩm</th>
                   <th className="py-1.5 px-3 w-20 text-right">Kế hoạch</th>
                   <th className="py-1.5 px-3 w-20 text-right">Đã nhập</th>
+                  <th className="py-1.5 px-3 w-24 text-right" title="Số thành phẩm (đạt + lỗi) còn làm được từ NVL đã xuất">
+                    Tối đa duyệt
+                  </th>
                   <th className="py-1.5 px-3 w-28 text-right">SL đạt *</th>
                   <th className="py-1.5 px-3 w-24 text-right">SL lỗi</th>
                 </tr>
@@ -215,13 +247,16 @@ export function ApproveCompletionModal({ detail, onClose, onDone }: ApproveCompl
                         </td>
                         <td className="py-1.5 px-3 text-right">{fmtQty(l.planned)}</td>
                         <td className="py-1.5 px-3 text-right text-[#16a34a]">{fmtQty(l.received)}</td>
+                        <td className={`py-1.5 px-3 text-right font-semibold ${p.overMaterial ? 'text-[#fb2c36]' : 'text-[#0070f4]'}`}>
+                          {l.maxApprovable == null ? '—' : fmtQty(l.maxApprovable)}
+                        </td>
                         <td className="py-1 px-3">
                           <input
                             inputMode="decimal"
                             value={l.accepted}
                             onChange={(e) => updateLine(i, { accepted: e.target.value })}
                             className={`w-full h-7 px-2 text-right text-xs border rounded-[6px] focus:outline-none ${
-                              p.acceptedBad
+                              p.acceptedBad || p.overMaterial
                                 ? 'border-[#fb2c36] bg-[#fef2f2]'
                                 : p.exceeds
                                   ? 'border-amber-400 bg-amber-50/50'
@@ -236,7 +271,7 @@ export function ApproveCompletionModal({ detail, onClose, onDone }: ApproveCompl
                             onChange={(e) => updateLine(i, { defect: e.target.value })}
                             placeholder="0"
                             className={`w-full h-7 px-2 text-right text-xs border rounded-[6px] focus:outline-none ${
-                              p.defectBad ? 'border-[#fb2c36] bg-[#fef2f2]' : 'border-slate-300 focus:border-[#0070f4]'
+                              p.defectBad || p.overMaterial ? 'border-[#fb2c36] bg-[#fef2f2]' : 'border-slate-300 focus:border-[#0070f4]'
                             }`}
                           />
                         </td>
@@ -244,7 +279,7 @@ export function ApproveCompletionModal({ detail, onClose, onDone }: ApproveCompl
                       {!p.defectBad && p.defect > 0 && (
                         <tr className="bg-slate-50/60">
                           <td />
-                          <td colSpan={5} className="py-1 px-3">
+                          <td colSpan={6} className="py-1 px-3">
                             <input
                               list="stockflow-approve-defect-reasons"
                               value={l.defectReason}
@@ -269,6 +304,11 @@ export function ApproveCompletionModal({ detail, onClose, onDone }: ApproveCompl
               ))}
             </datalist>
           </div>
+          {parsed.some((p) => p.overMaterial) && (
+            <p className="text-xs text-[#fb2c36]">
+              SL đạt + lỗi vượt số thành phẩm làm được từ NVL đã xuất — giảm số lượng hoặc Xuất bổ sung NVL trước khi duyệt.
+            </p>
+          )}
           {parsed.some((p) => p.exceeds) && (
             <p className="text-xs text-amber-700">Có thành phẩm nhập vượt số lượng kế hoạch — hệ thống sẽ hỏi xác nhận khi duyệt.</p>
           )}
@@ -278,10 +318,7 @@ export function ApproveCompletionModal({ detail, onClose, onDone }: ApproveCompl
               <label className={labelCls}>Kho nhận thành phẩm *</label>
               <select
                 value={warehouseId}
-                onChange={(e) => {
-                  setWarehouseId(Number(e.target.value));
-                  setLocationId(null);
-                }}
+                onChange={(e) => setWarehouseId(Number(e.target.value))}
                 className={inputCls}
               >
                 {warehouses.map((w) => (
@@ -293,16 +330,12 @@ export function ApproveCompletionModal({ detail, onClose, onDone }: ApproveCompl
             </div>
             <div>
               <label className={labelCls}>Vị trí lưu kho</label>
-              <select
-                value={locationId ?? ''}
-                onChange={(e) => setLocationId(e.target.value ? Number(e.target.value) : null)}
-                className={inputCls}
-                disabled={locations.warehouseId !== warehouseId || locations.items.length === 0}
-              >
-                <option value="">{locations.items.length === 0 ? 'Kho chưa khai báo vị trí' : 'Không chọn vị trí'}</option>
-                {locations.items.map((loc) => (
-                  <option key={loc.locationId} value={loc.locationId}>
-                    {[loc.locationCode, loc.locationName].filter(Boolean).join(' · ')}
+              {/* Lấy từ trường "Vị trí" của danh mục Hàng hóa; không bắt buộc */}
+              <select value={locationName} onChange={(e) => setLocationName(e.target.value)} className={inputCls}>
+                <option value="">{locations.length === 0 ? 'Danh mục hàng hóa chưa có vị trí' : 'Không chọn vị trí'}</option>
+                {locations.map((loc) => (
+                  <option key={loc} value={loc}>
+                    {loc}
                   </option>
                 ))}
               </select>

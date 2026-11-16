@@ -5,11 +5,11 @@
 // - Tab Nhu cầu NVL (UC-PP-03), tab Lệnh sản xuất thuộc kế hoạch.
 // Nút thao tác hiện theo detail.actions do backend tính (không tự suy ra từ trạng thái).
 
-import React, { useState } from 'react';
-import { Ban, CheckCircle2, ClipboardPlus, Lock, Pencil, RefreshCcw, Send, ShoppingCart, XCircle } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { AlertTriangle, Ban, CheckCircle2, ClipboardPlus, Lock, Pencil, RefreshCcw, Send, ShoppingCart, XCircle } from 'lucide-react';
 import { ProductCodeLink } from '@/components/links/EntityLinks';
 import type { WarehouseItem } from '@/lib/warehouse/useActiveWarehouse';
-import type { ProductionPlanDetail } from '../types';
+import type { PlanMaterialRequirementLine, ProductionPlanDetail } from '../types';
 import { productionPlanService } from '../services/productionPlanService';
 import { fmtDate, fmtDateTime, fmtQty } from '../utils/productionFormat';
 import { fmtDateOnly } from '../utils/productionPlanFormat';
@@ -37,6 +37,73 @@ interface ProductionPlanDetailPanelProps {
   onAction: (action: ProductionPlanAction) => void;
   /** Hiện nút "Đặt hàng nhập" (đặt NVL theo kế hoạch); màn hình cha quyết định theo chức năng và trạng thái */
   canOrderMaterials?: boolean;
+  /** Hiện nút "Duyệt": chỉ ở màn Duyệt kế hoạch sản xuất (màn Kế hoạch sản xuất không duyệt) */
+  allowApprove?: boolean;
+}
+
+/** Số thiếu dùng để cảnh báo / đặt hàng: theo phần còn lại chưa lập lệnh (nếu có), không thì theo tổng kế hoạch */
+export const planShortageQty = (m: PlanMaterialRequirementLine): number => m.remainingShortageQty ?? m.shortageQty ?? 0;
+
+/**
+ * Cảnh báo thiếu NVL hiện ngay khi mở chi tiết kế hoạch (không phải vào tab Nhu cầu NVL mới thấy),
+ * so với tồn tại kho làm việc. Chỉ cảnh báo, không chặn gửi duyệt / duyệt (BR-PP-15).
+ */
+function PlanShortageBanner({
+  planId,
+  reloadKey,
+  warehouseId,
+  warehouseName,
+  onViewDetail,
+}: {
+  planId: number;
+  reloadKey: string;
+  warehouseId: number | null;
+  warehouseName: string;
+  onViewDetail: () => void;
+}) {
+  const key = `${reloadKey}:${warehouseId ?? ''}`;
+  const [state, setState] = useState<{ key: string; lines: PlanMaterialRequirementLine[] }>({ key: '', lines: [] });
+
+  useEffect(() => {
+    let stale = false;
+    productionPlanService
+      .getMaterialRequirements(planId, warehouseId)
+      .then((req) => {
+        if (!stale) setState({ key, lines: req.materials.filter((m) => planShortageQty(m) > 0) });
+      })
+      .catch(() => {
+        if (!stale) setState({ key, lines: [] });
+      });
+    return () => {
+      stale = true;
+    };
+    // key gom đủ tham số (kế hoạch + số lượng + kho)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
+
+  if (state.key !== key || state.lines.length === 0) return null;
+  const shown = state.lines.slice(0, 5);
+  return (
+    <div className="mb-3 flex items-start gap-2 rounded-[8px] border border-[#fecaca] bg-[#fef2f2] px-3 py-2 text-xs text-[#b91c1c]">
+      <AlertTriangle size={14} className="shrink-0 mt-px" />
+      <div className="min-w-0 flex-1">
+        <span className="font-semibold">
+          Thiếu {state.lines.length} nguyên vật liệu tại {warehouseName}:
+        </span>{' '}
+        {shown.map((m, i) => (
+          <span key={m.materialId}>
+            {i > 0 && ', '}
+            {m.materialCode} {m.materialName} (thiếu {fmtQty(planShortageQty(m))} {m.unitName})
+          </span>
+        ))}
+        {state.lines.length > shown.length && <span>, … và {state.lines.length - shown.length} NVL khác</span>}
+        <span className="text-[#9f1239]">. Chỉ là cảnh báo, kế hoạch vẫn gửi duyệt / duyệt được.</span>
+      </div>
+      <button type="button" onClick={onViewDetail} className="shrink-0 font-semibold text-[#0070f4] hover:underline cursor-pointer">
+        Xem nhu cầu NVL
+      </button>
+    </div>
+  );
 }
 
 const actionBtn =
@@ -53,6 +120,7 @@ export function ProductionPlanDetailPanel({
   defaultWarehouseId,
   onAction,
   canOrderMaterials,
+  allowApprove = true,
 }: ProductionPlanDetailPanelProps) {
   const [tab, setTab] = useState<Tab>('info');
 
@@ -93,6 +161,17 @@ export function ProductionPlanDetailPanel({
         ))}
         {loading && <RefreshCcw size={13} className="animate-spin ml-2 text-[#0070f4]" />}
       </div>
+
+      {/* Cảnh báo thiếu NVL hiện ở mọi tab (trừ tab Nhu cầu NVL đã có bảng chi tiết); kế hoạch đã đóng / hủy thì thôi */}
+      {tab !== 'materials' && s.status !== 'CLOSED' && s.status !== 'CANCELLED' && (
+        <PlanShortageBanner
+          planId={s.productionPlanId}
+          reloadKey={`${s.productionPlanId}:${s.totalPlannedQuantity}:${s.totalOrderedQuantity}`}
+          warehouseId={defaultWarehouseId}
+          warehouseName={warehouses.find((w) => w.warehouseId === defaultWarehouseId)?.name ?? 'kho làm việc'}
+          onViewDetail={() => setTab('materials')}
+        />
+      )}
 
       {tab === 'info' && (
         <>
@@ -301,7 +380,7 @@ export function ProductionPlanDetailPanel({
             type="button"
             onClick={() => onAction('purchaseOrder')}
             className={actionBtn}
-            title="Mở phiếu đặt hàng nhập, điền sẵn nguyên vật liệu theo toàn bộ nhu cầu của kế hoạch"
+            title="Mở phiếu đặt hàng nhập, điền sẵn các nguyên vật liệu đang thiếu (số lượng = phần thiếu tại kho làm việc)"
           >
             <ShoppingCart size={14} /> Đặt hàng nhập
           </button>
@@ -311,7 +390,7 @@ export function ProductionPlanDetailPanel({
             <Send size={14} /> Gửi duyệt
           </button>
         )}
-        {a.canApprove && (
+        {a.canApprove && allowApprove && (
           <button type="button" onClick={() => onAction('approve')} className={primaryBtn}>
             <CheckCircle2 size={14} /> Duyệt
           </button>

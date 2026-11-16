@@ -10,6 +10,30 @@ namespace StockFlow.Application.Features.Production.Helpers;
 /// <summary>Luật nhập thành phẩm dùng chung cho bước kiểm tra và bước ghi nhận (UC-49, BR-35, BR-37).</summary>
 public static class FinishedGoodsRules
 {
+    // Vị trí lưu kho chọn từ trường "Vị trí" của danh mục Hàng hóa (mst_products.location_name, chuỗi tự do).
+    // Bảng phiếu nhập thành phẩm chỉ có location_id (danh mục vị trí kho) → lưu vị trí dạng thẻ ở đầu ghi chú phiếu,
+    // khi đọc tách ra lại thành cột Vị trí (không cần migration).
+    private const string LocationTagPrefix = "[Vị trí: ";
+
+    /// <summary>Gắn thẻ vị trí vào đầu ghi chú phiếu nhập (vị trí trống → giữ nguyên ghi chú).</summary>
+    public static string? WithLocationTag(string? locationName, string? notes)
+    {
+        var loc = string.IsNullOrWhiteSpace(locationName) ? null : locationName.Trim().Replace("]", ")");
+        var text = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim();
+        if (loc == null) return text;
+        return text == null ? $"{LocationTagPrefix}{loc}]" : $"{LocationTagPrefix}{loc}] {text}";
+    }
+
+    /// <summary>Tách thẻ vị trí khỏi ghi chú phiếu nhập: (vị trí, ghi chú còn lại).</summary>
+    public static (string? Location, string? Notes) SplitLocationTag(string? notes)
+    {
+        if (string.IsNullOrEmpty(notes) || !notes.StartsWith(LocationTagPrefix, StringComparison.Ordinal)) return (null, notes);
+        var end = notes.IndexOf(']', LocationTagPrefix.Length);
+        if (end < 0) return (null, notes);
+        var rest = notes[(end + 1)..].Trim();
+        return (notes[LocationTagPrefix.Length..end], rest.Length == 0 ? null : rest);
+    }
+
     /// <summary>Số thành phẩm đã sản xuất luỹ kế của lệnh hoặc dòng thành phẩm (đạt + lỗi) theo các báo cáo đã ghi.</summary>
     public static async Task<(decimal Accepted, decimal Defect)> ProducedSoFarAsync(
         IStockFlowDbContext context, int productionOrderId, CancellationToken ct, int? productionOrderItemId = null)
@@ -60,6 +84,27 @@ public static class FinishedGoodsRules
             .Where(x => x.Needed > x.r.Issued)
             .Select(x => new MaterialUsageWarningDto(x.r.Code, x.r.Name, x.r.Unit, x.Needed, x.r.Issued))
             .ToList();
+    }
+
+    /// <summary>
+    /// Số thành phẩm tối đa sản xuất được từ NVL ĐÃ XUẤT cho lệnh / dòng thành phẩm:
+    /// nhỏ nhất của (SL kế hoạch × đã xuất ÷ nhu cầu) trên các NVL của thành phẩm (NVL dùng chung của lệnh cũng tính).
+    /// Null = thành phẩm không có dòng nhu cầu NVL nào (không giới hạn).
+    /// </summary>
+    public static async Task<decimal?> ProducibleAsync(
+        IStockFlowDbContext context, TrxProductionOrder order, CancellationToken ct,
+        int? productionOrderItemId = null, decimal? itemPlannedQty = null)
+    {
+        var planned = itemPlannedQty ?? order.PlannedQuantity ?? 0;
+        var q = context.TrxProductionMaterialRequirements.AsNoTracking()
+            .Where(r => r.ProductionOrderId == order.ProductionOrderId);
+        if (productionOrderItemId.HasValue)
+            q = q.Where(r => r.ProductionOrderItemId == productionOrderItemId.Value || r.ProductionOrderItemId == null);
+
+        var reqs = await q.Select(r => new { Required = r.RequiredQty ?? 0, Issued = r.IssuedQty ?? 0 }).ToListAsync(ct);
+        var relevant = reqs.Where(r => r.Required > 0).ToList();
+        if (relevant.Count == 0) return null;
+        return relevant.Min(r => ProductionPolicy.ProducibleFromIssued(r.Required, r.Issued, planned));
     }
 
     /// <summary>Thông tin 1 lần nhập thành phẩm (dùng chung cho nhập thủ công và Duyệt hoàn thành).</summary>

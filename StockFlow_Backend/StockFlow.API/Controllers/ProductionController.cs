@@ -74,27 +74,8 @@ public class ProductionController : ControllerBase
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { message = result.Error });
     }
 
-    /// <summary>Lập lệnh sản xuất (trạng thái Chưa bắt đầu).</summary>
-    [HttpPost("orders")]
-    [ProducesResponseType(typeof(ProductionOrderDetailDto), StatusCodes.Status200OK)]
-    [RequirePermission("PROD_CREATE")]
-    [RequireFeature("feat-prod-plan")]
-    public async Task<IActionResult> CreateOrder([FromBody] SaveProductionOrderRequest request)
-    {
-        var result = await _mediator.Send(new CreateProductionOrderCommand(request));
-        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { message = result.Error });
-    }
-
-    /// <summary>Sửa lệnh còn Chưa bắt đầu.</summary>
-    [HttpPut("orders/{id:int}")]
-    [ProducesResponseType(typeof(ProductionOrderDetailDto), StatusCodes.Status200OK)]
-    [RequirePermission("PROD_CREATE")]
-    [RequireFeature("feat-prod-plan")]
-    public async Task<IActionResult> UpdateOrder(int id, [FromBody] SaveProductionOrderRequest request)
-    {
-        var result = await _mediator.Send(new UpdateProductionOrderCommand(id, request));
-        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { message = result.Error });
-    }
+    // Lập / sửa lệnh trực tiếp (POST orders, PUT orders/{id}) đã bỏ (17/11/2026): lệnh chỉ lập từ kế hoạch sản xuất
+    // (ProductionPlansController → CreateProductionOrderFromPlanCommand).
 
     /// <summary>Huỷ lệnh chưa xuất NVL.</summary>
     [HttpPost("orders/{id:int}/cancel")]
@@ -224,15 +205,15 @@ public class ProductionController : ControllerBase
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { message = result.Error });
     }
 
-    /// <summary>Vị trí lưu kho của kho thành phẩm.</summary>
+    /// <summary>Vị trí lưu kho để chọn khi Duyệt hoàn thành: các giá trị "Vị trí" trong danh mục Hàng hóa.</summary>
     [HttpGet("lookups/locations")]
-    [ProducesResponseType(typeof(List<WarehouseLocationDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(List<string>), StatusCodes.Status200OK)]
     [RequirePermission("PROD_READ")]
     // Dùng chung: nhập thành phẩm thủ công và form Duyệt hoàn thành của Manager
     [RequireFeature("feat-prod-receipt", "feat-prod-plan")]
-    public async Task<IActionResult> GetLocations([FromQuery] int warehouseId)
+    public async Task<IActionResult> GetLocations()
     {
-        var result = await _mediator.Send(new GetWarehouseLocationsQuery(warehouseId));
+        var result = await _mediator.Send(new GetProductLocationNamesQuery());
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { message = result.Error });
     }
 }

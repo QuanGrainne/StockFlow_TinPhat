@@ -331,7 +331,8 @@ export function ProductionPlanFormModal({ detail, onClose, onSaved }: Production
         </div>
         <div className="w-full md:w-96">
           <ProductSearchInput
-            placeholder="Thêm thành phẩm / bán thành phẩm theo mã hoặc tên"
+            placeholder="Theo mã, tên hàng,..."
+            variant="catalog"
             productTypes={PLAN_PRODUCT_TYPES}
             excludeIds={form.lines.map((l) => l.productId)}
             onSelect={addProduct}

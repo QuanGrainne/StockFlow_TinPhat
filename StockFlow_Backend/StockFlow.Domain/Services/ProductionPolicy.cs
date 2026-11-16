@@ -82,6 +82,18 @@ public static class ProductionPolicy
     }
 
     /// <summary>
+    /// Số thành phẩm sản xuất được từ lượng 1 NVL đã xuất (ngược của <see cref="MaterialNeededFor"/>):
+    /// SL kế hoạch × đã xuất ÷ nhu cầu, làm tròn XUỐNG 2 chữ số thập phân (không cho duyệt dư NVL).
+    /// Thành phẩm dùng nhiều NVL thì lấy giá trị nhỏ nhất giữa các NVL (handler tính).
+    /// VD: nhu cầu 25 kg cho 50 lốc, đã xuất 15 kg → 50 × 15 ÷ 25 = 30 lốc.
+    /// </summary>
+    public static decimal ProducibleFromIssued(decimal requiredQuantity, decimal issuedQuantity, decimal plannedQuantity)
+    {
+        if (requiredQuantity <= 0 || plannedQuantity <= 0 || issuedQuantity <= 0) return 0;
+        return Math.Floor(plannedQuantity * issuedQuantity / requiredQuantity * 100m) / 100m;
+    }
+
+    /// <summary>
     /// Đơn giá vốn thành phẩm khi nhập kho (quyết định nhóm 13/11/2026):
     /// tổng giá trị NVL đã xuất cho lệnh (theo giá vốn lúc xuất) ÷ SL kế hoạch. Không phải giá thành đầy đủ.
     /// </summary>
