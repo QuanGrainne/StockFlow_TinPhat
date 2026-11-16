@@ -9,7 +9,7 @@ namespace StockFlow.API.Controllers;
 
 /// <summary>
 /// Yêu cầu duyệt vượt hạn mức công nợ (HM-01): Sales gửi từ POS (UC-27), Manager duyệt ở Approval Inbox (UC-64).
-/// Duyệt cần SALES_APPROVE và chức năng "Duyệt yêu cầu" (feat-credit-approvals): vai trò Sales tick "Bán hàng"
+/// Duyệt cần SALES_APPROVE và chức năng "Duyệt hạn mức" (feat-credit-approvals): vai trò Sales tick "Bán hàng"
 /// cũng nhận SALES_APPROVE, nên chặn thêm bằng chức năng để Sales không tự duyệt.
 /// </summary>
 [ApiController]

@@ -59,7 +59,7 @@ public static class FeatureConstants
         new("feat-invoices", "Hóa đơn", "SALES", new[] { "FIN" }),
         new("feat-sales-returns", "Trả hàng", "SALES", None),
         // Approval Inbox (UC-64): duyệt yêu cầu vượt hạn mức. Mặc định chỉ Manager/Admin.
-        new("feat-credit-approvals", "Duyệt yêu cầu", "SALES", None),
+        new("feat-credit-approvals", "Duyệt hạn mức", "SALES", None),
 
         new("feat-purchase-orders", "Đặt hàng nhập", "PURCHASE", new[] { "PARTNER", "GOODS", "FIN" }),
         new("feat-purchase", "Nhập hàng", "PURCHASE", new[] { "PARTNER", "GOODS", "FIN" }),

@@ -190,7 +190,7 @@ export const NAV_GROUPS: NavGroup[] = [
     id: 'customers-group',
     label: 'Khách hàng',
     icon: Users,
-    single: true,
+    // Menu thả xuống: Khách hàng + Duyệt hạn mức (hạn mức công nợ là thông tin của khách hàng)
     items: [
       {
         screen: 'customers',
@@ -201,6 +201,16 @@ export const NAV_GROUPS: NavGroup[] = [
         icon: Users,
         backendModule: 'PARTNER',
         aliases: ['sales-customers', 'manager-customers', 'admin-customers'],
+      },
+      {
+        // Approval Inbox (UC-64): mặc định chỉ Kế toán trưởng / Admin. Quyền vẫn theo SALES_APPROVE.
+        screen: 'credit-approvals',
+        path: '/approvals',
+        featureId: 'feat-credit-approvals',
+        title: 'Duyệt hạn mức',
+        desc: 'Duyệt yêu cầu vượt hạn mức công nợ của khách hàng',
+        icon: ShieldCheck,
+        backendModule: 'SALES',
       },
     ],
   },
@@ -244,16 +254,6 @@ export const NAV_GROUPS: NavGroup[] = [
         title: 'Trả hàng',
         desc: 'Khách trả lại hàng đã mua',
         icon: RotateCcw,
-        backendModule: 'SALES',
-      },
-      {
-        // Approval Inbox (UC-64): mặc định chỉ Kế toán trưởng / Admin
-        screen: 'credit-approvals',
-        path: '/approvals',
-        featureId: 'feat-credit-approvals',
-        title: 'Duyệt yêu cầu',
-        desc: 'Duyệt yêu cầu vượt hạn mức công nợ',
-        icon: ShieldCheck,
         backendModule: 'SALES',
       },
     ],

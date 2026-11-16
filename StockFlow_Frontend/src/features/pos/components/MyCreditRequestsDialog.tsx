@@ -1,18 +1,16 @@
-// Yêu cầu hạn mức của tôi cho khách đang chọn ở POS (UC-27): xem trạng thái xử lý của Kế toán trưởng
-// và chọn ngoại lệ một lần đã duyệt, chưa dùng để thanh toán lại hóa đơn ghi nợ.
-// Duyệt "nâng hạn mức" thì không cần chọn: hạn mức của khách đã được cập nhật.
+// Yêu cầu hạn mức của tôi cho khách đang chọn ở POS (UC-27): xem trạng thái xử lý của Kế toán trưởng.
+// Chỉ còn duyệt "nâng hạn mức" (đã bỏ ngoại lệ một lần): duyệt xong hạn mức khách được cập nhật, thanh toán lại là được.
 
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Check, Loader2, RefreshCw, X } from 'lucide-react';
+import { Loader2, RefreshCw, X } from 'lucide-react';
 import { creditRequestService } from '@/features/credit-requests/services/creditRequestService';
 import type { CreditRequest } from '@/features/credit-requests/types';
 import {
   APPROVAL_TYPE_LABEL,
   CREDIT_STATUS,
   formatCreditVnd as fmt,
-  isUsableOneTime,
   msg24Approved,
   msg25Rejected,
 } from '@/features/credit-requests';
@@ -21,10 +19,7 @@ import { formatDateTimeVN } from '@/lib/utils/date';
 interface Props {
   partnerId: number;
   customerName: string;
-  /** Yêu cầu đang gắn vào tab (nếu có) */
-  selectedId: number | null;
   onClose: () => void;
-  onSelect: (request: CreditRequest | null) => void;
 }
 
 /** Màu chip trạng thái theo antd Tag (gold/green/red) quy sang Tailwind cho bảng tự dựng */
@@ -34,7 +29,7 @@ const STATUS_CLS: Record<string, string> = {
   red: 'bg-rose-50 text-rose-700 border-rose-200',
 };
 
-export function MyCreditRequestsDialog({ partnerId, customerName, selectedId, onClose, onSelect }: Props) {
+export function MyCreditRequestsDialog({ partnerId, customerName, onClose }: Props) {
   const [reloadTick, setReloadTick] = useState(0);
   const requestKey = `${partnerId}|${reloadTick}`;
   const [result, setResult] = useState<{ key: string; items: CreditRequest[]; error: string | null }>({
@@ -90,37 +85,34 @@ export function MyCreditRequestsDialog({ partnerId, customerName, selectedId, on
                   <th className="py-2 px-3 text-right">Đề xuất / Duyệt</th>
                   <th className="py-2 px-3">Trạng thái</th>
                   <th className="py-2 px-3">Kết quả xử lý</th>
-                  <th className="py-2 px-3 w-28" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {loading ? (
                   <tr>
-                    <td colSpan={6} className="py-10 text-center text-[#677484]">
+                    <td colSpan={5} className="py-10 text-center text-[#677484]">
                       <Loader2 size={16} className="inline animate-spin mr-2 text-[#0071BA]" />
                       Đang tải...
                     </td>
                   </tr>
                 ) : result.error ? (
                   <tr>
-                    <td colSpan={6} className="py-10 text-center text-[#fb2c36]">
+                    <td colSpan={5} className="py-10 text-center text-[#fb2c36]">
                       {result.error}
                     </td>
                   </tr>
                 ) : result.items.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="py-10 text-center text-[#677484]">
+                    <td colSpan={5} className="py-10 text-center text-[#677484]">
                       Bạn chưa gửi yêu cầu hạn mức nào cho khách hàng này
                     </td>
                   </tr>
                 ) : (
                   result.items.map((r) => {
                     const st = CREDIT_STATUS[r.status];
-                    const usable = isUsableOneTime(r);
-                    const selected = r.requestId === selectedId;
                     const code = r.requestCode ?? `#${r.requestId}`;
                     return (
-                      <tr key={r.requestId} className={selected ? 'bg-[#e8f2ff]/60' : ''}>
+                      <tr key={r.requestId}>
                         <td className="py-2.5 px-3 font-mono font-semibold text-[#0071BA] whitespace-nowrap">
                           {code}
                         </td>
@@ -140,7 +132,6 @@ export function MyCreditRequestsDialog({ partnerId, customerName, selectedId, on
                           {r.approvalType && (
                             <div className="mt-1 text-[12px] text-[#677484]">
                               {APPROVAL_TYPE_LABEL[r.approvalType]}
-                              {r.approvalType === 'ONE_TIME' && r.isUsed && ` · đã dùng (${r.salesOrderCode ?? ''})`}
                             </div>
                           )}
                         </td>
@@ -155,27 +146,6 @@ export function MyCreditRequestsDialog({ partnerId, customerName, selectedId, on
                             <div className="mt-0.5 text-[#677484]">Ghi chú: {r.approvalNotes}</div>
                           )}
                         </td>
-                        <td className="py-2.5 px-3 text-right">
-                          {usable &&
-                            (selected ? (
-                              <button
-                                type="button"
-                                onClick={() => onSelect(null)}
-                                className="h-7 px-3 rounded-[8px] border border-slate-300 font-semibold hover:bg-[#f7f8f9] cursor-pointer"
-                              >
-                                Bỏ chọn
-                              </button>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() => onSelect(r)}
-                                className="inline-flex items-center gap-1 h-7 px-3 rounded-[8px] bg-[#0071BA] hover:bg-[#005f9c] text-white font-semibold cursor-pointer"
-                              >
-                                <Check size={13} />
-                                Dùng
-                              </button>
-                            ))}
-                        </td>
                       </tr>
                     );
                   })
@@ -184,7 +154,7 @@ export function MyCreditRequestsDialog({ partnerId, customerName, selectedId, on
             </table>
           </div>
           <p className="mt-3 text-[12px] text-[#677484]">
-            Chỉ ngoại lệ một lần đã duyệt và chưa dùng mới chọn được; mỗi ngoại lệ dùng cho đúng một hóa đơn.
+            Khi yêu cầu được duyệt, hạn mức của khách đã được nâng — thanh toán lại hóa đơn ghi nợ là được.
           </p>
         </div>
       </div>
