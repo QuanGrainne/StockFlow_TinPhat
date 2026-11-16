@@ -10,8 +10,8 @@ using StockFlow.Domain.Entities;
 namespace StockFlow.Application.Features.CreditRequests.Commands;
 
 /// <summary>
-/// UC-64 Approve Credit Request (BR-13): Manager duyệt ngoại lệ một lần (ONE_TIME)
-/// hoặc nâng hạn mức (NEW_LIMIT → cập nhật CreditLimit của khách bằng hạn mức đề xuất).
+/// UC-64 Approve Credit Request (BR-13): Manager duyệt nâng hạn mức (NEW_LIMIT → cập nhật CreditLimit
+/// của khách bằng mức duyệt). Nhóm đã bỏ "ngoại lệ một lần" (ONE_TIME, 16/11/2026): API từ chối loại này.
 /// </summary>
 public record ApproveCreditRequestCommand(int RequestId, ApproveCreditRequestRequest Request) : IRequest<Result<CreditRequestActionResultDto>>;
 
@@ -22,7 +22,7 @@ public class ApproveCreditRequestCommandValidator : AbstractValidator<ApproveCre
         RuleFor(x => x.RequestId).GreaterThan(0).WithMessage(CreditRequestMessages.NotFound);
 
         RuleFor(x => x.Request.ApprovalType)
-            .Must(CreditApprovalType.IsValid).WithMessage(CreditRequestMessages.InvalidApprovalType);
+            .Must(CreditApprovalType.CanApproveAs).WithMessage(CreditRequestMessages.InvalidApprovalType);
 
         RuleFor(x => x.Request.ApprovedLimit)
             .GreaterThan(0).When(x => x.Request.ApprovedLimit.HasValue)
@@ -65,32 +65,24 @@ public class ApproveCreditRequestCommandHandler : IRequestHandler<ApproveCreditR
         decimal approvedLimit = command.Request.ApprovedLimit ?? entity.RequestedLimit ?? 0;
         decimal partnerLimit = entity.Partner.CreditLimit ?? 0;
 
-        if (approvalType == CreditApprovalType.NewLimit)
-        {
-            // E62.1: hạn mức mới không được thấp hơn hạn mức hiện tại của khách
-            if (approvedLimit < partnerLimit)
-                return Result<CreditRequestActionResultDto>.Failure(CreditRequestMessages.NewLimitBelowCurrent(partnerLimit));
+        // E62.1: hạn mức mới không được thấp hơn hạn mức hiện tại của khách
+        if (approvedLimit < partnerLimit)
+            return Result<CreditRequestActionResultDto>.Failure(CreditRequestMessages.NewLimitBelowCurrent(partnerLimit));
 
-            entity.Partner.CreditLimit = approvedLimit;
-            if (approvedLimit != partnerLimit)
-            {
-                _context.TrxCreditLimitHistories.Add(new TrxCreditLimitHistory
-                {
-                    PartnerId = entity.PartnerId,
-                    OldLimit = partnerLimit,
-                    NewLimit = approvedLimit,
-                    Source = CreditLimitChangeSource.RequestApproved,
-                    Reason = string.IsNullOrWhiteSpace(command.Request.Notes) ? entity.Reason : command.Request.Notes.Trim(),
-                    RequestId = entity.RequestId,
-                    ChangedBy = currentUserId,
-                    ChangedAt = VietnamTime.Now,
-                });
-            }
-        }
-        else if (approvedLimit <= partnerLimit)
+        entity.Partner.CreditLimit = approvedLimit;
+        if (approvedLimit != partnerLimit)
         {
-            // Ngoại lệ một lần: mức dư nợ tối đa phải vượt hạn mức hiện tại, nếu không thì không cần ngoại lệ
-            return Result<CreditRequestActionResultDto>.Failure(CreditRequestMessages.OneTimeCeilingTooLow(partnerLimit));
+            _context.TrxCreditLimitHistories.Add(new TrxCreditLimitHistory
+            {
+                PartnerId = entity.PartnerId,
+                OldLimit = partnerLimit,
+                NewLimit = approvedLimit,
+                Source = CreditLimitChangeSource.RequestApproved,
+                Reason = string.IsNullOrWhiteSpace(command.Request.Notes) ? entity.Reason : command.Request.Notes.Trim(),
+                RequestId = entity.RequestId,
+                ChangedBy = currentUserId,
+                ChangedAt = VietnamTime.Now,
+            });
         }
 
         entity.MarkApproved(approvalType, approvedLimit);

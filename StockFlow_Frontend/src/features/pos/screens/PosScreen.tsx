@@ -868,8 +868,8 @@ export default function PosScreen() {
   // ── Khách hàng ──
   const customerItems = customerResults.q === customerQuery.trim() ? customerResults.items : [];
   const selectCustomer = (c: PosCustomer | null) => {
-    // Chọn / bỏ khách không làm mất số tiền khách trả đã nhập; ngoại lệ hạn mức gắn theo khách nên bỏ khi đổi khách
-    updateTab({ customer: c, creditRequestId: null, creditRequestCode: null });
+    // Chọn / bỏ khách không làm mất số tiền khách trả đã nhập
+    updateTab({ customer: c });
     setCustomerQuery('');
     setCustomerDropdown(false);
   };
@@ -1008,7 +1008,6 @@ export default function PosScreen() {
       orderDate: !lockSaleTime && saleTime ? new Date(saleTime).toISOString() : undefined,
       bookingOrderId: tab.bookingId ?? undefined,
       createRemainderBooking,
-      creditRequestId: tab.creditRequestId ?? undefined,
       excessAction: excessToDebt ? 'RECORD_DEBT' : 'RETURN_CASH',
       items: tab.lines.map((l) => {
         const c = lineCalc(l);
@@ -1047,7 +1046,7 @@ export default function PosScreen() {
       setReloadTick((t) => t + 1); // tồn kho thay đổi
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Thanh toán không thành công.';
-      if (tab.customer && !tab.creditRequestId && isOverCreditLimitError(msg)) {
+      if (tab.customer && isOverCreditLimitError(msg)) {
         // BR-12: vượt hạn mức → cho gửi yêu cầu duyệt. Nợ mới cộng cả tiền trả trước của đơn đặt
         // vì server cộng lại phần này vào dư nợ khi so hạn mức.
         setShortage(null);
@@ -1557,16 +1556,14 @@ export default function PosScreen() {
           </div>
 
           {/* Khách hàng + bảng giá */}
-          <div className="mt-3 flex items-center gap-2">
+          <div className="mt-3 flex items-start gap-2">
             <div ref={customerBoxRef} className="relative flex-1 min-w-0">
               {tab.customer ? (
-                <div className="h-9 px-3 rounded-lg bg-[#e6f1fe] flex items-center gap-2">
-                  <span className="text-[#0070f4] font-semibold truncate">{tab.customer.name}</span>
+                <>
+                <div className="h-9 px-3 rounded-lg bg-[#e6f1fe] flex items-center gap-2 min-w-0">
+                  <span className="min-w-0 text-[#0070f4] font-semibold truncate">{tab.customer.name}</span>
                   <span className="text-[12px] text-[#677484] shrink-0">{tab.customer.phone}</span>
-                  {tab.customer.currentDebt > 0 && (
-                    <span className="text-[12px] text-[#fb2c36] shrink-0">Nợ: {fmt(tab.customer.currentDebt)}</span>
-                  )}
-                  {/* Hóa đơn: yêu cầu vượt hạn mức đã gửi / chọn ngoại lệ một lần đã duyệt (UC-27) */}
+                  {/* Hóa đơn: xem hạn mức còn lại và các yêu cầu vượt hạn mức đã gửi (UC-27) */}
                   {!isBooking && (
                     <Tooltip
                       placement="bottom"
@@ -1586,7 +1583,6 @@ export default function PosScreen() {
                           {tab.customer.debtWarning && (
                             <div className="text-[#fbbf24] font-semibold">Cảnh báo: {tab.customer.debtWarning}</div>
                           )}
-                          {tab.creditRequestCode && <div>Đang dùng ngoại lệ {tab.creditRequestCode}</div>}
                           <div className="opacity-70">Bấm để xem yêu cầu hạn mức của tôi</div>
                         </div>
                       }
@@ -1596,11 +1592,7 @@ export default function PosScreen() {
                         onClick={() => setMyCreditOpen(true)}
                         aria-label="Hạn mức còn lại"
                         className={`ml-auto shrink-0 inline-flex items-center justify-center h-6 w-6 rounded-full cursor-pointer ${
-                          tab.creditRequestCode
-                            ? 'bg-[#0071BA] text-white'
-                            : tab.customer.debtWarning
-                              ? 'text-[#f59e0b] hover:bg-black/5'
-                              : 'text-[#0071BA] hover:bg-black/5'
+                          tab.customer.debtWarning ? 'text-[#f59e0b] hover:bg-black/5' : 'text-[#0071BA] hover:bg-black/5'
                         }`}
                       >
                         <CircleAlert size={15} />
@@ -1612,12 +1604,20 @@ export default function PosScreen() {
                     <button
                       type="button"
                       onClick={() => selectCustomer(null)}
-                      className={`${isBooking ? 'ml-auto' : ''} p-0.5 rounded hover:bg-black/5 cursor-pointer`}
+                      className={`${isBooking ? 'ml-auto' : ''} shrink-0 p-0.5 rounded hover:bg-black/5 cursor-pointer`}
+                      title="Bỏ chọn khách hàng"
                     >
                       <X size={15} />
                     </button>
                   )}
                 </div>
+                {/* Dư nợ hiện tại của khách: hiện bên dưới ô khách hàng (giống KiotViet) */}
+                {tab.customer.currentDebt > 0 && (
+                  <span className="mt-1 inline-block px-1.5 py-0.5 rounded bg-[#fef2f2] text-[12px] text-[#fb2c36]">
+                    Nợ: {fmt(tab.customer.currentDebt)}
+                  </span>
+                )}
+                </>
               ) : (
                 <>
                   <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#677484]" />
@@ -1774,11 +1774,12 @@ export default function PosScreen() {
 
             {isBooking ? (
               <>
-                {/* Như KiotViet: tiền khách đã trả trừ khách cần trả (âm = khách còn phải trả khi giao) */}
+                {/* Như KiotViet: tiền khách đã trả trừ khách cần trả.
+                    Dương = Tiền thừa trả khách; âm = phần khách còn phải trả → "Tính vào công nợ" (khách lẻ: "Còn thiếu") */}
                 <div className="flex items-center justify-between">
-                  <span>Tiền thừa trả khách</span>
-                  <span className={`font-semibold ${bookingPaidTotal > due ? 'text-[#fb2c36]' : ''}`}>
-                    {bookingPaidTotal - due < 0 ? `- ${fmt(due - bookingPaidTotal)}` : fmt(bookingPaidTotal - due)}
+                  <span>{bookingPaidTotal < due ? (tab.customer ? 'Tính vào công nợ' : 'Còn thiếu') : 'Tiền thừa trả khách'}</span>
+                  <span className={`font-semibold ${bookingPaidTotal < due ? 'text-[#fb2c36]' : ''}`}>
+                    {bookingPaidTotal < due ? `- ${fmt(due - bookingPaidTotal)}` : fmt(bookingPaidTotal - due)}
                   </span>
                 </div>
                 {/* Thời gian giao hàng dự kiến */}
@@ -1930,13 +1931,7 @@ export default function PosScreen() {
         <MyCreditRequestsDialog
           partnerId={tab.customer.id}
           customerName={tab.customer.name}
-          selectedId={tab.creditRequestId ?? null}
           onClose={() => setMyCreditOpen(false)}
-          onSelect={(r) => {
-            updateTab({ creditRequestId: r?.requestId ?? null, creditRequestCode: r ? (r.requestCode ?? `#${r.requestId}`) : null });
-            setMyCreditOpen(false);
-            if (r) message.info(`Hóa đơn này sẽ dùng ngoại lệ ${r.requestCode ?? `#${r.requestId}`} khi thanh toán.`);
-          }}
         />
       )}
 

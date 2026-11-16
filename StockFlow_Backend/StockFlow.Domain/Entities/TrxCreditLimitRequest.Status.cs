@@ -11,14 +11,6 @@ public partial class TrxCreditLimitRequest
 
     public bool IsPending() => StatusIs(CreditRequestStatus.Pending);
 
-    /// <summary>Ngoại lệ một lần đã dùng khi đã gắn hóa đơn.</summary>
-    public bool IsUsed() => SalesOrderId.HasValue;
-
-    /// <summary>Đã được duyệt theo loại ngoại lệ một lần.</summary>
-    public bool IsOneTimeApproved() =>
-        StatusIs(CreditRequestStatus.Approved)
-        && string.Equals(ApprovalType, CreditApprovalType.OneTime, StringComparison.OrdinalIgnoreCase);
-
     /// <summary>Chỉ quyết định được yêu cầu đang chờ (đã xử lý thì báo MSG57).</summary>
     public bool CanApprove() => IsPending();
 
@@ -38,10 +30,4 @@ public partial class TrxCreditLimitRequest
         ApprovalType = null;
         ApprovedLimit = null;
     }
-
-    /// <summary>Mức dư nợ tối đa POS được phép khi dùng ngoại lệ một lần (số Manager duyệt; dữ liệu cũ dùng số đề xuất).</summary>
-    public decimal OneTimeCeiling() => ApprovedLimit ?? RequestedLimit ?? 0;
-
-    /// <summary>Đánh dấu ngoại lệ một lần đã dùng cho hóa đơn.</summary>
-    public void MarkUsed(int salesOrderId) => SalesOrderId = salesOrderId;
 }

@@ -26,9 +26,6 @@ public static class CreditRequestMessages
     public static string NewLimitBelowCurrent(decimal current) =>
         $"Hạn mức mới thấp hơn hạn mức hiện tại của khách hàng ({current:N0} đ), không thể duyệt nâng hạn mức (E62.1).";
 
-    public static string OneTimeCeilingTooLow(decimal current) =>
-        $"Mức dư nợ tối đa duyệt cho ngoại lệ phải lớn hơn hạn mức hiện tại của khách hàng ({current:N0} đ).";
-
     // Kiểm tra khi gửi yêu cầu (UC-27) – SRS không có mã MSG riêng
     public const string ReasonRequired = "Vui lòng nhập lý do gửi yêu cầu duyệt tín dụng.";
     public const string NotOverLimit =
@@ -45,18 +42,5 @@ public static class CreditRequestMessages
     public const string ZeroLimit =
         "Khách hàng không có hạn mức tín dụng (Hạn mức: 0 đ). Không thể gửi yêu cầu duyệt vượt hạn mức (CUS-007).";
 
-    public const string InvalidApprovalType = "Loại duyệt không hợp lệ (chỉ ONE_TIME hoặc NEW_LIMIT).";
-
-    // Dùng ở POS khi gửi kèm CreditRequestId (BR-12: ngoại lệ đã duyệt cho đúng giao dịch)
-    public static string UseWrongCustomer(string code) =>
-        $"Yêu cầu {code} được duyệt cho khách hàng khác, không dùng được cho hóa đơn này.";
-
-    public static string UseNotOneTime(string code) =>
-        $"Yêu cầu {code} chưa được duyệt ngoại lệ một lần, không dùng được cho hóa đơn này.";
-
-    public static string UseAlreadyUsed(string code) =>
-        $"Ngoại lệ một lần của yêu cầu {code} đã được dùng cho một hóa đơn khác.";
-
-    public static string UseOverApproved(string code, decimal ceiling, decimal projected) =>
-        $"Dư nợ sau hóa đơn ({projected:N0} đ) vượt mức đã duyệt theo yêu cầu {code} ({ceiling:N0} đ). Vui lòng tăng tiền trả hoặc gửi yêu cầu mới.";
+    public const string InvalidApprovalType = "Loại duyệt không hợp lệ: chỉ duyệt nâng hạn mức (NEW_LIMIT).";
 }

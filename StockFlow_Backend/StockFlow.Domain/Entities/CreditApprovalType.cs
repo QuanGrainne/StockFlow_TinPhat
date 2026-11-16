@@ -6,12 +6,15 @@ namespace StockFlow.Domain.Entities;
 /// </summary>
 public static class CreditApprovalType
 {
-    /// <summary>Ngoại lệ một lần: cho đúng một hóa đơn ghi nợ, không đổi hạn mức của khách.</summary>
+    /// <summary>
+    /// Ngoại lệ một lần (cho đúng một hóa đơn ghi nợ). Nhóm đã bỏ cách duyệt này (16/11/2026);
+    /// giữ hằng số chỉ để đọc các yêu cầu cũ đã lưu trong DB.
+    /// </summary>
     public const string OneTime = "ONE_TIME";
 
-    /// <summary>Nâng hạn mức: hạn mức của khách được cập nhật bằng hạn mức đề xuất.</summary>
+    /// <summary>Nâng hạn mức: hạn mức của khách được cập nhật bằng mức Manager duyệt.</summary>
     public const string NewLimit = "NEW_LIMIT";
 
-    public static bool IsValid(string? value) =>
-        value == OneTime || value == NewLimit;
+    /// <summary>Loại được phép khi duyệt mới: chỉ nâng hạn mức.</summary>
+    public static bool CanApproveAs(string? value) => value == NewLimit;
 }

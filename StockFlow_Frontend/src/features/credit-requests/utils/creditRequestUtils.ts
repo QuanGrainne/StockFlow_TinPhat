@@ -13,14 +13,19 @@ export const CREDIT_STATUS: Record<CreditRequestStatus, { label: string; color: 
   REJECTED: { label: 'Từ chối', color: 'red' },
 };
 
+/** Màu nhãn trạng thái dạng viên thuốc, cùng kiểu nhãn trạng thái ở Xuất hủy / Chuyển hàng */
+export const CREDIT_STATUS_CLS: Record<CreditRequestStatus, string> = {
+  PENDING: 'bg-[#fffbeb] text-[#d97706] border-[#fde68a]',
+  APPROVED: 'bg-[#e6f8ec] text-[#16a34a] border-[#bbf7d0]',
+  REJECTED: 'bg-[#fef2f2] text-[#fb2c36] border-[#fecaca]',
+};
+
+/** ONE_TIME chỉ còn ở dữ liệu cũ (đã bỏ duyệt ngoại lệ một lần); duyệt mới luôn là NEW_LIMIT */
 export const APPROVAL_TYPE_LABEL: Record<CreditApprovalType, string> = {
   ONE_TIME: 'Ngoại lệ một lần',
   NEW_LIMIT: 'Nâng hạn mức',
 };
 
-/** Ngoại lệ một lần đã duyệt, chưa gắn hóa đơn → POS dùng được */
-export const isUsableOneTime = (r: CreditRequest): boolean =>
-  r.status === 'APPROVED' && r.approvalType === 'ONE_TIME' && !r.isUsed;
 
 /** Phần vượt hạn mức hiện tại nếu duyệt theo hạn mức đề xuất */
 export const exceedOverLimit = (r: CreditRequest): number =>
