@@ -1,40 +1,33 @@
 'use client';
 
 // Nhập thành phẩm (UC-49/50; Manager theo dõi ở UC-61): danh sách phiếu nhập thành phẩm của các kho được phân quyền
-// (BR-04), lọc phiếu cần Manager xem xét (BR-37), ghi nhận phiếu mới cho lệnh Đang sản xuất.
+// (BR-04), lọc phiếu cần Manager xem xét (BR-37). Chỉ để xem: phiếu do hệ thống tự sinh khi Manager
+// bấm "Duyệt hoàn thành" ở lệnh sản xuất (không ghi nhận phiếu thủ công tại đây).
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { message } from 'antd';
 import * as XLSX from 'xlsx';
-import { AlertTriangle, FileDown, Inbox, Plus, RefreshCcw, Search } from 'lucide-react';
+import { AlertTriangle, FileDown, Inbox, RefreshCcw, Search } from 'lucide-react';
 import { useActiveWarehouse } from '@/lib/warehouse/useActiveWarehouse';
 import { ProductCodeLink } from '@/components/links/EntityLinks';
 import { productionService } from '../services/productionService';
 import type { FinishedGoodsReceipt, ProductionListFilter } from '../types';
-import { useProductionFeatures } from '../hooks/useProductionFeatures';
 import { errorText, fmtDate, fmtDateTime, fmtQty } from '../utils/productionFormat';
 import { ProductionFilterSidebar, SidebarToggle, defaultProductionFilter } from '../components/ProductionFilterSidebar';
 import { SmallTag } from '../components/ProductionStatusTag';
-import { OrderPickerDialog } from '../components/OrderPickerDialog';
-import { FinishedGoodsReceiptModal } from '../components/FinishedGoodsReceiptModal';
 
 export default function FinishedGoodsReceiptsScreen() {
-  const features = useProductionFeatures();
   const { warehouses } = useActiveWarehouse();
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<ProductionListFilter>(() => defaultProductionFilter([]));
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [reloadTick, setReloadTick] = useState(0);
   const [expandedId, setExpandedId] = useState<number | null>(null);
-  const [picking, setPicking] = useState(false);
-  const [receiveOrderId, setReceiveOrderId] = useState<number | null>(null);
 
   const requestKey = JSON.stringify({
     warehouseIds: filter.warehouseIds,
     fromDate: filter.dateFrom,
     toDate: filter.dateTo,
     needsReviewOnly: filter.needsReviewOnly,
-    reloadTick,
   });
   const [result, setResult] = useState<{ key: string; data: FinishedGoodsReceipt[] }>({ key: '', data: [] });
   const loading = result.key !== requestKey;
@@ -118,16 +111,6 @@ export default function FinishedGoodsReceiptsScreen() {
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {features.canReceive && (
-            <button
-              type="button"
-              onClick={() => setPicking(true)}
-              className="inline-flex items-center gap-1.5 px-3.5 h-8 rounded-[8px] bg-[#0070f4] hover:bg-[#005ac3] text-white font-semibold text-[13px] shadow-xs transition cursor-pointer"
-            >
-              <Plus size={15} className="stroke-[2.5]" />
-              <span>Nhập thành phẩm</span>
-            </button>
-          )}
           <button
             type="button"
             onClick={exportList}
@@ -291,29 +274,6 @@ export default function FinishedGoodsReceiptsScreen() {
         </div>
       </div>
 
-      {picking && (
-        <OrderPickerDialog
-          title="Chọn lệnh sản xuất cần nhập thành phẩm"
-          statuses={['IN_PROGRESS']}
-          emptyText="Không có lệnh sản xuất nào đang sản xuất"
-          onClose={() => setPicking(false)}
-          onPick={(o) => {
-            setPicking(false);
-            setReceiveOrderId(o.productionOrderId);
-          }}
-        />
-      )}
-      {receiveOrderId !== null && (
-        <FinishedGoodsReceiptModal
-          productionOrderId={receiveOrderId}
-          onClose={() => setReceiveOrderId(null)}
-          onDone={(receipt) => {
-            setReceiveOrderId(null);
-            setExpandedId(receipt.fgrId);
-            setReloadTick((t) => t + 1);
-          }}
-        />
-      )}
     </div>
   );
 }

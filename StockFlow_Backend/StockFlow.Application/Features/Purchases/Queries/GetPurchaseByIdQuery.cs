@@ -72,11 +72,14 @@ public class GetPurchaseByIdQueryHandler : IRequestHandler<GetPurchaseByIdQuery,
             decimal totalAmount = PurchaseItemMapper.NetTotal(receipt.DtlGoodsReceiptItems);
             decimal openAmount = Math.Max(0, totalAmount - paidAmount);
             decimal returnOffset = 0;
+            List<PurchaseCostingDto>? costing = null;
             if (string.Equals(receipt.Status, "COMPLETED", StringComparison.OrdinalIgnoreCase))
             {
                 var offsets = await ReturnOffsetCalculator.ComputeAsync(
                     _context, new Dictionary<int, decimal> { [receipt.GrId] = openAmount }, cancellationToken);
                 returnOffset = offsets.OffsetByReceipt.GetValueOrDefault(receipt.GrId);
+                // Cách tính giá vốn BQ gia quyền của từng dòng (từ thẻ kho)
+                costing = await PurchaseCostingReader.ReadAsync(_context, receipt, cancellationToken);
             }
             // Cần trả NCC = Tổng cộng − Đã trả − Trả hàng nhập trừ vào công nợ
             decimal debtAmount = Math.Max(0, openAmount - returnOffset);
@@ -138,7 +141,8 @@ public class GetPurchaseByIdQueryHandler : IRequestHandler<GetPurchaseByIdQuery,
                 DiscountAmount: discountAmount,
                 Payments: paymentDtos,
                 Returns: returns,
-                ReturnOffsetAmount: returnOffset
+                ReturnOffsetAmount: returnOffset,
+                Costing: costing
             );
 
             return Result.Success(detail);

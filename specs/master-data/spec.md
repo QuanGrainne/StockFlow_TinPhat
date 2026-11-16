@@ -81,7 +81,7 @@ Mã BR giữ nguyên theo Report 3 để truy vết.
 | Mã hàng, mã đối tác, mã kho | Duy nhất | BE: kiểm tra + unique index |
 | Hạn mức | ≥ 0 | BE: có khi tạo, không có khi sửa |
 | Hệ số quy đổi | > 0 | Chưa xác minh |
-| BOM | Có ít nhất một vật tư | Chưa có |
+| BOM | Có ít nhất một vật tư; NVL không trùng, không là chính thành phẩm; định mức > 0, tối đa 4 số lẻ; hao hụt 0–100%, tối đa 2 số lẻ | BE: có (`BomRules.ValidateAsync`, chỉ trả lỗi đầu tiên, chưa chỉ rõ dòng lỗi) |
 | Email, điện thoại đối tác | Đúng định dạng | BE: có |
 
 ## 9. Main Flow
@@ -119,7 +119,8 @@ Chỉ liệt kê API đang có trong code. Dòng "—" là yêu cầu chưa có 
 | GET/POST/PUT/DELETE | /api/suppliers… | PARTNER_* | Nhà cung cấp | Một phần |
 | GET/POST/PUT/DELETE | /api/warehouses… | Đọc: đã đăng nhập. Ghi: RequireAdmin | Kho | Một phần |
 | GET/POST/PUT/DELETE | /api/price-books… | GOODS_* | Bảng giá | Ngoài tài liệu |
-| — | Vị trí kho, BOM | — | UC-56, UC-57 | Chưa có |
+| GET/POST/PUT/DELETE | /api/production/boms… | BOM_READ / CREATE / UPDATE / APPROVE (kích hoạt, ngừng) / DELETE | BOM: danh sách, chi tiết, tạo, sửa, xóa, kích hoạt, ngừng áp dụng (UC-57) | Có |
+| — | Vị trí kho | — | UC-56 | Chưa có |
 
 ## 13. Database Specification
 
@@ -131,7 +132,7 @@ Mọi bảng thuộc schema `stockflow`. SPEC này không đề xuất bảng ha
 | mst_units, mst_unit_conversions | Đơn vị, quy đổi | Có |
 | mst_business_partners | Đối tác, hạn mức, dư nợ | Thiếu kỳ hạn thanh toán, mã số thuế |
 | mst_warehouses, mst_warehouse_locations | Kho, vị trí | Vị trí không có code |
-| mst_boms, dtl_bom_items | BOM | Có bảng, không có code |
+| mst_boms, dtl_bom_items | BOM (phiên bản, trạng thái Active, ghi chú kỹ thuật; dòng NVL: định mức, hao hụt %, đơn vị) | Có; chưa có cột ngày hiệu lực; đơn vị dòng NVL luôn là đơn vị cơ sở |
 | mst_price_books, dtl_price_book_items | Bảng giá | Ngoài SRS |
 
 ## 14. Acceptance Criteria
@@ -150,7 +151,12 @@ Mọi bảng thuộc schema `stockflow`. SPEC này không đề xuất bảng ha
 | TS-MD-03 | Ngừng kinh doanh rồi bán | Bị từ chối | Integration |
 | TS-MD-04 | Sửa hạn mức âm | Bị từ chối (hiện tại: lưu được) | Unit |
 | TS-MD-05 | Gửi currentDebt trong API sửa khách | Bị bỏ qua (hiện tại: ghi đè dư nợ) | Integration |
-| TS-MD-06 | Quản lý BOM, vị trí kho | Chưa kiểm thử được | System |
+| TS-MD-06 | Quản lý vị trí kho | Chưa kiểm thử được | System |
+| TS-MD-07 | Tạo BOM không có NVL / NVL trùng / NVL là chính thành phẩm / định mức 5 số lẻ | Bị từ chối kèm thông báo | Unit |
+| TS-MD-08 | Tạo BOM kích hoạt ngay khi thành phẩm đã có BOM Active | BOM cũ chuyển ngừng áp dụng, chỉ còn một Active (BR-30) | Integration |
+| TS-MD-09 | Sửa / xóa BOM đã dùng trong lệnh sản xuất | Bị khóa (BR-06); cho tạo phiên bản mới từ BOM đó | Integration |
+| TS-MD-10 | (Đề xuất, §17) Chọn đơn vị khác đơn vị cơ sở trên dòng BOM | Số lượng quy về đơn vị cơ sở đúng hệ số | Unit |
+| TS-MD-11 | (Đề xuất, §17) Tạo lệnh vào ngày ngoài khoảng hiệu lực của BOM Active | Bị từ chối kèm thông báo | Integration |
 
 ## 16. Dependencies and Constraints
 
@@ -162,9 +168,10 @@ Mọi bảng thuộc schema `stockflow`. SPEC này không đề xuất bảng ha
 
 1. API sửa khách hàng và nhà cung cấp ghi đè được dư nợ / công nợ (rủi ro nghiêm trọng về dữ liệu tài chính).
 2. API sửa nhà cung cấp không kiểm tra loại đối tác.
-3. Thiếu kỳ hạn thanh toán, cờ theo dõi lô, vị trí kho, BOM.
+3. Thiếu kỳ hạn thanh toán, cờ theo dõi lô, vị trí kho.
 4. Quản lý kho chỉ dành cho Admin, khác SRS (Manager).
 5. Bảng giá có trong code, không có trong SRS.
+6. BOM: chưa quyết định có làm đơn vị tính / quy đổi và ngày hiệu lực hay không (xem §17, chờ nhóm duyệt).
 
 ## Source code đã phân tích
 
@@ -179,4 +186,34 @@ Mọi bảng thuộc schema `stockflow`. SPEC này không đề xuất bảng ha
 - `StockFlow_Frontend/src/features/products/screens/GoodsCatalogScreen.tsx`
 - `StockFlow_Frontend/src/features/customers/screens/CustomersScreen.tsx`
 - `StockFlow_Frontend/src/features/suppliers/screens/SuppliersScreen.tsx`
-- `StockFlow_Frontend/src/features/bom/screens/BomManagementScreen.tsx (dữ liệu giả)`
+- `StockFlow_Backend/StockFlow.Application/Features/Production/Commands/*BomCommand.cs`, `Helpers/BomRules.cs`
+- `StockFlow_Frontend/src/features/production/screens/BomManagementScreen.tsx`, `components/BomFormModal.tsx`
+
+## 17. Đề xuất mở rộng BOM (chưa duyệt, chưa là yêu cầu)
+
+Phần này chỉ ghi phân tích khả thi, **chưa thêm FR/BR/UC mới** (theo `.claude/rules/00-principles.md` mục 3). Chỉ triển khai sau khi nhóm đối chiếu Report 3 và duyệt. Hai đề xuất này tham khảo cách làm của phần mềm kế toán MISA.
+
+### 17.1 Chọn đơn vị tính có quy đổi trên dòng NVL
+
+- **Hiện trạng:** `BomRules.ReplaceItems` luôn gán `UnitId = BaseUnitId` của NVL (BR-26). Bảng `mst_unit_conversions` (`product_id`, `from_unit_id`, `to_unit_id`, `conversion_factor`) đã có nhưng chưa có handler nào dùng hệ số (FR-MD-02).
+- **Khả thi:** Có, không cần bảng mới. Cột `dtl_bom_items.unit_id` đã tồn tại.
+- **Cách làm đề xuất:**
+  1. Request dòng BOM thêm `unitId` (tùy chọn; không gửi thì dùng đơn vị cơ sở, tương thích ngược).
+  2. Validate: `unitId` là đơn vị cơ sở của NVL hoặc có dòng quy đổi trong `mst_unit_conversions` của NVL đó; hệ số > 0.
+  3. Giữ nguyên `quantity` theo đơn vị người dùng chọn để hiển thị; mọi tính toán nhu cầu (BR-31), kiểm tồn và xuất kho quy về đơn vị cơ sở = `quantity × hệ số`.
+  4. Lệnh sản xuất sao chép định mức đã quy đổi về đơn vị cơ sở, nên phần xuất kho và thẻ kho không đổi.
+- **Rủi ro:** làm tròn khi quy đổi (định mức tối đa 4 số lẻ); cần chốt chiều của `conversion_factor`; phải làm cùng FR-MD-02 (màn quản lý đơn vị và hệ số) nếu muốn người dùng tự cấu hình.
+- **Câu hỏi cho nhóm:** Tín Phát có thực sự định mức bằng đơn vị khác đơn vị cơ sở (túi 25 kg, cuộn) không? Nếu NVL chỉ tính theo kg thì không cần.
+
+### 17.2 Ngày bắt đầu và kết thúc áp dụng
+
+- **Hiện trạng:** `mst_boms` chỉ có `is_active`, không có ngày hiệu lực. BR-30 cho tối đa một BOM Active mỗi thành phẩm, được bảo vệ bằng chỉ mục duy nhất `uq_mst_boms_active_product`.
+- **Khả thi:** Có, cần thêm 2 cột ngày (nullable) và một migration. Việc này phải được nhóm duyệt vì mục §13 hiện nêu không thêm cột mới.
+- **Cách làm đề xuất:**
+  1. Thêm `effective_from`, `effective_to` (date, nullable; null = không giới hạn). Lưu giờ Việt Nam.
+  2. Validate: `effective_to >= effective_from`.
+  3. Khi tạo lệnh sản xuất, chọn BOM Active có ngày lệnh nằm trong khoảng hiệu lực; không có thì trả lỗi E58.1.
+  4. Lệnh đã tạo giữ BOM đã chọn, không đổi khi BOM hết hạn.
+  5. Giữ BR-30: tại một thời điểm chỉ một BOM Active. Nếu cho nhiều BOM Active với khoảng ngày khác nhau thì phải đổi BR-30 và chỉ mục duy nhất, tức là đổi yêu cầu nghiệp vụ.
+- **Phương án nhẹ hơn:** không thêm cột; khi kích hoạt BOM mới thì BOM cũ tự ngừng (đã có). Thường đủ cho Tín Phát.
+- **Câu hỏi cho nhóm:** Có cần lên lịch kích hoạt trước (BOM mới có hiệu lực từ ngày sau) không?

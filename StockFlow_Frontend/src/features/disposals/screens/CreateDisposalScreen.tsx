@@ -34,11 +34,13 @@ interface Row {
   unitCost: number;
   /** null = chưa nhập SL hủy */
   quantity: number | null;
+  /** Ảnh hàng hóa (dòng nạp từ phiếu cũ được bổ sung khi lấy lại tồn kho) */
+  imageUrl?: string | null;
 }
 
-// Xóa | STT | Mã hàng | Tên hàng | ĐVT | Tồn kho | SL hủy | Giá vốn | Giá trị hủy
-const GRID = '36px 44px 120px minmax(200px,1fr) 80px 100px 120px 110px 130px';
-const MIN_WIDTH = 36 + 44 + 120 + 200 + 80 + 100 + 120 + 110 + 130 + 24;
+// Xóa | STT | Ảnh | Mã hàng | Tên hàng | ĐVT | Tồn kho | SL hủy | Giá vốn | Giá trị hủy
+const GRID = '36px 44px 48px 120px minmax(200px,1fr) 80px 100px 120px 110px 130px';
+const MIN_WIDTH = 36 + 44 + 48 + 120 + 200 + 80 + 100 + 120 + 110 + 130 + 24;
 const money = new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 0 });
 const qtyFmt = (n: number) => n.toLocaleString('vi-VN', { maximumFractionDigits: 2 });
 
@@ -112,7 +114,9 @@ export default function CreateDisposalScreen() {
       setRows((prev) =>
         prev.map((r) => {
           const f = fresh.find((p) => p?.productId === r.productId);
-          return f ? { ...r, stock: f.sourceStock, unitCost: f.costPrice } : { ...r, stock: 0 };
+          return f
+            ? { ...r, stock: f.sourceStock, unitCost: f.costPrice, imageUrl: f.imageUrl ?? null }
+            : { ...r, stock: 0 };
         })
       );
     });
@@ -225,6 +229,7 @@ export default function CreateDisposalScreen() {
         stock: p.sourceStock,
         unitCost: p.costPrice,
         quantity: 1,
+        imageUrl: p.imageUrl ?? null,
       },
     ]);
     setSearch('');
@@ -248,6 +253,7 @@ export default function CreateDisposalScreen() {
       stock: p.stockQuantity || 0,
       unitCost: p.costPrice || 0,
       quantity: null,
+      imageUrl: p.imageUrl ?? null,
     }));
     setRows((prev) => [...newRows, ...prev]);
     if (warehouseId) refreshRows(warehouseId, newRows);
@@ -464,6 +470,7 @@ export default function CreateDisposalScreen() {
               >
                 <span />
                 <span>STT</span>
+                <span />
                 <span>Mã hàng</span>
                 <span>Tên hàng</span>
                 <span>ĐVT</span>
@@ -501,6 +508,11 @@ export default function CreateDisposalScreen() {
                         <Trash2 size={14} />
                       </button>
                       <span className="text-slate-400">{i + 1}</span>
+                      <ProductThumb
+                        src={r.imageUrl}
+                        alt={r.productName}
+                        size={32}
+                      />
                       <span className="font-mono text-[#0070f4] font-medium truncate">{r.productCode}</span>
                       <span className="truncate pr-2" title={r.productName}>{r.productName}</span>
                       <span className="text-[#0070f4]">{r.unit}</span>

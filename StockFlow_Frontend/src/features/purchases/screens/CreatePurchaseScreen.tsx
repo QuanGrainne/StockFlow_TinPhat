@@ -70,6 +70,8 @@ export interface CreatePurchaseItemRow {
   lineTotal: number;
   notes?: string;
   lotNumber?: string;
+  /** SL lỗi khi nhận hàng (chỉ phiếu nhập): không vào tồn kho, không tính tiền — cột Số lượng là SL đạt */
+  defectQuantity?: number;
 }
 
 /** Số tiền giảm trên 1 đơn vị (không vượt quá đơn giá) */
@@ -150,8 +152,9 @@ export default function CreatePurchaseScreen({ mode = 'receipt' }: CreatePurchas
   // Sao chép: nạp hàng hóa / NCC / giảm giá của phiếu nguồn vào một phiếu MỚI
   const copyPurchaseId = editPurchaseId ? null : searchParams.get('copy');
   const sourcePurchaseId = editPurchaseId || copyPurchaseId;
-  // Nhập hàng từ danh mục hàng hóa: ?products=1,2,3 → thêm sẵn các hàng đã chọn vào phiếu mới (SL 1).
-  // Có thể kèm số lượng: ?products=1:600,2:50 (đặt NVL theo kế hoạch sản xuất); ?notes= điền sẵn ghi chú.
+  // Nhập hàng từ danh mục hàng hóa: ?products=1,2,3 → thêm sẵn các hàng đã chọn vào phiếu mới;
+  // kèm số lượng ?products=1:5,2:2.5 (VD đặt hàng nhập NVL còn thiếu từ màn Lập lệnh sản xuất,
+  // hoặc NVL theo kế hoạch sản xuất từ màn Duyệt kế hoạch); ?notes= điền sẵn ghi chú phiếu.
   const prefillProductIds = sourcePurchaseId ? null : searchParams.get('products');
   const prefillNotes = sourcePurchaseId ? null : searchParams.get('notes');
   // Nhập hàng theo phiếu đặt hàng nhập: ?po=<id> → nạp phần chưa nhập của phiếu đặt
@@ -258,7 +261,8 @@ export default function CreatePurchaseScreen({ mode = 'receipt' }: CreatePurchas
       ...(columns.stock ? ([['90px', 90]] as [string, number][]) : []),
       ...(columns.costPrice ? ([['100px', 100]] as [string, number][]) : []),
       ...(columns.salePrice ? ([['100px', 100]] as [string, number][]) : []),
-      ['90px', 90], // Số lượng
+      ['90px', 90], // Số lượng (SL đạt)
+      ...(isOrder ? [] : ([['80px', 80]] as [string, number][])), // SL lỗi
       ['110px', 110], // Đơn giá
       ['90px', 90], // Giảm giá
       ['140px', 140], // Thành tiền (đủ cho 999.999.999.999; số dài hơn thu nhỏ chữ)
@@ -267,7 +271,7 @@ export default function CreatePurchaseScreen({ mode = 'receipt' }: CreatePurchas
       gridTemplate: cols.map((c) => c[0]).join(' '),
       tableMinWidth: cols.reduce((sum, c) => sum + c[1], 24),
     };
-  }, [columns]);
+  }, [columns, isOrder]);
 
   // ─── Search & Suggestions State ─────────────────────────────────────────────
   const [searchQuery, setSearchQuery] = useState('');
@@ -405,6 +409,7 @@ export default function CreatePurchaseScreen({ mode = 'receipt' }: CreatePurchas
                   imageUrl: prod?.imageUrl ?? null,
                   categoryName: prod?.categoryName,
                   quantity: it.quantity,
+                  defectQuantity: it.defectQuantity ?? 0,
                   unitPrice: Math.round(it.unitPrice),
                   discountType: asVnd ? ('VND' as const) : ('PERCENT' as const),
                   discountValue: asVnd ? unitDiscountVnd : it.discountPercent || 0,
@@ -502,28 +507,35 @@ export default function CreatePurchaseScreen({ mode = 'receipt' }: CreatePurchas
     const key = `${prefillProductIds}@${activeWarehouse.warehouseId}`;
     if (loadedPrefillRef.current === key) return;
     loadedPrefillRef.current = key;
-    // Mỗi phần tử "id" hoặc "id:số lượng"; số lượng là số nguyên dương (ô số lượng của phiếu chỉ nhận số nguyên), sai thì lấy 1
-    const entries = prefillProductIds
+    const qtyById = new Map<number, number>();
+    const ids = prefillProductIds
       .split(',')
-      .map((s) => {
-        const [idText, qtyText] = s.split(':');
-        const qty = qtyText === undefined ? 1 : Number(qtyText.trim());
-        return { id: Number(idText.trim()), qty: Number.isInteger(qty) && qty > 0 ? qty : 1 };
+      .map((part) => {
+        const [idText, qtyText] = part.split(':');
+        const id = Number(idText.trim());
+        const q = Number(qtyText);
+        if (Number.isInteger(id) && id > 0 && qtyText && q > 0) qtyById.set(id, Math.ceil(q));
+        return id;
       })
-      .filter((e) => Number.isInteger(e.id) && e.id > 0);
-    if (entries.length === 0) return;
+      .filter((n) => Number.isInteger(n) && n > 0);
+    if (ids.length === 0) return;
     async function loadPrefill() {
       try {
         const prods = await productService.getProducts({ warehouseId: activeWarehouse.warehouseId });
         const byId = new Map(prods.map((p) => [p.productId, p]));
         // Giữ thứ tự như lúc chọn; bỏ qua hàng không còn tồn tại / ngừng kinh doanh
-        const picked = entries.flatMap((e) => {
-          const p = byId.get(e.id);
-          return p && p.status !== 'INACTIVE' ? [{ prod: p, qty: e.qty }] : [];
-        });
-        setItems(picked.map(({ prod, qty }) => recalcRow({ ...buildRowFromProduct(prod), quantity: qty })));
-        if (picked.length < entries.length) {
-          showToast(`${entries.length - picked.length} hàng hóa không còn kinh doanh nên không được thêm`, 'warning');
+        const picked = ids
+          .map((id) => byId.get(id))
+          .filter((p): p is BackendProduct => Boolean(p) && p?.status !== 'INACTIVE');
+        setItems(
+          picked.map((p) => {
+            const row = buildRowFromProduct(p);
+            const q = qtyById.get(p.productId);
+            return q ? recalcRow({ ...row, quantity: q }) : row;
+          })
+        );
+        if (picked.length < ids.length) {
+          showToast(`${ids.length - picked.length} hàng hóa không còn kinh doanh nên không được thêm`, 'warning');
         }
       } catch (err) {
         console.error('Lỗi nạp hàng hóa đã chọn:', err);
@@ -639,6 +651,11 @@ export default function CreatePurchaseScreen({ mode = 'receipt' }: CreatePurchas
     setItems((prev) =>
       prev.map((it) => (it.productId === productId ? recalcRow({ ...it, quantity: Math.max(1, qty) }) : it))
     );
+  };
+
+  // SL lỗi: không âm, chỉ ghi nhận trên phiếu (không vào kho, không tính tiền)
+  const handleUpdateDefect = (productId: number, qty: number) => {
+    setItems((prev) => prev.map((it) => (it.productId === productId ? { ...it, defectQuantity: Math.max(0, qty) } : it)));
   };
 
   const handleUpdatePrice = (productId: number, price: number) => {
@@ -804,6 +821,7 @@ export default function CreatePurchaseScreen({ mode = 'receipt' }: CreatePurchas
         unitPrice: i.unitPrice,
         discountPercent: i.discountPercent || 0,
         lotNumber: i.lotNumber || null,
+        defectQuantity: i.defectQuantity || 0,
       }));
       const discount = Math.round(orderDiscount);
 
@@ -1179,7 +1197,14 @@ export default function CreatePurchaseScreen({ mode = 'receipt' }: CreatePurchas
                 {columns.stock && <div className="text-right pr-2">Tồn kho</div>}
                 {columns.costPrice && <div className="text-right pr-2">Giá vốn</div>}
                 {columns.salePrice && <div className="text-right pr-2">Giá bán</div>}
-                <div className="text-right pr-2">Số lượng</div>
+                <div className="text-right pr-2" title={isOrder ? undefined : "SL đạt: vào tồn kho và tính tiền trả NCC"}>
+                  {isOrder ? "Số lượng" : "SL đạt"}
+                </div>
+                {!isOrder && (
+                  <div className="text-right pr-2" title="SL lỗi: chỉ ghi nhận trên phiếu, không vào tồn kho, không tính tiền">
+                    SL lỗi
+                  </div>
+                )}
                 <div className="text-right pr-2">Đơn giá</div>
                 <div className="text-right pr-2">Giảm giá</div>
                 <div className="text-right pr-2">Thành tiền</div>
@@ -1327,6 +1352,18 @@ export default function CreatePurchaseScreen({ mode = 'receipt' }: CreatePurchas
                             className="w-full"
                           />
                         </div>
+
+                        {/* SL lỗi (chỉ phiếu nhập) */}
+                        {!isOrder && (
+                          <div className="px-1">
+                            <NumberInput
+                              value={row.defectQuantity ?? 0}
+                              onChange={(v) => handleUpdateDefect(row.productId, v)}
+                              title="SL lỗi: không vào tồn kho, không tính tiền trả NCC"
+                              className={`w-full ${(row.defectQuantity ?? 0) > 0 ? "!border-[#fb2c36] text-[#fb2c36] font-semibold" : ""}`}
+                            />
+                          </div>
+                        )}
 
                         {/* Đơn giá: đỏ khi cao hơn giá bán */}
                         <div className="px-1">

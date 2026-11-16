@@ -205,13 +205,41 @@ public record SaveProductionOrderRequest(
     string? Workshop,
     string? Notes,
     List<SaveProductionOrderItemInput>? Items = null,
+    /// <summary>Không còn dùng khi lập / sửa lệnh: lệnh bắt buộc theo đúng BOM (gửi lên sẽ bị từ chối)</summary>
     List<SaveProductionOrderMaterialInput>? CustomMaterials = null,
     string? AdjustReason = null,
+    /// <summary>Kho NVL để kiểm tra tồn theo BOM (kho làm việc); để trống = không kiểm tra</summary>
+    int? WarehouseId = null,
+    /// <summary>Đã xác nhận vẫn lưu lệnh khi thiếu NVL (cảnh báo được ghi vào ghi chú lệnh)</summary>
+    bool ConfirmShortage = false,
     /// <summary>Mã yêu cầu do client sinh, chống tạo trùng. Chỉ dùng khi lập lệnh từ kế hoạch (Q-V6); lập lệnh trực tiếp bỏ qua.</summary>
     string? ClientRequestId = null
 );
 
 public record CloseProductionOrderRequest(string? Reason);
+
+/// <summary>SL thực tế của 1 thành phẩm khi Duyệt hoàn thành (ProductionOrderItemId null = lệnh cũ 1 thành phẩm)</summary>
+public record ApproveProductionOrderLine(
+    int? ProductionOrderItemId,
+    decimal AcceptedQuantity,
+    decimal DefectQuantity,
+    string? DefectReason);
+
+/// <summary>
+/// Duyệt hoàn thành lệnh sản xuất: hệ thống tự sinh phiếu nhập thành phẩm cho từng thành phẩm có SL &gt; 0
+/// vào kho thành phẩm đã chọn rồi đóng lệnh. LotNumber để trống → dùng mã lệnh.
+/// </summary>
+public record ApproveProductionOrderRequest(
+    int WarehouseId,
+    int? LocationId,
+    string? LotNumber,
+    DateOnly? ProductionDate,
+    string? Notes,
+    /// <summary>Ghi chú bắt buộc khi có cảnh báo dùng NVL (BR-37)</summary>
+    string? ReviewNote,
+    List<ApproveProductionOrderLine> Lines,
+    /// <summary>Đã xác nhận nhập vượt SL kế hoạch</summary>
+    bool ConfirmExceedPlan = false);
 
 public record AdjustMaterialNormLine(
     /// <summary>Dòng nhu cầu đang có; null = thêm NVL mới vào lệnh</summary>

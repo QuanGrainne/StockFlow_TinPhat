@@ -19,6 +19,21 @@ export interface PurchaseItem {
   lotNumber?: string | null;
   currentStock?: number;
   currentUnitCost?: number;
+  /** SL lỗi khi nhận hàng: không vào tồn kho, không tính tiền trả NCC */
+  defectQuantity?: number;
+}
+
+/** Cách tính giá vốn bình quân gia quyền của 1 dòng phiếu nhập đã hoàn thành (lấy từ thẻ kho) */
+export interface PurchaseCosting {
+  productId: number;
+  productCode: string;
+  productName: string;
+  qtyBefore: number;
+  costBefore: number;
+  qtyIn: number;
+  priceIn: number;
+  qtyAfter: number;
+  costAfter: number;
 }
 
 export interface PurchaseListRecord {
@@ -75,6 +90,8 @@ export interface PurchaseDetail {
   returns?: PurchaseReturnSummary[];
   /** Trả hàng nhập (phần tính vào công nợ) đã trừ vào số cần trả NCC của phiếu này */
   returnOffsetAmount?: number;
+  /** Cách tính giá vốn BQ gia quyền (chỉ phiếu đã hoàn thành) */
+  costing?: PurchaseCosting[];
 }
 
 export interface PurchaseReturnSummary {
@@ -115,6 +132,8 @@ export interface CreatePurchasePayload {
     discountPercent?: number;
     lotId?: number | null;
     lotNumber?: string | null;
+    /** SL lỗi: quantity là SL đạt (vào kho, tính tiền) */
+    defectQuantity?: number;
   }[];
 }
 
@@ -131,6 +150,8 @@ export interface UpdatePurchasePayload {
     discountPercent?: number;
     lotId?: number | null;
     lotNumber?: string | null;
+    /** SL lỗi: quantity là SL đạt (vào kho, tính tiền) */
+    defectQuantity?: number;
   }[];
 }
 

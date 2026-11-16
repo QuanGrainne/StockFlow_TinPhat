@@ -115,6 +115,10 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
 
     public virtual DbSet<MstOrderSetting> MstOrderSettings { get; set; }
 
+    public virtual DbSet<MstDebtWarningSetting> MstDebtWarningSettings { get; set; }
+
+    public virtual DbSet<TrxCreditLimitHistory> TrxCreditLimitHistories { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema("stockflow");
@@ -2284,6 +2288,63 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
                 .HasForeignKey(d => d.UpdatedBy)
                 .OnDelete(DeleteBehavior.SetNull)
                 .HasConstraintName("fk_mst_order_settings_updated_by");
+        });
+
+        // Thiết lập cảnh báo công nợ khách hàng (một dòng, setting_id = 1)
+        modelBuilder.Entity<MstDebtWarningSetting>(entity =>
+        {
+            entity.HasKey(e => e.SettingId).HasName("mst_debt_warning_settings_pkey");
+            entity.ToTable("mst_debt_warning_settings", "stockflow");
+
+            entity.Property(e => e.SettingId).ValueGeneratedNever().HasColumnName("setting_id");
+            entity.Property(e => e.EnableDebtAmountWarning).HasColumnName("enable_debt_amount_warning");
+            entity.Property(e => e.DebtAmountThreshold).HasPrecision(18, 2).HasColumnName("debt_amount_threshold");
+            entity.Property(e => e.EnableDebtDaysWarning).HasColumnName("enable_debt_days_warning");
+            entity.Property(e => e.DebtDaysThreshold).HasColumnName("debt_days_threshold");
+            entity.Property(e => e.DebtDaysFrom).HasMaxLength(20).HasColumnName("debt_days_from");
+            entity.Property(e => e.AllowDebtOverLimit).HasColumnName("allow_debt_over_limit");
+            entity.Property(e => e.DefaultCreditLimit)
+                .HasPrecision(18, 2)
+                .HasColumnName("default_credit_limit");
+            entity.Property(e => e.UpdatedAt).HasColumnType("timestamp with time zone").HasColumnName("updated_at");
+            entity.Property(e => e.UpdatedBy).HasColumnName("updated_by");
+
+            entity.HasOne<SecUser>()
+                .WithMany()
+                .HasForeignKey(e => e.UpdatedBy)
+                .OnDelete(DeleteBehavior.SetNull)
+                .HasConstraintName("fk_mst_debt_warning_settings_updated_by");
+        });
+
+        // Nhật ký thay đổi hạn mức công nợ khách hàng
+        modelBuilder.Entity<TrxCreditLimitHistory>(entity =>
+        {
+            entity.HasKey(e => e.HistoryId).HasName("trx_credit_limit_histories_pkey");
+            entity.ToTable("trx_credit_limit_histories", "stockflow");
+            entity.HasIndex(e => new { e.PartnerId, e.ChangedAt }, "ix_trx_credit_limit_histories_partner_changed");
+
+            entity.Property(e => e.HistoryId).HasColumnName("history_id");
+            entity.Property(e => e.PartnerId).HasColumnName("partner_id");
+            entity.Property(e => e.OldLimit).HasPrecision(18, 2).HasColumnName("old_limit");
+            entity.Property(e => e.NewLimit).HasPrecision(18, 2).HasColumnName("new_limit");
+            entity.Property(e => e.Source).HasMaxLength(30).HasColumnName("source");
+            entity.Property(e => e.Reason).HasMaxLength(500).HasColumnName("reason");
+            entity.Property(e => e.RequestId).HasColumnName("request_id");
+            entity.Property(e => e.ChangedBy).HasColumnName("changed_by");
+            entity.Property(e => e.ChangedAt).HasColumnType("timestamp without time zone").HasColumnName("changed_at");
+
+            entity.HasOne(e => e.Partner).WithMany()
+                .HasForeignKey(e => e.PartnerId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("fk_trx_credit_limit_histories_partner");
+            entity.HasOne<TrxCreditLimitRequest>().WithMany()
+                .HasForeignKey(e => e.RequestId)
+                .OnDelete(DeleteBehavior.SetNull)
+                .HasConstraintName("fk_trx_credit_limit_histories_request");
+            entity.HasOne<SecUser>().WithMany()
+                .HasForeignKey(e => e.ChangedBy)
+                .OnDelete(DeleteBehavior.SetNull)
+                .HasConstraintName("fk_trx_credit_limit_histories_changed_by");
         });
 
         // Trả hàng nhập (trả hàng cho nhà cung cấp)

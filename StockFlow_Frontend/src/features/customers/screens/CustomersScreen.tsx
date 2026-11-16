@@ -7,14 +7,18 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { message } from 'antd';
-import { ChevronLeft, ChevronRight, FileDown, Inbox, Lock, Plus, RefreshCw, Search, Unlock, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, CircleAlert, FileDown, Inbox, Lock, Plus, RefreshCw, Search, Settings, SlidersHorizontal, Unlock, X } from 'lucide-react';
 import CustomerFilterSidebar from '@/features/customers/components/CustomerFilterSidebar';
 import CustomerExpandedRow from '@/features/customers/components/CustomerExpandedRow';
 import { CustomerFormModal } from '@/features/customers/components/CustomerFormModal';
+import { DebtWarningSettingsModal } from '@/features/customers/components/DebtWarningSettingsModal';
+import { CreditLimitAdjustModal } from '@/features/customers/components/CreditLimitAdjustModal';
+import { permissionService } from '@/features/admin/services/permissionService';
+import { getStoredRole } from '@/lib/navigation/currentRole';
 import { customerService } from '@/features/customers/services/customerService';
 import { exportCustomersToXLSX } from '@/features/customers/utils/exportExcel';
 import { useAuthorizedWarehouses } from '@/lib/warehouse/useActiveWarehouse';
-import type { CreateCustomerPayload, Customer, CustomerDetail, CustomerFilterState } from '@/features/customers/types';
+import type { BatchCreditLimitResult, CreateCustomerPayload, Customer, CustomerDetail, CustomerFilterState } from '@/features/customers/types';
 import { readDocumentLink, scrollToWhenReady } from '@/lib/navigation/documentLink';
 
 const money = new Intl.NumberFormat('vi-VN');
@@ -65,6 +69,23 @@ export default function CustomersScreen({ }: CustomersScreenProps = {}) {
   const [editing, setEditing] = useState<Customer | null>(null);
   const [deleting, setDeleting] = useState<Customer | null>(null);
   const [busy, setBusy] = useState(false);
+  // Thiết lập cảnh báo công nợ: chỉ vai trò được quyền duyệt hạn mức (Manager / Kế toán trưởng / Admin)
+  const [debtSettingsOpen, setDebtSettingsOpen] = useState(false);
+  const [canSetDebtWarning, setCanSetDebtWarning] = useState(false);
+  // Điều chỉnh hạn mức (một / nhiều khách): cùng quyền với thiết lập công nợ
+  const [adjustingLimit, setAdjustingLimit] = useState<Customer[] | null>(null);
+  useEffect(() => {
+    let stale = false;
+    permissionService
+      .getAllowedFeatures(`ROLE_${getStoredRole()}`)
+      .then((feats) => {
+        if (!stale) setCanSetDebtWarning(feats.has('feat-credit-approvals'));
+      })
+      .catch(() => {});
+    return () => {
+      stale = true;
+    };
+  }, []);
 
   // ── Tải danh sách: bộ lọc (trừ từ khóa) gửi lên server; đang tải khi kết quả chưa khớp khóa hiện tại ──
   const { search, ...serverFilter } = filter;
@@ -222,6 +243,29 @@ export default function CustomersScreen({ }: CustomersScreenProps = {}) {
     }
   };
 
+  const handleCreditLimitSaved = (res: BatchCreditLimitResult) => {
+    const done = res.updated.length;
+    const skipped = res.skipped.length;
+    if (done > 0) message.success(`Đã điều chỉnh hạn mức ${done} khách hàng`);
+    if (skipped > 0)
+      message.warning(
+        `${skipped} khách không đổi hạn mức: ` +
+          res.skipped
+            .slice(0, 3)
+            .map((x) => `${x.partnerCode ?? x.partnerId} (${x.reason})`)
+            .join('; ') +
+          (skipped > 3 ? '...' : ''),
+        6
+      );
+    if (done > 0) {
+      setSelectedIds([]);
+      res.updated.forEach((u) => {
+        if (details[u.partnerId]) void loadDetail(u.partnerId);
+      });
+      reload();
+    }
+  };
+
   const allPageSelected = paged.length > 0 && paged.every((c) => selectedIds.includes(c.id));
 
   return (
@@ -272,6 +316,17 @@ export default function CustomersScreen({ }: CustomersScreenProps = {}) {
             <FileDown size={14} className="text-[#677484]" />
             <span>Xuất file</span>
           </button>
+          {canSetDebtWarning && (
+            <button
+              type="button"
+              onClick={() => setDebtSettingsOpen(true)}
+              title="Thiết lập cảnh báo công nợ khách hàng"
+              aria-label="Thiết lập cảnh báo công nợ khách hàng"
+              className="inline-flex items-center justify-center w-8 h-8 rounded-[8px] border border-slate-300 hover:bg-[#f7f8f9] transition cursor-pointer bg-white"
+            >
+              <Settings size={15} className="text-[#677484]" />
+            </button>
+          )}
         </div>
       </header>
 
@@ -403,7 +458,14 @@ export default function CustomersScreen({ }: CustomersScreenProps = {}) {
                                   : undefined
                             }
                           >
-                            {money.format(c.currentDebt || 0)}
+                            <span className="inline-flex items-center justify-end gap-1">
+                              {c.debtWarning && (
+                                <span title={`Cảnh báo công nợ: ${c.debtWarning}`} className="inline-flex text-[#f59e0b] cursor-help">
+                                  <CircleAlert size={13} />
+                                </span>
+                              )}
+                              {money.format(c.currentDebt || 0)}
+                            </span>
                           </td>
                           <td className="py-2.5 px-3 text-right font-mono">{money.format(c.totalSales || 0)}</td>
                           <td className="py-2.5 px-3 text-right font-mono">{money.format(c.totalSalesNetReturns || 0)}</td>
@@ -435,6 +497,7 @@ export default function CustomersScreen({ }: CustomersScreenProps = {}) {
                               void loadDetail(id);
                               reload();
                             }}
+                            onAdjustCreditLimit={canSetDebtWarning ? (cust) => setAdjustingLimit([cust]) : undefined}
                           />
                         )}
                       </React.Fragment>
@@ -522,6 +585,15 @@ export default function CustomersScreen({ }: CustomersScreenProps = {}) {
           >
             <Unlock size={13} /> Cho phép hoạt động
           </button>
+          {canSetDebtWarning && (
+            <button
+              type="button"
+              onClick={() => setAdjustingLimit(result.items.filter((c) => selectedIds.includes(c.id)))}
+              className="inline-flex items-center gap-1 px-2.5 h-7 rounded-[6px] bg-white/10 hover:bg-white/20 cursor-pointer"
+            >
+              <SlidersHorizontal size={13} /> Điều chỉnh hạn mức
+            </button>
+          )}
           <button type="button" onClick={() => setSelectedIds([])} className="p-1 rounded hover:bg-white/10 cursor-pointer" title="Bỏ chọn">
             <X size={14} />
           </button>
@@ -529,6 +601,20 @@ export default function CustomersScreen({ }: CustomersScreenProps = {}) {
       )}
 
       {/* 4. Form thêm / sửa */}
+      <DebtWarningSettingsModal
+        open={debtSettingsOpen}
+        onClose={() => setDebtSettingsOpen(false)}
+        onSaved={() => {
+          message.success('Đã lưu thiết lập cảnh báo công nợ');
+          setReloadTick((t) => t + 1);
+        }}
+      />
+      <CreditLimitAdjustModal
+        open={adjustingLimit !== null && adjustingLimit.length > 0}
+        customers={adjustingLimit ?? []}
+        onClose={() => setAdjustingLimit(null)}
+        onSaved={handleCreditLimitSaved}
+      />
       <CustomerFormModal
         open={formOpen}
         customer={editing}

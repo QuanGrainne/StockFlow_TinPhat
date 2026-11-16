@@ -7,11 +7,9 @@ using StockFlow.Domain.Services;
 
 namespace StockFlow.Application.Features.Production.Helpers;
 
-/// <summary>Luật dùng chung khi lập / sửa lệnh sản xuất (UC-59, E58.2, BR-31, BR-51).</summary>
+/// <summary>Luật dùng chung khi lập / sửa lệnh sản xuất (UC-59, E58.2, BR-31): theo đúng BOM, kiểm tra thiếu NVL tại kho.</summary>
 public static class ProductionOrderRules
 {
-    private const int ReasonMaxLength = 500;
-
     /// <summary>E58.2: hạn hoàn thành không được ở quá khứ (so theo ngày giờ Việt Nam).</summary>
     public static string? ValidateDeadline(DateTime? deadline)
     {
@@ -54,7 +52,7 @@ public static class ProductionOrderRules
     }
 
     /// <summary>
-    /// Tạo danh sách dòng thành phẩm (dtl_production_order_items) và nhu cầu NVL tương ứng (hỗ trợ chỉnh sửa trực tiếp định mức ngay khi lập/sửa lệnh, BR-51).
+    /// Tạo danh sách dòng thành phẩm (dtl_production_order_items) và nhu cầu NVL tính đúng theo BOM đang áp dụng (BR-31).
     /// Trả về thông báo lỗi nếu dữ liệu không hợp lệ, hoặc null nếu thành công.
     /// </summary>
     public static async Task<string?> PopulateItemsAndRequirementsAsync(
@@ -63,6 +61,10 @@ public static class ProductionOrderRules
     {
         var items = NormalizeItems(req);
         if (items.Count == 0) return "Vui lòng chọn ít nhất một thành phẩm.";
+        // Lệnh sản xuất bắt buộc theo đúng công thức BOM đang áp dụng (quyết định nhóm 15/11/2026, thay BR-51 khi lập lệnh):
+        // không nhận định mức tự sửa / NVL ngoài BOM khi lập hoặc sửa lệnh.
+        if (req.CustomMaterials is { Count: > 0 } || items.Any(i => i.CustomMaterials is { Count: > 0 }))
+            return ProductionMessages.MustFollowBom;
         if (items.Select(i => i.ProductId).Distinct().Count() != items.Count)
             return "Mỗi thành phẩm chỉ được chọn một dòng trong cùng một lệnh sản xuất.";
 
@@ -114,78 +116,120 @@ public static class ProductionOrderRules
             };
             context.DtlProductionOrderItems.Add(orderItem);
 
-            if (it.CustomMaterials is not { Count: > 0 })
-            {
-                // V-04: nhu cầu tính ra phải lưu được vào numeric(18,2)
-                if (bom.DtlBomItems.Any(b => !ProductionPolicy.TryCalculateRequirement(
-                        it.PlannedQuantity, b.Quantity ?? 0, b.WastageRate ?? 0, out _)))
-                    return ProductionMessages.QuantityLimit;
-                AddRequirementsFromBom(context, order, bom, it.PlannedQuantity, orderItem);
-                continue;
-            }
+            // V-04: nhu cầu tính ra phải lưu được vào numeric(18,2)
+            if (bom.DtlBomItems.Any(b => !ProductionPolicy.TryCalculateRequirement(
+                    it.PlannedQuantity, b.Quantity ?? 0, b.WastageRate ?? 0, out _)))
+                return ProductionMessages.QuantityLimit;
 
-            if (it.CustomMaterials.Select(m => m.MaterialId).Distinct().Count() != it.CustomMaterials.Count)
-                return $"Nguyên vật liệu của thành phẩm {products[it.ProductId].ProductCode} bị trùng lặp.";
-            if (it.CustomMaterials.Any(m => m.MaterialId == it.ProductId))
-                return "Thành phẩm không được là nguyên vật liệu của chính nó.";
-
-            var bomByMaterial = bom.DtlBomItems.ToDictionary(b => b.MaterialId);
-            var isDifferentFromBom = it.CustomMaterials.Count != bom.DtlBomItems.Count
-                || it.CustomMaterials.Any(m =>
-                    !bomByMaterial.TryGetValue(m.MaterialId, out var bi)
-                    || (bi.Quantity ?? 0) != m.NormPerUnit
-                    || (bi.WastageRate ?? 0) != m.WastageRate);
-
-            var reason = (it.AdjustReason ?? req.AdjustReason)?.Trim();
-            if (isDifferentFromBom && string.IsNullOrWhiteSpace(reason))
-                return ProductionMessages.NormReasonRequired;
-
-            var matIds = it.CustomMaterials.Select(m => m.MaterialId).ToList();
-            var matMap = await context.MstProducts.AsNoTracking()
-                .Where(p => matIds.Contains(p.ProductId) && p.IsActive != false)
-                .ToDictionaryAsync(p => p.ProductId, ct);
-            if (matMap.Count != matIds.Count)
-                return "Nguyên vật liệu không tồn tại hoặc đã ngừng kinh doanh.";
-
-            foreach (var cm in it.CustomMaterials)
-            {
-                if (cm.NormPerUnit <= 0 || !ProductionHelper.HasMaxScale(cm.NormPerUnit, BomRules.QuantityScale))
-                    return $"Định mức phải lớn hơn 0 và có tối đa {BomRules.QuantityScale} chữ số thập phân.";
-                if (cm.WastageRate < 0 || cm.WastageRate > 100 || !ProductionHelper.HasMaxScale(cm.WastageRate, BomRules.WastageScale))
-                    return "Tỷ lệ hao hụt phải từ 0 đến 100%.";
-
-                var mat = matMap[cm.MaterialId];
-                var hasBomLine = bomByMaterial.TryGetValue(cm.MaterialId, out var bi);
-                var lineChanged = !hasBomLine || (bi!.Quantity ?? 0) != cm.NormPerUnit || (bi.WastageRate ?? 0) != cm.WastageRate;
-                if (!ProductionPolicy.TryCalculateRequirement(it.PlannedQuantity, cm.NormPerUnit, cm.WastageRate, out var required))
-                    return ProductionMessages.QuantityLimit; // V-04
-                var adjustNote = lineChanged && !string.IsNullOrWhiteSpace(reason)
-                    ? (hasBomLine
-                        ? $"{reason} (định mức {bi!.Quantity ?? 0:0.####} → {cm.NormPerUnit:0.####}, hao hụt {bi.WastageRate ?? 0:0.##}% → {cm.WastageRate:0.##}%)"
-                        : $"{reason} (thêm NVL ngoài BOM)")
-                    : null;
-                if (adjustNote is { Length: > ReasonMaxLength }) adjustNote = adjustNote[..ReasonMaxLength];
-
-                context.TrxProductionMaterialRequirements.Add(new TrxProductionMaterialRequirement
-                {
-                    ProductionOrder = order,
-                    ProductionOrderItem = orderItem,
-                    MaterialId = cm.MaterialId,
-                    UnitId = hasBomLine ? bi!.UnitId : mat.BaseUnitId,
-                    SourceBomItemId = hasBomLine ? bi!.BomItemId : null,
-                    NormPerUnit = cm.NormPerUnit,
-                    WastageRate = cm.WastageRate,
-                    RequiredQty = required,
-                    IssuedQty = 0,
-                    ShortageQty = required,
-                    IsAdjusted = lineChanged,
-                    AdjustedBy = lineChanged ? userId : null,
-                    AdjustedAt = lineChanged ? now : null,
-                    AdjustReason = adjustNote,
-                });
-            }
+            // BR-31: nhu cầu NVL = SL kế hoạch × định mức BOM × (1 + hao hụt %)
+            AddRequirementsFromBom(context, order, bom, it.PlannedQuantity, orderItem);
         }
 
+        return null;
+    }
+
+    /// <summary>1 NVL không đủ tồn tại kho cho lệnh (đã gộp nhu cầu của mọi thành phẩm trong lệnh)</summary>
+    public sealed record MaterialShortage(string Code, string Name, string Unit, decimal Required, decimal Available, decimal Shortage);
+
+    private const string ShortageNoteTag = "[Cảnh báo thiếu NVL";
+    private const int NotesMaxLength = 500;
+
+    /// <summary>
+    /// Kiểm tra tồn NVL tại kho theo nhu cầu BOM của lệnh (BR-31): gộp nhu cầu còn phải xuất theo từng NVL
+    /// (nhiều thành phẩm dùng chung NVL thì cộng dồn), so với tồn hiện có của kho (mọi vị trí / lô).
+    /// Đọc các dòng nhu cầu đang được theo dõi trong context (vừa tạo khi lập lệnh hoặc vừa tính lại khi sửa lệnh).
+    /// </summary>
+    public static async Task<List<MaterialShortage>> ShortagesAsync(
+        IStockFlowDbContext context, TrxProductionOrder order, int warehouseId, CancellationToken ct)
+    {
+        var needs = context.TrxProductionMaterialRequirements.Local
+            .Where(r => ReferenceEquals(r.ProductionOrder, order)
+                        || (order.ProductionOrderId > 0 && r.ProductionOrderId == order.ProductionOrderId))
+            .GroupBy(r => r.MaterialId)
+            .Select(g => new { MaterialId = g.Key, Needed = g.Sum(r => Math.Max(0, (r.RequiredQty ?? 0) - (r.IssuedQty ?? 0))) })
+            .Where(x => x.Needed > 0)
+            .ToList();
+        if (needs.Count == 0) return new List<MaterialShortage>();
+
+        var ids = needs.Select(n => n.MaterialId).ToList();
+        var available = await ProductionStockOps.AvailableAsync(context, warehouseId, ids, ct);
+        var materials = await context.MstProducts.AsNoTracking()
+            .Where(p => ids.Contains(p.ProductId))
+            .Select(p => new { p.ProductId, p.ProductCode, p.ProductName, Unit = p.BaseUnit.UnitName })
+            .ToDictionaryAsync(p => p.ProductId, ct);
+
+        return needs
+            .Select(n =>
+            {
+                var stock = available.GetValueOrDefault(n.MaterialId);
+                var m = materials.GetValueOrDefault(n.MaterialId);
+                return new MaterialShortage(m?.ProductCode ?? $"#{n.MaterialId}", m?.ProductName ?? "", m?.Unit ?? "",
+                    n.Needed, stock, ProductionPolicy.RoundQuantity(n.Needed - stock));
+            })
+            .Where(x => x.Shortage > 0)
+            .OrderBy(x => x.Code)
+            .ToList();
+    }
+
+    /// <summary>Mô tả ngắn danh sách NVL thiếu: "VAI01 Vải (thiếu 3 m), KEO01 Keo (thiếu 1,5 kg)"</summary>
+    public static string DescribeShortages(IEnumerable<MaterialShortage> shortages) =>
+        string.Join(", ", shortages.Select(s => $"{s.Code} {s.Name} (cần {s.Required:0.##}, tồn {s.Available:0.##}, thiếu {s.Shortage:0.##} {s.Unit})".Replace(" )", ")")));
+
+    /// <summary>
+    /// Ghi chú lệnh sau khi lưu: giữ ghi chú người dùng (bỏ cảnh báo thiếu NVL cũ) và thêm cảnh báo mới nếu còn thiếu,
+    /// để kế toán lên kế hoạch mua / nhập bù. Tổng độ dài tối đa 500 ký tự (cột notes).
+    /// </summary>
+    public static string? BuildNotesWithShortage(string? userNotes, IReadOnlyCollection<MaterialShortage> shortages, string warehouseName, DateTime now)
+    {
+        var kept = string.Join("\n", (userNotes ?? "")
+            .Split('\n')
+            .Select(l => l.TrimEnd('\r'))
+            .Where(l => !l.TrimStart().StartsWith(ShortageNoteTag, StringComparison.Ordinal)))
+            .Trim();
+        if (shortages.Count == 0) return string.IsNullOrEmpty(kept) ? null : kept;
+
+        var warning = $"{ShortageNoteTag} {now:dd/MM/yyyy HH:mm} - {warehouseName}] {DescribeShortages(shortages)}";
+        var room = NotesMaxLength - (string.IsNullOrEmpty(kept) ? 0 : kept.Length + 1);
+        if (room < 40)
+        {
+            // Ghi chú người dùng quá dài: rút gọn để luôn còn chỗ cho cảnh báo
+            kept = kept[..Math.Max(0, NotesMaxLength - 200)];
+            room = NotesMaxLength - (string.IsNullOrEmpty(kept) ? 0 : kept.Length + 1);
+        }
+        if (warning.Length > room) warning = warning[..Math.Max(0, room - 1)] + "…";
+        return string.IsNullOrEmpty(kept) ? warning : $"{kept}\n{warning}";
+    }
+
+    /// <summary>
+    /// Kiểm tra thiếu NVL khi lập / sửa lệnh (quyết định nhóm 15/11/2026: cho lưu nhưng phải cảnh báo):
+    /// - Không gửi kho → không kiểm tra, chỉ chuẩn hoá ghi chú.
+    /// - Thiếu NVL mà chưa xác nhận → trả lỗi có tiền tố [CONFIRM_SHORTAGE] để FE hỏi người dùng.
+    /// - Đã xác nhận → vẫn lưu, cảnh báo thiếu NVL được ghi vào ghi chú lệnh để lên kế hoạch mua / nhập bù.
+    /// Trả về thông báo lỗi, hoặc null nếu được lưu (order.Notes đã được gán).
+    /// </summary>
+    public static async Task<string?> ApplyShortageCheckAsync(
+        IStockFlowDbContext context, ICurrentUserService currentUser, TrxProductionOrder order,
+        SaveProductionOrderRequest req, DateTime now, CancellationToken ct)
+    {
+        if (req.WarehouseId is not > 0)
+        {
+            order.Notes = BuildNotesWithShortage(req.Notes, Array.Empty<MaterialShortage>(), "", now);
+            return null;
+        }
+
+        var warehouseId = req.WarehouseId.Value;
+        if (!await currentUser.HasWarehouseAccessAsync(warehouseId, ct)) return ProductionMessages.NoWarehouseAccess;
+        var warehouseName = await context.MstWarehouses.AsNoTracking()
+            .Where(w => w.WarehouseId == warehouseId)
+            .Select(w => w.WarehouseName)
+            .FirstOrDefaultAsync(ct) ?? $"Kho #{warehouseId}";
+
+        var shortages = await ShortagesAsync(context, order, warehouseId, ct);
+        if (shortages.Count > 0 && !req.ConfirmShortage)
+            return $"{ProductionMessages.ConfirmShortagePrefix} Thiếu nguyên vật liệu tại {warehouseName} theo công thức BOM: "
+                   + $"{DescribeShortages(shortages)}. Bạn có muốn vẫn lưu lệnh để lên kế hoạch mua / nhập bù không?";
+
+        order.Notes = BuildNotesWithShortage(req.Notes, shortages, warehouseName, now);
         return null;
     }
 }

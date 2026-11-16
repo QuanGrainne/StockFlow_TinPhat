@@ -34,7 +34,66 @@ export interface Customer {
   /** Tổng bán trừ trả hàng */
   totalSalesNetReturns?: number;
   lastTransactionDate?: string | null;
+  /** Lý do cảnh báo công nợ theo "Thiết lập cảnh báo công nợ" (null = không cảnh báo) */
+  debtWarning?: string | null;
   assignedStaff?: string;
+}
+
+/** Thiết lập cảnh báo công nợ khách hàng (GET/PUT /api/settings/debt-warning) */
+export type DebtDaysFrom = 'FIRST_DEBT' | 'LAST_TRANSACTION';
+export interface DebtWarningSettings {
+  enableDebtAmountWarning: boolean;
+  debtAmountThreshold: number;
+  enableDebtDaysWarning: boolean;
+  debtDaysThreshold: number;
+  debtDaysFrom: DebtDaysFrom;
+  allowDebtOverLimit: boolean;
+  /** Hạn mức công nợ mặc định cho khách tạo mới (Manager cài đặt) */
+  defaultCreditLimit: number;
+  /** Khách lẻ luôn phải thanh toán đủ — chỉ hiển thị */
+  noDebtForWalkIn?: boolean;
+  updatedAt?: string;
+  updatedByName?: string | null;
+}
+
+/** SET: đặt cố định · PERCENT: tăng/giảm theo % · RESET_DEFAULT: về hạn mức mặc định */
+export type CreditLimitBatchMode = 'SET' | 'PERCENT' | 'RESET_DEFAULT';
+
+export interface CreditLimitChange {
+  partnerId: number;
+  partnerCode: string | null;
+  partnerName: string | null;
+  oldLimit: number;
+  newLimit: number;
+  currentDebt: number;
+}
+
+export interface CreditLimitSkip {
+  partnerId: number;
+  partnerCode: string | null;
+  partnerName: string | null;
+  currentLimit: number;
+  proposedLimit: number;
+  currentDebt: number;
+  reason: string;
+}
+
+export interface BatchCreditLimitResult {
+  updated: CreditLimitChange[];
+  skipped: CreditLimitSkip[];
+}
+
+/** INITIAL · MANUAL · BULK · REQUEST_APPROVED */
+export interface CreditLimitHistoryItem {
+  historyId: number;
+  changedAt: string;
+  oldLimit: number;
+  newLimit: number;
+  source: string;
+  reason: string | null;
+  requestId: number | null;
+  requestCode: string | null;
+  changedByName: string | null;
 }
 
 export interface CustomerStats {

@@ -103,7 +103,12 @@ public class GetCustomersQueryHandler : IRequestHandler<GetCustomersQuery, Resul
         var partners = await dbQuery.OrderByDescending(p => p.PartnerId).ToListAsync(cancellationToken);
         var lookups = await CustomerProfileHelper.LoadLookupsAsync(_context, partners, query.SalesFrom, query.SalesTo, cancellationToken);
 
-        var dtos = partners.Select(p => CustomerProfileHelper.ToDto(p, lookups));
+        var warnings = await CustomerDebtWarning.EvaluateAsync(_context, partners, cancellationToken);
+
+        var dtos = partners.Select(p => CustomerProfileHelper.ToDto(p, lookups) with
+        {
+            DebtWarning = warnings.GetValueOrDefault(p.PartnerId),
+        });
 
         // Tổng bán (khoảng giá trị, tính trong khoảng thời gian bán đã chọn)
         if (query.MinSales.HasValue) dtos = dtos.Where(d => d.TotalSales >= query.MinSales.Value);

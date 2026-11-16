@@ -118,6 +118,20 @@ public class ProductionController : ControllerBase
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { message = result.Error });
     }
 
+    /// <summary>
+    /// Duyệt hoàn thành lệnh đang sản xuất: nhập SL thực tế từng thành phẩm, hệ thống tự sinh phiếu nhập
+    /// thành phẩm vào kho rồi đóng lệnh.
+    /// </summary>
+    [HttpPost("orders/{id:int}/approve")]
+    [ProducesResponseType(typeof(ProductionOrderDetailDto), StatusCodes.Status200OK)]
+    [RequirePermission("PROD_APPROVE")]
+    [RequireFeature("feat-prod-plan")]
+    public async Task<IActionResult> ApproveOrder(int id, [FromBody] ApproveProductionOrderRequest request)
+    {
+        var result = await _mediator.Send(new ApproveProductionOrderCommand(id, request));
+        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { message = result.Error });
+    }
+
     /// <summary>Điều chỉnh định mức NVL trên lệnh (BR-51/BR-52).</summary>
     [HttpPost("orders/{id:int}/adjust-norms")]
     [ProducesResponseType(typeof(ProductionOrderDetailDto), StatusCodes.Status200OK)]
@@ -214,7 +228,8 @@ public class ProductionController : ControllerBase
     [HttpGet("lookups/locations")]
     [ProducesResponseType(typeof(List<WarehouseLocationDto>), StatusCodes.Status200OK)]
     [RequirePermission("PROD_READ")]
-    [RequireFeature("feat-prod-receipt")]
+    // Dùng chung: nhập thành phẩm thủ công và form Duyệt hoàn thành của Manager
+    [RequireFeature("feat-prod-receipt", "feat-prod-plan")]
     public async Task<IActionResult> GetLocations([FromQuery] int warehouseId)
     {
         var result = await _mediator.Send(new GetWarehouseLocationsQuery(warehouseId));

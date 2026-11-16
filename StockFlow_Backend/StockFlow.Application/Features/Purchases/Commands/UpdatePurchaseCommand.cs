@@ -83,6 +83,8 @@ public class UpdatePurchaseCommandHandler : IRequestHandler<UpdatePurchaseComman
 
             foreach (var item in req.Items)
             {
+                var defectError = PurchaseItemMapper.ValidateDefect(item);
+                if (defectError != null) return Result.Failure<PurchaseDetailDto>(defectError);
                 if (item.Quantity <= 0)
                 {
                     return Result.Failure<PurchaseDetailDto>($"Số lượng nhập của sản phẩm ID #{item.ProductId} phải lớn hơn 0.");
@@ -143,22 +145,8 @@ public class UpdatePurchaseCommandHandler : IRequestHandler<UpdatePurchaseComman
 
             foreach (var line in pricing.Lines)
             {
-                var item = line.Request;
-                var dtl = new DtlGoodsReceiptItem
-                {
-                    GrId = receipt.GrId,
-                    ProductId = item.ProductId,
-                    OrderedQty = item.Quantity,
-                    ReceivedQty = item.Quantity,
-                    AcceptedQty = item.Quantity,
-                    DefectiveQty = 0,
-                    DamagedQty = 0,
-                    ShortageQty = 0,
-                    UnitLandedCost = line.LandedCost,
-                    UnitPrice = item.UnitPrice,
-                    DiscountPercent = Math.Clamp(item.DiscountPercent, 0, 100),
-                    LotId = item.LotId
-                };
+                var dtl = PurchaseItemMapper.NewItem(line.Request, line.LandedCost);
+                dtl.GrId = receipt.GrId;
                 newItems.Add(dtl);
                 _context.DtlGoodsReceiptItems.Add(dtl);
             }
