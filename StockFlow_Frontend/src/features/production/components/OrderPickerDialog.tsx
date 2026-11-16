@@ -71,7 +71,7 @@ export function OrderPickerDialog({ title, statuses, emptyText, onClose, onPick 
             <tr>
               <th className="py-2 px-3">Mã lệnh</th>
               <th className="py-2 px-3">Thành phẩm</th>
-              <th className="py-2 px-3 text-right">Kế hoạch</th>
+              <th className="py-2 px-3 text-right">SL kế hoạch</th>
               <th className="py-2 px-3 text-right">Đã nhập</th>
               <th className="py-2 px-3">Hạn</th>
               <th className="py-2 px-3 text-center">NVL</th>

@@ -101,7 +101,10 @@ public class UpdateProductionOrderCommandHandler : IRequestHandler<UpdateProduct
 
         order.EndDate = req.Deadline?.Date;
         order.Workshop = string.IsNullOrWhiteSpace(req.Workshop) ? null : req.Workshop.Trim();
-        order.Notes = string.IsNullOrWhiteSpace(req.Notes) ? null : req.Notes.Trim();
+
+        // Thiếu NVL tại kho đang chọn: hỏi xác nhận, đã xác nhận thì ghi (lại) cảnh báo vào ghi chú lệnh
+        var shortageError = await ProductionOrderRules.ApplyShortageCheckAsync(_context, _currentUser, order, req, VietnamTime.Now, ct);
+        if (shortageError != null) return Result.Failure<ProductionOrderDetailDto>(shortageError);
 
         await _context.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);

@@ -57,6 +57,7 @@ import { useActiveWarehouse } from '@/lib/warehouse/useActiveWarehouse';
 import { supplierService } from '@/features/suppliers/services/supplierService';
 import { Supplier } from '@/features/suppliers/types';
 import { getDateRangeForPreset } from '@/lib/utils/date';
+import PurchaseCostingTable from '@/features/purchases/components/PurchaseCostingTable';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 // PurchaseStatus, PurchaseFilterState: xem features/purchases/types/filterTypes.ts
@@ -318,7 +319,7 @@ export default function PurchasesScreen({ onNavigate }: { onNavigate?: (screen: 
   const [cancellingRecord, setCancellingRecord] = useState<PurchaseListRecord | null>(null);
   const [cancelReason, setCancelReason] = useState<string>('');
   // Tab trong khung chi tiết phiếu: Thông tin | Lịch sử thanh toán
-  const [detailTab, setDetailTab] = useState<'info' | 'payments' | 'returns'>('info');
+  const [detailTab, setDetailTab] = useState<'info' | 'payments' | 'returns' | 'costing'>('info');
 
   const [isSubmittingAction, setIsSubmittingAction] = useState(false);
 
@@ -1077,6 +1078,7 @@ export default function PurchasesScreen({ onNavigate }: { onNavigate?: (screen: 
                                     ['info', 'Thông tin'],
                                     ['payments', 'Lịch sử thanh toán'],
                                     ['returns', 'Lịch sử trả hàng'],
+                                    ['costing', 'Giá vốn BQ'],
                                   ] as const).map(([key, label]) => (
                                     <button
                                       key={key}
@@ -1102,6 +1104,8 @@ export default function PurchasesScreen({ onNavigate }: { onNavigate?: (screen: 
                                   <PurchasePaymentHistory payments={detail?.payments ?? []} />
                                 ) : detailTab === 'returns' ? (
                                   <PurchaseReturnHistory returns={detail?.returns ?? []} />
+                                ) : detailTab === 'costing' ? (
+                                  <PurchaseCostingTable costing={detail?.costing} status={detail?.status ?? record.status} />
                                 ) : (
                                   <>
                                     {/* Header Info Row */}
@@ -1169,7 +1173,8 @@ export default function PurchasesScreen({ onNavigate }: { onNavigate?: (screen: 
                                             <th className="py-2 px-3 w-32">Mã hàng</th>
                                             <th className="py-2 px-3">Tên hàng hóa</th>
                                             <th className="py-2 px-3 w-16 text-center">ĐVT</th>
-                                            <th className="py-2 px-3 w-24 text-right">Số lượng</th>
+                                            <th className="py-2 px-3 w-24 text-right" title="SL đạt: vào tồn kho, tính tiền">SL đạt</th>
+                                            <th className="py-2 px-3 w-20 text-right" title="SL lỗi: không vào tồn kho, không tính tiền">SL lỗi</th>
                                             <th className="py-2 px-3 w-28 text-right">Đơn giá</th>
                                             <th className="py-2 px-3 w-24 text-right">Giảm giá</th>
                                             <th className="py-2 px-3 w-28 text-right">Giá nhập</th>
@@ -1193,14 +1198,14 @@ export default function PurchasesScreen({ onNavigate }: { onNavigate?: (screen: 
                                                 className="w-full h-7 px-2 text-xs font-normal border border-slate-300 rounded-[6px] focus:outline-none focus:border-[#0070f4]"
                                               />
                                             </th>
-                                            <th colSpan={6} />
+                                            <th colSpan={7} />
                                           </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-100">
                                           {detail?.items && detail.items.length > 0 ? (
                                             detail.items.filter(matchItemSearch).length === 0 ? (
                                               <tr>
-                                                <td colSpan={9} className="py-6 text-center text-xs text-slate-400">
+                                                <td colSpan={10} className="py-6 text-center text-xs text-slate-400">
                                                   Không có mặt hàng nào phù hợp
                                                 </td>
                                               </tr>
@@ -1213,6 +1218,9 @@ export default function PurchasesScreen({ onNavigate }: { onNavigate?: (screen: 
                                                 <td className="py-2 px-3 font-medium text-[#15171a]">{item.productName}</td>
                                                 <td className="py-2 px-3 text-center text-slate-500">{item.unit || 'Cái'}</td>
                                                 <td className="py-2 px-3 text-right font-mono font-medium">{item.quantity.toLocaleString('vi-VN')}</td>
+                                                <td className={`py-2 px-3 text-right font-mono ${(item.defectQuantity ?? 0) > 0 ? 'text-[#fb2c36] font-semibold' : 'text-slate-400'}`}>
+                                                  {(item.defectQuantity ?? 0).toLocaleString('vi-VN')}
+                                                </td>
                                                 <td className="py-2 px-3 text-right font-mono">{currencyFormatter.format(item.unitPrice)} đ</td>
                                                 <td className="py-2 px-3 text-right font-mono" title={item.discountPercent > 0 ? `Giảm ${item.discountPercent}%` : undefined}>
                                                   {currencyFormatter.format(lineDiscountPerUnit(item))} đ
@@ -1227,7 +1235,7 @@ export default function PurchasesScreen({ onNavigate }: { onNavigate?: (screen: 
                                             ))
                                           ) : (
                                             <tr>
-                                              <td colSpan={9} className="py-6 text-center text-xs text-slate-400">
+                                              <td colSpan={10} className="py-6 text-center text-xs text-slate-400">
                                                 Phiếu chưa có danh sách mặt hàng
                                               </td>
                                             </tr>

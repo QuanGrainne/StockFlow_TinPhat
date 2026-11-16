@@ -6,6 +6,7 @@ namespace StockFlow.Domain.Entities;
 /// Thiết lập cảnh báo công nợ khách hàng (một dòng duy nhất, SettingId = 1).
 /// - Số tiền nợ / số ngày nợ: chỉ là ngưỡng CẢNH BÁO chung, không thay hạn mức riêng của từng khách.
 /// - AllowDebtOverLimit: bật → POS chỉ cảnh báo, vẫn cho ghi nợ vượt hạn mức (không cần gửi yêu cầu duyệt).
+/// - DefaultCreditLimit: hạn mức gán cho khách tạo mới; Manager (Kế toán trưởng) đổi được.
 /// </summary>
 public class MstDebtWarningSetting
 {
@@ -23,6 +24,9 @@ public class MstDebtWarningSetting
     public string DebtDaysFrom { get; set; } = FromFirstDebt;
 
     public bool AllowDebtOverLimit { get; set; } = false;
+
+    /// <summary>Hạn mức công nợ mặc định cho khách tạo mới.</summary>
+    public decimal DefaultCreditLimit { get; set; } = 200_000_000m;
 
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
     public int? UpdatedBy { get; set; }

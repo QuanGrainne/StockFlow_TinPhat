@@ -21,6 +21,8 @@ export interface ProductionFeatures {
   canPlanProduction: boolean;
   /** Duyệt / từ chối, sửa sau duyệt, đóng kế hoạch sản xuất (Manager) */
   canApprovePlans: boolean;
+  /** Đặt hàng nhập (feat-purchase-orders): đặt NVL theo kế hoạch sản xuất */
+  canOrderPurchase: boolean;
 }
 
 function toFeatures(set: Set<string> | null): ProductionFeatures {
@@ -31,6 +33,7 @@ function toFeatures(set: Set<string> | null): ProductionFeatures {
     canManageBom: !!set?.has('feat-bom'),
     canPlanProduction: !!set?.has('feat-production-plans'),
     canApprovePlans: !!set?.has('feat-production-plan-approval'),
+    canOrderPurchase: !!set?.has('feat-purchase-orders'),
   };
 }
 

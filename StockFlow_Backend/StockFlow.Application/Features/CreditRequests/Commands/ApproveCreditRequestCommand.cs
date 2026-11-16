@@ -72,6 +72,20 @@ public class ApproveCreditRequestCommandHandler : IRequestHandler<ApproveCreditR
                 return Result<CreditRequestActionResultDto>.Failure(CreditRequestMessages.NewLimitBelowCurrent(partnerLimit));
 
             entity.Partner.CreditLimit = approvedLimit;
+            if (approvedLimit != partnerLimit)
+            {
+                _context.TrxCreditLimitHistories.Add(new TrxCreditLimitHistory
+                {
+                    PartnerId = entity.PartnerId,
+                    OldLimit = partnerLimit,
+                    NewLimit = approvedLimit,
+                    Source = CreditLimitChangeSource.RequestApproved,
+                    Reason = string.IsNullOrWhiteSpace(command.Request.Notes) ? entity.Reason : command.Request.Notes.Trim(),
+                    RequestId = entity.RequestId,
+                    ChangedBy = currentUserId,
+                    ChangedAt = VietnamTime.Now,
+                });
+            }
         }
         else if (approvedLimit <= partnerLimit)
         {

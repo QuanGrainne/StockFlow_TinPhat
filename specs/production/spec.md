@@ -56,6 +56,12 @@ Mã BR giữ nguyên theo Report 3 để truy vết.
 | BR-42 | Đang kiểm kê thì không xác nhận xuất vật tư. |
 | BR-51 | Cho phép điều chỉnh định mức NVL (sửa 2 chiều, thêm/xóa dòng NVL) ngay khi lập lệnh hoặc trên lệnh kèm lý do điều chỉnh; chỉ áp dụng cho lệnh đó, không đổi BOM gốc. |
 
+**Ghi chú hành vi hiện tại (Existing; làm rõ, không phải BR mới):**
+- Khi lập lệnh, hệ thống sao chép định mức NVL từ BOM Active vào lệnh (`trx_production_material_requirements`). Vì vậy sửa BOM sau đó, hoặc kích hoạt BOM phiên bản khác, **không làm đổi định mức của lệnh đã tạo**.
+- BOM đã dùng trong bất kỳ lệnh nào (ở bảng `trx_production_orders` hoặc ở từng dòng thành phẩm `dtl_production_order_items`) không sửa, không xóa được (BR-06); chỉ ngừng áp dụng hoặc tạo phiên bản mới.
+- Lệnh đã Completed hoặc Cancelled không sửa lệnh, không điều chỉnh định mức, không xuất NVL, không nhập thành phẩm; chưa có thao tác mở lại lệnh.
+- Lỗi dữ liệu dòng NVL của BOM được báo kèm số dòng, ví dụ "Dòng 3: nguyên vật liệu trùng với dòng 1…".
+
 ## 6. Functional Requirements
 
 | Mã | Yêu cầu (Expected) | Hiện trạng | Hành vi hiện tại (Existing) |

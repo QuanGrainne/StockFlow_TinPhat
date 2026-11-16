@@ -22,9 +22,12 @@ import {
   MapPin,
   Building2,
   AlertTriangle,
+  Settings,
 } from 'lucide-react';
 import { adminService } from '@/features/admin/services/adminService';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
+import { permissionService } from '@/features/admin/services/permissionService';
+import { SCREEN_PATH_MAP, canOpenScreen } from '@/lib/navigation/navbar';
 import { setActiveWarehouseGlobal, useAuthorizedWarehouses } from '@/lib/warehouse/useActiveWarehouse';
 import { ROLE_SWITCHER_ENABLED } from '@/lib/auth/flags';
 import { BrandLogo } from '@/components/brand/BrandLogo';
@@ -43,7 +46,33 @@ export const Header: React.FC<HeaderProps> = ({
   onRoleChange,
 }) => {
   const router = useRouter();
+  const pathname = usePathname();
   const [roleDropdownOpen, setRoleDropdownOpen] = useState(false);
+
+  // Nút Cài đặt (bánh răng) mở màn Thiết lập đơn hàng; chỉ hiện khi vai trò được mở màn đó (EXTRA_SCREENS trong navbar)
+  const settingsPath = SCREEN_PATH_MAP['admin-order-settings'];
+  const [allowedFeatures, setAllowedFeatures] = useState<Set<string> | null>(() =>
+    permissionService.peekAllowedFeatures(`ROLE_${currentRole}`)
+  );
+  useEffect(() => {
+    let stale = false;
+    const load = async () => {
+      try {
+        const feats = await permissionService.getAllowedFeatures(`ROLE_${currentRole}`);
+        if (!stale) setAllowedFeatures(feats);
+      } catch {
+        if (!stale) setAllowedFeatures(null);
+      }
+    };
+    void load();
+    window.addEventListener('stockflow_permissions_updated', load);
+    return () => {
+      stale = true;
+      window.removeEventListener('stockflow_permissions_updated', load);
+    };
+  }, [currentRole]);
+  const canOpenSettings = !!settingsPath && !!allowedFeatures && canOpenScreen('admin-order-settings', allowedFeatures);
+  const onSettingsPage = !!settingsPath && !!pathname?.startsWith(settingsPath);
   const [changePasswordOpen, setChangePasswordOpen] = useState(false);
   const [facilities, setFacilities] = useState<WarehouseFacility[]>([]);
   // Kho được phân quyền lấy từ server (GET /api/warehouses/my-warehouses), Admin: tất cả kho đang hoạt động
@@ -540,6 +569,27 @@ export const Header: React.FC<HeaderProps> = ({
               </>
             )}
           </div>
+        )}
+
+        {/* Cài đặt: mở màn Thiết lập đơn hàng (/settings/orders) */}
+        {canOpenSettings && (
+          <button
+            type="button"
+            onClick={() => {
+              setBranchDropdownOpen(false);
+              setRoleDropdownOpen(false);
+              router.push(settingsPath);
+            }}
+            aria-label="Cài đặt"
+            title="Cài đặt: Thiết lập đơn hàng"
+            className={`h-9 w-9 rounded-lg border flex items-center justify-center transition cursor-pointer shadow-2xs ${
+              onSettingsPage
+                ? 'border-blue-400 bg-blue-50 text-blue-700'
+                : 'border-slate-200 bg-slate-50/90 text-slate-600 hover:bg-white hover:border-blue-400 hover:text-blue-700'
+            }`}
+          >
+            <Settings size={16} />
+          </button>
         )}
 
         <button

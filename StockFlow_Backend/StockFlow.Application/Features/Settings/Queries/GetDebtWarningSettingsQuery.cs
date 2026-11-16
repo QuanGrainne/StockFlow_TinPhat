@@ -50,6 +50,7 @@ public static class DebtWarningSettingsLoader
             DebtDaysThreshold = s.DebtDaysThreshold,
             DebtDaysFrom = s.DebtDaysFrom,
             AllowDebtOverLimit = s.AllowDebtOverLimit,
+            DefaultCreditLimit = s.DefaultCreditLimit,
             UpdatedAt = s.UpdatedAt,
             UpdatedByName = updater,
         };

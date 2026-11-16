@@ -45,30 +45,15 @@ public class SubmitProductionPlanCommandHandler : IRequestHandler<SubmitProducti
         var error = ProductionPlanPermissions.CheckSubmit(plan, user);
         if (error != null) return Result.Failure<ProductionPlanDetailDto>(error);
 
-        if (plan.DtlProductionPlanItems.Count == 0)
-            return Result.Failure<ProductionPlanDetailDto>("Kế hoạch phải có ít nhất một thành phẩm.");
-
-        // V-08 / Q-V2: thành phẩm có thể đã bị ngừng hoạt động hoặc đổi loại sau khi lưu nháp
-        var productError = await ProductionPlanRules.ValidatePlanProductsAsync(
-            _context, plan.DtlProductionPlanItems.Select(i => i.ProductId), ct);
-        if (productError != null) return Result.Failure<ProductionPlanDetailDto>(productError);
+        // V-08 / Q-V2 / BR-PP-09: có dòng, thành phẩm còn hoạt động, đúng loại, có BOM đang áp dụng
+        // (thành phẩm / BOM có thể đã đổi sau khi lưu nháp)
+        var readyError = await ProductionPlanRules.ValidateReadyForApprovalAsync(
+            _context, plan.DtlProductionPlanItems.Select(i => i.ProductId).ToList(), ct);
+        if (readyError != null) return Result.Failure<ProductionPlanDetailDto>(readyError);
 
         // Q-V1: nháp lập cho tương lai có thể đã thành quá khứ khi chờ gửi duyệt
         if (ProductionPlanRules.RequiresPastPeriodNote(plan.PeriodEnd, plan.Notes, ProductionPlanRules.Today()))
             return Result.Failure<ProductionPlanDetailDto>(ProductionPlanMessages.PastPeriodNoteRequired);
-
-        var withoutBom = await ProductionPlanRules.ProductsWithoutActiveBomAsync(
-            _context, plan.DtlProductionPlanItems.Select(i => i.ProductId), ct);
-        if (withoutBom.Count > 0)
-        {
-            var ids = withoutBom.ToList();
-            var codes = await _context.MstProducts.AsNoTracking()
-                .Where(p => ids.Contains(p.ProductId))
-                .OrderBy(p => p.ProductCode)
-                .Select(p => p.ProductCode)
-                .ToListAsync(ct);
-            return Result.Failure<ProductionPlanDetailDto>($"{ProductionMessages.NoActiveBom} ({string.Join(", ", codes)})");
-        }
 
         plan.MarkPendingApproval();
         ProductionPlanRules.Touch(plan, userId, VietnamTime.Now);

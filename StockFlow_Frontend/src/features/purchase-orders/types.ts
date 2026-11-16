@@ -89,6 +89,22 @@ export interface SavePurchaseOrderPayload {
   items: PurchaseOrderLinePayload[];
 }
 
+/** 1 dòng nhận hàng ngay trên phiếu đặt: SL đạt (vào kho) và SL lỗi (không vào kho, không tính tiền) */
+export interface ReceivePurchaseOrderLine {
+  productId: number;
+  quantity: number;
+  defectQuantity: number;
+}
+
+/** Nhập hàng ngay trong phiếu đặt: hệ thống tự sinh phiếu nhập Hoàn thành */
+export interface ReceivePurchaseOrderPayload {
+  receivedDate?: string;
+  paidAmount: number;
+  paymentMethod?: string;
+  notes?: string | null;
+  lines: ReceivePurchaseOrderLine[];
+}
+
 export interface PurchaseOrderListFilter {
   warehouseIds?: number[];
   statuses?: PurchaseOrderStatus[];

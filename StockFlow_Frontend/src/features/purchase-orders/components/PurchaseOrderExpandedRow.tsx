@@ -14,6 +14,7 @@ import { purchaseOrderService } from '../services/purchaseOrderService';
 import type { PurchaseOrderDetail, PurchaseOrderItem } from '../types';
 import { printPurchaseOrder } from '../utils/printPurchaseOrder';
 import { exportPurchaseOrderDetailToXLSX, PO_STATUS } from '../utils/purchaseOrderUtils';
+import ReceivePurchaseOrderModal from './ReceivePurchaseOrderModal';
 
 const fmt = (v: number) => Math.round(v || 0).toLocaleString('vi-VN');
 const qty = (v: number) => (v || 0).toLocaleString('vi-VN');
@@ -56,6 +57,8 @@ export default function PurchaseOrderExpandedRow({ poId, colSpan, onClose, onCha
   const [busy, setBusy] = useState(false);
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
+  // Nhập hàng ngay trong phiếu đặt (hộp thoại), không chuyển sang form Nhập hàng
+  const [receiving, setReceiving] = useState(false);
   const loading = result.key !== key;
 
   useEffect(() => {
@@ -321,7 +324,7 @@ export default function PurchaseOrderExpandedRow({ poId, colSpan, onClose, onCha
                 </button>
               )}
               {canReceive && (
-                <button type="button" onClick={() => router.push(`/purchases/create?po=${po.poId}`)} className={primaryBtnCls}>
+                <button type="button" onClick={() => setReceiving(true)} title="Nhập SL đạt / SL lỗi ngay trên phiếu đặt" className={primaryBtnCls}>
                   <ArrowDownToLine size={14} /> Nhập hàng
                 </button>
               )}
@@ -392,6 +395,19 @@ export default function PurchaseOrderExpandedRow({ poId, colSpan, onClose, onCha
             </table>
           </div>
         </div>
+      )}
+
+      {receiving && (
+        <ReceivePurchaseOrderModal
+          po={po}
+          onClose={() => setReceiving(false)}
+          onReceived={(updated) => {
+            setReceiving(false);
+            setResult({ key, po: updated });
+            setNotes(updated.notes ?? '');
+            onChanged();
+          }}
+        />
       )}
 
       {confirm && (

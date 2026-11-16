@@ -28,6 +28,11 @@ public partial class TrxProductionOrder
     /// <summary>Nhập thành phẩm khi lệnh đang sản xuất (UC-49 tiền điều kiện).</summary>
     public bool CanReceiveFinishedGoods() => IsInProgress();
 
+    /// <summary>
+    /// Duyệt hoàn thành: chỉ lệnh đang sản xuất (đã xuất NVL). Duyệt → tự sinh phiếu nhập thành phẩm và đóng lệnh.
+    /// </summary>
+    public bool CanApproveCompletion() => IsInProgress();
+
     /// <summary>Điều chỉnh định mức trên lệnh khi lệnh còn hiệu lực (BR-51).</summary>
     public bool CanAdjustNorm() => IsNotStarted() || IsInProgress();
 

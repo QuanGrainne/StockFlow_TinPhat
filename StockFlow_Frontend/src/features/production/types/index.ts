@@ -183,20 +183,13 @@ export interface ProductionOrderDetail {
   receipts: FinishedGoodsReceipt[];
 }
 
-export interface SaveProductionOrderMaterialInput {
-  materialId: number;
-  normPerUnit: number;
-  wastageRate: number;
-  requiredQty?: number | null;
-}
-
 export interface SaveProductionOrderItemInput {
   productId: number;
   plannedQuantity: number;
   notes?: string | null;
-  customMaterials?: SaveProductionOrderMaterialInput[] | null;
 }
 
+/** Lệnh sản xuất bắt buộc đúng công thức BOM đang áp dụng (không gửi định mức tự chỉnh / NVL ngoài BOM). */
 export interface SaveProductionOrderPayload {
   productId: number;
   plannedQuantity: number;
@@ -205,6 +198,10 @@ export interface SaveProductionOrderPayload {
   workshop: string | null;
   notes: string | null;
   items?: SaveProductionOrderItemInput[] | null;
+  /** Kho làm việc để kiểm tra thiếu NVL (BR-31) */
+  warehouseId?: number | null;
+  /** Đã xác nhận "vẫn lưu" khi thiếu NVL ([CONFIRM_SHORTAGE]) */
+  confirmShortage?: boolean;
   adjustReason?: string | null;
   /** Mã yêu cầu chống tạo trùng — chỉ dùng khi lập lệnh từ kế hoạch */
   clientRequestId?: string | null;
@@ -263,6 +260,26 @@ export interface CreateFinishedGoodsReceiptPayload {
   reviewNote: string | null;
   productionOrderItemId?: number | null;
   productId?: number | null;
+  confirmExceedPlan?: boolean;
+}
+
+/** Duyệt hoàn thành lệnh: SL thực tế từng thành phẩm → hệ thống tự sinh phiếu nhập thành phẩm rồi đóng lệnh */
+export interface ApproveProductionOrderLine {
+  productionOrderItemId: number | null;
+  acceptedQuantity: number;
+  defectQuantity: number;
+  defectReason: string | null;
+}
+
+export interface ApproveProductionOrderPayload {
+  warehouseId: number;
+  locationId: number | null;
+  lotNumber: string | null;
+  /** yyyy-MM-dd */
+  productionDate: string | null;
+  notes: string | null;
+  reviewNote: string | null;
+  lines: ApproveProductionOrderLine[];
   confirmExceedPlan?: boolean;
 }
 

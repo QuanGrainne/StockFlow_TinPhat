@@ -27,7 +27,7 @@
         "Id":  "IT-05",
         "Name":  "Hai người đồng thời lập 6 + 6 trên kế hoạch 10: 1 thành công, tổng đã lập 6",
         "Pass":  true,
-        "Actual":  "codes=200,400 tổng=6.00"
+        "Actual":  "codes=400,200 tổng=6.00"
     },
     {
         "Id":  "IT-06",
