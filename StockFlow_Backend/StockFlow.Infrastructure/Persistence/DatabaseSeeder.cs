@@ -426,7 +426,8 @@ public static class DatabaseSeeder
         };
 
         var hasNewSuppliers = false;
-        foreach (var supplier in initialSuppliers)
+        // Bản deploy (seedDemoData=false) không tạo lại 8 nhà cung cấp mẫu
+        foreach (var supplier in seedDemoData ? initialSuppliers : [])
         {
             var exists = await context.MstBusinessPartners
                 .AnyAsync(bp => bp.PartnerCode == supplier.PartnerCode);

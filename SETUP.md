@@ -424,6 +424,9 @@ database on purpose.
 | `JWT_SECRET_KEY` | dev value | JWT signing key, at least 32 characters |
 | `HTTP_PORT` | `8080` | Port of the site |
 | `HTTP_BIND` | `127.0.0.1` | `0.0.0.0` lets other machines on the LAN open the site (demo) |
+| `HTTPS_PORT` | `8443` | Host port for HTTPS; `443` on a VPS with a domain |
+| `SITE_ADDRESS` | empty (`:80`) | Domain name, e.g. `stockflow.example.com`. Caddy then gets a Let's Encrypt certificate and redirects HTTP to HTTPS (needs a DNS A record to the server and ports 80 + 443 open) |
+| `SEED_DEMO_DATA` | `true` | `false` on a real deployment: the API only ensures the `admin` account and does not re-create sample staff, warehouses or suppliers on restart |
 
 Change `POSTGRES_PASSWORD` and `JWT_SECRET_KEY` before the stack is
 reachable by anyone else. Never commit `deploy/.env`.
