@@ -94,6 +94,9 @@ export interface ProductionOrderSummary {
   isFullyReceived?: boolean;
   /** Danh sách thành phẩm trong lệnh (1..N) */
   items?: ProductionOrderProductItem[];
+  /** Kế hoạch sản xuất sinh ra lệnh (null = lệnh lập trực tiếp) */
+  productionPlanId?: number | null;
+  productionPlanCode?: string | null;
 }
 
 export interface ProductionMaterial {
@@ -180,20 +183,13 @@ export interface ProductionOrderDetail {
   receipts: FinishedGoodsReceipt[];
 }
 
-export interface SaveProductionOrderMaterialInput {
-  materialId: number;
-  normPerUnit: number;
-  wastageRate: number;
-  requiredQty?: number | null;
-}
-
 export interface SaveProductionOrderItemInput {
   productId: number;
   plannedQuantity: number;
   notes?: string | null;
-  customMaterials?: SaveProductionOrderMaterialInput[] | null;
 }
 
+/** Lệnh sản xuất bắt buộc đúng công thức BOM đang áp dụng (không gửi định mức tự chỉnh / NVL ngoài BOM). */
 export interface SaveProductionOrderPayload {
   productId: number;
   plannedQuantity: number;
@@ -202,7 +198,11 @@ export interface SaveProductionOrderPayload {
   workshop: string | null;
   notes: string | null;
   items?: SaveProductionOrderItemInput[] | null;
+  /** Kho làm việc để kiểm tra thiếu NVL (BR-31) */
+  warehouseId?: number | null;
   adjustReason?: string | null;
+  /** Mã yêu cầu chống tạo trùng — chỉ dùng khi lập lệnh từ kế hoạch */
+  clientRequestId?: string | null;
 }
 
 export interface AdjustNormLine {
@@ -261,6 +261,28 @@ export interface CreateFinishedGoodsReceiptPayload {
   confirmExceedPlan?: boolean;
 }
 
+/** Duyệt hoàn thành lệnh: SL thực tế từng thành phẩm → hệ thống tự sinh phiếu nhập thành phẩm rồi đóng lệnh */
+export interface ApproveProductionOrderLine {
+  productionOrderItemId: number | null;
+  acceptedQuantity: number;
+  defectQuantity: number;
+  defectReason: string | null;
+}
+
+export interface ApproveProductionOrderPayload {
+  warehouseId: number;
+  locationId: number | null;
+  lotNumber: string | null;
+  /** yyyy-MM-dd */
+  productionDate: string | null;
+  notes: string | null;
+  reviewNote: string | null;
+  lines: ApproveProductionOrderLine[];
+  confirmExceedPlan?: boolean;
+  /** Vị trí lưu kho chọn từ trường "Vị trí" của danh mục Hàng hóa (không bắt buộc) */
+  locationName?: string | null;
+}
+
 export interface MaterialUsageWarning {
   materialCode: string;
   materialName: string;
@@ -288,12 +310,6 @@ export interface ProductionProductLookup {
   availableQty: number | null;
 }
 
-export interface WarehouseLocation {
-  locationId: number;
-  locationCode: string | null;
-  locationName: string | null;
-}
-
 // ─── Bộ lọc danh sách ─────────────────────────────────────────────────────────
 
 export interface ProductionListFilter {
@@ -306,3 +322,6 @@ export interface ProductionListFilter {
   /** Chỉ phiếu / lệnh cần Manager xem xét (BR-37) */
   needsReviewOnly: boolean;
 }
+
+// ─── Kế hoạch sản xuất (UC-PP-01..06) ────────────────────────────────────────
+export * from './productionPlan';

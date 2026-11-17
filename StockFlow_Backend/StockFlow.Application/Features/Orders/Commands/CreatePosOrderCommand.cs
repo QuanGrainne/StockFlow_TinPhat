@@ -9,7 +9,6 @@ using Microsoft.EntityFrameworkCore;
 using StockFlow.Application.Common;
 using StockFlow.Application.Common.Interfaces;
 using StockFlow.Application.Features.Customers.Helpers;
-using StockFlow.Application.Features.CreditRequests.Common;
 using StockFlow.Application.Features.Orders.DTOs;
 using StockFlow.Application.Features.SalesBookings.Common;
 using StockFlow.Domain.Entities;
@@ -416,9 +415,8 @@ public class CreatePosOrderCommandHandler : IRequestHandler<CreatePosOrderComman
                 "Khách lẻ tại quầy bắt buộc phải thanh toán đủ 100% (Tiền mặt, VietQR, Thẻ POS). Không áp dụng hình thức ghi nợ cho khách lẻ (PAY-009).");
         }
 
-        // Kiểm tra hạn mức tín dụng nếu có phát sinh công nợ
-        // Ngoại lệ một lần đã duyệt (UC-27/UC-64): chỉ gắn vào hóa đơn khi thực sự ghi nợ
-        TrxCreditLimitRequest? creditRequest = null;
+        // Kiểm tra hạn mức tín dụng nếu có phát sinh công nợ.
+        // Vượt hạn mức → Sales gửi yêu cầu, Manager duyệt NÂNG HẠN MỨC (UC-27/UC-64); không còn "ngoại lệ một lần".
         if (outstanding > 0 && isCompleted)
         {
             decimal currentDebt = customer.CurrentDebt ?? 0;
@@ -435,26 +433,11 @@ public class CreatePosOrderCommandHandler : IRequestHandler<CreatePosOrderComman
             currentDebt += depositApplied;
             decimal remainingCredit = Math.Max(0, creditLimit - currentDebt);
 
-            if (req.CreditRequestId is > 0)
+            if (await _context.MstDebtWarningSettings.AsNoTracking()
+                         .AnyAsync(s => s.SettingId == 1 && s.AllowDebtOverLimit, cancellationToken))
             {
-                // BR-12: có ngoại lệ được Manager duyệt → so với mức đã duyệt thay cho hạn mức (CUS-008/009)
-                creditRequest = await _context.TrxCreditLimitRequests
-                    .FirstOrDefaultAsync(r => r.RequestId == req.CreditRequestId.Value, cancellationToken);
-                if (creditRequest == null)
-                    return Result<PosOrderResultDto>.Failure(CreditRequestMessages.NotFound);
-
-                string code = creditRequest.RequestCode ?? $"#{creditRequest.RequestId}";
-                if (creditRequest.PartnerId != customer.PartnerId)
-                    return Result<PosOrderResultDto>.Failure(CreditRequestMessages.UseWrongCustomer(code));
-                if (!creditRequest.IsOneTimeApproved())
-                    return Result<PosOrderResultDto>.Failure(CreditRequestMessages.UseNotOneTime(code));
-                if (creditRequest.IsUsed())
-                    return Result<PosOrderResultDto>.Failure(CreditRequestMessages.UseAlreadyUsed(code));
-
-                decimal approvedCeiling = creditRequest.OneTimeCeiling();
-                if (currentDebt + outstanding > approvedCeiling)
-                    return Result<PosOrderResultDto>.Failure(
-                        CreditRequestMessages.UseOverApproved(code, approvedCeiling, currentDebt + outstanding));
+                // Thiết lập cảnh báo công nợ: "Cho phép khách hàng nợ thêm khi vượt quá hạn mức"
+                // → chỉ cảnh báo ở POS, không chặn CUS-008/009, không cần yêu cầu duyệt.
             }
             else if (currentDebt >= creditLimit)
             {
@@ -527,23 +510,6 @@ public class CreatePosOrderCommandHandler : IRequestHandler<CreatePosOrderComman
 
             _context.TrxOrders.Add(order);
             await _context.SaveChangesAsync(cancellationToken);
-
-            // Gắn ngoại lệ một lần vào hóa đơn ngay khi có OrderId (cùng transaction).
-            // SalesOrderId là concurrency token: hóa đơn khác đã dùng trước → UPDATE không khớp → hủy cả giao dịch.
-            if (creditRequest != null)
-            {
-                creditRequest.MarkUsed(order.OrderId);
-                try
-                {
-                    await _context.SaveChangesAsync(cancellationToken);
-                }
-                catch (DbUpdateConcurrencyException)
-                {
-                    await transaction.RollbackAsync(cancellationToken);
-                    return Result<PosOrderResultDto>.Failure(
-                        CreditRequestMessages.UseAlreadyUsed(creditRequest.RequestCode ?? $"#{creditRequest.RequestId}"));
-                }
-            }
 
             // 9. Thêm chi tiết đơn hàng DtlOrderItems kèm chiết khấu cấp dòng
             var addedOrderItems = new List<(DtlOrderItem OrderItem, PosOrderItemRequest RequestItem, MstProduct Product)>();

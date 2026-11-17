@@ -30,7 +30,9 @@ public record CustomerDto(
     string? CreatedWarehouseName = null,
     decimal TotalSales = 0,
     decimal TotalSalesNetReturns = 0,
-    DateTime? LastTransactionDate = null
+    DateTime? LastTransactionDate = null,
+    /// <summary>Lý do cảnh báo công nợ theo thiết lập (null = không cảnh báo)</summary>
+    string? DebtWarning = null
 );
 
 /// <summary>DTO thống kê các chỉ số KPI Khách hàng.</summary>

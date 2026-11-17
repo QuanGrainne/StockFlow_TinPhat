@@ -75,9 +75,6 @@ export interface PosTab {
   excessToDebt?: boolean;
   /** Trả nhanh: khách quên hóa đơn — tự tìm hàng, tự chọn khách, không giới hạn theo hóa đơn */
   returnQuick?: boolean;
-  /** Ngoại lệ một lần đã được Manager duyệt, gắn vào hóa đơn này khi thanh toán (UC-27/UC-64) */
-  creditRequestId?: number | null;
-  creditRequestCode?: string | null;
 }
 
 export const POS_TABS_KEY = 'stockflow_pos_tabs_v2';

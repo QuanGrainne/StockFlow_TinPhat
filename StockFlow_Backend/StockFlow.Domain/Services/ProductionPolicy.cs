@@ -15,6 +15,27 @@ public static class ProductionPolicy
     /// <summary>Số chữ số thập phân của định mức NVL trên 1 đơn vị thành phẩm.</summary>
     public const int NormScale = 4;
 
+    /// <summary>Giá trị lớn nhất lưu được ở cột numeric(18,2) (số lượng, nhu cầu, số đã xuất).</summary>
+    public const decimal MaxStoredQuantity = 9_999_999_999_999_999.99m;
+
+    /// <summary>
+    /// Nhu cầu NVL theo BR-31, trả false nếu kết quả vượt <see cref="MaxStoredQuantity"/> hoặc tràn kiểu decimal
+    /// (dùng trước khi lưu để báo lỗi rõ thay vì lỗi cơ sở dữ liệu).
+    /// </summary>
+    public static bool TryCalculateRequirement(decimal plannedQuantity, decimal normPerUnit, decimal wastageRatePercent, out decimal required)
+    {
+        try
+        {
+            required = CalculateRequirement(plannedQuantity, normPerUnit, wastageRatePercent);
+            return required <= MaxStoredQuantity;
+        }
+        catch (OverflowException)
+        {
+            required = 0;
+            return false;
+        }
+    }
+
     /// <summary>Làm tròn số lượng về độ chính xác lưu trữ (half-up).</summary>
     public static decimal RoundQuantity(decimal value) =>
         Math.Round(value, QuantityScale, MidpointRounding.AwayFromZero);
@@ -58,6 +79,18 @@ public static class ProductionPolicy
     {
         if (plannedQuantity <= 0 || receivedQuantity <= 0) return 0;
         return RoundQuantity(requiredQuantity * receivedQuantity / plannedQuantity);
+    }
+
+    /// <summary>
+    /// Số thành phẩm sản xuất được từ lượng 1 NVL đã xuất (ngược của <see cref="MaterialNeededFor"/>):
+    /// SL kế hoạch × đã xuất ÷ nhu cầu, làm tròn XUỐNG 2 chữ số thập phân (không cho duyệt dư NVL).
+    /// Thành phẩm dùng nhiều NVL thì lấy giá trị nhỏ nhất giữa các NVL (handler tính).
+    /// VD: nhu cầu 25 kg cho 50 lốc, đã xuất 15 kg → 50 × 15 ÷ 25 = 30 lốc.
+    /// </summary>
+    public static decimal ProducibleFromIssued(decimal requiredQuantity, decimal issuedQuantity, decimal plannedQuantity)
+    {
+        if (requiredQuantity <= 0 || plannedQuantity <= 0 || issuedQuantity <= 0) return 0;
+        return Math.Floor(plannedQuantity * issuedQuantity / requiredQuantity * 100m) / 100m;
     }
 
     /// <summary>

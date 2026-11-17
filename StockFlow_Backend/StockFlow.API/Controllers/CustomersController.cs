@@ -290,6 +290,48 @@ public class CustomersController : ControllerBase
     }
 
     /// <summary>
+    /// Manager (Kế toán trưởng) điều chỉnh hạn mức công nợ của một khách. Không được thấp hơn dư nợ hiện tại.
+    /// </summary>
+    [HttpPatch("{id:int}/credit-limit")]
+    [ProducesResponseType(typeof(CreditLimitChangeDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [RequirePermission("SALES_APPROVE")]
+    [RequireFeature("feat-credit-approvals")]
+    public async Task<IActionResult> UpdateCreditLimit(int id, [FromBody] UpdateCustomerCreditLimitRequest request)
+    {
+        var result = await _mediator.Send(new UpdateCustomerCreditLimitCommand(id, request));
+        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { message = result.Error });
+    }
+
+    /// <summary>
+    /// Manager (Kế toán trưởng) điều chỉnh hạn mức nhiều khách: đặt cố định, tăng/giảm theo %, hoặc về hạn mức mặc định.
+    /// Khách không đổi được (dư nợ cao hơn hạn mức mới, trùng hạn mức...) được bỏ qua và trả về trong danh sách Skipped.
+    /// </summary>
+    [HttpPatch("credit-limit/batch")]
+    [ProducesResponseType(typeof(BatchCreditLimitResultDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [RequirePermission("SALES_APPROVE")]
+    [RequireFeature("feat-credit-approvals")]
+    public async Task<IActionResult> BatchUpdateCreditLimit([FromBody] BatchUpdateCustomerCreditLimitRequest request)
+    {
+        var result = await _mediator.Send(new BatchUpdateCustomerCreditLimitCommand(request));
+        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { message = result.Error });
+    }
+
+    /// <summary>
+    /// Lịch sử thay đổi hạn mức công nợ của khách (mới nhất trước).
+    /// </summary>
+    [HttpGet("{id:int}/credit-limit-history")]
+    [ProducesResponseType(typeof(List<CreditLimitHistoryDto>), StatusCodes.Status200OK)]
+    [RequirePermission("PARTNER_READ")]
+    [RequireFeature("feat-customers")]
+    public async Task<IActionResult> GetCreditLimitHistory(int id)
+    {
+        var result = await _mediator.Send(new GetCustomerCreditLimitHistoryQuery(id));
+        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { message = result.Error });
+    }
+
+    /// <summary>
     /// Xóa hoặc ngừng hoạt động Khách hàng.
     /// </summary>
     [HttpDelete("{id}")]

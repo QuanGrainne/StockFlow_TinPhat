@@ -4,7 +4,7 @@
 /** Trạng thái lưu trong DB (CreditRequestStatus.cs) */
 export type CreditRequestStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
 
-/** Loại duyệt (CreditApprovalType.cs): ngoại lệ một lần / nâng hạn mức */
+/** Loại duyệt (CreditApprovalType.cs). Duyệt mới chỉ còn NEW_LIMIT; ONE_TIME là dữ liệu cũ (đã bỏ ngoại lệ một lần) */
 export type CreditApprovalType = 'ONE_TIME' | 'NEW_LIMIT';
 
 export interface CreditRequest {

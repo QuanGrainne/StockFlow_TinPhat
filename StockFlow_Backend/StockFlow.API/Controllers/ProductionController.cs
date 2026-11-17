@@ -74,27 +74,8 @@ public class ProductionController : ControllerBase
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { message = result.Error });
     }
 
-    /// <summary>Lập lệnh sản xuất (trạng thái Chưa bắt đầu).</summary>
-    [HttpPost("orders")]
-    [ProducesResponseType(typeof(ProductionOrderDetailDto), StatusCodes.Status200OK)]
-    [RequirePermission("PROD_CREATE")]
-    [RequireFeature("feat-prod-plan")]
-    public async Task<IActionResult> CreateOrder([FromBody] SaveProductionOrderRequest request)
-    {
-        var result = await _mediator.Send(new CreateProductionOrderCommand(request));
-        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { message = result.Error });
-    }
-
-    /// <summary>Sửa lệnh còn Chưa bắt đầu.</summary>
-    [HttpPut("orders/{id:int}")]
-    [ProducesResponseType(typeof(ProductionOrderDetailDto), StatusCodes.Status200OK)]
-    [RequirePermission("PROD_CREATE")]
-    [RequireFeature("feat-prod-plan")]
-    public async Task<IActionResult> UpdateOrder(int id, [FromBody] SaveProductionOrderRequest request)
-    {
-        var result = await _mediator.Send(new UpdateProductionOrderCommand(id, request));
-        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { message = result.Error });
-    }
+    // Lập / sửa lệnh trực tiếp (POST orders, PUT orders/{id}) đã bỏ (17/11/2026): lệnh chỉ lập từ kế hoạch sản xuất
+    // (ProductionPlansController → CreateProductionOrderFromPlanCommand).
 
     /// <summary>Huỷ lệnh chưa xuất NVL.</summary>
     [HttpPost("orders/{id:int}/cancel")]
@@ -115,6 +96,20 @@ public class ProductionController : ControllerBase
     public async Task<IActionResult> CloseOrder(int id, [FromBody] CloseProductionOrderRequest request)
     {
         var result = await _mediator.Send(new CloseProductionOrderCommand(id, request));
+        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { message = result.Error });
+    }
+
+    /// <summary>
+    /// Duyệt hoàn thành lệnh đang sản xuất: nhập SL thực tế từng thành phẩm, hệ thống tự sinh phiếu nhập
+    /// thành phẩm vào kho rồi đóng lệnh.
+    /// </summary>
+    [HttpPost("orders/{id:int}/approve")]
+    [ProducesResponseType(typeof(ProductionOrderDetailDto), StatusCodes.Status200OK)]
+    [RequirePermission("PROD_APPROVE")]
+    [RequireFeature("feat-prod-plan")]
+    public async Task<IActionResult> ApproveOrder(int id, [FromBody] ApproveProductionOrderRequest request)
+    {
+        var result = await _mediator.Send(new ApproveProductionOrderCommand(id, request));
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { message = result.Error });
     }
 
@@ -200,22 +195,25 @@ public class ProductionController : ControllerBase
     [HttpGet("lookups/products")]
     [ProducesResponseType(typeof(List<ProductionProductLookupDto>), StatusCodes.Status200OK)]
     [RequirePermission("PROD_READ")]
-    [RequireFeature("feat-bom", "feat-prod-plan")]
+    [RequireFeature("feat-bom", "feat-prod-plan", "feat-production-plans", "feat-production-plan-approval")]
     public async Task<IActionResult> SearchProducts(
-        [FromQuery] string? search, [FromQuery] int? warehouseId, [FromQuery] bool activeBomOnly = false, [FromQuery] int limit = 30, [FromQuery] string? productType = null)
+        [FromQuery] string? search, [FromQuery] int? warehouseId, [FromQuery] bool activeBomOnly = false, [FromQuery] int limit = 30,
+        [FromQuery] string? productType = null, [FromQuery] string? productTypes = null)
     {
-        var result = await _mediator.Send(new SearchProductionProductsQuery(search, warehouseId, activeBomOnly, limit, productType));
+        var result = await _mediator.Send(new SearchProductionProductsQuery(
+            search, warehouseId, activeBomOnly, limit, productType, SplitStrings(productTypes)));
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { message = result.Error });
     }
 
-    /// <summary>Vị trí lưu kho của kho thành phẩm.</summary>
+    /// <summary>Vị trí lưu kho để chọn khi Duyệt hoàn thành: các giá trị "Vị trí" trong danh mục Hàng hóa.</summary>
     [HttpGet("lookups/locations")]
-    [ProducesResponseType(typeof(List<WarehouseLocationDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(List<string>), StatusCodes.Status200OK)]
     [RequirePermission("PROD_READ")]
-    [RequireFeature("feat-prod-receipt")]
-    public async Task<IActionResult> GetLocations([FromQuery] int warehouseId)
+    // Dùng chung: nhập thành phẩm thủ công và form Duyệt hoàn thành của Manager
+    [RequireFeature("feat-prod-receipt", "feat-prod-plan")]
+    public async Task<IActionResult> GetLocations()
     {
-        var result = await _mediator.Send(new GetWarehouseLocationsQuery(warehouseId));
+        var result = await _mediator.Send(new GetProductLocationNamesQuery());
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { message = result.Error });
     }
 }

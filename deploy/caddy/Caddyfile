@@ -1,0 +1,30 @@
+# Cửa vào duy nhất của stack Docker (trình duyệt → :8080 → Caddy):
+#   /api/*   → api:8080 (ASP.NET Core)
+#   còn lại  → web:3000 (Next.js)
+# Web và API cùng một địa chỉ nên trình duyệt không cần CORS.
+#
+# SITE_ADDRESS (deploy/.env):
+#   bỏ trống  → ":80", chỉ HTTP (chạy trên máy, http://localhost:8080)
+#   tên miền  → vd "stockflow.tenmien.vn": Caddy tự lấy chứng chỉ HTTPS (Let's Encrypt)
+#               và chuyển HTTP sang HTTPS. Cần bản ghi DNS A trỏ về IP VPS, mở cổng 80 + 443.
+{$SITE_ADDRESS::80} {
+	encode zstd gzip
+
+	header {
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		-Server
+	}
+
+	handle /api/* {
+		# Ảnh hàng hoá đang lưu base64 trong request JSON → cho phép body lớn
+		request_body {
+			max_size 20MB
+		}
+		reverse_proxy api:8080
+	}
+
+	handle {
+		reverse_proxy web:3000
+	}
+}

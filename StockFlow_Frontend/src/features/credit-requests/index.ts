@@ -7,7 +7,6 @@ export {
   CREDIT_STATUS,
   formatVnd as formatCreditVnd,
   isOverCreditLimitError,
-  isUsableOneTime,
   msg22CreditExceeded,
   msg24Approved,
   msg25Rejected,

@@ -13,6 +13,11 @@ import {
   CustomerPaymentResult,
   CreateCustomerPaymentPayload,
   CustomerReceiptDetail,
+  DebtWarningSettings,
+  BatchCreditLimitResult,
+  CreditLimitBatchMode,
+  CreditLimitChange,
+  CreditLimitHistoryItem,
 } from '../types';
 import type { DebtAdjustmentDetail, DebtAdjustPayload, DebtAdjustResult } from '@/components/debt/types';
 
@@ -42,6 +47,7 @@ interface BackendCustomerDto {
   totalSales?: number;
   totalSalesNetReturns?: number;
   lastTransactionDate?: string | null;
+  debtWarning?: string | null;
 }
 
 interface BackendStatsDto {
@@ -140,6 +146,7 @@ function mapDtoToCustomer(dto: BackendCustomerDto): Customer {
     totalSales: Number(dto.totalSales) || 0,
     totalSalesNetReturns: Number(dto.totalSalesNetReturns ?? dto.totalSales) || 0,
     lastTransactionDate: dto.lastTransactionDate ?? null,
+    debtWarning: dto.debtWarning ?? null,
   };
 }
 
@@ -303,5 +310,36 @@ export const customerService = {
   /** Xóa khách hàng (hoặc ngừng hoạt động nếu đã có giao dịch / còn nợ) */
   async deleteCustomer(id: number): Promise<void> {
     await apiClient.delete(`/api/customers/${id}`);
+  },
+
+  /** Thiết lập cảnh báo công nợ khách hàng */
+  /** Manager điều chỉnh hạn mức một khách (không được thấp hơn dư nợ hiện tại) */
+  async updateCreditLimit(partnerId: number, newLimit: number, reason: string): Promise<CreditLimitChange> {
+    return apiClient.patch<CreditLimitChange>(`/api/customers/${partnerId}/credit-limit`, { newLimit, reason });
+  },
+
+  /** Manager điều chỉnh hạn mức hàng loạt; khách không đổi được trả về trong `skipped` */
+  async batchUpdateCreditLimit(
+    partnerIds: number[],
+    mode: CreditLimitBatchMode,
+    value: number,
+    reason: string
+  ): Promise<BatchCreditLimitResult> {
+    return apiClient.patch<BatchCreditLimitResult>('/api/customers/credit-limit/batch', { partnerIds, mode, value, reason });
+  },
+
+  async getCreditLimitHistory(partnerId: number): Promise<CreditLimitHistoryItem[]> {
+    return apiClient.get<CreditLimitHistoryItem[]>(`/api/customers/${partnerId}/credit-limit-history`);
+  },
+
+  async getDebtWarningSettings(): Promise<DebtWarningSettings> {
+    return apiClient.get<DebtWarningSettings>('/api/settings/debt-warning');
+  },
+
+  /** Lưu thiết lập cảnh báo công nợ (Manager / Kế toán trưởng / Admin) */
+  async updateDebtWarningSettings(
+    payload: Omit<DebtWarningSettings, 'noDebtForWalkIn' | 'updatedAt' | 'updatedByName'>
+  ): Promise<DebtWarningSettings> {
+    return apiClient.put<DebtWarningSettings>('/api/settings/debt-warning', payload);
   },
 };

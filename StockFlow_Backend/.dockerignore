@@ -1,0 +1,10 @@
+**/bin/
+**/obj/
+**/.vs/
+**/.vscode/
+**/.idea/
+**/*.user
+**/*.log
+# Cấu hình riêng từng máy (mật khẩu DB, khoá JWT) không được đóng vào image
+**/appsettings.Development.json
+**/Properties/launchSettings.json

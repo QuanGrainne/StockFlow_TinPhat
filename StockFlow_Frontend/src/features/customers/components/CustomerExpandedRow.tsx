@@ -1,12 +1,13 @@
 'use client';
 
 // Chi tiết Khách hàng dạng accordion ngay dưới dòng — cùng bố cục với SupplierExpandedRow:
-//   [Thông tin] [Lịch sử bán/trả hàng] [Nợ cần thu từ khách]
+//   [Thông tin] [Lịch sử bán/trả hàng] [Nợ cần thu từ khách] [Lịch sử hạn mức]
 
 import React, { useMemo, useState } from 'react';
 import { ChevronDown, ChevronLeft, ChevronRight, CircleDollarSign, FileUp, Loader2, Lock, Pencil, SlidersHorizontal, Trash2, Unlock, UserRound } from 'lucide-react';
 import CustomerPaymentModal from './CustomerPaymentModal';
 import CustomerReceiptModal from './CustomerReceiptModal';
+import CreditLimitHistoryTab from './CreditLimitHistoryTab';
 import DebtAdjustModal from '@/components/debt/DebtAdjustModal';
 import { customerService } from '../services/customerService';
 import { InvoicePreviewModal } from '@/features/orders';
@@ -31,9 +32,11 @@ interface CustomerExpandedRowProps {
   onPaymentCreated?: (customerId: number, voucherCode: string) => void;
   /** Gọi sau khi sửa / hủy phiếu thu để tải lại chi tiết + danh sách */
   onDataChanged?: (customerId: number) => void;
+  /** Có = người dùng được điều chỉnh hạn mức (Manager / Kế toán trưởng) → hiện nút "Điều chỉnh hạn mức" */
+  onAdjustCreditLimit?: (customer: Customer) => void;
 }
 
-type TabKey = 'info' | 'orders' | 'bookings' | 'debts';
+type TabKey = 'info' | 'orders' | 'bookings' | 'debts' | 'creditLimit';
 type LedgerFilter = 'ALL' | 'SALE' | 'PAYMENT' | 'ADJUST';
 
 const LEDGER_FILTER_OPTIONS: { value: LedgerFilter; label: string }[] = [
@@ -96,6 +99,7 @@ export default function CustomerExpandedRow({
   onDelete,
   onPaymentCreated,
   onDataChanged,
+  onAdjustCreditLimit,
 }: CustomerExpandedRowProps) {
   const [activeTab, setActiveTab] = useState<TabKey>('info');
   const [ledgerFilter, setLedgerFilter] = useState<LedgerFilter>('ALL');
@@ -135,6 +139,7 @@ export default function CustomerExpandedRow({
     ...(orders.length > 0 || bookings.length === 0 ? [{ key: 'orders' as const, label: 'Lịch sử bán/trả hàng' }] : []),
     ...(bookings.length > 0 ? [{ key: 'bookings' as const, label: 'Lịch sử đặt hàng' }] : []),
     { key: 'debts', label: 'Nợ cần thu từ khách' },
+    { key: 'creditLimit', label: 'Lịch sử hạn mức' },
   ];
 
   return (
@@ -224,6 +229,12 @@ export default function CustomerExpandedRow({
                       <span>Xóa</span>
                     </button>
                     <div className="flex items-center gap-2">
+                      {onAdjustCreditLimit && (
+                        <button type="button" onClick={() => onAdjustCreditLimit(detail ?? customer)} className={outlineBtnCls}>
+                          <SlidersHorizontal size={14} />
+                          <span>Điều chỉnh hạn mức</span>
+                        </button>
+                      )}
                       <button type="button" onClick={() => onEdit(detail ?? customer)} className={primaryBtnCls}>
                         <Pencil size={14} />
                         <span>Chỉnh sửa</span>
@@ -235,6 +246,16 @@ export default function CustomerExpandedRow({
                     </div>
                   </div>
                 </>
+              )}
+
+              {/* ── LỊCH SỬ HẠN MỨC ── (key theo hạn mức: điều chỉnh xong thì tải lại) */}
+              {activeTab === 'creditLimit' && (
+                <CreditLimitHistoryTab
+                  key={`${customer.id}-${c.creditLimit}`}
+                  customerId={customer.id}
+                  currentLimit={c.creditLimit || 0}
+                  onAdjust={onAdjustCreditLimit ? () => onAdjustCreditLimit(detail ?? customer) : undefined}
+                />
               )}
 
               {/* ── TAB 2: LỊCH SỬ BÁN/TRẢ HÀNG ── */}

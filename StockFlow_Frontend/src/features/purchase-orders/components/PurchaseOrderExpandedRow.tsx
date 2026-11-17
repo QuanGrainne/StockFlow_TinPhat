@@ -321,6 +321,7 @@ export default function PurchaseOrderExpandedRow({ poId, colSpan, onClose, onCha
                 </button>
               )}
               {canReceive && (
+                // Như trước commit f1a0879: mở form Nhập hàng (phiếu nhập) điền sẵn theo phiếu đặt
                 <button type="button" onClick={() => router.push(`/purchases/create?po=${po.poId}`)} className={primaryBtnCls}>
                   <ArrowDownToLine size={14} /> Nhập hàng
                 </button>

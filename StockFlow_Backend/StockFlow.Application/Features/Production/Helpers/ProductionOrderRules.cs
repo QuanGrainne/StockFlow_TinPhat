@@ -7,11 +7,9 @@ using StockFlow.Domain.Services;
 
 namespace StockFlow.Application.Features.Production.Helpers;
 
-/// <summary>Luật dùng chung khi lập / sửa lệnh sản xuất (UC-59, E58.2, BR-31, BR-51).</summary>
+/// <summary>Luật dùng chung khi lập / sửa lệnh sản xuất (UC-59, E58.2, BR-31): theo đúng BOM, kiểm tra thiếu NVL tại kho.</summary>
 public static class ProductionOrderRules
 {
-    private const int ReasonMaxLength = 500;
-
     /// <summary>E58.2: hạn hoàn thành không được ở quá khứ (so theo ngày giờ Việt Nam).</summary>
     public static string? ValidateDeadline(DateTime? deadline)
     {
@@ -54,7 +52,7 @@ public static class ProductionOrderRules
     }
 
     /// <summary>
-    /// Tạo danh sách dòng thành phẩm (dtl_production_order_items) và nhu cầu NVL tương ứng (hỗ trợ chỉnh sửa trực tiếp định mức ngay khi lập/sửa lệnh, BR-51).
+    /// Tạo danh sách dòng thành phẩm (dtl_production_order_items) và nhu cầu NVL tính đúng theo BOM đang áp dụng (BR-31).
     /// Trả về thông báo lỗi nếu dữ liệu không hợp lệ, hoặc null nếu thành công.
     /// </summary>
     public static async Task<string?> PopulateItemsAndRequirementsAsync(
@@ -63,6 +61,10 @@ public static class ProductionOrderRules
     {
         var items = NormalizeItems(req);
         if (items.Count == 0) return "Vui lòng chọn ít nhất một thành phẩm.";
+        // Lệnh sản xuất bắt buộc theo đúng công thức BOM đang áp dụng (quyết định nhóm 15/11/2026, thay BR-51 khi lập lệnh):
+        // không nhận định mức tự sửa / NVL ngoài BOM khi lập hoặc sửa lệnh.
+        if (req.CustomMaterials is { Count: > 0 } || items.Any(i => i.CustomMaterials is { Count: > 0 }))
+            return ProductionMessages.MustFollowBom;
         if (items.Select(i => i.ProductId).Distinct().Count() != items.Count)
             return "Mỗi thành phẩm chỉ được chọn một dòng trong cùng một lệnh sản xuất.";
 
@@ -72,6 +74,10 @@ public static class ProductionOrderRules
             if (it.PlannedQuantity <= 0 || !ProductionHelper.HasMaxScale(it.PlannedQuantity, ProductionPolicy.QuantityScale))
                 return "Số lượng kế hoạch của từng thành phẩm phải lớn hơn 0 và có tối đa 2 chữ số thập phân.";
         }
+        // V-04: số lượng từng dòng và tổng (cột numeric(18,2) của lệnh) không vượt giới hạn lưu trữ, tránh lỗi 500 khi lưu
+        if (items.Any(i => i.PlannedQuantity > ProductionPolicy.MaxStoredQuantity)
+            || items.Sum(i => i.PlannedQuantity) > ProductionPolicy.MaxStoredQuantity)
+            return ProductionMessages.QuantityLimit;
 
         var productIds = items.Select(i => i.ProductId).ToList();
         var products = await context.MstProducts.AsNoTracking()
@@ -110,73 +116,18 @@ public static class ProductionOrderRules
             };
             context.DtlProductionOrderItems.Add(orderItem);
 
-            if (it.CustomMaterials is not { Count: > 0 })
-            {
-                AddRequirementsFromBom(context, order, bom, it.PlannedQuantity, orderItem);
-                continue;
-            }
+            // V-04: nhu cầu tính ra phải lưu được vào numeric(18,2)
+            if (bom.DtlBomItems.Any(b => !ProductionPolicy.TryCalculateRequirement(
+                    it.PlannedQuantity, b.Quantity ?? 0, b.WastageRate ?? 0, out _)))
+                return ProductionMessages.QuantityLimit;
 
-            if (it.CustomMaterials.Select(m => m.MaterialId).Distinct().Count() != it.CustomMaterials.Count)
-                return $"Nguyên vật liệu của thành phẩm {products[it.ProductId].ProductCode} bị trùng lặp.";
-            if (it.CustomMaterials.Any(m => m.MaterialId == it.ProductId))
-                return "Thành phẩm không được là nguyên vật liệu của chính nó.";
-
-            var bomByMaterial = bom.DtlBomItems.ToDictionary(b => b.MaterialId);
-            var isDifferentFromBom = it.CustomMaterials.Count != bom.DtlBomItems.Count
-                || it.CustomMaterials.Any(m =>
-                    !bomByMaterial.TryGetValue(m.MaterialId, out var bi)
-                    || (bi.Quantity ?? 0) != m.NormPerUnit
-                    || (bi.WastageRate ?? 0) != m.WastageRate);
-
-            var reason = (it.AdjustReason ?? req.AdjustReason)?.Trim();
-            if (isDifferentFromBom && string.IsNullOrWhiteSpace(reason))
-                return ProductionMessages.NormReasonRequired;
-
-            var matIds = it.CustomMaterials.Select(m => m.MaterialId).ToList();
-            var matMap = await context.MstProducts.AsNoTracking()
-                .Where(p => matIds.Contains(p.ProductId) && p.IsActive != false)
-                .ToDictionaryAsync(p => p.ProductId, ct);
-            if (matMap.Count != matIds.Count)
-                return "Nguyên vật liệu không tồn tại hoặc đã ngừng kinh doanh.";
-
-            foreach (var cm in it.CustomMaterials)
-            {
-                if (cm.NormPerUnit <= 0 || !ProductionHelper.HasMaxScale(cm.NormPerUnit, BomRules.QuantityScale))
-                    return $"Định mức phải lớn hơn 0 và có tối đa {BomRules.QuantityScale} chữ số thập phân.";
-                if (cm.WastageRate < 0 || cm.WastageRate > 100 || !ProductionHelper.HasMaxScale(cm.WastageRate, BomRules.WastageScale))
-                    return "Tỷ lệ hao hụt phải từ 0 đến 100%.";
-
-                var mat = matMap[cm.MaterialId];
-                var hasBomLine = bomByMaterial.TryGetValue(cm.MaterialId, out var bi);
-                var lineChanged = !hasBomLine || (bi!.Quantity ?? 0) != cm.NormPerUnit || (bi.WastageRate ?? 0) != cm.WastageRate;
-                var required = ProductionPolicy.CalculateRequirement(it.PlannedQuantity, cm.NormPerUnit, cm.WastageRate);
-                var adjustNote = lineChanged && !string.IsNullOrWhiteSpace(reason)
-                    ? (hasBomLine
-                        ? $"{reason} (định mức {bi!.Quantity ?? 0:0.####} → {cm.NormPerUnit:0.####}, hao hụt {bi.WastageRate ?? 0:0.##}% → {cm.WastageRate:0.##}%)"
-                        : $"{reason} (thêm NVL ngoài BOM)")
-                    : null;
-                if (adjustNote is { Length: > ReasonMaxLength }) adjustNote = adjustNote[..ReasonMaxLength];
-
-                context.TrxProductionMaterialRequirements.Add(new TrxProductionMaterialRequirement
-                {
-                    ProductionOrder = order,
-                    ProductionOrderItem = orderItem,
-                    MaterialId = cm.MaterialId,
-                    UnitId = hasBomLine ? bi!.UnitId : mat.BaseUnitId,
-                    SourceBomItemId = hasBomLine ? bi!.BomItemId : null,
-                    NormPerUnit = cm.NormPerUnit,
-                    WastageRate = cm.WastageRate,
-                    RequiredQty = required,
-                    IssuedQty = 0,
-                    ShortageQty = required,
-                    IsAdjusted = lineChanged,
-                    AdjustedBy = lineChanged ? userId : null,
-                    AdjustedAt = lineChanged ? now : null,
-                    AdjustReason = adjustNote,
-                });
-            }
+            // BR-31: nhu cầu NVL = SL kế hoạch × định mức BOM × (1 + hao hụt %)
+            AddRequirementsFromBom(context, order, bom, it.PlannedQuantity, orderItem);
         }
 
         return null;
     }
+
+    // Kiểm tra thiếu NVL khi lập / sửa lệnh trực tiếp (ShortagesAsync, ApplyShortageCheckAsync...) đã bỏ cùng chức năng
+    // "Lập lệnh sản xuất" (17/11/2026). Lệnh lập từ kế hoạch: CreateProductionOrderFromPlanCommand.
 }

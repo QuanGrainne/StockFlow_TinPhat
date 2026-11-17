@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { Search, Edit2 } from 'lucide-react';
 import { PriceBook } from '../types';
 
@@ -52,13 +53,32 @@ export default function PriceBookFilterSidebar({
   const selectorRef = useRef<HTMLDivElement>(null);
 
   // Mở popover: lấy lại lựa chọn hiện tại và xóa từ khóa (trước đây làm trong useEffect → render 2 lần)
+  const [popoverPos, setPopoverPos] = useState<{ top: number; left: number } | null>(null);
+
+  const updatePopoverPos = () => {
+    const r = selectorRef.current?.getBoundingClientRect();
+    if (r) setPopoverPos({ top: r.top, left: r.right + 10 });
+  };
+
   const togglePopover = () => {
     if (!isPopoverOpen) {
       setTempSelectedIds(selectedPriceBookIds);
       setSearchKeyword('');
+      updatePopoverPos();
     }
     setIsPopoverOpen(!isPopoverOpen);
   };
+
+  // Popover render qua portal (position: fixed) → cập nhật vị trí khi cuộn / đổi kích thước
+  useEffect(() => {
+    if (!isPopoverOpen) return;
+    window.addEventListener('resize', updatePopoverPos);
+    window.addEventListener('scroll', updatePopoverPos, true);
+    return () => {
+      window.removeEventListener('resize', updatePopoverPos);
+      window.removeEventListener('scroll', updatePopoverPos, true);
+    };
+  }, [isPopoverOpen]);
 
   // Click outside listener to close popover
   useEffect(() => {
@@ -167,10 +187,11 @@ export default function PriceBookFilterSidebar({
           )}
         </div>
 
-        {isPopoverOpen && (
+        {isPopoverOpen && popoverPos && typeof document !== 'undefined' && createPortal(
           <div
             ref={popoverRef}
-            className="absolute left-[calc(100%+10px)] top-0 z-50 w-[310px] rounded-[8px] border border-slate-200 bg-white shadow-[0_6px_20px_rgba(0,0,0,0.12)] p-3.5 space-y-3"
+            style={{ top: popoverPos.top, left: popoverPos.left }}
+            className="fixed z-[1000] w-[310px] text-[#15171a] select-none rounded-[8px] border border-slate-200 bg-white shadow-[0_6px_20px_rgba(0,0,0,0.12)] p-3.5 space-y-3"
           >
             <div className="absolute -left-[6px] top-4 w-3 h-3 bg-white border-l border-b border-slate-200 rotate-45" />
 
@@ -251,7 +272,8 @@ export default function PriceBookFilterSidebar({
                 Áp dụng
               </button>
             </div>
-          </div>
+          </div>,
+          document.body
         )}
       </div>
 

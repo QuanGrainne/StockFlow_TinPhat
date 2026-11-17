@@ -5,10 +5,9 @@
 // Không hiển thị giá / giá vốn (BR-39).
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { message } from 'antd';
 import * as XLSX from 'xlsx';
-import { FileDown, Inbox, Plus, RefreshCcw, Search } from 'lucide-react';
+import { FileDown, Inbox, RefreshCcw, Search } from 'lucide-react';
 import { useActiveWarehouse } from '@/lib/warehouse/useActiveWarehouse';
 import { productionService } from '../services/productionService';
 import type { ProductionListFilter, ProductionOrderDetail, ProductionOrderSummary } from '../types';
@@ -21,7 +20,7 @@ import { ConfirmDialog } from '../components/ProductionDialog';
 import { ReasonDialog } from '../components/ReasonDialog';
 import { AdjustNormModal } from '../components/AdjustNormModal';
 import { MaterialIssueModal } from '../components/MaterialIssueModal';
-import { FinishedGoodsReceiptModal } from '../components/FinishedGoodsReceiptModal';
+import { ApproveCompletionModal } from '../components/ApproveCompletionModal';
 
 const STATUS_OPTIONS = [
   { value: 'NOT_STARTED', label: 'Chưa bắt đầu' },
@@ -31,17 +30,16 @@ const STATUS_OPTIONS = [
 ];
 
 type Dialog =
-  | { kind: 'cancel' | 'close' | 'adjust'; detail: ProductionOrderDetail }
-  | { kind: 'issue' | 'supplement' | 'receive'; orderId: number }
+  | { kind: 'cancel' | 'close' | 'adjust' | 'approve'; detail: ProductionOrderDetail }
+  | { kind: 'issue' | 'supplement'; orderId: number }
   | null;
 
 export default function ProductionOrdersScreen() {
-  const router = useRouter();
   const features = useProductionFeatures();
   const { activeWarehouse, warehouses } = useActiveWarehouse();
 
   const [query, setQuery] = useState('');
-  const [filter, setFilter] = useState<ProductionListFilter>(() => defaultProductionFilter(['NOT_STARTED', 'IN_PROGRESS']));
+  const [filter, setFilter] = useState<ProductionListFilter>(() => defaultProductionFilter(['NOT_STARTED', 'IN_PROGRESS', 'COMPLETED']));
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [reloadTick, setReloadTick] = useState(0);
   const [expandedId, setExpandedId] = useState<number | null>(null);
@@ -129,17 +127,14 @@ export default function ProductionOrdersScreen() {
     if (!lastDetail) return;
     const id = lastDetail.summary.productionOrderId;
     switch (action) {
-      case 'edit':
-        router.push(`/production/create?edit=${id}`);
-        break;
       case 'cancel':
       case 'close':
       case 'adjust':
+      case 'approve':
         setDialog({ kind: action, detail: lastDetail });
         break;
       case 'issue':
       case 'supplement':
-      case 'receive':
         setDialog({ kind: action, orderId: id });
         break;
     }
@@ -216,16 +211,7 @@ export default function ProductionOrdersScreen() {
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {features.canPlan && (
-            <button
-              type="button"
-              onClick={() => router.push('/production/create')}
-              className="inline-flex items-center gap-1.5 px-3.5 h-8 rounded-[8px] bg-[#0070f4] hover:bg-[#005ac3] text-white font-semibold text-[13px] shadow-xs transition cursor-pointer"
-            >
-              <Plus size={15} className="stroke-[2.5]" />
-              <span>Lập lệnh</span>
-            </button>
-          )}
+          {/* Bỏ "Lập lệnh" (17/11/2026): lệnh chỉ lập từ Kế hoạch sản xuất */}
           <button
             type="button"
             onClick={exportList}
@@ -259,7 +245,7 @@ export default function ProductionOrdersScreen() {
                   <th className={th}>Mã lệnh</th>
                   <th className={th}>Ngày lập</th>
                   <th className={th}>Thành phẩm</th>
-                  <th className={`${th} text-right`}>Kế hoạch</th>
+                  <th className={`${th} text-right`}>SL kế hoạch</th>
                   <th className={`${th} text-right`}>Đã nhập</th>
                   <th className={th}>Tiến độ</th>
                   <th className={th}>Hạn hoàn thành</th>
@@ -433,9 +419,9 @@ export default function ProductionOrdersScreen() {
           }}
         />
       )}
-      {dialog?.kind === 'receive' && (
-        <FinishedGoodsReceiptModal
-          productionOrderId={dialog.orderId}
+      {dialog?.kind === 'approve' && (
+        <ApproveCompletionModal
+          detail={dialog.detail}
           onClose={() => setDialog(null)}
           onDone={() => {
             setDialog(null);

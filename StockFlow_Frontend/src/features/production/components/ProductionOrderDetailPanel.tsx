@@ -3,20 +3,23 @@
 // Chi tiết lệnh sản xuất mở dưới dòng (UC-44 bước 5, UC-45, UC-60, UC-61):
 // - Tab Thông tin & NVL: nhu cầu / đã xuất / còn thiếu / tồn tại kho đang chọn (A45.1), định mức đã điều chỉnh (BR-51).
 // - Tab Phiếu xuất NVL, tab Nhập thành phẩm (cờ cần xem xét BR-37).
-// Nút thao tác hiện theo chức năng được phân quyền: Lập lệnh (Manager) / Xuất NVL / Nhập thành phẩm.
+// Nút thao tác hiện theo chức năng được phân quyền: Lập lệnh / Duyệt hoàn thành (Manager) / Xuất NVL.
+// Phiếu nhập thành phẩm do hệ thống tự sinh khi Manager Duyệt hoàn thành (không nhập tay).
 
 import React, { useState } from 'react';
-import { AlertTriangle, Ban, CheckCircle2, PackageMinus, PackagePlus, Pencil, RefreshCcw, Sliders } from 'lucide-react';
+import Link from 'next/link';
+import { documentLinkHref } from '@/lib/navigation/documentLink';
+import { AlertTriangle, Ban, BadgeCheck, CheckCircle2, PackageMinus, RefreshCcw, Sliders } from 'lucide-react';
 import { ProductCodeLink } from '@/components/links/EntityLinks';
 import type { WarehouseItem } from '@/lib/warehouse/useActiveWarehouse';
 import type { ProductionOrderDetail } from '../types';
 import type { ProductionFeatures } from '../hooks/useProductionFeatures';
-import { fmtDate, fmtDateTime, fmtNorm, fmtPercent, fmtQty } from '../utils/productionFormat';
+import { fmtDate, fmtDateTime, fmtNorm, fmtPercent, fmtQty, producedSoFar, producibleFromIssued } from '../utils/productionFormat';
 import { ProductionStatusTag, ProgressBar, SmallTag } from './ProductionStatusTag';
 
 type Tab = 'info' | 'issues' | 'receipts';
 
-export type ProductionOrderAction = 'edit' | 'adjust' | 'close' | 'cancel' | 'issue' | 'supplement' | 'receive';
+export type ProductionOrderAction = 'adjust' | 'close' | 'cancel' | 'issue' | 'supplement' | 'approve';
 
 interface ProductionOrderDetailPanelProps {
   detail: ProductionOrderDetail | null;
@@ -56,6 +59,11 @@ export function ProductionOrderDetailPanel({
   const s = detail.summary;
   const notStarted = s.status === 'NOT_STARTED';
   const inProgress = s.status === 'IN_PROGRESS';
+  // Số thành phẩm làm được từ NVL đã xuất (cùng công thức backend dùng để chặn Duyệt hoàn thành)
+  const multiItems = !!s.items && s.items.length > 1;
+  const producibleOf = (planned: number, itemId: number | null) => producibleFromIssued(detail.materials, planned, itemId);
+  const orderProducible = multiItems ? null : producibleOf(s.plannedQuantity, s.items?.[0]?.productionOrderItemId ?? null);
+  const orderProduced = detail.receipts.reduce((sum, r) => sum + r.acceptedQuantity + r.defectQuantity, 0);
   const tabs: { key: Tab; label: string }[] = [
     { key: 'info', label: 'Thông tin & NVL' },
     { key: 'issues', label: `Phiếu xuất NVL (${detail.issues.length})` },
@@ -113,6 +121,22 @@ export function ProductionOrderDetailPanel({
                 <span className="text-slate-400">Người lập: </span>
                 <span className="font-medium text-slate-800">{s.createdByName}</span>
               </div>
+              {s.productionPlanCode && (
+                <div>
+                  <span className="text-slate-400">Kế hoạch sản xuất: </span>
+                  {/* Bấm mở kế hoạch ở tab mới (màn Kế hoạch sản xuất mở sẵn chi tiết theo ?code=&id=) */}
+                  <Link
+                    href={documentLinkHref('/production/plans', { code: s.productionPlanCode, id: s.productionPlanId ?? null })}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    className="font-mono font-semibold text-[#0070f4] hover:underline"
+                    title={`Mở kế hoạch sản xuất ${s.productionPlanCode}`}
+                  >
+                    {s.productionPlanCode}
+                  </Link>
+                </div>
+              )}
               <div>
                 <span className="text-slate-400">Ngày lập: </span>
                 <span className="font-medium text-slate-800">{fmtDateTime(s.createdDate)}</span>
@@ -124,9 +148,9 @@ export function ProductionOrderDetailPanel({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+          <div className={`grid grid-cols-2 gap-3 mb-4 ${orderProducible != null ? 'md:grid-cols-5' : 'md:grid-cols-4'}`}>
             {[
-              { label: 'Kế hoạch', value: s.plannedQuantity, cls: '' },
+              { label: 'SL kế hoạch', value: s.plannedQuantity, cls: '' },
               { label: 'Đã nhập kho', value: s.receivedQuantity, cls: 'text-[#16a34a]' },
               { label: 'Còn lại', value: Math.max(0, s.plannedQuantity - s.receivedQuantity), cls: 'text-[#0070f4]' },
               { label: 'Lỗi / phế phẩm', value: s.defectQuantity, cls: 'text-[#fb2c36]' },
@@ -138,6 +162,20 @@ export function ProductionOrderDetailPanel({
                 </div>
               </div>
             ))}
+            {orderProducible != null && (
+              <div
+                className="border border-[#0070f4]/25 rounded-[8px] px-3 py-2 bg-[#e6f1fe]/60"
+                title="Số thành phẩm làm được từ NVL đã xuất (NVL ít nhất quyết định). Duyệt hoàn thành không vượt số này."
+              >
+                <div className="text-[11px] text-slate-500">Đủ SX từ NVL đã xuất</div>
+                <div className="text-base font-bold text-[#0070f4]">
+                  {fmtQty(orderProducible)} <span className="text-xs font-normal text-slate-500">{s.unitName}</span>
+                </div>
+                <div className="text-[11px] text-slate-500">
+                  Còn duyệt được: <b>{fmtQty(Math.max(0, orderProducible - orderProduced))}</b>
+                </div>
+              </div>
+            )}
           </div>
           <div className="mb-4 max-w-md">
             <ProgressBar percent={s.progressPercent} />
@@ -157,9 +195,12 @@ export function ProductionOrderDetailPanel({
                       <th className="py-1.5 px-3">Tên thành phẩm</th>
                       <th className="py-1.5 px-3 w-14 text-center">ĐVT</th>
                       <th className="py-1.5 px-3 w-36">Định mức BOM</th>
-                      <th className="py-1.5 px-3 w-24 text-right">Kế hoạch</th>
+                      <th className="py-1.5 px-3 w-24 text-right">SL kế hoạch</th>
                       <th className="py-1.5 px-3 w-24 text-right">Đã nhập</th>
                       <th className="py-1.5 px-3 w-24 text-right">Còn lại</th>
+                      <th className="py-1.5 px-3 w-28 text-right" title="Số thành phẩm làm được từ NVL đã xuất / còn duyệt được">
+                        Đủ SX từ NVL
+                      </th>
                       <th className="py-1.5 px-3 w-36">Tiến độ</th>
                     </tr>
                   </thead>
@@ -178,6 +219,19 @@ export function ProductionOrderDetailPanel({
                         <td className="py-1.5 px-3 text-right font-semibold">{fmtQty(it.plannedQuantity)}</td>
                         <td className="py-1.5 px-3 text-right text-[#16a34a] font-semibold">{fmtQty(it.receivedQuantity)}</td>
                         <td className="py-1.5 px-3 text-right text-[#0070f4] font-semibold">{fmtQty(it.remainingQuantity)}</td>
+                        <td className="py-1.5 px-3 text-right">
+                          {(() => {
+                            const p = producibleOf(it.plannedQuantity, it.productionOrderItemId);
+                            if (p == null) return <span className="text-slate-400">—</span>;
+                            const room = Math.max(0, p - producedSoFar(detail.receipts, it.productId));
+                            return (
+                              <span title={`Còn duyệt được ${fmtQty(room)}`}>
+                                <b className="text-[#0070f4]">{fmtQty(p)}</b>
+                                <span className="text-slate-400"> / còn {fmtQty(room)}</span>
+                              </span>
+                            );
+                          })()}
+                        </td>
                         <td className="py-1.5 px-3">
                           <ProgressBar percent={it.progressPercent} />
                         </td>
@@ -415,12 +469,6 @@ export function ProductionOrderDetailPanel({
               <span>Điều chỉnh định mức</span>
             </button>
           )}
-          {features.canPlan && notStarted && (
-            <button type="button" onClick={() => onAction('edit')} className={actionBtn}>
-              <Pencil size={13} />
-              <span>Sửa lệnh</span>
-            </button>
-          )}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {features.canIssue && inProgress && (
@@ -429,16 +477,22 @@ export function ProductionOrderDetailPanel({
               <span>Xuất bổ sung</span>
             </button>
           )}
-          {features.canIssue && (notStarted || inProgress) && (
+          {/* Đã xuất đủ NVL theo lệnh → chỉ còn "Xuất bổ sung" */}
+          {features.canIssue && (notStarted || inProgress) && !s.isFullyIssued && (
             <button type="button" onClick={() => onAction('issue')} className={primaryBtn}>
               <PackageMinus size={13} />
               <span>Xuất NVL</span>
             </button>
           )}
-          {features.canReceive && inProgress && (
-            <button type="button" onClick={() => onAction('receive')} className={primaryBtn}>
-              <PackagePlus size={13} />
-              <span>Nhập thành phẩm</span>
+          {features.canPlan && inProgress && (
+            <button
+              type="button"
+              onClick={() => onAction('approve')}
+              className="flex items-center gap-1.5 px-4 py-1.5 text-xs bg-[#16a34a] hover:bg-[#15803d] text-white rounded-[8px] font-semibold cursor-pointer"
+              title="Nhập SL thực tế, hệ thống tự sinh phiếu nhập thành phẩm; nhập đủ kế hoạch thì lệnh chuyển Hoàn thành"
+            >
+              <BadgeCheck size={13} />
+              <span>Duyệt hoàn thành</span>
             </button>
           )}
         </div>

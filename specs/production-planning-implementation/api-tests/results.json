@@ -1,0 +1,338 @@
+﻿[
+    {
+        "Id":  "PP-01",
+        "Name":  "Sales không xem được kế hoạch",
+        "Pass":  true,
+        "Actual":  "403 Vai trò của bạn chưa được phân quyền chức năng Kế hoạch sản xuất / Duyệt kế hoạch sản xuất / Lập lệnh sản xuất."
+    },
+    {
+        "Id":  "PP-02",
+        "Name":  "Kế hoạch không có dòng bị chặn",
+        "Pass":  true,
+        "Actual":  "400 Dữ liệu không hợp lệ. | Kế hoạch phải có ít nhất một thành phẩm."
+    },
+    {
+        "Id":  "PP-03",
+        "Name":  "Số lượng 0 bị chặn",
+        "Pass":  true,
+        "Actual":  "400 Dữ liệu không hợp lệ. | Số lượng kế hoạch phải lớn hơn 0 và có tối đa 2 chữ số thập phân."
+    },
+    {
+        "Id":  "PP-04",
+        "Name":  "Ngày kết thúc dòng trước ngày bắt đầu bị chặn",
+        "Pass":  true,
+        "Actual":  "400 Dữ liệu không hợp lệ. | Ngày kết thúc của dòng không được trước ngày bắt đầu."
+    },
+    {
+        "Id":  "PP-05",
+        "Name":  "Dòng nằm ngoài kỳ bị chặn",
+        "Pass":  true,
+        "Actual":  "400 Dữ liệu không hợp lệ. | Thời gian của từng dòng phải nằm trong kỳ kế hoạch."
+    },
+    {
+        "Id":  "PP-06",
+        "Name":  "Trùng thành phẩm trong kế hoạch bị chặn",
+        "Pass":  true,
+        "Actual":  "400 Dữ liệu không hợp lệ. | Mỗi thành phẩm chỉ được có một dòng trong cùng một kế hoạch."
+    },
+    {
+        "Id":  "PP-07",
+        "Name":  "Thành phẩm không tồn tại bị chặn",
+        "Pass":  true,
+        "Actual":  "400 Thành phẩm không tồn tại hoặc đã ngừng hoạt động: #999999."
+    },
+    {
+        "Id":  "PP-08",
+        "Name":  "Kỳ kế hoạch ngược bị chặn",
+        "Pass":  true,
+        "Actual":  "400 Dữ liệu không hợp lệ. | Ngày kết thúc kỳ kế hoạch không được trước ngày bắt đầu. | Thời gian của từng dòng phải nằm trong kỳ kế hoạch."
+    },
+    {
+        "Id":  "PP-09",
+        "Name":  "Kho nhận không thuộc quyền bị chặn (prodstaff chỉ có K002)",
+        "Pass":  true,
+        "Actual":  "400 Bạn không có quyền thao tác trên kho này."
+    },
+    {
+        "Id":  "PP-10",
+        "Name":  "Số lượng quá 2 chữ số thập phân bị chặn",
+        "Pass":  true,
+        "Actual":  "400 Dữ liệu không hợp lệ. | Số lượng kế hoạch phải lớn hơn 0 và có tối đa 2 chữ số thập phân."
+    },
+    {
+        "Id":  "PP-11",
+        "Name":  "Production Accountant lập kế hoạch → DRAFT, mã KHSX",
+        "Pass":  true,
+        "Actual":  "200 KHSX00001 DRAFT"
+    },
+    {
+        "Id":  "PP-12",
+        "Name":  "Thành phẩm chưa có BOM được cảnh báo (HasActiveBom=false), các dòng khác true",
+        "Pass":  true,
+        "Actual":  "fg3=False fg1=True"
+    },
+    {
+        "Id":  "PP-13",
+        "Name":  "Gửi duyệt bị chặn khi có thành phẩm chưa có BOM",
+        "Pass":  true,
+        "Actual":  "400 Thành phẩm chưa có BOM đang áp dụng. Vui lòng thiết lập BOM trước. (PPFG3)"
+    },
+    {
+        "Id":  "PP-14",
+        "Name":  "Sửa nháp (bỏ dòng FG3) → còn 2 dòng, vẫn DRAFT",
+        "Pass":  true,
+        "Actual":  "200 items=2"
+    },
+    {
+        "Id":  "PP-15",
+        "Name":  "Gửi duyệt → PENDING_APPROVAL",
+        "Pass":  true,
+        "Actual":  "200 {\"summary\":{\"productionPlanId\":1,\"planCode\":\"KHSX00001\",\"planName\":\"Ke hoach thang 12\",\"planDate\":\"2026-11-15T19:55:38.862783\",\"periodStart\":\"2026-11-15\",\"perio"
+    },
+    {
+        "Id":  "PP-16",
+        "Name":  "Không sửa được khi đang chờ duyệt",
+        "Pass":  true,
+        "Actual":  "400 Kế hoạch sản xuất không thể thực hiện thao tác này ở trạng thái hiện tại."
+    },
+    {
+        "Id":  "PP-17",
+        "Name":  "AllowedActions: prodstaff không được duyệt; ",
+        "Pass":  true,
+        "Actual":  "canApprove=False canEdit=False"
+    },
+    {
+        "Id":  "PP-18",
+        "Name":  "AllowedActions: manager được duyệt / từ chối",
+        "Pass":  true,
+        "Actual":  "canApprove=True"
+    },
+    {
+        "Id":  "PP-19",
+        "Name":  "Production Accountant gọi API duyệt → 403",
+        "Pass":  true,
+        "Actual":  "403 Vai trò của bạn chưa được phân quyền chức năng Duyệt kế hoạch sản xuất."
+    },
+    {
+        "Id":  "PP-20",
+        "Name":  "Từ chối không có lý do bị chặn",
+        "Pass":  true,
+        "Actual":  "400 Vui lòng nhập lý do."
+    },
+    {
+        "Id":  "PP-21",
+        "Name":  "Từ chối có lý do → REJECTED, lý do ghi vào ghi chú",
+        "Pass":  true,
+        "Actual":  "200 REJECTED | Ghi chu ban dau\n[Từ chối 15/11/2026 19:55 - Nguyễn Văn Quản Lý] Can xem lai so luong FG2"
+    },
+    {
+        "Id":  "PP-22",
+        "Name":  "Sửa kế hoạch bị từ chối rồi gửi duyệt lại → PENDING_APPROVAL",
+        "Pass":  true,
+        "Actual":  "sửa=REJECTED gửi=PENDING_APPROVAL"
+    },
+    {
+        "Id":  "PP-23",
+        "Name":  "Manager duyệt → APPROVED, ghi người duyệt và thời điểm",
+        "Pass":  true,
+        "Actual":  "APPROVED by=2 at=2026-11-15T19:55:39.199747"
+    },
+    {
+        "Id":  "PP-24",
+        "Name":  "Nhu cầu NVL cộng dồn đúng, cảnh báo thiếu MAT2",
+        "Pass":  true,
+        "Actual":  "MAT1=252.50 MAT2=55.00 thiếu=45.00 shortageCount=1"
+    },
+    {
+        "Id":  "PP-25",
+        "Name":  "Xem tồn ở kho không có quyền bị chặn",
+        "Pass":  true,
+        "Actual":  "400 Bạn không có quyền thao tác trên kho này."
+    },
+    {
+        "Id":  "PP-26",
+        "Name":  "Xem trước nhu cầu khi đang soạn; thành phẩm thiếu BOM liệt kê riêng",
+        "Pass":  true,
+        "Actual":  "200 withoutBom=1"
+    },
+    {
+        "Id":  "PP-27",
+        "Name":  "Production Accountant không lập lệnh được (403)",
+        "Pass":  true,
+        "Actual":  "403 Vai trò của bạn chưa được phân quyền chức năng Lập lệnh sản xuất."
+    },
+    {
+        "Id":  "PP-28",
+        "Name":  "Lập lệnh một phần (FG1 60) → NOT_STARTED, gắn mã kế hoạch, có nhu cầu NVL",
+        "Pass":  true,
+        "Actual":  "200 {\"summary\":{\"productionOrderId\":1,\"code\":\"LSX00001\",\"productId\":3,\"productCode\":\"PPFG1\",\"productName\":\"SP thu PPFG1\",\"unitName\":\"Cái\",\"bomId\":1,\"bomCode\":\"BOM-3 plan=KHSX00001 mats=2"
+    },
+    {
+        "Id":  "PP-29",
+        "Name":  "Chi tiết kế hoạch: FG1 đã lập 60, còn 40",
+        "Pass":  true,
+        "Actual":  "ordered=60.00 remaining=40.00"
+    },
+    {
+        "Id":  "PP-30",
+        "Name":  "Lập vượt số còn lại (50 \u003e 40) bị chặn",
+        "Pass":  true,
+        "Actual":  "400 Số lượng lập lệnh của thành phẩm PPFG1 vượt số còn lại của kế hoạch (40)."
+    },
+    {
+        "Id":  "PP-31",
+        "Name":  "Lập lệnh cho thành phẩm ngoài kế hoạch bị chặn",
+        "Pass":  true,
+        "Actual":  "400 Thành phẩm không thuộc kế hoạch sản xuất của lệnh."
+    },
+    {
+        "Id":  "PP-32",
+        "Name":  "Lập lần 2 từ cùng dòng + nhiều thành phẩm trong một lệnh → còn lại 0",
+        "Pass":  true,
+        "Actual":  "200 {\"summary\":{\"productionOrderId\":2,\"code\":\"LSX00002\",\"productId\":3,\"productCode\":\"PPFG1, PPFG2\",\"productName\":\"SP thu PPFG1, SP thu PPFG2\",\"unitName\":\"Cái\",\"bomI fg1Còn=0 canCreateOrder=False"
+    },
+    {
+        "Id":  "PP-33",
+        "Name":  "Hết số còn lại thì lập thêm bị chặn",
+        "Pass":  true,
+        "Actual":  "400 Số lượng lập lệnh của thành phẩm PPFG1 vượt số còn lại của kế hoạch (0)."
+    },
+    {
+        "Id":  "PP-34",
+        "Name":  "Sửa lệnh thuộc kế hoạch làm vượt kế hoạch (60→70) bị chặn",
+        "Pass":  true,
+        "Actual":  "400 Số lượng lập lệnh của thành phẩm PPFG1 vượt số còn lại của kế hoạch (60)."
+    },
+    {
+        "Id":  "PP-35",
+        "Name":  "Giảm số lượng lệnh (60→50) được, số còn lại của kế hoạch tăng lên 10",
+        "Pass":  true,
+        "Actual":  "200 {\"summary\":{\"productionOrderId\":1,\"code\":\"LSX00001\",\"productId\":3,\"productCode\":\"PPFG1\",\"productName\":\"SP thu PPFG1\",\"unitName\":\"Cái\",\"bomId\":1,\"bomCode\":\"BOM-3 còn=10.00"
+    },
+    {
+        "Id":  "PP-36",
+        "Name":  "Production Accountant không sửa được kế hoạch đã duyệt",
+        "Pass":  true,
+        "Actual":  "400 Chỉ người có quyền duyệt kế hoạch sản xuất mới được thực hiện thao tác này."
+    },
+    {
+        "Id":  "PP-37",
+        "Name":  "Giảm số kế hoạch thấp hơn số đã lập lệnh (80 \u003c 90) bị chặn",
+        "Pass":  true,
+        "Actual":  "400 Số lượng kế hoạch của PPFG1 không được thấp hơn số đã lập lệnh (90)."
+    },
+    {
+        "Id":  "PP-38",
+        "Name":  "Đổi tên kế hoạch đã duyệt bị chặn",
+        "Pass":  true,
+        "Actual":  "400 Kế hoạch đã duyệt không được đổi tên hoặc kỳ kế hoạch."
+    },
+    {
+        "Id":  "PP-39",
+        "Name":  "Xóa dòng đã có lệnh (FG2) bị chặn",
+        "Pass":  true,
+        "Actual":  "400 Không được xóa dòng đã có lệnh sản xuất (PPFG2)."
+    },
+    {
+        "Id":  "PP-40",
+        "Name":  "Thêm dòng thiếu BOM vào kế hoạch đã duyệt bị chặn",
+        "Pass":  true,
+        "Actual":  "400 Thành phẩm chưa có BOM đang áp dụng. Vui lòng thiết lập BOM trước. (PPFG3)"
+    },
+    {
+        "Id":  "PP-41",
+        "Name":  "Manager tăng FG1 lên 120 và thêm FG5 → vẫn APPROVED, FG1 còn 30",
+        "Pass":  true,
+        "Actual":  "200 {\"summary\":{\"productionPlanId\":1,\"planCode\":\"KHSX00001\",\"planName\":\"Ke hoach thang 12\",\"planDate\":\"2026-11-15T19:55:38.862783\",\"periodStart\":\"2026-11-15\",\"perio còn=30.00"
+    },
+    {
+        "Id":  "PP-42",
+        "Name":  "Hủy kế hoạch đã duyệt còn lệnh chưa hủy bị chặn",
+        "Pass":  true,
+        "Actual":  "400 Kế hoạch đã có lệnh sản xuất chưa hủy. Vui lòng hủy các lệnh đó hoặc dùng chức năng Đóng kế hoạch."
+    },
+    {
+        "Id":  "PP-43",
+        "Name":  "Hủy lệnh thuộc kế hoạch → số lượng trở lại số còn lại (FG1 70, FG2 50)",
+        "Pass":  true,
+        "Actual":  "200 {\"summary\":{\"productionOrderId\":2,\"code\":\"LSX00002\",\"productId\":3,\"productCode\":\"PPFG1, PPFG2\",\"productName\":\"SP thu PPFG1, SP thu PPFG2\",\"unitName\":\"Cái\",\"bomI fg1=70.00 fg2=50.00"
+    },
+    {
+        "Id":  "PP-44",
+        "Name":  "Hai người lập lệnh đồng thời: chỉ 2/5 thành công, không vượt kế hoạch",
+        "Pass":  true,
+        "Actual":  "codes=400,400,200,200,400 ordered=110.00"
+    },
+    {
+        "Id":  "PP-45",
+        "Name":  "Production Accountant không đóng được kế hoạch (403)",
+        "Pass":  true,
+        "Actual":  "403 Vai trò của bạn chưa được phân quyền chức năng Duyệt kế hoạch sản xuất."
+    },
+    {
+        "Id":  "PP-46",
+        "Name":  "Đóng kế hoạch → CLOSED; không lập thêm lệnh; lệnh cũ giữ nguyên",
+        "Pass":  true,
+        "Actual":  "CLOSED | lập thêm=400 Chỉ được lập lệnh sản xuất từ kế hoạch đã duyệt. | lệnh cũ=NOT_STARTED"
+    },
+    {
+        "Id":  "PP-47",
+        "Name":  "Production Accountant không hủy được kế hoạch nháp của người khác",
+        "Pass":  true,
+        "Actual":  "400 Chỉ người lập kế hoạch hoặc người có quyền duyệt mới được hủy kế hoạch này."
+    },
+    {
+        "Id":  "PP-48",
+        "Name":  "Người lập hủy kế hoạch nháp của mình → CANCELLED, lý do vào ghi chú",
+        "Pass":  true,
+        "Actual":  "200 {\"summary\":{\"productionPlanId\":3,\"planCode\":\"KHSX00003\",\"planName\":\"KH cua prodstaff\",\"planDate\":\"2026-11-15T19:55:40.194595\",\"periodStart\":\"2026-11-15\",\"period"
+    },
+    {
+        "Id":  "PP-49",
+        "Name":  "Hủy kế hoạch đã duyệt khi mọi lệnh đã hủy → CANCELLED",
+        "Pass":  true,
+        "Actual":  "200 {\"summary\":{\"productionPlanId\":2,\"planCode\":\"KHSX00002\",\"planName\":\"KH cua manager\",\"planDate\":\"2026-11-15T19:55:40.157829\",\"periodStart\":\"2026-11-15\",\"periodEn"
+    },
+    {
+        "Id":  "PP-50",
+        "Name":  "Kế hoạch số lượng lớn (1.000.000), lập 999.999,99 → còn 0,01",
+        "Pass":  true,
+        "Actual":  "200 {\"summary\":{\"productionOrderId\":6,\"code\":\"LSX00006\",\"productId\":4,\"productCode\":\"PPFG2\",\"productName\":\"SP thu PPFG2\",\"unitName\":\"Cái\",\"bomId\":2,\"bomCode\":\"BOM-4 còn=0.01"
+    },
+    {
+        "Id":  "PP-51",
+        "Name":  "Danh sách lọc trạng thái APPROVED,CLOSED",
+        "Pass":  true,
+        "Actual":  "200 count=2"
+    },
+    {
+        "Id":  "PP-52",
+        "Name":  "Tìm theo mã kế hoạch; tổng đã lập / tỷ lệ tính đúng",
+        "Pass":  true,
+        "Actual":  "200 count=1 ordered=110.00 pct=55"
+    },
+    {
+        "Id":  "PP-53",
+        "Name":  "Hồi quy: lập lệnh trực tiếp (không kế hoạch) vẫn chạy, productionPlanId null",
+        "Pass":  true,
+        "Actual":  "200 {\"summary\":{\"productionOrderId\":7,\"code\":\"LSX00007\",\"productId\":3,\"productCode\":\"PPFG1\",\"productName\":\"SP thu PPFG1\",\"unitName\":\"Cái\",\"bomId\":1,\"bomCode\":\"BOM-3"
+    },
+    {
+        "Id":  "PP-54",
+        "Name":  "Hồi quy: sửa lệnh không thuộc kế hoạch không bị giới hạn bởi kế hoạch",
+        "Pass":  true,
+        "Actual":  "200 {\"summary\":{\"productionOrderId\":7,\"code\":\"LSX00007\",\"productId\":3,\"productCode\":\"PPFG1\",\"productName\":\"SP thu PPFG1\",\"unitName\":\"Cái\",\"bomId\":1,\"bomCode\":\"BOM-3"
+    },
+    {
+        "Id":  "PP-55",
+        "Name":  "Danh sách lệnh trả mã kế hoạch cho lệnh lập từ kế hoạch",
+        "Pass":  true,
+        "Actual":  "200 lệnh có mã KH=6"
+    },
+    {
+        "Id":  "PP-56",
+        "Name":  "Production Accountant tra cứu thành phẩm cho form kế hoạch",
+        "Pass":  true,
+        "Actual":  "200 count=4"
+    }
+]

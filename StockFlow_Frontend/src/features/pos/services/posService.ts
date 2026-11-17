@@ -37,8 +37,6 @@ export interface PosSaleRequest {
   bookingOrderId?: number;
   /** Hóa đơn từ đơn, khách lấy thiếu: true = tạo đơn đặt mới (Phiếu tạm) cho phần còn lại */
   createRemainderBooking?: boolean;
-  /** Ngoại lệ một lần đã duyệt (vượt hạn mức): server kiểm đúng khách, chưa dùng, không vượt mức đã duyệt */
-  creditRequestId?: number;
   /** Tiền khách trả thừa: RETURN_CASH = trả lại khách; RECORD_DEBT = trừ vào nợ cũ của khách */
   excessAction?: 'RETURN_CASH' | 'RECORD_DEBT';
   items: {
@@ -294,6 +292,7 @@ export const posService = {
           creditLimit: Number(cust.creditLimit) || 0,
           currentDebt: Number(cust.currentDebt) || 0,
           isOverCreditLimit: Boolean(cust.isOverCreditLimit),
+          debtWarning: cust.debtWarning ?? null,
           taxCode: cust.code === 'KH00892' ? '0108924192' : undefined,
           salesRep: cust.code === 'KH00892' ? 'Trần Minh Tuấn' : 'Thu ngân quầy',
         }));

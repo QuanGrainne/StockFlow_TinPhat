@@ -134,7 +134,8 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
         }
       } catch {}
     }
-    return INITIAL_GOODS_LIST;
+    // Chưa có bản lưu: để trống chờ tải từ DB, không hiện hàng mẫu (dữ liệu giả không dùng trên màn hình thật)
+    return [];
   });
   const suggestedProductCode = getNextProductCode(goods);
   // Link mở thẳng 1 hàng hóa (?code=SP...&id=..., VD bấm mã hàng trong phiếu nhập / chuyển / kiểm kho...)
@@ -482,7 +483,15 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
       setIsLoadingDb(true);
       try {
         const apiProducts = await productService.getProducts();
-        if (!isMounted || !apiProducts || apiProducts.length === 0) return;
+        if (!isMounted || !apiProducts) return;
+        if (apiProducts.length === 0) {
+          // DB chưa có hàng hóa: hiện danh sách trống và xoá bản lưu cũ, không giữ hàng mẫu / hàng đã xoá
+          setGoods([]);
+          try {
+            localStorage.removeItem(STOCKFLOW_GOODS_STORAGE_KEY);
+          } catch {}
+          return;
+        }
 
         const dbItems: GoodsItem[] = apiProducts.map((p: any) => {
           let parsedUnits = p.units;
@@ -2257,8 +2266,10 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
         </div>
       )}
 
-      {/* 1. Header Toolbar Bar */}
-      <header className="min-h-12 bg-white/84 backdrop-blur-[2px] border-b border-slate-200 px-3 sm:px-4 py-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 shrink-0">
+      {/* 1. Header Toolbar Bar
+          relative z-[25]: cao hơn sidebar lọc và tiêu đề bảng (sticky z-20) để dropdown gợi ý tìm kiếm không bị đè,
+          nhưng thấp hơn thanh menu chính (Sidebar.tsx, z-30) để menu xổ xuống không bị header đè */}
+      <header className="relative z-[25] min-h-12 bg-white/84 backdrop-blur-[2px] border-b border-slate-200 px-3 sm:px-4 py-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 shrink-0">
         {/* Left: Title & Search bar */}
         <div className="flex items-center gap-4 flex-1 basis-[320px] min-w-[260px] max-w-xl">
           <h1 className="text-[20px] font-bold text-[#15171a] leading-7 tracking-tight whitespace-nowrap">

@@ -4,6 +4,7 @@
 import { apiClient } from '@/lib/api/client';
 import type {
   AdjustNormLine,
+  ApproveProductionOrderPayload,
   BomDetail,
   BomSummary,
   CreateFinishedGoodsReceiptPayload,
@@ -16,8 +17,6 @@ import type {
   ProductionProductLookup,
   RequirementPreview,
   SaveBomPayload,
-  SaveProductionOrderPayload,
-  WarehouseLocation,
 } from '../types';
 
 function qs(params: Record<string, string | number | boolean | undefined | null>): string {
@@ -93,20 +92,17 @@ export const productionService = {
     );
   },
 
-  createOrder(payload: SaveProductionOrderPayload): Promise<ProductionOrderDetail> {
-    return apiClient.post<ProductionOrderDetail>('/api/production/orders', payload);
-  },
-
-  updateOrder(id: number, payload: SaveProductionOrderPayload): Promise<ProductionOrderDetail> {
-    return apiClient.put<ProductionOrderDetail>(`/api/production/orders/${id}`, payload);
-  },
-
   cancelOrder(id: number): Promise<ProductionOrderDetail> {
     return apiClient.post<ProductionOrderDetail>(`/api/production/orders/${id}/cancel`, {});
   },
 
   closeOrder(id: number, reason: string): Promise<ProductionOrderDetail> {
     return apiClient.post<ProductionOrderDetail>(`/api/production/orders/${id}/close`, { reason });
+  },
+
+  /** Duyệt hoàn thành: tự sinh phiếu nhập thành phẩm theo SL thực tế và đóng lệnh */
+  approveOrder(id: number, payload: ApproveProductionOrderPayload): Promise<ProductionOrderDetail> {
+    return apiClient.post<ProductionOrderDetail>(`/api/production/orders/${id}/approve`, payload);
   },
 
   adjustNorms(id: number, reason: string, lines: AdjustNormLine[]): Promise<ProductionOrderDetail> {
@@ -187,6 +183,8 @@ export const productionService = {
     warehouseId?: number | null;
     activeBomOnly?: boolean;
     productType?: string;
+    /** Nhiều loại hàng (VD FINISHED, SEMI_FINISHED) */
+    productTypes?: string[];
     limit?: number;
   }): Promise<ProductionProductLookup[]> {
     return asList(
@@ -196,13 +194,15 @@ export const productionService = {
           warehouseId: params.warehouseId,
           activeBomOnly: params.activeBomOnly || undefined,
           productType: params.productType || undefined,
+          productTypes: params.productTypes?.length ? params.productTypes.join(',') : undefined,
           limit: params.limit,
         })}`
       )
     );
   },
 
-  async getLocations(warehouseId: number): Promise<WarehouseLocation[]> {
-    return asList(await apiClient.get<WarehouseLocation[]>(`/api/production/lookups/locations${qs({ warehouseId })}`));
+  /** Các giá trị "Vị trí" đang dùng trong danh mục Hàng hóa (chọn vị trí lưu kho khi Duyệt hoàn thành) */
+  async getLocations(): Promise<string[]> {
+    return asList(await apiClient.get<string[]>('/api/production/lookups/locations'));
   },
 };

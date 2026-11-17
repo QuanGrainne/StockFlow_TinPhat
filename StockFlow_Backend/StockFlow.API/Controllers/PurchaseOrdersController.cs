@@ -88,6 +88,19 @@ public class PurchaseOrdersController : ControllerBase
         return result.IsSuccess ? Ok(new { message = "Đã kết thúc phiếu đặt hàng nhập." }) : BadRequest(new { message = result.Error });
     }
 
+    /// <summary>
+    /// Nhập hàng ngay trong phiếu đặt: tự sinh phiếu nhập Hoàn thành (SL đạt vào kho, SL lỗi chỉ ghi nhận),
+    /// cộng tồn + giá vốn BQ gia quyền, công nợ NCC và cập nhật trạng thái phiếu đặt.
+    /// </summary>
+    [HttpPost("{id:int}/receive")]
+    [RequirePermission("PURCHASE_CREATE")]
+    [RequireFeature("feat-purchase-orders", "feat-purchase")]
+    public async Task<IActionResult> ReceivePurchaseOrder(int id, [FromBody] ReceivePurchaseOrderRequest request)
+    {
+        var result = await _mediator.Send(new ReceivePurchaseOrderCommand(id, request));
+        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { message = result.Error });
+    }
+
     [HttpPatch("{id:int}/notes")]
     [RequirePermission("PURCHASE_UPDATE")]
     [RequireFeature("feat-purchase-orders")]

@@ -6,9 +6,9 @@ import type { LucideIcon } from 'lucide-react';
 import {
   ArrowDownToLine,
   Building2,
+  CalendarRange,
   ClipboardCheck,
   ClipboardList,
-  ClipboardPlus,
   DollarSign,
   Factory,
   LayoutGrid,
@@ -189,7 +189,7 @@ export const NAV_GROUPS: NavGroup[] = [
     id: 'customers-group',
     label: 'Khách hàng',
     icon: Users,
-    single: true,
+    // Menu thả xuống: Khách hàng + Duyệt hạn mức (hạn mức công nợ là thông tin của khách hàng)
     items: [
       {
         screen: 'customers',
@@ -200,6 +200,16 @@ export const NAV_GROUPS: NavGroup[] = [
         icon: Users,
         backendModule: 'PARTNER',
         aliases: ['sales-customers', 'manager-customers', 'admin-customers'],
+      },
+      {
+        // Approval Inbox (UC-64): mặc định chỉ Kế toán trưởng / Admin. Quyền vẫn theo SALES_APPROVE.
+        screen: 'credit-approvals',
+        path: '/approvals',
+        featureId: 'feat-credit-approvals',
+        title: 'Duyệt hạn mức',
+        desc: 'Duyệt yêu cầu vượt hạn mức công nợ của khách hàng',
+        icon: ShieldCheck,
+        backendModule: 'SALES',
       },
     ],
   },
@@ -243,16 +253,6 @@ export const NAV_GROUPS: NavGroup[] = [
         title: 'Trả hàng',
         desc: 'Khách trả lại hàng đã mua',
         icon: RotateCcw,
-        backendModule: 'SALES',
-      },
-      {
-        // Approval Inbox (UC-64): mặc định chỉ Kế toán trưởng / Admin
-        screen: 'credit-approvals',
-        path: '/approvals',
-        featureId: 'feat-credit-approvals',
-        title: 'Duyệt yêu cầu',
-        desc: 'Duyệt yêu cầu vượt hạn mức công nợ',
-        icon: ShieldCheck,
         backendModule: 'SALES',
       },
     ],
@@ -308,6 +308,26 @@ export const NAV_GROUPS: NavGroup[] = [
     icon: Factory,
     items: [
       {
+        // UC-PP-01..06 (mã tạm): lập, gửi duyệt kế hoạch, lập lệnh từ kế hoạch (Manager + Kế toán sản xuất)
+        screen: 'production-plans',
+        path: '/production/plans',
+        featureId: 'feat-production-plans',
+        title: 'Kế hoạch sản xuất',
+        desc: 'Lập kế hoạch theo kỳ, nhu cầu NVL dự kiến, lập lệnh từ kế hoạch',
+        icon: CalendarRange,
+        backendModule: 'PROD',
+      },
+      {
+        // UC-PP-04, UC-PP-06: duyệt / từ chối, điều chỉnh sau duyệt, đóng kế hoạch (Manager)
+        screen: 'production-plan-approvals',
+        path: '/production/plan-approvals',
+        featureId: 'feat-production-plan-approval',
+        title: 'Duyệt kế hoạch sản xuất',
+        desc: 'Duyệt / từ chối kế hoạch chờ duyệt, điều chỉnh và đóng kế hoạch',
+        icon: ClipboardCheck,
+        backendModule: 'PROD',
+      },
+      {
         // UC-44 / UC-58–61: xem lệnh, NVL, thành phẩm (Manager + Kế toán sản xuất)
         screen: 'production-orders',
         path: '/production',
@@ -315,16 +335,6 @@ export const NAV_GROUPS: NavGroup[] = [
         title: 'Lệnh sản xuất',
         desc: 'Theo dõi lệnh, nhu cầu NVL và tiến độ nhập thành phẩm',
         icon: Layers,
-        backendModule: 'PROD',
-      },
-      {
-        // UC-59 / BR-51: lập, sửa, hủy, đóng lệnh, điều chỉnh định mức (Manager)
-        screen: 'production-create',
-        path: '/production/create',
-        featureId: 'feat-prod-plan',
-        title: 'Lập lệnh sản xuất',
-        desc: 'Lập lệnh từ BOM đang áp dụng, điều hành lệnh',
-        icon: ClipboardPlus,
         backendModule: 'PROD',
       },
       {
