@@ -45,6 +45,8 @@ services:
       # Ghi đè appsettings.json (dấu "__" = dấu ":" trong appsettings)
       ConnectionStrings__StockFlowDb: Host=db;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD};SearchPath=stockflow,public
       Jwt__SecretKey: ${JWT_SECRET_KEY:?đặt JWT_SECRET_KEY trong deploy/.env (ít nhất 32 ký tự)}
+      # false = không tạo lại nhân viên / kho mẫu khi API khởi động (chỉ giữ admin)
+      Seed__DemoData: ${SEED_DEMO_DATA:-true}
       Logging__LogLevel__Microsoft.EntityFrameworkCore.Database.Command: Warning
     healthcheck:
       # Image ASP.NET không có curl: gọi GET /api/health bằng bash /dev/tcp
