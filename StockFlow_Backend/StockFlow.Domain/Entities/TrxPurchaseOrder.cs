@@ -19,6 +19,9 @@ public partial class TrxPurchaseOrder
 
     public DateTime? OrderDate { get; set; }
 
+    /// <summary>Ngày hàng dự kiến về kho (dùng cho MRP / theo dõi tiến độ giao).</summary>
+    public DateOnly? ExpectedDate { get; set; }
+
     public decimal DiscountAmount { get; set; }
 
     public decimal TotalAmount { get; set; }
