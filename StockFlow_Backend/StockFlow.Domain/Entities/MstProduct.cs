@@ -33,6 +33,9 @@ public partial class MstProduct
 
     public decimal? MaxSafeStock { get; set; }
 
+    /// <summary>Số ngày từ lúc đặt tới lúc hàng vào kho (dùng cho MRP). Rỗng = chưa khai báo.</summary>
+    public int? LeadTimeDays { get; set; }
+
     public decimal? Weight { get; set; }
 
     public string? Dimensions { get; set; }

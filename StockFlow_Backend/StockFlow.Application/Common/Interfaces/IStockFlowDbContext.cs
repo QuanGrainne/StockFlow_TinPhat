@@ -60,6 +60,10 @@ public interface IStockFlowDbContext
     DbSet<MstInventoryLot> MstInventoryLots { get; }
     DbSet<MstWarehouseLocation> MstWarehouseLocations { get; }
 
+    // MRP: lần chạy và dòng chi tiết kết quả hoạch định NVL
+    DbSet<TrxMrpRun> TrxMrpRuns { get; }
+    DbSet<DtlMrpRunLine> DtlMrpRunLines { get; }
+
     Task<long> GetNextSequenceValueAsync(string sequenceName, CancellationToken cancellationToken = default);
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 
