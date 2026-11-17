@@ -2,11 +2,12 @@
 #   /api/*   → api:8080 (ASP.NET Core)
 #   còn lại  → web:3000 (Next.js)
 # Web và API cùng một địa chỉ nên trình duyệt không cần CORS.
-{
-	auto_https off
-}
-
-:80 {
+#
+# SITE_ADDRESS (deploy/.env):
+#   bỏ trống  → ":80", chỉ HTTP (chạy trên máy, http://localhost:8080)
+#   tên miền  → vd "stockflow.tenmien.vn": Caddy tự lấy chứng chỉ HTTPS (Let's Encrypt)
+#               và chuyển HTTP sang HTTPS. Cần bản ghi DNS A trỏ về IP VPS, mở cổng 80 + 443.
+{$SITE_ADDRESS::80} {
 	encode zstd gzip
 
 	header {
