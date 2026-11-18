@@ -41,6 +41,8 @@ export interface GoodsItem {
   availableQuantity: number;
   minSafeStock: number;
   maxSafeStock: number;
+  /** MRP: thời gian giao (ngày); null = chưa khai báo */
+  leadTimeDays?: number | null;
   standardPrice: number;
   costPrice: number;
   barcode: string;
