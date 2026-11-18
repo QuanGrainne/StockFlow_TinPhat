@@ -16,6 +16,7 @@ import { fmtDateOnly } from '../utils/productionPlanFormat';
 import { ProductionPlanStatusTag } from './ProductionPlanStatusTag';
 import { ProductionStatusTag, ProgressBar, SmallTag } from './ProductionStatusTag';
 import { PlanMaterialRequirementsPanel } from './PlanMaterialRequirementsPanel';
+import { ProductionDocLink } from './ProductionDocLink';
 
 type Tab = 'info' | 'materials' | 'orders';
 
@@ -181,8 +182,8 @@ export function ProductionPlanDetailPanel({
               <span className="text-sm font-semibold">{s.planName}</span>
               <ProductionPlanStatusTag status={s.status} />
               {missingBom.length > 0 && (
-                <SmallTag tone="amber" title="Cần thiết lập BOM trước khi gửi duyệt (BR-PP-09)">
-                  {missingBom.length} thành phẩm chưa có BOM
+                <SmallTag tone="amber" title="Cần thiết lập định mức trước khi gửi duyệt (BR-PP-09)">
+                  {missingBom.length} thành phẩm chưa có định mức
                 </SmallTag>
               )}
             </div>
@@ -270,7 +271,7 @@ export function ProductionPlanDetailPanel({
                     </td>
                     <td className="py-1.5 px-3">
                       <div className="font-medium">{it.productName}</div>
-                      {!it.hasActiveBom && <div className="text-[11px] text-[#d97706]">Chưa có BOM đang áp dụng</div>}
+                      {!it.hasActiveBom && <div className="text-[11px] text-[#d97706]">Chưa có định mức đang áp dụng</div>}
                       {it.notes && <div className="text-[11px] text-[#677484]">{it.notes}</div>}
                     </td>
                     <td className="py-1.5 px-3 text-center text-slate-500">{it.unitName}</td>
@@ -330,7 +331,10 @@ export function ProductionPlanDetailPanel({
               ) : (
                 detail.orders.map((o) => (
                   <tr key={o.productionOrderId}>
-                    <td className="py-1.5 px-3 font-mono font-semibold text-[#0070f4]">{o.productionOrderCode}</td>
+                    <td className="py-1.5 px-3">
+                      {/* Không truyền ngày: màn Lệnh sản xuất lọc theo ngày lập, khác ngày bắt đầu của lệnh */}
+                      <ProductionDocLink kind="order" code={o.productionOrderCode} id={o.productionOrderId} />
+                    </td>
                     <td className="py-1.5 px-3 whitespace-nowrap">{fmtDateTime(o.startDate)}</td>
                     <td className="py-1.5 px-3">
                       {o.items.map((i) => (

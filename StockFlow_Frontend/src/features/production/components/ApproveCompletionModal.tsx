@@ -214,8 +214,8 @@ export function ApproveCompletionModal({ detail, onClose, onDone }: ApproveCompl
       >
         <div className="space-y-4">
           <p className="text-xs text-[#677484] leading-relaxed">
-            Nhập số lượng <b>thực tế</b> sản xuất được. Hệ thống tự sinh phiếu nhập thành phẩm (chỉ SL đạt vào tồn kho, giá vốn theo NVL đã
-            xuất). Nhập <b>đủ kế hoạch</b> thì lệnh chuyển sang <b>Hoàn thành</b>; chưa đủ thì lệnh vẫn <b>Đang sản xuất</b> để duyệt nhập tiếp
+            Nhập số lượng <b>thực tế</b> sản xuất được. Hệ thống tự sinh phiếu nhập thành phẩm (chỉ SL đạt vào tồn kho, giữ nguyên giá vốn
+            hiện có của thành phẩm). Nhập <b>đủ kế hoạch</b> thì lệnh chuyển sang <b>Hoàn thành</b>; chưa đủ thì lệnh vẫn <b>Đang sản xuất</b> để duyệt nhập tiếp
             (muốn kết thúc sớm dùng &quot;Đóng lệnh&quot;). Chỉ duyệt được tối đa số thành phẩm làm được từ <b>NVL đã xuất</b> (cột
             &quot;Tối đa duyệt&quot;, tính cả SL lỗi); muốn duyệt thêm thì Xuất bổ sung NVL trước.
           </p>
@@ -430,7 +430,7 @@ export function ApproveCompletionModal({ detail, onClose, onDone }: ApproveCompl
           <div className="flex items-start gap-2.5 mb-3 text-xs">
             <AlertTriangle size={16} className="text-amber-500 shrink-0 mt-0.5" />
             <span>
-              Số thành phẩm thực tế cần nhiều nguyên vật liệu hơn số đã xuất theo BOM. Vui lòng nhập ghi chú để tiếp tục; phiếu nhập sinh ra
+              Số thành phẩm thực tế cần nhiều nguyên vật liệu hơn số đã xuất theo định mức. Vui lòng nhập ghi chú để tiếp tục; phiếu nhập sinh ra
               sẽ được gắn cờ cần xem xét.
             </span>
           </div>

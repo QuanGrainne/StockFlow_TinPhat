@@ -237,7 +237,7 @@ export function ProductionPlanFormModal({ detail, onClose, onSaved }: Production
         <div className="mb-3 flex items-start gap-2 px-3 py-2 rounded-[8px] border border-[#0070f4]/25 bg-[#e6f1fe] text-xs text-[#1e3a8a]">
           <AlertTriangle size={14} className="shrink-0 mt-0.5 text-[#0070f4]" />
           <span>
-            Kế hoạch đã duyệt: chỉ sửa được số lượng (không thấp hơn số đã lập lệnh), ngày, kho nhận, ghi chú và thêm thành phẩm có BOM.
+            Kế hoạch đã duyệt: chỉ sửa được số lượng (không thấp hơn số đã lập lệnh), ngày, kho nhận, ghi chú và thêm thành phẩm có định mức.
             Không đổi tên, kỳ kế hoạch; không xóa dòng đã có lệnh.
           </span>
         </div>
@@ -390,7 +390,7 @@ export function ProductionPlanFormModal({ detail, onClose, onSaved }: Production
                         </div>
                         {!l.hasActiveBom && (
                           <div className="mt-0.5 text-[11px] text-[#d97706] flex items-center gap-1">
-                            <AlertTriangle size={11} /> Chưa có BOM đang áp dụng
+                            <AlertTriangle size={11} /> Chưa có định mức đang áp dụng
                           </div>
                         )}
                       </td>
@@ -478,7 +478,7 @@ export function ProductionPlanFormModal({ detail, onClose, onSaved }: Production
       </div>
       {missingBom.length > 0 && !limited && (
         <p className="mb-3 text-[11px] text-[#d97706]">
-          {missingBom.length} thành phẩm chưa có BOM đang áp dụng: vẫn lưu nháp được, nhưng phải thiết lập BOM trước khi gửi duyệt.
+          {missingBom.length} thành phẩm chưa có định mức đang áp dụng: vẫn lưu nháp được, nhưng phải thiết lập định mức trước khi gửi duyệt.
         </p>
       )}
 

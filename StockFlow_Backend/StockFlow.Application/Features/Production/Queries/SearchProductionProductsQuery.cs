@@ -63,6 +63,7 @@ public class SearchProductionProductsQueryHandler
                 Unit = p.BaseUnit.UnitName ?? "",
                 p.ProductType,
                 HasBom = p.MstBoms.Any(b => b.IsActive == true),
+                p.ImageUrl,
             })
             .ToListAsync(ct);
 
@@ -75,6 +76,7 @@ public class SearchProductionProductsQueryHandler
 
         return Result.Success(rows.Select(r => new ProductionProductLookupDto(
             r.ProductId, r.Code, r.Name, r.Unit, r.ProductType, r.HasBom,
-            available != null ? available.GetValueOrDefault(r.ProductId) : null)).ToList());
+            available != null ? available.GetValueOrDefault(r.ProductId) : null,
+            string.IsNullOrWhiteSpace(r.ImageUrl) ? null : r.ImageUrl)).ToList());
     }
 }

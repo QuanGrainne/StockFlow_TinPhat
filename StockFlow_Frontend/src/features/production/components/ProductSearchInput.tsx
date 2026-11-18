@@ -1,11 +1,12 @@
 'use client';
 
 // Ô tìm mặt hàng cho form BOM / lập lệnh / kế hoạch sản xuất (API tra cứu riêng của Sản xuất, không trả giá — BR-39).
-// variant="catalog": giống ô tìm của màn Hàng hóa — chỉ hiện gợi ý khi đã gõ, dòng 2 tầng (tên + ĐVT / mã • tồn),
-// không có nhãn loại hàng, chọn bằng phím ↑ ↓ Enter.
+// variant="catalog": giống ô tìm của màn Hàng hóa — chỉ hiện gợi ý khi đã gõ, có ảnh, dòng 2 tầng (tên + ĐVT / mã • tồn),
+// không có nhãn loại hàng, không có ô "hiện cả thành phẩm", chọn bằng phím ↑ ↓ Enter.
 
 import React, { useEffect, useRef, useState } from 'react';
 import { Search } from 'lucide-react';
+import { ProductThumb } from '@/components/ProductThumb';
 import { productionService } from '../services/productionService';
 import type { ProductionProductLookup } from '../types';
 import { fmtQty } from '../utils/productionFormat';
@@ -164,7 +165,7 @@ export function ProductSearchInput({
           }`}
           style={catalog && anchor ? { top: anchor.top, left: anchor.left, width: anchor.width } : undefined}
         >
-          {productType === 'RAW_MATERIAL' && (
+          {productType === 'RAW_MATERIAL' && !catalog && (
             <label className="px-2.5 py-1.5 bg-slate-50 flex items-center justify-between text-[11px] text-[#677484] cursor-pointer select-none">
               <span>Mặc định lọc Nguyên vật liệu</span>
               <span className="inline-flex items-center gap-1.5 font-medium text-slate-700">
@@ -183,39 +184,42 @@ export function ProductSearchInput({
           ) : items.length === 0 ? (
             <div className="p-4 text-center text-[#677484]">
               {activeBomOnly
-                ? 'Không có thành phẩm có BOM đang áp dụng phù hợp'
+                ? 'Không có thành phẩm có định mức đang áp dụng phù hợp'
                 : catalog
                   ? <>Không tìm thấy hàng hóa phù hợp với &quot;{text.trim()}&quot;</>
                   : 'Không tìm thấy hàng hóa phù hợp'}
             </div>
           ) : catalog ? (
-            // Giống gợi ý ô tìm của màn Hàng hóa: tên + ĐVT, dòng dưới mã • tồn (không nhãn loại hàng)
+            // Giống gợi ý ô tìm của màn Hàng hóa: ảnh, tên + đơn vị, dòng dưới mã • tồn (không nhãn loại hàng)
             items.map((p, idx) => (
               <button
                 type="button"
                 key={p.productId}
                 onMouseEnter={() => setActiveIdx(idx)}
                 onClick={() => pick(p)}
-                className={`w-full text-left px-3 py-2 cursor-pointer transition ${idx === activeIdx ? 'bg-[#eff6ff]' : 'bg-white'}`}
+                className={`w-full text-left px-3 py-2 flex items-center gap-2.5 cursor-pointer transition ${idx === activeIdx ? 'bg-[#eff6ff]' : 'bg-white'}`}
               >
-                <div className="text-[13px] font-bold text-[#15171a] truncate">
-                  {p.productName} <span className="font-medium text-[#0070f4]">{p.unitName}</span>
-                </div>
-                <div className="text-[12px] text-[#677484] truncate">
-                  {p.productCode}
-                  {p.availableQty !== null && (
-                    <>
-                      <span className="mx-1">•</span>
-                      Tồn:{' '}
-                      <span className={p.availableQty > 0 ? 'text-[#00b63e] font-semibold' : ''}>{fmtQty(p.availableQty)}</span>
-                    </>
-                  )}
-                  {p.hasActiveBom && (
-                    <>
-                      <span className="mx-1">•</span>
-                      <span className="text-[#16a34a]">Có BOM</span>
-                    </>
-                  )}
+                <ProductThumb src={p.imageUrl} alt={p.productName} size={36} />
+                <div className="min-w-0 flex-1">
+                  <div className="text-[13px] font-bold text-[#15171a] truncate">
+                    {p.productName} <span className="font-medium text-[#0070f4]">{p.unitName}</span>
+                  </div>
+                  <div className="text-[12px] text-[#677484] truncate">
+                    {p.productCode}
+                    {p.availableQty !== null && (
+                      <>
+                        <span className="mx-1">•</span>
+                        Tồn:{' '}
+                        <span className={p.availableQty > 0 ? 'text-[#00b63e] font-semibold' : ''}>{fmtQty(p.availableQty)}</span>
+                      </>
+                    )}
+                    {p.hasActiveBom && (
+                      <>
+                        <span className="mx-1">•</span>
+                        <span>Đã có định mức</span>
+                      </>
+                    )}
+                  </div>
                 </div>
               </button>
             ))
@@ -244,7 +248,7 @@ export function ProductSearchInput({
                     Tồn: {fmtQty(p.availableQty)}
                   </span>
                 ) : (
-                  p.hasActiveBom && <span className="text-[10px] text-[#16a34a] shrink-0">Có BOM</span>
+                  p.hasActiveBom && <span className="text-[10px] text-[#16a34a] shrink-0">Có định mức</span>
                 )}
               </button>
             ))

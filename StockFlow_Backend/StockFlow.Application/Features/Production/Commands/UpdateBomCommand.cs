@@ -19,7 +19,7 @@ public class UpdateBomCommandValidator : AbstractValidator<UpdateBomCommand>
     public UpdateBomCommandValidator()
     {
         RuleFor(x => x.Request.ProductId).GreaterThan(0).WithMessage("Vui lòng chọn thành phẩm.");
-        RuleFor(x => x.Request.BomCode).MaximumLength(100).WithMessage("Mã BOM tối đa 100 ký tự.");
+        RuleFor(x => x.Request.BomCode).MaximumLength(100).WithMessage("Mã định mức tối đa 100 ký tự.");
         RuleFor(x => x.Request.Version).MaximumLength(20).WithMessage("Phiên bản tối đa 20 ký tự.");
         RuleFor(x => x.Request.Description).MaximumLength(500).WithMessage("Ghi chú kỹ thuật tối đa 500 ký tự.");
     }
@@ -44,20 +44,20 @@ public class UpdateBomCommandHandler : IRequestHandler<UpdateBomCommand, Result<
 
         if (await BomRules.IsUsedAsync(_context, bom.BomId, ct))
             return Result.Failure<BomDetailDto>(
-                "BOM đã được dùng cho lệnh sản xuất nên không sửa được. Vui lòng tạo phiên bản mới.");
+                "Định mức đã được dùng cho lệnh sản xuất nên không sửa được. Vui lòng tạo phiên bản mới.");
 
         var (error, product, lines) = await BomRules.ValidateAsync(_context, req, ct);
         if (error != null) return Result.Failure<BomDetailDto>(error);
 
         var version = string.IsNullOrWhiteSpace(req.Version) ? bom.Version ?? "1" : req.Version.Trim();
         if (await _context.MstBoms.AnyAsync(b => b.BomId != bom.BomId && b.ProductId == req.ProductId && b.Version == version, ct))
-            return Result.Failure<BomDetailDto>($"Thành phẩm đã có BOM phiên bản {version}.");
+            return Result.Failure<BomDetailDto>($"Thành phẩm đã có định mức phiên bản {version}.");
 
         var code = string.IsNullOrWhiteSpace(req.BomCode)
             ? $"BOM-{product!.ProductCode}-V{version}".ToUpperInvariant()
             : req.BomCode.Trim();
         if (await _context.MstBoms.AnyAsync(b => b.BomId != bom.BomId && b.BomName == code, ct))
-            return Result.Failure<BomDetailDto>($"Mã BOM {code} đã tồn tại trong hệ thống.");
+            return Result.Failure<BomDetailDto>($"Mã định mức {code} đã tồn tại trong hệ thống.");
 
         await using var tx = await _context.BeginTransactionAsync(ct);
 

@@ -1078,7 +1078,7 @@ export default function PurchasesScreen({ onNavigate }: { onNavigate?: (screen: 
                                     ['info', 'Thông tin'],
                                     ['payments', 'Lịch sử thanh toán'],
                                     ['returns', 'Lịch sử trả hàng'],
-                                    ['costing', 'Giá vốn BQ'],
+                                    ['costing', 'Giá vốn bình quân'],
                                   ] as const).map(([key, label]) => (
                                     <button
                                       key={key}

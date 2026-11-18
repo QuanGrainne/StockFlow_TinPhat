@@ -61,7 +61,7 @@ export function PlanMaterialRequirementsPanel({
   return (
     <div>
       <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-        <div className="text-xs font-semibold text-[#15171a]">Nhu cầu nguyên vật liệu dự kiến (theo BOM đang áp dụng)</div>
+        <div className="text-xs font-semibold text-[#15171a]">Nhu cầu nguyên vật liệu dự kiến (theo định mức đang áp dụng)</div>
         <div className="flex flex-wrap items-center gap-3 text-xs text-[#677484]">
           {showRemainingToggle && (
             <label className="flex items-center gap-1.5 cursor-pointer">
@@ -99,8 +99,8 @@ export function PlanMaterialRequirementsPanel({
         <div className="mb-2 flex items-start gap-2 px-3 py-2 rounded-[8px] border border-[#fde68a] bg-[#fffbeb] text-xs text-[#92400e]">
           <AlertTriangle size={14} className="shrink-0 mt-0.5 text-[#d97706]" />
           <span>
-            Chưa có BOM đang áp dụng, không tính vào nhu cầu:{' '}
-            <b>{data.productsWithoutBom.map((p) => p.productCode).join(', ')}</b>. Cần thiết lập BOM trước khi gửi duyệt.
+            Chưa có định mức đang áp dụng, không tính vào nhu cầu:{' '}
+            <b>{data.productsWithoutBom.map((p) => p.productCode).join(', ')}</b>. Cần thiết lập định mức trước khi gửi duyệt.
           </span>
         </div>
       )}
@@ -136,7 +136,7 @@ export function PlanMaterialRequirementsPanel({
             ) : data.materials.length === 0 ? (
               <tr>
                 <td colSpan={7} className="py-6 text-center text-slate-400">
-                  Chưa có nguyên vật liệu nào (chưa có thành phẩm có BOM đang áp dụng)
+                  Chưa có nguyên vật liệu nào (chưa có thành phẩm có định mức đang áp dụng)
                 </td>
               </tr>
             ) : (
