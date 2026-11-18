@@ -8,3 +8,5 @@
 # Cấu hình riêng từng máy (mật khẩu DB, khoá JWT) không được đóng vào image
 **/appsettings.Development.json
 **/Properties/launchSettings.json
+# Ảnh hàng hóa lưu ở máy dev không đóng vào image (bản Docker dùng volume "uploads")
+**/uploads/

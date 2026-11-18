@@ -2237,14 +2237,15 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
     showToast(`Đã xuất thành công tệp ${result.fileName}`);
   };
 
-  const handleImportSuccess = (importedCount: number, fileName: string, newGoods: GoodsItem[]) => {
+  const handleImportSuccess = (importedCount: number, fileName: string, newGoods: GoodsItem[], serverMessage?: string) => {
     setGoods(newGoods);
     try {
       localStorage.setItem(STOCKFLOW_GOODS_STORAGE_KEY, JSON.stringify(newGoods));
     } catch {}
     setLastExportedFile({ fileName: fileName, workbook: null });
     setIsExportDockOpen(true);
-    showToast(`Nhập dữ liệu thành công! Đã xử lý ${importedCount} mặt hàng từ file.`);
+    // Thông báo của máy chủ cho biết cả số ảnh không tải được (nếu có)
+    showToast(serverMessage || `Nhập dữ liệu thành công! Đã xử lý ${importedCount} mặt hàng từ file.`);
   };
 
   // Quick tag suggestions for attribute modal

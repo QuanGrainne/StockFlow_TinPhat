@@ -14,13 +14,16 @@ public class CreateProductCommandHandler : IRequestHandler<CreateProductCommand,
 {
     private readonly IStockFlowDbContext _context;
     private readonly ICurrentUserService _currentUserService;
+    private readonly IImageStorage _imageStorage;
 
     public CreateProductCommandHandler(
         IStockFlowDbContext context,
-        ICurrentUserService currentUserService)
+        ICurrentUserService currentUserService,
+        IImageStorage imageStorage)
     {
         _context = context;
         _currentUserService = currentUserService;
+        _imageStorage = imageStorage;
     }
 
     public async Task<Result<ProductDto>> Handle(CreateProductCommand command, CancellationToken cancellationToken)
@@ -71,6 +74,13 @@ public class CreateProductCommandHandler : IRequestHandler<CreateProductCommand,
         if (string.IsNullOrWhiteSpace(req.Name))
         {
             return Result.Failure<ProductDto>("Tên hàng hóa không được để trống.");
+        }
+
+        // Lưu ảnh thành file trên máy chủ trước khi ghi DB (ảnh không hợp lệ thì dừng, chưa ghi gì)
+        var image = await _imageStorage.StoreAsync(req.ImageUrl, cancellationToken);
+        if (image.Rejected)
+        {
+            return Result.Failure<ProductDto>(image.Error!);
         }
 
         // 1. Resolve Category
@@ -161,7 +171,7 @@ public class CreateProductCommandHandler : IRequestHandler<CreateProductCommand,
             LocationName = req.LocationName?.Trim(),
             IsDirectSale = req.IsDirectSale ?? true,
             HasRewardPoints = req.HasRewardPoints ?? true,
-            ImageUrl = req.ImageUrl?.Trim(),
+            ImageUrl = string.IsNullOrEmpty(image.Url) ? null : image.Url,
             VariantsJson = variantsJson,
             IsActive = true,
             CreatedAt = req.CreatedAt ?? DateTime.UtcNow

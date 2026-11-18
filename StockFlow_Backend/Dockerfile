@@ -23,6 +23,9 @@ ENV ASPNETCORE_URLS=http://+:8080 \
     ASPNETCORE_ENVIRONMENT=Docker \
     DOTNET_RUNNING_IN_CONTAINER=true
 COPY --from=build --chown=app:app /app/publish ./
+# Thư mục ảnh hàng hóa (gắn volume "uploads" trong compose). Tạo sẵn và giao cho user app
+# để volume mới tạo nhận đúng quyền ghi.
+RUN mkdir -p /app/uploads && chown app:app /app/uploads
 USER app
 EXPOSE 8080
 ENTRYPOINT ["dotnet", "StockFlow.API.dll"]

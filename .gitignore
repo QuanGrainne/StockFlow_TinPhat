@@ -69,3 +69,6 @@ graphify-out/
 
 # Claude Code per-machine settings
 .claude/settings.local.json
+
+# Ảnh hàng hóa lưu khi chạy API ở máy dev (Storage:UploadsPath mặc định)
+StockFlow_Backend/StockFlow.API/uploads/
