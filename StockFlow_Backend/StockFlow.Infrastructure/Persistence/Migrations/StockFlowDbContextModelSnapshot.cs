@@ -249,6 +249,76 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                     b.ToTable("dtl_inventory_disposal_items", "stockflow");
                 });
 
+            modelBuilder.Entity("StockFlow.Domain.Entities.DtlMrpRunDemand", b =>
+                {
+                    b.Property<int>("MrpRunDemandId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("mrp_run_demand_id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("MrpRunDemandId"));
+
+                    b.Property<decimal>("AllocatedQty")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("allocated_qty");
+
+                    b.Property<int>("MaterialId")
+                        .HasColumnType("integer")
+                        .HasColumnName("material_id");
+
+                    b.Property<int>("MrpRunId")
+                        .HasColumnType("integer")
+                        .HasColumnName("mrp_run_id");
+
+                    b.Property<DateOnly>("NeedDate")
+                        .HasColumnType("date")
+                        .HasColumnName("need_date");
+
+                    b.Property<int>("ProductId")
+                        .HasColumnType("integer")
+                        .HasColumnName("product_id");
+
+                    b.Property<int?>("ProductionOrderId")
+                        .HasColumnType("integer")
+                        .HasColumnName("production_order_id");
+
+                    b.Property<int?>("ProductionPlanId")
+                        .HasColumnType("integer")
+                        .HasColumnName("production_plan_id");
+
+                    b.Property<decimal>("RequiredQty")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("required_qty");
+
+                    b.Property<decimal>("ShortageQty")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("shortage_qty");
+
+                    b.Property<string>("SourceType")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("source_type");
+
+                    b.HasKey("MrpRunDemandId")
+                        .HasName("dtl_mrp_run_demands_pkey");
+
+                    b.HasIndex(new[] { "MaterialId" }, "ix_dtl_mrp_run_demands_material_id");
+
+                    b.HasIndex(new[] { "ProductId" }, "ix_dtl_mrp_run_demands_product_id");
+
+                    b.HasIndex(new[] { "ProductionOrderId" }, "ix_dtl_mrp_run_demands_production_order_id");
+
+                    b.HasIndex(new[] { "ProductionPlanId" }, "ix_dtl_mrp_run_demands_production_plan_id");
+
+                    b.HasIndex(new[] { "MrpRunId", "MaterialId" }, "ix_dtl_mrp_run_demands_run_material");
+
+                    b.ToTable("dtl_mrp_run_demands", "stockflow");
+                });
+
             modelBuilder.Entity("StockFlow.Domain.Entities.DtlMrpRunLine", b =>
                 {
                     b.Property<int>("MrpRunLineId")
@@ -3652,6 +3722,48 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                     b.Navigation("Product");
                 });
 
+            modelBuilder.Entity("StockFlow.Domain.Entities.DtlMrpRunDemand", b =>
+                {
+                    b.HasOne("StockFlow.Domain.Entities.MstProduct", "Material")
+                        .WithMany()
+                        .HasForeignKey("MaterialId")
+                        .IsRequired()
+                        .HasConstraintName("fk_dtl_mrp_run_demands_material_id");
+
+                    b.HasOne("StockFlow.Domain.Entities.TrxMrpRun", "MrpRun")
+                        .WithMany("DtlMrpRunDemands")
+                        .HasForeignKey("MrpRunId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_dtl_mrp_run_demands_mrp_run_id");
+
+                    b.HasOne("StockFlow.Domain.Entities.MstProduct", "Product")
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .IsRequired()
+                        .HasConstraintName("fk_dtl_mrp_run_demands_product_id");
+
+                    b.HasOne("StockFlow.Domain.Entities.TrxProductionOrder", "ProductionOrder")
+                        .WithMany()
+                        .HasForeignKey("ProductionOrderId")
+                        .HasConstraintName("fk_dtl_mrp_run_demands_production_order_id");
+
+                    b.HasOne("StockFlow.Domain.Entities.TrxProductionPlan", "ProductionPlan")
+                        .WithMany()
+                        .HasForeignKey("ProductionPlanId")
+                        .HasConstraintName("fk_dtl_mrp_run_demands_production_plan_id");
+
+                    b.Navigation("Material");
+
+                    b.Navigation("MrpRun");
+
+                    b.Navigation("Product");
+
+                    b.Navigation("ProductionOrder");
+
+                    b.Navigation("ProductionPlan");
+                });
+
             modelBuilder.Entity("StockFlow.Domain.Entities.DtlMrpRunLine", b =>
                 {
                     b.HasOne("StockFlow.Domain.Entities.MstProduct", "Material")
@@ -5055,6 +5167,8 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("StockFlow.Domain.Entities.TrxMrpRun", b =>
                 {
+                    b.Navigation("DtlMrpRunDemands");
+
                     b.Navigation("DtlMrpRunLines");
                 });
 

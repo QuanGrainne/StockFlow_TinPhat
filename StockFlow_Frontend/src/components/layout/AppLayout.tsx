@@ -30,6 +30,7 @@ import ProductionOrdersScreen from '@/features/production/screens/ProductionOrde
 import MaterialIssuesScreen from '@/features/production/screens/MaterialIssuesScreen';
 import FinishedGoodsReceiptsScreen from '@/features/production/screens/FinishedGoodsReceiptsScreen';
 import ProductionPlansScreen from '@/features/production/screens/ProductionPlansScreen';
+import { MrpScreen } from '@/features/production/screens/MrpScreen';
 
 // Admin Screens
 import { AdminDashboard } from '@/features/admin/screens/AdminDashboard';
@@ -169,6 +170,8 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ initialScreen, children })
         return <ProductionPlansScreen key="plans" mode="plans" />;
       case 'production-plan-approvals':
         return <ProductionPlansScreen key="approvals" mode="approvals" />;
+      case 'production-mrp':
+        return <MrpScreen />;
 
       // ─── Admin Screens ───
       case 'admin-dashboard':

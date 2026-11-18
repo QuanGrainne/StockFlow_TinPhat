@@ -32,6 +32,13 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
+// Thư mục lưu file ảnh hàng hóa. Docker đặt Storage__UploadsPath=/app/uploads (volume "uploads");
+// chạy dev không cấu hình thì dùng StockFlow.API/uploads (đã có trong .gitignore).
+if (string.IsNullOrWhiteSpace(builder.Configuration["Storage:UploadsPath"]))
+{
+    builder.Configuration["Storage:UploadsPath"] = Path.Combine(builder.Environment.ContentRootPath, "uploads");
+}
+
 // Layer registrations
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
@@ -90,6 +97,23 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseMiddleware<StockFlow.API.Middleware.ExceptionHandlingMiddleware>();
+
+// Phục vụ file ảnh hàng hóa ở /api/uploads/... Đặt TRƯỚC UseAuthentication/UseAuthorization để ảnh
+// xem được không cần đăng nhập (thẻ <img> không gửi token). Chỉ phục vụ file có thật, không liệt kê thư mục.
+var uploadsPath = app.Configuration["Storage:UploadsPath"]!;
+Directory.CreateDirectory(uploadsPath);
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(uploadsPath),
+    RequestPath = StockFlow.Application.Common.Interfaces.IImageStorage.PublicPathPrefix,
+    OnPrepareResponse = ctx =>
+    {
+        // Tên file là GUID, không bao giờ bị ghi đè → cho trình duyệt lưu đệm lâu
+        ctx.Context.Response.Headers.CacheControl = "public,max-age=31536000,immutable";
+        ctx.Context.Response.Headers.XContentTypeOptions = "nosniff";
+    }
+});
+
 app.UseCors("AllowFrontend");
 if (!app.Environment.IsDevelopment())
 {

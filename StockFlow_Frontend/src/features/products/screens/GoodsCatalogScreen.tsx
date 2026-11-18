@@ -374,6 +374,8 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
   const [formStockQuantity, setFormStockQuantity] = useState<number | string>(0);
   const [formMinSafe, setFormMinSafe] = useState<number | string>(0);
   const [formMaxSafe, setFormMaxSafe] = useState<number | string>(999999999);
+  // MRP: thời gian giao (ngày lịch từ lúc đặt tới lúc hàng vào kho); '' = chưa khai báo
+  const [formLeadTime, setFormLeadTime] = useState<number | ''>('');
   const [formHasRewardPoints, setFormHasRewardPoints] = useState(true);
   const [formIsDirectSale, setFormIsDirectSale] = useState(true);
   const [formLocation, setFormLocation] = useState('');
@@ -556,6 +558,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
             availableQuantity: Number(p.stockQuantity) || 0,
             minSafeStock: Number(p.minSafeStock ?? p.reorderPoint) || 0,
             maxSafeStock: Number(p.maxSafeStock) || 999999999,
+            leadTimeDays: typeof p.leadTimeDays === 'number' ? p.leadTimeDays : null,
             standardPrice: Number(p.standardPrice) || 0,
             costPrice: Number(p.costPrice) || 0,
             barcode: p.barcode || '',
@@ -1075,6 +1078,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
     setFormStockQuantity(0);
     setFormMinSafe(0);
     setFormMaxSafe(999999999);
+    setFormLeadTime('');
     setFormHasRewardPoints(true);
     setFormIsDirectSale(true);
     setFormLocation('');
@@ -1158,6 +1162,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
 
     setFormMinSafe(branchMinSafe);
     setFormMaxSafe(branchMaxSafe);
+    setFormLeadTime(item.leadTimeDays ?? '');
     setFormHasRewardPoints(item.hasRewardPoints ?? true);
     setFormIsDirectSale(item.isDirectSale ?? true);
     setFormLocation(item.locationName || '');
@@ -1524,6 +1529,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
             : editingItem.minSafeStock)
         : numEnteredMinSafe,
       maxSafeStock: numEnteredMaxSafe,
+      leadTimeDays: formLeadTime === '' ? null : formLeadTime,
       standardPrice: numEnteredSalePrice,
       costPrice: applyCostScope === 'ALL'
         ? numEnteredCost
@@ -1599,6 +1605,9 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
           : undefined,
       minSafeStock: savedItem.minSafeStock,
       maxSafeStock: savedItem.maxSafeStock,
+      // MRP: thời gian giao; khi sửa mà để trống thì xóa giá trị cũ
+      leadTimeDays: savedItem.leadTimeDays ?? undefined,
+      clearLeadTime: editingItem && savedItem.leadTimeDays == null ? true : undefined,
       barcode: savedItem.barcode,
       brand: savedItem.brand,
       weight: savedItem.weight,
@@ -2228,14 +2237,15 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
     showToast(`Đã xuất thành công tệp ${result.fileName}`);
   };
 
-  const handleImportSuccess = (importedCount: number, fileName: string, newGoods: GoodsItem[]) => {
+  const handleImportSuccess = (importedCount: number, fileName: string, newGoods: GoodsItem[], serverMessage?: string) => {
     setGoods(newGoods);
     try {
       localStorage.setItem(STOCKFLOW_GOODS_STORAGE_KEY, JSON.stringify(newGoods));
     } catch {}
     setLastExportedFile({ fileName: fileName, workbook: null });
     setIsExportDockOpen(true);
-    showToast(`Nhập dữ liệu thành công! Đã xử lý ${importedCount} mặt hàng từ file.`);
+    // Thông báo của máy chủ cho biết cả số ảnh không tải được (nếu có)
+    showToast(serverMessage || `Nhập dữ liệu thành công! Đã xử lý ${importedCount} mặt hàng từ file.`);
   };
 
   // Quick tag suggestions for attribute modal
@@ -3919,6 +3929,21 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                               if (formMaxSafe === '') setFormMaxSafe(999999999);
                             }}
                             placeholder="999,999,999"
+                            className="w-full h-9 px-3 rounded-lg border border-slate-200 font-mono text-xs focus:outline-none focus:border-blue-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block font-semibold text-slate-700 mb-1">Thời gian giao hàng (ngày)</label>
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            value={formLeadTime}
+                            onChange={(e) => {
+                              const raw = e.target.value.replace(/\D/g, '');
+                              setFormLeadTime(raw === '' ? '' : Math.min(365, Number(raw)));
+                            }}
+                            placeholder="Chưa khai báo"
+                            title="Số ngày từ lúc đặt hàng tới lúc hàng vào kho (0–365). Dùng cho Hoạch định NVL (MRP) để tính hạn đặt hàng."
                             className="w-full h-9 px-3 rounded-lg border border-slate-200 font-mono text-xs focus:outline-none focus:border-blue-500"
                           />
                         </div>

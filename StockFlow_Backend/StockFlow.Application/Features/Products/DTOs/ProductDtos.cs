@@ -55,7 +55,9 @@ public record ProductDto(
     string? Description = null,
     DateTime? CreatedAt = null,
     string? Supplier = null,
-    List<ProductWarehouseStockDto>? Warehouses = null
+    List<ProductWarehouseStockDto>? Warehouses = null,
+    // MRP: số ngày từ lúc đặt tới lúc hàng vào kho; rỗng = chưa khai báo
+    int? LeadTimeDays = null
 );
 
 public record ProductWarehouseStockDto(
@@ -100,7 +102,9 @@ public record ProductDetailDto(
     List<ProductConversionUnitDto>? Units = null,
     List<ProductAttributeDto>? Attributes = null,
     List<ProductVariantItemDto>? Variants = null,
-    string? Supplier = null
+    string? Supplier = null,
+    // MRP: số ngày từ lúc đặt tới lúc hàng vào kho; rỗng = chưa khai báo
+    int? LeadTimeDays = null
 );
 
 public record ProductCategoryDto(
@@ -149,6 +153,8 @@ public class CreateProductRequest
     public List<ProductVariantItemDto>? Variants { get; set; }
     public DateTime? CreatedAt { get; set; }
     public string? Supplier { get; set; }
+    /// <summary>MRP: thời gian giao (ngày, 0–365); rỗng = chưa khai báo.</summary>
+    public int? LeadTimeDays { get; set; }
 }
 
 public class UpdateProductRequest
@@ -186,6 +192,10 @@ public class UpdateProductRequest
     /// Phạm vi áp dụng giá vốn mới (CostPrice): null/rỗng = toàn hệ thống (mọi kho), có giá trị = chỉ các kho này.
     /// </summary>
     public List<int>? CostWarehouseIds { get; set; }
+    /// <summary>MRP: thời gian giao (ngày, 0–365). Rỗng = không đổi; muốn xóa thì gửi <see cref="ClearLeadTime"/> = true.</summary>
+    public int? LeadTimeDays { get; set; }
+    /// <summary>true = xóa thời gian giao (về "chưa khai báo").</summary>
+    public bool? ClearLeadTime { get; set; }
 }
 
 public class ImportProductItemRequest

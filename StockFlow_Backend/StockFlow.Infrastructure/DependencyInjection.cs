@@ -40,6 +40,9 @@ public static class DependencyInjection
         services.AddScoped<StockFlow.Application.Common.Interfaces.IUserPermissionService, Services.UserPermissionService>();
         services.AddScoped<StockFlow.Application.Common.Interfaces.ITransactionCodeGenerator, Services.TransactionCodeGenerator>();
 
+        // Lưu ảnh hàng hóa thành file trên máy chủ (singleton: dùng chung một HttpClient để tải ảnh từ link)
+        services.AddSingleton<StockFlow.Application.Common.Interfaces.IImageStorage, Services.LocalImageStorage>();
+
         return services;
     }
 }

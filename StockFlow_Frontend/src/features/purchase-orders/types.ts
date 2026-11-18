@@ -68,6 +68,8 @@ export interface PurchaseOrderDetail {
   mergedFromCodes?: string[] | null;
   /** Đã trả NCC cho các phiếu nhập theo phiếu đặt (cập nhật khi trả thêm NCC — khớp lịch sử thanh toán phiếu nhập) */
   paidAmount: number;
+  /** Ngày hàng dự kiến về kho (yyyy-MM-dd); dùng cho MRP */
+  expectedDate?: string | null;
 }
 
 export interface PurchaseOrderLinePayload {
@@ -87,6 +89,8 @@ export interface SavePurchaseOrderPayload {
   poCode?: string;
   discountAmount: number;
   items: PurchaseOrderLinePayload[];
+  /** Ngày hàng dự kiến về kho (yyyy-MM-dd), không trước ngày đặt; rỗng = chưa rõ */
+  expectedDate?: string | null;
 }
 
 /** 1 dòng nhận hàng ngay trên phiếu đặt: SL đạt (vào kho) và SL lỗi (không vào kho, không tính tiền) */
