@@ -16,6 +16,7 @@ import { productionPlanService } from '../services/productionPlanService';
 import type { ProductionPlanDetail, ProductionProductLookup, SaveProductionPlanPayload } from '../types';
 import { todayIso } from '../utils/productionFormat';
 import {
+  planStockWarehouseId,
   PLAN_MAX_DATE,
   PLAN_MIN_DATE,
   PLAN_NAME_MAX,
@@ -94,7 +95,26 @@ function initialState(detail: ProductionPlanDetail | null): PlanFormState {
 export function ProductionPlanFormModal({ detail, onClose, onSaved }: ProductionPlanFormModalProps) {
   const { warehouses, activeWarehouse } = useActiveWarehouse();
   const limited = !!detail?.actions.isLimitedEdit;
+  // Người duyệt điều chỉnh kế hoạch Chờ duyệt: sửa toàn bộ, lưu xong vẫn Chờ duyệt
+  const pendingApproval = detail?.summary.status === 'PENDING_APPROVAL';
   const [form, setForm] = useState<PlanFormState>(() => initialState(detail));
+  // Kho xuất NVL chỉ chọn trong các kho người lập kế hoạch được phân quyền (lập mới: chính người đang lập).
+  // Người duyệt điều chỉnh kế hoạch của nhân viên không chọn được kho nhân viên đó không làm việc.
+  // Kho đang lưu luôn giữ trong danh sách (người lập bị bỏ quyền kho đó sau này thì vẫn lưu được, backend chỉ kiểm khi đổi kho)
+  const creatorWarehouseIds = detail?.creatorWarehouseIds;
+  const savedWarehouseId = detail?.summary.warehouseId ?? null;
+  const materialWarehouses = useMemo(
+    () =>
+      creatorWarehouseIds
+        ? warehouses.filter((w) => creatorWarehouseIds.includes(w.warehouseId) || w.warehouseId === savedWarehouseId)
+        : warehouses,
+    [warehouses, creatorWarehouseIds, savedWarehouseId]
+  );
+  // Mặc định: kho đã lưu (khi sửa) → kho làm việc → kho đầu tiên trong danh sách được chọn
+  const [materialWarehouseId, setMaterialWarehouseId] = useState<number | null>(() => {
+    const preferred = planStockWarehouseId(detail?.summary.warehouseId, materialWarehouses, activeWarehouse.warehouseId);
+    return materialWarehouses.some((w) => w.warehouseId === preferred) ? preferred : (materialWarehouses[0]?.warehouseId ?? null);
+  });
   const [touched, setTouched] = useState(false);
   const [saving, setSaving] = useState(false);
   const [showMaterials, setShowMaterials] = useState(false);
@@ -102,7 +122,11 @@ export function ProductionPlanFormModal({ detail, onClose, onSaved }: Production
   const savingRef = useRef(false);
   const today = todayIso();
 
-  const errors = useMemo(() => validatePlanForm(form, limited, today), [form, limited, today]);
+  const errors = useMemo(() => {
+    const e = validatePlanForm(form, limited, today);
+    if (!materialWarehouseId) e.materialWarehouse = 'Vui lòng chọn kho xuất nguyên vật liệu.';
+    return e;
+  }, [form, limited, today, materialWarehouseId]);
   const hasErrors = Object.keys(errors).length > 0;
   const showErr = (key: string) => touched && errors[key];
   const missingBom = form.lines.filter((l) => !l.hasActiveBom);
@@ -165,7 +189,8 @@ export function ProductionPlanFormModal({ detail, onClose, onSaved }: Production
           quantityText: '',
           plannedStartDate: f.periodStart,
           plannedEndDate: f.periodEnd,
-          warehouseId: null,
+          // Mặc định nhận thành phẩm tại kho xuất NVL (thường sản xuất tại cùng kho); đổi được ở từng dòng
+          warehouseId: materialWarehouseId ?? activeWarehouse.warehouseId,
           notes: '',
           orderedQuantity: 0,
           existing: false,
@@ -198,6 +223,8 @@ export function ProductionPlanFormModal({ detail, onClose, onSaved }: Production
       })),
       // Q-V5: backend từ chối nếu kế hoạch đã bị người khác lưu sau khi mở form
       expectedUpdatedAt: detail?.summary.updatedAt ?? null,
+      // Kho xuất NVL: mọi người xem kế hoạch so tồn / đặt hàng nhập theo kho này
+      warehouseId: materialWarehouseId,
     };
     savingRef.current = true;
     setSaving(true);
@@ -219,7 +246,11 @@ export function ProductionPlanFormModal({ detail, onClose, onSaved }: Production
 
   return (
     <ProductionDialog
-      title={detail ? `Sửa kế hoạch ${detail.summary.planCode}` : 'Lập kế hoạch sản xuất'}
+      title={
+        detail
+          ? `${limited || pendingApproval ? 'Điều chỉnh' : 'Sửa'} kế hoạch ${detail.summary.planCode}`
+          : 'Lập kế hoạch sản xuất'
+      }
       onClose={onClose}
       widthClass="max-w-6xl"
       footer={
@@ -233,17 +264,24 @@ export function ProductionPlanFormModal({ detail, onClose, onSaved }: Production
         </>
       }
     >
+      {pendingApproval && (
+        <div className="mb-3 flex items-start gap-2 px-3 py-2 rounded-[8px] border border-[#0070f4]/25 bg-[#e6f1fe] text-xs text-[#1e3a8a]">
+          <AlertTriangle size={14} className="shrink-0 mt-0.5 text-[#0070f4]" />
+          <span>Kế hoạch đang chờ duyệt: điều chỉnh trước khi duyệt. Lưu xong kế hoạch vẫn ở trạng thái Chờ duyệt.</span>
+        </div>
+      )}
       {limited && (
         <div className="mb-3 flex items-start gap-2 px-3 py-2 rounded-[8px] border border-[#0070f4]/25 bg-[#e6f1fe] text-xs text-[#1e3a8a]">
           <AlertTriangle size={14} className="shrink-0 mt-0.5 text-[#0070f4]" />
           <span>
-            Kế hoạch đã duyệt: chỉ sửa được số lượng (không thấp hơn số đã lập lệnh), ngày, kho nhận, ghi chú và thêm thành phẩm có định mức.
+            Kế hoạch đã duyệt: chỉ sửa được số lượng (không thấp hơn số đã lập lệnh), ngày, kho xuất nguyên vật liệu, kho nhận, ghi chú
+            và thêm thành phẩm có định mức.
             Không đổi tên, kỳ kế hoạch; không xóa dòng đã có lệnh.
           </span>
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-3 mb-4">
         <div className="md:col-span-2">
           <label className={labelCls}>
             Tên kế hoạch <span className="text-[#fb2c36]">*</span>
@@ -295,19 +333,42 @@ export function ProductionPlanFormModal({ detail, onClose, onSaved }: Production
             className={`${inputCls} ${showPeriodErr ? 'border-[#fb2c36]' : ''}`}
           />
         </div>
+        <div>
+          <label className={labelCls}>
+            Kho xuất NVL <span className="text-[#fb2c36]">*</span>
+          </label>
+          <select
+            value={materialWarehouseId ?? ''}
+            onChange={(e) => setMaterialWarehouseId(e.target.value ? Number(e.target.value) : null)}
+            title="Kho xuất nguyên vật liệu cho kế hoạch: tab Nhu cầu NVL, cảnh báo thiếu và Đặt hàng nhập đều so tồn theo kho này"
+            className={`${inputCls} cursor-pointer ${showErr('materialWarehouse') ? 'border-[#fb2c36]' : ''}`}
+          >
+            {!materialWarehouseId && (
+              <option value="" disabled>
+                Chọn kho
+              </option>
+            )}
+            {materialWarehouses.map((w) => (
+              <option key={w.warehouseId} value={w.warehouseId}>
+                {w.name}
+              </option>
+            ))}
+          </select>
+          {showErr('materialWarehouse') && <p className="mt-1 text-xs text-[#fb2c36]">{errors.materialWarehouse}</p>}
+        </div>
         {showPeriodErr && (
-          <p className="md:col-span-4 -mt-2 text-xs text-[#fb2c36] font-medium flex items-center gap-1">
+          <p className="md:col-span-5 -mt-2 text-xs text-[#fb2c36] font-medium flex items-center gap-1">
             <AlertTriangle size={13} />
             {errors.period || 'Ngày kết thúc kỳ kế hoạch không được trước ngày bắt đầu.'}
           </p>
         )}
         {pastPeriod && (
-          <div className="md:col-span-4 flex items-start gap-2 px-3 py-2 rounded-[8px] border border-[#fde68a] bg-[#fffbeb] text-xs text-[#92400e]">
+          <div className="md:col-span-5 flex items-start gap-2 px-3 py-2 rounded-[8px] border border-[#fde68a] bg-[#fffbeb] text-xs text-[#92400e]">
             <AlertTriangle size={14} className="shrink-0 mt-0.5 text-[#d97706]" />
             <span>Kỳ kế hoạch đã kết thúc trước hôm nay. Bắt buộc ghi lý do lập kế hoạch cho kỳ đã qua vào ô Ghi chú.</span>
           </div>
         )}
-        <div className="md:col-span-4">
+        <div className="md:col-span-5">
           <label className={labelCls}>
             Ghi chú {pastPeriod && <span className="text-[#fb2c36]">*</span>}
           </label>
@@ -350,7 +411,7 @@ export function ProductionPlanFormModal({ detail, onClose, onSaved }: Production
               {limited && <th className="py-1.5 px-2 w-24 text-right">Đã lập lệnh</th>}
               <th className="py-1.5 px-2 w-36">Bắt đầu *</th>
               <th className="py-1.5 px-2 w-36">Kết thúc *</th>
-              <th className="py-1.5 px-2 w-40">Kho nhận thành phẩm</th>
+              <th className="py-1.5 px-2 w-40">Kho nhận thành phẩm *</th>
               <th className="py-1.5 px-2 w-40">Ghi chú</th>
               <th className="py-1.5 px-2 w-10" />
             </tr>
@@ -431,9 +492,16 @@ export function ProductionPlanFormModal({ detail, onClose, onSaved }: Production
                         <select
                           value={l.warehouseId ?? ''}
                           onChange={(e) => patchLine(l.productId, { warehouseId: e.target.value ? Number(e.target.value) : null })}
-                          className={`${lineInput} w-full border-slate-300 focus:border-[#0070f4] cursor-pointer`}
+                          className={`${lineInput} w-full cursor-pointer ${
+                            err && l.warehouseId == null ? 'border-[#fb2c36]' : 'border-slate-300 focus:border-[#0070f4]'
+                          }`}
                         >
-                          <option value="">Chưa chỉ định</option>
+                          {/* Bắt buộc chọn kho: chỉ hiện ô trống với dòng cũ chưa có kho nhận */}
+                          {l.warehouseId == null && (
+                            <option value="" disabled>
+                              Chọn kho
+                            </option>
+                          )}
                           {warehouses.map((w) => (
                             <option key={w.warehouseId} value={w.warehouseId}>
                               {w.name}
@@ -495,12 +563,14 @@ export function ProductionPlanFormModal({ detail, onClose, onSaved }: Production
           <div className="text-xs text-slate-400 mb-2">Nhập số lượng cho ít nhất một thành phẩm để tính nhu cầu.</div>
         ) : (
           <PlanMaterialRequirementsPanel
+            // Đổi Kho xuất NVL ở trên thì bảng nhu cầu so tồn theo kho mới
+            key={materialWarehouseId ?? 'none'}
             reloadKey={debouncedKey}
             load={(warehouseId) =>
               productionPlanService.previewMaterialRequirements(JSON.parse(debouncedKey) as typeof previewItems, warehouseId)
             }
             warehouses={warehouses}
-            defaultWarehouseId={activeWarehouse.warehouseId}
+            defaultWarehouseId={materialWarehouseId}
           />
         ))}
     </ProductionDialog>

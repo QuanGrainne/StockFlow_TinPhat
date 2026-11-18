@@ -97,6 +97,9 @@ export interface ProductionOrderSummary {
   /** Kế hoạch sản xuất sinh ra lệnh (null = lệnh lập trực tiếp) */
   productionPlanId?: number | null;
   productionPlanCode?: string | null;
+  /** Kho xuất NVL của kế hoạch sinh ra lệnh: có thì phiếu xuất NVL bắt buộc xuất tại kho này */
+  planWarehouseId?: number | null;
+  planWarehouseName?: string | null;
 }
 
 export interface ProductionMaterial {
