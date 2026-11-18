@@ -131,7 +131,8 @@ public class GetProductByIdQueryHandler : IRequestHandler<GetProductByIdQuery, R
             Units: units,
             Attributes: attributes,
             Variants: variants,
-            Supplier: supplier
+            Supplier: supplier,
+            LeadTimeDays: product.LeadTimeDays
         );
 
         return Result.Success(detail);

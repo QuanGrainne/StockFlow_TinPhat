@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using StockFlow.Application.Common;
 using StockFlow.Application.Common.Interfaces;
 using StockFlow.Application.Features.Products.DTOs;
+using StockFlow.Application.Features.Products.Helpers;
 using StockFlow.Domain.Entities;
 
 namespace StockFlow.Application.Features.Products.Commands;
@@ -187,6 +188,18 @@ public class UpdateProductCommandHandler : IRequestHandler<UpdateProductCommand,
         if (req.MaxSafeStock.HasValue)
         {
             product.MaxSafeStock = req.MaxSafeStock.Value;
+        }
+
+        // MRP: thời gian giao 0–365 ngày; ClearLeadTime = true thì về "chưa khai báo"
+        if (req.ClearLeadTime == true)
+        {
+            product.LeadTimeDays = null;
+        }
+        else if (req.LeadTimeDays.HasValue)
+        {
+            if (req.LeadTimeDays is < 0 or > ProductLeadTime.MaxDays)
+                return Result.Failure<ProductDto>(ProductLeadTime.RangeMessage);
+            product.LeadTimeDays = req.LeadTimeDays.Value;
         }
 
         if (req.Barcode != null)
@@ -375,7 +388,8 @@ public class UpdateProductCommandHandler : IRequestHandler<UpdateProductCommand,
             VariantsJson: updatedProduct.VariantsJson,
             Description: updatedProduct.Description,
             CreatedAt: updatedProduct.CreatedAt,
-            Supplier: resolvedSupplier
+            Supplier: resolvedSupplier,
+            LeadTimeDays: updatedProduct.LeadTimeDays
         );
 
         return Result.Success(dto);

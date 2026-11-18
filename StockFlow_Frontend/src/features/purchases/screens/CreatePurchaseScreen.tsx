@@ -231,6 +231,8 @@ export default function CreatePurchaseScreen({ mode = 'receipt' }: CreatePurchas
   const [paidAmount, setPaidAmount] = useState<number>(0);
   const [paymentMethod, setPaymentMethod] = useState<'CASH' | 'BANK_TRANSFER'>('CASH');
   const [notes, setNotes] = useState(() => prefillNotes?.slice(0, 500) ?? '');
+  // Phiếu đặt hàng nhập: ngày hàng dự kiến về kho (yyyy-MM-dd), '' = chưa rõ
+  const [expectedDate, setExpectedDate] = useState('');
   const [status, setStatus] = useState<'DRAFT' | 'COMPLETED'>('DRAFT');
   // Trạng thái gốc của phiếu đang mở để sửa (null = phiếu mới / sao chép)
   const [originalStatus, setOriginalStatus] = useState<'DRAFT' | 'COMPLETED' | null>(null);
@@ -487,6 +489,7 @@ export default function CreatePurchaseScreen({ mode = 'receipt' }: CreatePurchas
         } else {
           setPurchaseCode(po.poCode);
           setNotes(po.notes || '');
+          setExpectedDate(po.expectedDate ?? '');
           setOrderOriginalStatus(po.status as 'DRAFT' | 'ORDERED');
           setFixedWarehouse({ id: po.warehouseId, name: po.warehouseName });
           if (po.orderDate) setPurchaseDateTime(toLocalDatetimeInputString(po.orderDate));
@@ -763,6 +766,11 @@ export default function CreatePurchaseScreen({ mode = 'receipt' }: CreatePurchas
       setIsSidebarCollapsed(false);
       return;
     }
+    if (expectedDate && purchaseDateTime && expectedDate < purchaseDateTime.slice(0, 10)) {
+      showToast('Ngày giao dự kiến không được trước ngày đặt hàng', 'warning');
+      setIsSidebarCollapsed(false);
+      return;
+    }
     try {
       setIsSubmitting(true);
       const payload = {
@@ -770,6 +778,7 @@ export default function CreatePurchaseScreen({ mode = 'receipt' }: CreatePurchas
         orderDate: purchaseDateTime ? new Date(purchaseDateTime).toISOString() : undefined,
         status: targetStatus,
         notes: notes.trim() || null,
+        expectedDate: expectedDate || null,
         discountAmount: Math.round(orderDiscount),
         items: items.map((i) => ({
           productId: i.productId,
@@ -1464,6 +1473,23 @@ export default function CreatePurchaseScreen({ mode = 'receipt' }: CreatePurchas
                   title={isOrder ? 'Thời gian đặt hàng' : 'Thời gian nhập hàng'}
                 />
               </div>
+
+              {/* Ngày giao dự kiến (chỉ phiếu đặt): MRP dùng để tính hàng đang đặt sẽ về ngày nào */}
+              {isOrder && (
+                <div className="flex items-center justify-between gap-3">
+                  <label htmlFor="po-expected-date" className="text-[#677484]" title="Không có ngày giao thì MRP chỉ hiển thị, không tính hàng đặt này vào nguồn">
+                    Ngày giao dự kiến
+                  </label>
+                  <input
+                    id="po-expected-date"
+                    type="date"
+                    value={expectedDate}
+                    min={purchaseDateTime ? purchaseDateTime.slice(0, 10) : undefined}
+                    onChange={(e) => setExpectedDate(e.target.value)}
+                    className="h-8 px-2 rounded-[8px] border border-slate-300 text-[12px] text-[#15171a] bg-white hover:border-[#0070f4] focus:border-[#0070f4] focus:outline-none cursor-pointer transition"
+                  />
+                </div>
+              )}
 
               {/* Tìm nhà cung cấp (+ thêm nhanh) */}
               <div className="relative" ref={supplierRef}>

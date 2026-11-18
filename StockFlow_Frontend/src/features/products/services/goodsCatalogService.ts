@@ -34,10 +34,14 @@ export interface CreateProductPayload {
   variants?: ProductVariant[];
   createdAt?: string;
   supplier?: string;
+  /** MRP: thời gian giao (ngày, 0–365) */
+  leadTimeDays?: number;
 }
 
 export interface UpdateProductPayload extends Partial<CreateProductPayload> {
   isActive?: boolean;
+  /** true = xóa thời gian giao (về "chưa khai báo") */
+  clearLeadTime?: boolean;
 }
 
 export interface ProductCategoryItem {
