@@ -3,7 +3,21 @@
 // Luật kiểm tra khớp SaveProductionPlanRequestValidator (backend) để báo lỗi ngay trên form;
 // backend vẫn kiểm lại và là nơi quyết định.
 
+import type { WarehouseItem } from '@/lib/warehouse/useActiveWarehouse';
 import type { ProductionPlanStatus } from '../types';
+
+/**
+ * Kho dùng để so tồn nguyên vật liệu của kế hoạch: kho xuất NVL của kế hoạch, để người lập và người duyệt thấy cùng một kết quả.
+ * Kế hoạch cũ (chưa có kho xuất NVL) hoặc người xem không có quyền kho đó → dùng kho làm việc.
+ */
+export function planStockWarehouseId(
+  planWarehouseId: number | null | undefined,
+  warehouses: WarehouseItem[],
+  workingWarehouseId: number | null
+): number | null {
+  if (planWarehouseId && warehouses.some((w) => w.warehouseId === planWarehouseId)) return planWarehouseId;
+  return workingWarehouseId;
+}
 
 export const PLAN_STATUS_LABEL: Record<ProductionPlanStatus, string> = {
   DRAFT: 'Nháp',
@@ -174,6 +188,8 @@ export function validatePlanForm(form: PlanFormState, limited: boolean, today: s
       errors[key] = 'Ngày kết thúc của dòng không được trước ngày bắt đầu.';
     } else if (form.periodStart && form.periodEnd && (l.plannedStartDate < form.periodStart || l.plannedEndDate > form.periodEnd)) {
       errors[key] = 'Thời gian của dòng phải nằm trong kỳ kế hoạch.';
+    } else if (l.warehouseId == null) {
+      errors[key] = 'Vui lòng chọn kho nhận thành phẩm.';
     } else if (l.notes.trim().length > PLAN_NOTES_MAX) {
       errors[key] = 'Ghi chú dòng tối đa 500 ký tự.';
     } else if (limited && !l.existing && !l.hasActiveBom) {

@@ -60,6 +60,9 @@ public class SaveProductionPlanRequestValidator : AbstractValidator<SaveProducti
             .WithName("Notes")
             .WithMessage(ProductionPlanMessages.PastPeriodNoteRequired);
 
+        // Kho xuất nguyên vật liệu của cả kế hoạch: so tồn / đặt hàng nhập theo kho này
+        RuleFor(x => x.WarehouseId).NotNull().WithMessage("Vui lòng chọn kho xuất nguyên vật liệu.");
+
         RuleFor(x => x.Items)
             .Must(i => i is { Count: > 0 }).WithMessage("Kế hoạch phải có ít nhất một thành phẩm.")
             .Must(i => i == null || i.Select(l => l.ProductId).Distinct().Count() == i.Count)
@@ -73,6 +76,7 @@ public class SaveProductionPlanRequestValidator : AbstractValidator<SaveProducti
                 .WithMessage("Số lượng kế hoạch phải lớn hơn 0 và có tối đa 2 chữ số thập phân.")
                 .LessThanOrEqualTo(ProductionPlanRules.MaxPlannedQuantity)
                 .WithMessage(ProductionPlanMessages.QuantityTooLarge);
+            item.RuleFor(i => i.WarehouseId).NotNull().WithMessage("Vui lòng chọn kho nhận thành phẩm.");
             item.RuleFor(i => i.PlannedStartDate).NotNull().WithMessage("Vui lòng chọn ngày bắt đầu của dòng.");
             item.RuleFor(i => i.PlannedEndDate).NotNull().WithMessage("Vui lòng chọn ngày kết thúc của dòng.");
             item.RuleFor(i => i)
@@ -129,10 +133,15 @@ public static class ProductionPlanPermissions
     private static string OwnerOnly(string action) =>
         $"Chỉ người lập kế hoạch hoặc người có quyền duyệt mới được {action} kế hoạch này.";
 
-    /// <summary>BR-PP-12 / BR-PP-13 / Q5 / Q-V4: Nháp, Bị từ chối sửa toàn bộ (người lập / người duyệt); Đã duyệt chỉ người duyệt sửa hạn chế.</summary>
+    /// <summary>
+    /// BR-PP-12 / BR-PP-13 / Q5 / Q-V4: Nháp, Bị từ chối sửa toàn bộ (người lập / người duyệt); Chờ duyệt người duyệt
+    /// điều chỉnh toàn bộ; Đã duyệt chỉ người duyệt sửa hạn chế.
+    /// </summary>
     public static string? CheckEdit(TrxProductionPlan plan, PlanUserContext user)
     {
         if (plan.CanEditAll()) return IsOwnerOrApprover(plan, user) ? null : OwnerOnly("sửa");
+        // Chờ duyệt: chỉ người duyệt điều chỉnh trước khi duyệt (người lập đã gửi duyệt thì không sửa được)
+        if (plan.CanAdjustBeforeApproval()) return user.CanApprove ? null : ProductionPlanMessages.ApprovalFeatureRequired;
         if (plan.CanEditLimited()) return user.CanApprove ? null : ProductionPlanMessages.ApprovalFeatureRequired;
         return ProductionPlanMessages.StatusNotAllowed;
     }
@@ -267,6 +276,34 @@ public static class ProductionPlanRules
         }
         return null;
     }
+
+    /// <summary>
+    /// Kho xuất nguyên vật liệu của kế hoạch: đang hoạt động, thuộc quyền người đang lưu (BR-04) và thuộc quyền
+    /// người lập kế hoạch (người duyệt điều chỉnh không được chọn kho người lập không làm việc). Trả về thông báo lỗi hoặc null.
+    /// </summary>
+    public static async Task<string?> ValidateMaterialWarehouseAsync(
+        IStockFlowDbContext context, ICurrentUserService currentUser, int? warehouseId, int creatorUserId, CancellationToken ct)
+    {
+        if (warehouseId is not int id) return null;
+        if (!await ProductionHelper.IsActiveWarehouseAsync(context, id, ct))
+            return "Kho xuất nguyên vật liệu không tồn tại hoặc đã ngừng hoạt động.";
+        if (!await currentUser.HasWarehouseAccessAsync(id, ct))
+            return ProductionMessages.NoWarehouseAccess;
+        if (!(await UserWarehouseIdsAsync(context, creatorUserId, ct)).Contains(id))
+            return "Kho xuất nguyên vật liệu phải là kho mà người lập kế hoạch được phân quyền.";
+        return null;
+    }
+
+    /// <summary>
+    /// Kho đang hoạt động mà một người dùng được phân quyền (jnc_user_warehouse_access; mọi vai trò kể cả Admin,
+    /// cùng luật với CurrentUserService.GetAuthorizedWarehouseIdsAsync).
+    /// </summary>
+    public static async Task<List<int>> UserWarehouseIdsAsync(IStockFlowDbContext context, int userId, CancellationToken ct) =>
+        await context.JncUserWarehouseAccesses.AsNoTracking()
+            .Where(a => a.UserId == userId && (a.Warehouse == null || a.Warehouse.IsActive != false))
+            .Select(a => a.WarehouseId)
+            .Distinct()
+            .ToListAsync(ct);
 
     /// <summary>
     /// Kế hoạch đủ điều kiện chuyển bước (gửi duyệt, duyệt): có ít nhất một dòng; thành phẩm còn hoạt động, đúng loại

@@ -50,6 +50,9 @@ public class CreateProductionPlanCommandHandler : IRequestHandler<CreateProducti
         var refError = await ProductionPlanRules.ValidateReferencesAsync(_context, _currentUser, req.Items, ct);
         if (refError != null) return Result.Failure<ProductionPlanDetailDto>(refError);
 
+        var warehouseError = await ProductionPlanRules.ValidateMaterialWarehouseAsync(_context, _currentUser, req.WarehouseId, userId, ct);
+        if (warehouseError != null) return Result.Failure<ProductionPlanDetailDto>(warehouseError);
+
         await using var tx = await _context.BeginTransactionAsync(ct);
 
         var code = await ProductionHelper.NextCodeAsync(_context, _codeGenerator, "PRODUCTION_PLAN",
@@ -67,6 +70,7 @@ public class CreateProductionPlanCommandHandler : IRequestHandler<CreateProducti
             Status = ProductionPlanStatus.Draft,
             CreatedBy = userId,
             Notes = ProductionPlanRules.NormalizeText(req.Notes),
+            WarehouseId = req.WarehouseId,
         };
         ProductionPlanRules.Touch(plan, userId, now);
         foreach (var item in req.Items)

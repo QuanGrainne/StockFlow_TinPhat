@@ -2993,6 +2993,10 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("updated_by");
 
+                    b.Property<int?>("WarehouseId")
+                        .HasColumnType("integer")
+                        .HasColumnName("warehouse_id");
+
                     b.HasKey("ProductionPlanId")
                         .HasName("trx_production_plans_pkey");
 
@@ -3001,6 +3005,8 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                     b.HasIndex("CreatedBy");
 
                     b.HasIndex("UpdatedBy");
+
+                    b.HasIndex("WarehouseId");
 
                     b.HasIndex(new[] { "PlanCode" }, "uq_trx_production_plans_code")
                         .IsUnique();
@@ -4682,11 +4688,18 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                         .HasForeignKey("UpdatedBy")
                         .HasConstraintName("fk_trx_production_plans_updated_by");
 
+                    b.HasOne("StockFlow.Domain.Entities.MstWarehouse", "Warehouse")
+                        .WithMany()
+                        .HasForeignKey("WarehouseId")
+                        .HasConstraintName("fk_trx_production_plans_warehouse_id");
+
                     b.Navigation("ApprovedByNavigation");
 
                     b.Navigation("CreatedByNavigation");
 
                     b.Navigation("UpdatedByNavigation");
+
+                    b.Navigation("Warehouse");
                 });
 
             modelBuilder.Entity("StockFlow.Domain.Entities.TrxProductionReport", b =>

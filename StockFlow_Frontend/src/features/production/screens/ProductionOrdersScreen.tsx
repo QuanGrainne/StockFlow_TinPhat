@@ -13,7 +13,9 @@ import { productionService } from '../services/productionService';
 import type { ProductionListFilter, ProductionOrderDetail, ProductionOrderSummary } from '../types';
 import { useProductionFeatures } from '../hooks/useProductionFeatures';
 import { ORDER_STATUS_LABEL, errorText, fmtDate, fmtDateTime, fmtQty } from '../utils/productionFormat';
-import { ProductionFilterSidebar, SidebarToggle, defaultProductionFilter } from '../components/ProductionFilterSidebar';
+import { useSearchParams } from 'next/navigation';
+import { readDocumentLink, scrollToWhenReady } from '@/lib/navigation/documentLink';
+import { ProductionFilterSidebar, SidebarToggle, defaultProductionFilter, linkProductionFilter } from '../components/ProductionFilterSidebar';
 import { ProductionStatusTag, ProgressBar, SmallTag } from '../components/ProductionStatusTag';
 import { ProductionOrderDetailPanel, type ProductionOrderAction } from '../components/ProductionOrderDetailPanel';
 import { ConfirmDialog } from '../components/ProductionDialog';
@@ -38,11 +40,23 @@ export default function ProductionOrdersScreen() {
   const features = useProductionFeatures();
   const { activeWarehouse, warehouses } = useActiveWarehouse();
 
-  const [query, setQuery] = useState('');
-  const [filter, setFilter] = useState<ProductionListFilter>(() => defaultProductionFilter(['NOT_STARTED', 'IN_PROGRESS', 'COMPLETED']));
+  // Link mở thẳng 1 lệnh (?code=LSX...&id=..., VD bấm mã lệnh ở chi tiết kế hoạch / phiếu xuất NVL / nhập thành phẩm):
+  // điền mã vào ô tìm, hiện mọi trạng thái, mở sẵn chi tiết và cuộn tới dòng đó
+  const searchParams = useSearchParams();
+  const [docLink] = useState(() => readDocumentLink(searchParams));
+  const [query, setQuery] = useState(() => docLink?.code ?? '');
+  const [filter, setFilter] = useState<ProductionListFilter>(() =>
+    docLink
+      ? linkProductionFilter(STATUS_OPTIONS.map((o) => o.value), docLink.date)
+      : defaultProductionFilter(['NOT_STARTED', 'IN_PROGRESS', 'COMPLETED'])
+  );
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [reloadTick, setReloadTick] = useState(0);
-  const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [expandedId, setExpandedId] = useState<number | null>(() => docLink?.id ?? null);
+  useEffect(() => {
+    if (!docLink?.id) return;
+    return scrollToWhenReady(`[data-doc-row="${docLink.id}"]`);
+  }, [docLink]);
   const [availabilityWh, setAvailabilityWh] = useState<number>(activeWarehouse.warehouseId);
   const [details, setDetails] = useState<Record<string, ProductionOrderDetail>>({});
   const [dialog, setDialog] = useState<Dialog>(null);
@@ -281,6 +295,7 @@ export default function ProductionOrdersScreen() {
                     return (
                       <React.Fragment key={o.productionOrderId}>
                         <tr
+                          data-doc-row={o.productionOrderId}
                           onClick={() => setExpandedId(isExpanded ? null : o.productionOrderId)}
                           className={`cursor-pointer text-[13px] ${isExpanded ? 'bg-[#e6f1fe]/80' : 'hover:bg-[#f7f8f9]'}`}
                         >

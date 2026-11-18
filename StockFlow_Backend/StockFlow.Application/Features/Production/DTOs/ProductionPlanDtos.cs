@@ -26,7 +26,10 @@ public record ProductionPlanSummaryDto(
     int OrderCount,
     /// <summary>Lần ghi gần nhất; client gửi lại khi sửa để phát hiện sửa đồng thời (Q-V5)</summary>
     DateTime? UpdatedAt = null,
-    string? UpdatedByName = null
+    string? UpdatedByName = null,
+    // Kho xuất nguyên vật liệu: so tồn / đặt hàng nhập theo kho này (null với kế hoạch cũ)
+    int? WarehouseId = null,
+    string? WarehouseName = null
 );
 
 /// <summary>Dòng kế hoạch kèm tiến độ (BR-PP-10, BR-PP-11).</summary>
@@ -91,7 +94,9 @@ public record ProductionPlanDetailDto(
     string? Notes,
     List<ProductionPlanItemDto> Items,
     List<ProductionPlanOrderDto> Orders,
-    ProductionPlanActionsDto Actions
+    ProductionPlanActionsDto Actions,
+    // Kho người lập kế hoạch được phân quyền: form điều chỉnh chỉ cho chọn Kho xuất NVL trong các kho này
+    List<int>? CreatorWarehouseIds = null
 );
 
 // ─── Request ────────────────────────────────────────────────────────────────
@@ -119,7 +124,9 @@ public record SaveProductionPlanRequest(
     /// Khi sửa: giá trị UpdatedAt của bản client đang xem. Khác bản trong DB nghĩa là đã có người sửa trước → từ chối (Q-V5).
     /// Bỏ trống thì không kiểm (giữ tương thích).
     /// </summary>
-    DateTime? ExpectedUpdatedAt = null
+    DateTime? ExpectedUpdatedAt = null,
+    // Kho xuất nguyên vật liệu của cả kế hoạch (bắt buộc; validator kiểm)
+    int? WarehouseId = null
 );
 
 /// <summary>Lý do từ chối / hủy (bắt buộc).</summary>

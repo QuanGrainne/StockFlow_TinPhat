@@ -16,6 +16,7 @@ import type { ProductionOrderDetail } from '../types';
 import type { ProductionFeatures } from '../hooks/useProductionFeatures';
 import { fmtDate, fmtDateTime, fmtNorm, fmtPercent, fmtQty, producedSoFar, producibleFromIssued } from '../utils/productionFormat';
 import { ProductionStatusTag, ProgressBar, SmallTag } from './ProductionStatusTag';
+import { ProductionDocLink } from './ProductionDocLink';
 
 type Tab = 'info' | 'issues' | 'receipts';
 
@@ -108,9 +109,9 @@ export function ProductionOrderDetailPanel({
                 </span>
               </div>
               <div>
-                <span className="text-slate-400">BOM áp dụng: </span>
+                <span className="text-slate-400">Định mức áp dụng: </span>
                 <span className="font-medium text-slate-800">
-                  {s.bomCode} (v{s.bomVersion})
+                  <ProductionDocLink kind="bom" code={s.bomCode} id={s.bomId} /> (phiên bản {s.bomVersion})
                 </span>
               </div>
               <div>
@@ -194,7 +195,7 @@ export function ProductionOrderDetailPanel({
                       <th className="py-1.5 px-3 w-32">Mã TP</th>
                       <th className="py-1.5 px-3">Tên thành phẩm</th>
                       <th className="py-1.5 px-3 w-14 text-center">ĐVT</th>
-                      <th className="py-1.5 px-3 w-36">Định mức BOM</th>
+                      <th className="py-1.5 px-3 w-36">Định mức</th>
                       <th className="py-1.5 px-3 w-24 text-right">SL kế hoạch</th>
                       <th className="py-1.5 px-3 w-24 text-right">Đã nhập</th>
                       <th className="py-1.5 px-3 w-24 text-right">Còn lại</th>
@@ -214,7 +215,7 @@ export function ProductionOrderDetailPanel({
                         <td className="py-1.5 px-3 font-medium">{it.productName}</td>
                         <td className="py-1.5 px-3 text-center text-slate-500">{it.unitName}</td>
                         <td className="py-1.5 px-3 text-slate-600">
-                          {it.bomCode} (v{it.bomVersion})
+                          <ProductionDocLink kind="bom" code={it.bomCode} id={it.bomId} /> (phiên bản {it.bomVersion})
                         </td>
                         <td className="py-1.5 px-3 text-right font-semibold">{fmtQty(it.plannedQuantity)}</td>
                         <td className="py-1.5 px-3 text-right text-[#16a34a] font-semibold">{fmtQty(it.receivedQuantity)}</td>
@@ -244,7 +245,7 @@ export function ProductionOrderDetailPanel({
           )}
 
           <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-            <div className="text-xs font-semibold text-[#15171a]">Nguyên vật liệu theo BOM (không hiển thị giá)</div>
+            <div className="text-xs font-semibold text-[#15171a]">Nguyên vật liệu theo định mức (không hiển thị giá)</div>
             <label className="flex items-center gap-2 text-xs text-[#677484]">
               Tồn tại kho
               <select
@@ -290,9 +291,9 @@ export function ProductionOrderDetailPanel({
                       {m.isAdjusted && (
                         <span
                           className="ml-1.5 inline-flex items-center gap-0.5 text-[10px] text-[#d97706] cursor-help"
-                          title={`${m.fromBom ? 'Đã điều chỉnh' : 'Thêm ngoài BOM'} bởi ${m.adjustedByName ?? ''} lúc ${fmtDateTime(m.adjustedAt)}: ${m.adjustReason ?? ''}`}
+                          title={`${m.fromBom ? 'Đã điều chỉnh' : 'Thêm ngoài định mức'} bởi ${m.adjustedByName ?? ''} lúc ${fmtDateTime(m.adjustedAt)}: ${m.adjustReason ?? ''}`}
                         >
-                          <Sliders size={10} /> {m.fromBom ? 'đã điều chỉnh' : 'ngoài BOM'}
+                          <Sliders size={10} /> {m.fromBom ? 'đã điều chỉnh' : 'ngoài định mức'}
                         </span>
                       )}
                     </td>
@@ -353,7 +354,15 @@ export function ProductionOrderDetailPanel({
               ) : (
                 detail.issues.map((iss) => (
                   <tr key={iss.stockIssueId} className="align-top">
-                    <td className="py-2 px-3 font-mono font-semibold text-[#0070f4]">{iss.issueCode}</td>
+                    <td className="py-2 px-3">
+                      <ProductionDocLink
+                        kind="issue"
+                        code={iss.issueCode}
+                        id={iss.stockIssueId}
+                        date={iss.issueDate}
+                        warehouseId={iss.warehouseId}
+                      />
+                    </td>
                     <td className="py-2 px-3 whitespace-nowrap">{fmtDateTime(iss.issueDate)}</td>
                     <td className="py-2 px-3">{iss.warehouseName}</td>
                     <td className="py-2 px-3">
@@ -408,8 +417,8 @@ export function ProductionOrderDetailPanel({
               ) : (
                 detail.receipts.map((r) => (
                   <tr key={r.fgrId} className={`align-top ${r.needsReview ? 'bg-[#fef2f2]/50' : ''}`}>
-                    <td className="py-2 px-3 font-mono font-semibold text-[#0070f4]">
-                      {r.fgrCode}
+                    <td className="py-2 px-3">
+                      <ProductionDocLink kind="receipt" code={r.fgrCode} id={r.fgrId} date={r.receivedDate} warehouseId={r.warehouseId} />
                       {r.needsReview && (
                         <div className="mt-0.5">
                           <SmallTag tone="red">Cần xem xét</SmallTag>

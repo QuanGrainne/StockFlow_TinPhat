@@ -26,7 +26,7 @@ public static class BomRules
             return ("Vui lòng chọn thành phẩm đang hoạt động.", null, empty);
 
         if (req.Items == null || req.Items.Count == 0)
-            return ("BOM phải có ít nhất một nguyên vật liệu.", product, empty);
+            return ("Định mức phải có ít nhất một nguyên vật liệu.", product, empty);
 
         // Báo lỗi kèm số dòng (đếm từ 1, theo thứ tự người dùng nhập) để dễ tìm dòng sai khi BOM nhiều NVL.
         var firstSeen = new Dictionary<int, int>();
@@ -35,9 +35,9 @@ public static class BomRules
             var i = req.Items[idx];
             var row = idx + 1;
             if (i.MaterialId == req.ProductId)
-                return ($"Dòng {row}: thành phẩm không được là nguyên vật liệu trong BOM của chính nó.", product, empty);
+                return ($"Dòng {row}: thành phẩm không được là nguyên vật liệu trong định mức của chính nó.", product, empty);
             if (!firstSeen.TryAdd(i.MaterialId, row))
-                return ($"Dòng {row}: nguyên vật liệu trùng với dòng {firstSeen[i.MaterialId]}, một nguyên vật liệu chỉ được xuất hiện một lần trong BOM.", product, empty);
+                return ($"Dòng {row}: nguyên vật liệu trùng với dòng {firstSeen[i.MaterialId]}, một nguyên vật liệu chỉ được xuất hiện một lần trong định mức.", product, empty);
             if (i.Quantity <= 0 || !ProductionHelper.HasMaxScale(i.Quantity, QuantityScale))
                 return ($"Dòng {row}: định mức phải lớn hơn 0 và có tối đa {QuantityScale} chữ số thập phân.", product, empty);
             if (i.WastageRate < 0 || i.WastageRate > 100 || !ProductionHelper.HasMaxScale(i.WastageRate, WastageScale))

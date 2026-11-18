@@ -7,9 +7,9 @@ namespace StockFlow.Application.Features.Production.Helpers;
 /// <summary>Thông báo hệ thống của luồng sản xuất (nội dung theo MSG trong SRS, hiển thị tiếng Việt).</summary>
 public static class ProductionMessages
 {
-    public const string NoActiveBom = "Thành phẩm chưa có BOM đang áp dụng. Vui lòng thiết lập BOM trước."; // MSG58
+    public const string NoActiveBom = "Thành phẩm chưa có định mức đang áp dụng. Vui lòng thiết lập định mức trước."; // MSG58
     public const string OrderNotFound = "Không tìm thấy lệnh sản xuất hoặc lệnh không còn khả dụng."; // MSG16
-    public const string BomNotFound = "Không tìm thấy BOM hoặc BOM không còn khả dụng."; // MSG16
+    public const string BomNotFound = "Không tìm thấy định mức hoặc định mức không còn khả dụng."; // MSG16
     public const string StatusNotAllowed = "Lệnh sản xuất không thể thay đổi ở trạng thái hiện tại."; // MSG17
     public const string ReasonRequired = "Vui lòng nhập lý do."; // MSG40
     public const string NormReasonRequired = "Vui lòng nhập lý do điều chỉnh định mức."; // BR-51
@@ -17,10 +17,10 @@ public static class ProductionMessages
     public const string InvalidIssueQuantity = "Số lượng thực xuất không được âm và không được vượt tồn kho hiện có."; // MSG28, BR-33
     public const string ExceedsPlan = "Số lượng nhận vượt số lượng kế hoạch còn lại của lệnh sản xuất."; // MSG42
     public const string MaterialUsageWarning =
-        "Số thành phẩm cần nhiều NVL hơn số đã xuất theo BOM. Vui lòng nhập ghi chú để tiếp tục."; // MSG43
+        "Số thành phẩm cần nhiều nguyên vật liệu hơn số đã xuất theo định mức. Vui lòng nhập ghi chú để tiếp tục."; // MSG43
     public const string NoWarehouseAccess = "Bạn không có quyền thao tác trên kho này."; // MSG04, BR-04
     public const string MustFollowBom =
-        "Lệnh sản xuất phải theo đúng công thức BOM đang áp dụng. Muốn đổi định mức, vui lòng cập nhật BOM trước.";
+        "Lệnh sản xuất phải theo đúng định mức đang áp dụng. Muốn đổi định mức, vui lòng cập nhật định mức trước.";
     public const string QuantityLimit =
         "Số lượng hoặc nhu cầu nguyên vật liệu vượt giới hạn lưu trữ của hệ thống. Vui lòng giảm số lượng hoặc kiểm tra định mức."; // V-04
 }

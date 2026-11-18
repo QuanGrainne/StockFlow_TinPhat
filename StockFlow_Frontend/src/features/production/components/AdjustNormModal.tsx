@@ -288,7 +288,7 @@ export function AdjustNormModal({ detail, onClose, onDone }: AdjustNormModalProp
     >
       <p className="text-xs text-[#677484] mb-3">
         Điều chỉnh chỉ áp dụng cho lệnh này (SL kế hoạch {fmtQty(activeOrderItem.plannedQuantity)} {activeOrderItem.unitName} của{' '}
-        <b className="text-[#15171a]">{activeOrderItem.productCode}</b>), BOM gốc{' '}
+        <b className="text-[#15171a]">{activeOrderItem.productCode}</b>), định mức gốc{' '}
         <b className="text-[#15171a]">{activeOrderItem.bomCode}</b> không thay đổi. Hỗ trợ tính 2 chiều: sửa <b>Định mức / 1 đv</b> ⇄ tự tính <b>Nhu cầu mới</b>.
       </p>
 
@@ -317,7 +317,7 @@ export function AdjustNormModal({ detail, onClose, onDone }: AdjustNormModalProp
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <div className="flex-1 max-w-md">
           <ProductSearchInput
-            placeholder={`Thêm nguyên vật liệu ngoài BOM cho ${activeOrderItem.productCode} (mã hoặc tên)`}
+            placeholder={`Thêm nguyên vật liệu ngoài định mức cho ${activeOrderItem.productCode} (mã hoặc tên)`}
             productType={allowAllTypes ? undefined : 'RAW_MATERIAL'}
             onSelect={addMaterial}
             excludeIds={[

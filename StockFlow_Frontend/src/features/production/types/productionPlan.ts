@@ -27,6 +27,9 @@ export interface ProductionPlanSummary {
   /** Lần ghi gần nhất — gửi lại khi sửa để backend phát hiện sửa đồng thời */
   updatedAt?: string | null;
   updatedByName?: string | null;
+  /** Kho lập kế hoạch (kho làm việc của người lập); so tồn nguyên vật liệu theo kho này. Null với kế hoạch cũ */
+  warehouseId?: number | null;
+  warehouseName?: string | null;
 }
 
 export interface ProductionPlanItem {
@@ -87,6 +90,8 @@ export interface ProductionPlanDetail {
   items: ProductionPlanItem[];
   orders: ProductionPlanOrder[];
   actions: ProductionPlanActions;
+  /** Kho người lập kế hoạch được phân quyền: Kho xuất NVL chỉ chọn trong các kho này */
+  creatorWarehouseIds?: number[] | null;
 }
 
 export interface SaveProductionPlanItemInput {
@@ -108,6 +113,8 @@ export interface SaveProductionPlanPayload {
   items: SaveProductionPlanItemInput[];
   /** Khi sửa: summary.updatedAt của bản đang xem (khác bản trong DB thì backend từ chối) */
   expectedUpdatedAt?: string | null;
+  /** Kho lập kế hoạch: chỉ gửi khi lập mới (sửa không đổi kho lập) */
+  warehouseId?: number | null;
 }
 
 export interface PlanMaterialRequirementLine {

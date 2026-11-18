@@ -12,10 +12,11 @@ import type { WarehouseItem } from '@/lib/warehouse/useActiveWarehouse';
 import type { PlanMaterialRequirementLine, ProductionPlanDetail } from '../types';
 import { productionPlanService } from '../services/productionPlanService';
 import { fmtDate, fmtDateTime, fmtQty } from '../utils/productionFormat';
-import { fmtDateOnly } from '../utils/productionPlanFormat';
+import { fmtDateOnly, planStockWarehouseId } from '../utils/productionPlanFormat';
 import { ProductionPlanStatusTag } from './ProductionPlanStatusTag';
 import { ProductionStatusTag, ProgressBar, SmallTag } from './ProductionStatusTag';
 import { PlanMaterialRequirementsPanel } from './PlanMaterialRequirementsPanel';
+import { ProductionDocLink } from './ProductionDocLink';
 
 type Tab = 'info' | 'materials' | 'orders';
 
@@ -138,6 +139,10 @@ export function ProductionPlanDetailPanel({
   const totalRemaining = detail.items.reduce((sum, i) => sum + i.remainingQuantity, 0);
   const totalReceived = detail.items.reduce((sum, i) => sum + i.receivedQuantity, 0);
   const missingBom = detail.items.filter((i) => !i.hasActiveBom);
+  // So tồn NVL theo kho xuất NVL của kế hoạch (người lập và người duyệt thấy giống nhau); kế hoạch cũ thì theo kho làm việc
+  const stockWarehouseId = planStockWarehouseId(s.warehouseId, warehouses, defaultWarehouseId);
+  const stockWarehouseName =
+    warehouses.find((w) => w.warehouseId === stockWarehouseId)?.name ?? s.warehouseName ?? 'kho làm việc';
   const tabs: { key: Tab; label: string }[] = [
     { key: 'info', label: 'Thông tin & tiến độ' },
     { key: 'materials', label: 'Nhu cầu NVL' },
@@ -167,8 +172,8 @@ export function ProductionPlanDetailPanel({
         <PlanShortageBanner
           planId={s.productionPlanId}
           reloadKey={`${s.productionPlanId}:${s.totalPlannedQuantity}:${s.totalOrderedQuantity}`}
-          warehouseId={defaultWarehouseId}
-          warehouseName={warehouses.find((w) => w.warehouseId === defaultWarehouseId)?.name ?? 'kho làm việc'}
+          warehouseId={stockWarehouseId}
+          warehouseName={stockWarehouseName}
           onViewDetail={() => setTab('materials')}
         />
       )}
@@ -181,8 +186,8 @@ export function ProductionPlanDetailPanel({
               <span className="text-sm font-semibold">{s.planName}</span>
               <ProductionPlanStatusTag status={s.status} />
               {missingBom.length > 0 && (
-                <SmallTag tone="amber" title="Cần thiết lập BOM trước khi gửi duyệt (BR-PP-09)">
-                  {missingBom.length} thành phẩm chưa có BOM
+                <SmallTag tone="amber" title="Cần thiết lập định mức trước khi gửi duyệt (BR-PP-09)">
+                  {missingBom.length} thành phẩm chưa có định mức
                 </SmallTag>
               )}
             </div>
@@ -212,6 +217,10 @@ export function ProductionPlanDetailPanel({
               <div>
                 <span className="text-slate-400">Số lệnh còn hiệu lực: </span>
                 <span className="font-medium text-slate-800">{s.orderCount}</span>
+              </div>
+              <div>
+                <span className="text-slate-400">Kho xuất NVL: </span>
+                <span className="font-medium text-slate-800">{s.warehouseName || <span className="text-slate-400">Chưa chọn</span>}</span>
               </div>
               {s.updatedAt && (
                 <div className="md:col-span-3">
@@ -270,7 +279,7 @@ export function ProductionPlanDetailPanel({
                     </td>
                     <td className="py-1.5 px-3">
                       <div className="font-medium">{it.productName}</div>
-                      {!it.hasActiveBom && <div className="text-[11px] text-[#d97706]">Chưa có BOM đang áp dụng</div>}
+                      {!it.hasActiveBom && <div className="text-[11px] text-[#d97706]">Chưa có định mức đang áp dụng</div>}
                       {it.notes && <div className="text-[11px] text-[#677484]">{it.notes}</div>}
                     </td>
                     <td className="py-1.5 px-3 text-center text-slate-500">{it.unitName}</td>
@@ -296,10 +305,12 @@ export function ProductionPlanDetailPanel({
       {tab === 'materials' && (
         <div className="mb-4">
           <PlanMaterialRequirementsPanel
+            // Kho mặc định đổi (VD danh sách kho tải xong) thì dựng lại để ô "Tồn tại kho" nhận kho mới
+            key={stockWarehouseId ?? 'none'}
             reloadKey={`${s.productionPlanId}:${s.totalPlannedQuantity}:${s.totalOrderedQuantity}`}
             load={(warehouseId) => productionPlanService.getMaterialRequirements(s.productionPlanId, warehouseId)}
             warehouses={warehouses}
-            defaultWarehouseId={defaultWarehouseId}
+            defaultWarehouseId={stockWarehouseId}
             showRemainingToggle={s.totalOrderedQuantity > 0}
           />
         </div>
@@ -330,7 +341,10 @@ export function ProductionPlanDetailPanel({
               ) : (
                 detail.orders.map((o) => (
                   <tr key={o.productionOrderId}>
-                    <td className="py-1.5 px-3 font-mono font-semibold text-[#0070f4]">{o.productionOrderCode}</td>
+                    <td className="py-1.5 px-3">
+                      {/* Không truyền ngày: màn Lệnh sản xuất lọc theo ngày lập, khác ngày bắt đầu của lệnh */}
+                      <ProductionDocLink kind="order" code={o.productionOrderCode} id={o.productionOrderId} />
+                    </td>
                     <td className="py-1.5 px-3 whitespace-nowrap">{fmtDateTime(o.startDate)}</td>
                     <td className="py-1.5 px-3">
                       {o.items.map((i) => (
@@ -367,7 +381,8 @@ export function ProductionPlanDetailPanel({
         )}
         {a.canEdit && (
           <button type="button" onClick={() => onAction('edit')} className={actionBtn}>
-            <Pencil size={14} /> {a.isLimitedEdit ? 'Điều chỉnh' : 'Sửa'}
+            {/* Chờ duyệt (người duyệt điều chỉnh trước khi duyệt) và Đã duyệt: "Điều chỉnh"; Nháp / Bị từ chối: "Sửa" */}
+            <Pencil size={14} /> {a.isLimitedEdit || s.status === 'PENDING_APPROVAL' ? 'Điều chỉnh' : 'Sửa'}
           </button>
         )}
         {a.canReject && (
@@ -380,7 +395,7 @@ export function ProductionPlanDetailPanel({
             type="button"
             onClick={() => onAction('purchaseOrder')}
             className={actionBtn}
-            title="Mở phiếu đặt hàng nhập, điền sẵn các nguyên vật liệu đang thiếu (số lượng = phần thiếu tại kho làm việc)"
+            title="Mở phiếu đặt hàng nhập, điền sẵn các nguyên vật liệu đang thiếu (số lượng = phần thiếu tại kho xuất NVL của kế hoạch)"
           >
             <ShoppingCart size={14} /> Đặt hàng nhập
           </button>

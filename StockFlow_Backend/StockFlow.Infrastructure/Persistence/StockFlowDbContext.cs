@@ -1753,6 +1753,13 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
                 .HasForeignKey(d => d.UpdatedBy)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("fk_trx_production_plans_updated_by");
+
+            // Kho xuất nguyên vật liệu của kế hoạch: so tồn nguyên vật liệu theo kho này cho mọi người xem
+            entity.Property(e => e.WarehouseId).HasColumnName("warehouse_id");
+            entity.HasOne(d => d.Warehouse).WithMany()
+                .HasForeignKey(d => d.WarehouseId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("fk_trx_production_plans_warehouse_id");
         });
 
         modelBuilder.Entity<DtlProductionPlanItem>(entity =>

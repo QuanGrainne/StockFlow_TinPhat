@@ -7,29 +7,66 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { message } from 'antd';
 import * as XLSX from 'xlsx';
-import { AlertTriangle, FileDown, Inbox, RefreshCcw, Search } from 'lucide-react';
+import { AlertTriangle, FileDown, Inbox, Plus, RefreshCcw, Search } from 'lucide-react';
 import { useActiveWarehouse } from '@/lib/warehouse/useActiveWarehouse';
 import { ProductCodeLink } from '@/components/links/EntityLinks';
 import { productionService } from '../services/productionService';
-import type { FinishedGoodsReceipt, ProductionListFilter } from '../types';
+import type { FinishedGoodsReceipt, ProductionListFilter, ProductionOrderDetail } from '../types';
+import { useProductionFeatures } from '../hooks/useProductionFeatures';
+import { OrderPickerDialog } from '../components/OrderPickerDialog';
+import { ApproveCompletionModal } from '../components/ApproveCompletionModal';
 import { errorText, fmtDate, fmtDateTime, fmtQty } from '../utils/productionFormat';
-import { ProductionFilterSidebar, SidebarToggle, defaultProductionFilter } from '../components/ProductionFilterSidebar';
+import { useSearchParams } from 'next/navigation';
+import { readDocumentLink, scrollToWhenReady } from '@/lib/navigation/documentLink';
+import { ProductionFilterSidebar, SidebarToggle, defaultProductionFilter, linkProductionFilter } from '../components/ProductionFilterSidebar';
+import { ProductionDocLink } from '../components/ProductionDocLink';
 import { SmallTag } from '../components/ProductionStatusTag';
 
 export default function FinishedGoodsReceiptsScreen() {
-  const { warehouses } = useActiveWarehouse();
-  const [query, setQuery] = useState('');
-  const [filter, setFilter] = useState<ProductionListFilter>(() => defaultProductionFilter([]));
+  const { activeWarehouse, warehouses } = useActiveWarehouse();
+  const features = useProductionFeatures();
+  // "+ Nhập thành phẩm": lối tắt tới đúng luồng Duyệt hoàn thành của màn Lệnh sản xuất
+  // (chọn lệnh đang sản xuất → hộp Duyệt hoàn thành → hệ thống tự sinh phiếu nhập thành phẩm). Không có form nhập riêng.
+  const [picking, setPicking] = useState(false);
+  const [loadingOrderId, setLoadingOrderId] = useState<number | null>(null);
+  const [approveDetail, setApproveDetail] = useState<ProductionOrderDetail | null>(null);
+  const [reloadTick, setReloadTick] = useState(0);
+  // Link mở thẳng 1 phiếu nhập thành phẩm (?code=NTP...&id=&date=, VD bấm mã phiếu ở chi tiết lệnh sản xuất):
+  // điền mã vào ô tìm, lọc đúng ngày phiếu, mở sẵn chi tiết và cuộn tới dòng đó
+  const searchParams = useSearchParams();
+  const [docLink] = useState(() => readDocumentLink(searchParams));
+  const [query, setQuery] = useState(() => docLink?.code ?? '');
+  const [filter, setFilter] = useState<ProductionListFilter>(() =>
+    docLink ? linkProductionFilter([], docLink.date) : defaultProductionFilter([])
+  );
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [expandedId, setExpandedId] = useState<number | null>(() => docLink?.id ?? null);
+  useEffect(() => {
+    if (!docLink?.id) return;
+    return scrollToWhenReady(`[data-doc-row="${docLink.id}"]`);
+  }, [docLink]);
 
   const requestKey = JSON.stringify({
     warehouseIds: filter.warehouseIds,
     fromDate: filter.dateFrom,
     toDate: filter.dateTo,
     needsReviewOnly: filter.needsReviewOnly,
+    reloadTick,
   });
   const [result, setResult] = useState<{ key: string; data: FinishedGoodsReceipt[] }>({ key: '', data: [] });
+
+  /** Chọn lệnh xong: tải chi tiết lệnh (giống màn Lệnh sản xuất) rồi mở hộp Duyệt hoàn thành */
+  async function openApprove(productionOrderId: number) {
+    setPicking(false);
+    setLoadingOrderId(productionOrderId);
+    try {
+      setApproveDetail(await productionService.getOrder(productionOrderId, activeWarehouse.warehouseId));
+    } catch (err) {
+      message.error(errorText(err, 'Không tải được lệnh sản xuất'));
+    } finally {
+      setLoadingOrderId(null);
+    }
+  }
   const loading = result.key !== requestKey;
 
   useEffect(() => {
@@ -111,6 +148,18 @@ export default function FinishedGoodsReceiptsScreen() {
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {/* Duyệt hoàn thành cần chức năng "Lập lệnh sản xuất" (cùng điều kiện nút trong chi tiết lệnh) */}
+          {features.canPlan && (
+            <button
+              type="button"
+              disabled={loadingOrderId !== null}
+              onClick={() => setPicking(true)}
+              className="inline-flex items-center gap-1.5 px-3.5 h-8 rounded-[8px] bg-[#0070f4] hover:bg-[#005ac3] text-white font-semibold text-[13px] shadow-xs transition cursor-pointer disabled:opacity-60 disabled:cursor-wait"
+            >
+              {loadingOrderId !== null ? <RefreshCcw size={14} className="animate-spin" /> : <Plus size={15} className="stroke-[2.5]" />}
+              <span>Nhập thành phẩm</span>
+            </button>
+          )}
           <button
             type="button"
             onClick={exportList}
@@ -181,12 +230,15 @@ export default function FinishedGoodsReceiptsScreen() {
                     return (
                       <React.Fragment key={r.fgrId}>
                         <tr
+                          data-doc-row={r.fgrId}
                           onClick={() => setExpandedId(isExpanded ? null : r.fgrId)}
                           className={`cursor-pointer text-[13px] ${isExpanded ? 'bg-[#e6f1fe]/80' : r.needsReview ? 'bg-[#fef2f2]/40 hover:bg-[#fef2f2]' : 'hover:bg-[#f7f8f9]'}`}
                         >
                           <td className="py-2.5 px-3 font-mono font-medium text-[#0070f4]">{r.fgrCode}</td>
                           <td className="py-2.5 px-3 whitespace-nowrap">{fmtDateTime(r.receivedDate)}</td>
-                          <td className="py-2.5 px-3 font-mono">{r.productionOrderCode}</td>
+                          <td className="py-2.5 px-3">
+                            <ProductionDocLink kind="order" code={r.productionOrderCode} id={r.productionOrderId} className="!font-normal" />
+                          </td>
                           <td className="py-2.5 px-3">
                             <div className="font-medium">{r.productName}</div>
                             <div className="text-[11px] text-[#677484]">{r.productCode}</div>
@@ -274,6 +326,25 @@ export default function FinishedGoodsReceiptsScreen() {
         </div>
       </div>
 
+      {picking && (
+        <OrderPickerDialog
+          title="Chọn lệnh sản xuất cần nhập thành phẩm"
+          statuses={['IN_PROGRESS']}
+          emptyText="Không có lệnh sản xuất nào đang sản xuất (cần xuất nguyên vật liệu trước khi nhập thành phẩm)"
+          onClose={() => setPicking(false)}
+          onPick={(o) => void openApprove(o.productionOrderId)}
+        />
+      )}
+      {approveDetail && (
+        <ApproveCompletionModal
+          detail={approveDetail}
+          onClose={() => setApproveDetail(null)}
+          onDone={() => {
+            setApproveDetail(null);
+            setReloadTick((t) => t + 1);
+          }}
+        />
+      )}
     </div>
   );
 }

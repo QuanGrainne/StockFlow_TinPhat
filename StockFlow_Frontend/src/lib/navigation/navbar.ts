@@ -372,7 +372,7 @@ export const NAV_GROUPS: NavGroup[] = [
   },
   {
     id: 'bom-group',
-    label: 'Định mức BOM',
+    label: 'Định mức sản phẩm',
     icon: Sliders,
     single: true,
     items: [
@@ -380,7 +380,7 @@ export const NAV_GROUPS: NavGroup[] = [
         screen: 'manager-bom',
         path: '/bom',
         featureId: 'feat-bom',
-        title: 'Định mức BOM',
+        title: 'Định mức sản phẩm',
         desc: 'Định mức nguyên vật liệu và công thức phối liệu',
         icon: Sliders,
         backendModule: 'BOM',

@@ -20,6 +20,12 @@ public partial class TrxProductionPlan
     /// <summary>Sửa toàn bộ (tên, kỳ, thêm / xóa / đổi dòng) khi Nháp hoặc Bị từ chối (BR-PP-12).</summary>
     public bool CanEditAll() => IsDraft() || IsRejected();
 
+    /// <summary>
+    /// Điều chỉnh trước khi duyệt: kế hoạch Chờ duyệt được người duyệt sửa toàn bộ, giữ nguyên trạng thái Chờ duyệt
+    /// (yêu cầu nhóm 19/11/2026; quyền người duyệt do handler kiểm).
+    /// </summary>
+    public bool CanAdjustBeforeApproval() => IsPendingApproval();
+
     /// <summary>Sửa hạn chế khi Đã duyệt: số lượng, ngày, kho nhận, ghi chú, thêm dòng (BR-PP-13, Q5).</summary>
     public bool CanEditLimited() => IsApproved();
 

@@ -69,6 +69,12 @@ export function MaterialIssueModal({ productionOrderId, supplementary = false, o
       .getOrder(productionOrderId, warehouseId)
       .then((d) => {
         if (stale) return;
+        // Lệnh lập từ kế hoạch có Kho xuất NVL: chuyển sang đúng kho đó rồi tải lại tồn (không cho chọn kho khác)
+        const planWarehouseId = d.summary.planWarehouseId;
+        if (planWarehouseId && planWarehouseId !== warehouseId) {
+          setWarehouseId(planWarehouseId);
+          return;
+        }
         setLoaded({ key: requestKey, detail: d });
         const itemsList =
           d.summary.items && d.summary.items.length > 0
@@ -166,6 +172,11 @@ export function MaterialIssueModal({ productionOrderId, supplementary = false, o
   const producibleOf = (oi: { productionOrderItemId: number; plannedQuantity: number }, withExtra: boolean): number | null =>
     detail ? producibleFromIssued(detail.materials, oi.plannedQuantity, oi.productionOrderItemId || null, withExtra ? extraIssued : undefined) : null;
 
+  // Kho cố định theo kế hoạch; người xuất không có quyền kho đó thì không xuất được (backend cũng chặn)
+  const planWarehouseId = detail?.summary.planWarehouseId ?? null;
+  const planWarehouseName = detail?.summary.planWarehouseName ?? '';
+  const noPlanWarehouseAccess = !!planWarehouseId && !warehouses.some((w) => w.warehouseId === planWarehouseId);
+
   const anyInvalid = rows.some((r) => r.invalid);
   const anyExceeds = rows.some((r) => r.exceeds && r.qty > 0);
   const totalQty = rows.reduce((s, r) => s + (r.invalid ? 0 : r.qty), 0);
@@ -182,7 +193,7 @@ export function MaterialIssueModal({ productionOrderId, supplementary = false, o
       return;
     }
     if (reasonMissing) {
-      message.error('Số lượng xuất luỹ kế vượt nhu cầu theo BOM. Vui lòng nhập lý do.');
+      message.error('Số lượng xuất luỹ kế vượt nhu cầu theo định mức. Vui lòng nhập lý do.');
       return;
     }
     setBusy(true);
@@ -221,7 +232,7 @@ export function MaterialIssueModal({ productionOrderId, supplementary = false, o
           <button type="button" onClick={onClose} className={btnSecondary}>
             Bỏ qua
           </button>
-          <button type="button" disabled={busy || loading || !detail} onClick={submit} className={btnPrimary}>
+          <button type="button" disabled={busy || loading || !detail || noPlanWarehouseAccess} onClick={submit} className={btnPrimary}>
             {busy ? 'Đang xử lý...' : 'Xác nhận xuất kho'}
           </button>
         </>
@@ -293,13 +304,23 @@ export function MaterialIssueModal({ productionOrderId, supplementary = false, o
       <div className="flex flex-wrap items-end gap-4 mb-3">
         <div className="w-64">
           <label className={labelCls}>Kho xuất NVL</label>
-          <select value={warehouseId} onChange={(e) => setWarehouseId(Number(e.target.value))} className={inputCls}>
-            {warehouses.map((w) => (
-              <option key={w.warehouseId} value={w.warehouseId}>
-                {w.name}
-              </option>
-            ))}
-          </select>
+          {planWarehouseId ? (
+            // Lệnh lập từ kế hoạch: xuất đúng kho xuất NVL của kế hoạch, không chọn kho khác
+            <div
+              className={`${inputCls} flex items-center bg-slate-50 text-[#15171a] cursor-not-allowed`}
+              title={`Theo kho xuất NVL của kế hoạch ${detail?.summary.productionPlanCode ?? ''}`}
+            >
+              {planWarehouseName}
+            </div>
+          ) : (
+            <select value={warehouseId} onChange={(e) => setWarehouseId(Number(e.target.value))} className={inputCls}>
+              {warehouses.map((w) => (
+                <option key={w.warehouseId} value={w.warehouseId}>
+                  {w.name}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
         <label className="flex items-center gap-2 text-xs h-8 cursor-pointer">
           <input
@@ -311,6 +332,13 @@ export function MaterialIssueModal({ productionOrderId, supplementary = false, o
           <span>Xuất bổ sung (hao hụt, hỏng NVL trong sản xuất)</span>
         </label>
       </div>
+      {planWarehouseId && (
+        <p className={`-mt-1 mb-3 text-[11px] ${noPlanWarehouseAccess ? 'text-[#fb2c36]' : 'text-[#677484]'}`}>
+          {noPlanWarehouseAccess
+            ? `Lệnh lập từ kế hoạch ${detail?.summary.productionPlanCode ?? ''} xuất nguyên vật liệu tại ${planWarehouseName}. Bạn không được phân quyền kho này nên không xuất được.`
+            : `Theo kho xuất NVL của kế hoạch ${detail?.summary.productionPlanCode ?? ''}.`}
+        </p>
+      )}
 
       <div className="border border-slate-200 rounded-[8px] overflow-x-auto">
         <table className="w-full text-left border-collapse text-xs min-w-[880px]">

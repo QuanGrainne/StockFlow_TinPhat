@@ -1,24 +1,15 @@
 'use client';
 
 // Bộ lọc bên trái của các màn Sản xuất (cùng bố cục với bộ lọc Nhập hàng / Kiểm kho):
-// trạng thái (tuỳ màn), chi nhánh (tuỳ màn), thời gian theo mốc có sẵn hoặc tự chọn, ô "cần xem xét".
+// trạng thái (tuỳ màn), chi nhánh (tuỳ màn), thời gian dùng chung TimeRangeFilter như các màn khác
+// ([◉ Tháng này >] chọn nhanh / [○ Tùy chỉnh 📅] chọn khoảng ngày), ô "cần xem xét".
 
 import React from 'react';
 import type { WarehouseItem } from '@/lib/warehouse/useActiveWarehouse';
 import { getDateRangeForPreset } from '@/lib/utils/date';
+import TimeRangeFilter, { ALL_TIME_PRESET } from '@/components/filters/TimeRangeFilter';
+import WarehouseMultiSelect from '@/components/filters/WarehouseMultiSelect';
 import type { ProductionListFilter } from '../types';
-
-const TIME_PRESETS: { key: string; label: string }[] = [
-  { key: 'today', label: 'Hôm nay' },
-  { key: 'yesterday', label: 'Hôm qua' },
-  { key: 'this_week', label: 'Tuần này' },
-  { key: 'last_7_days', label: '7 ngày qua' },
-  { key: 'this_month', label: 'Tháng này' },
-  { key: 'last_month', label: 'Tháng trước' },
-  { key: 'last_30_days', label: '30 ngày qua' },
-  { key: 'this_year', label: 'Năm nay' },
-  { key: 'all', label: 'Toàn thời gian' },
-];
 
 interface ProductionFilterSidebarProps {
   state: ProductionListFilter;
@@ -50,18 +41,11 @@ export function ProductionFilterSidebar({
       statuses: state.statuses.includes(value) ? state.statuses.filter((s) => s !== value) : [...state.statuses, value],
     });
 
-  const toggleWarehouse = (id: number) =>
-    onChange({
-      warehouseIds: state.warehouseIds.includes(id) ? state.warehouseIds.filter((w) => w !== id) : [...state.warehouseIds, id],
-    });
-
-  const selectPreset = (key: string) => {
-    if (key === 'all') {
-      onChange({ timeRange: 'all', dateFrom: undefined, dateTo: undefined });
-      return;
-    }
-    const range = getDateRangeForPreset(key);
-    onChange({ timeRange: key, dateFrom: range.from, dateTo: range.to });
+  // Màn Sản xuất dùng 'all' + ngày undefined cho "Toàn thời gian"; TimeRangeFilter dùng 'all_time' + chuỗi rỗng
+  const timeValue = {
+    timeRange: state.timeRange === 'all' ? ALL_TIME_PRESET.key : state.timeRange,
+    dateFrom: state.dateFrom ?? '',
+    dateTo: state.dateTo ?? '',
   };
 
   return (
@@ -74,26 +58,19 @@ export function ProductionFilterSidebar({
         <div className="flex-1 min-h-0 p-3.5 space-y-4 overflow-y-auto">
           {warehouses && (
             <>
-              <div>
-                <div className={sectionTitle}>Chi nhánh</div>
-                <div className="space-y-2">
-                  {warehouses.map((w) => (
-                    <label key={w.warehouseId} className="flex items-center gap-2 text-xs hover:text-[#0070f4] cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={state.warehouseIds.includes(w.warehouseId)}
-                        onChange={() => toggleWarehouse(w.warehouseId)}
-                        className={checkCls}
-                      />
-                      <span className="truncate" title={w.name}>
-                        {w.name}
-                      </span>
-                    </label>
-                  ))}
-                  {warehouses.length === 0 && <div className="text-xs text-slate-400">Chưa được phân quyền kho nào</div>}
+              {/* Cùng ô chọn chi nhánh với màn Nhập hàng: thẻ chọn nhiều + danh sách thả xuống, [] = Tất cả */}
+              {warehouses.length === 0 ? (
+                <div>
+                  <div className={sectionTitle}>Chi nhánh</div>
+                  <div className="text-xs text-slate-400">Chưa được phân quyền kho nào</div>
                 </div>
-                <p className="mt-1.5 text-[11px] text-slate-400">Không chọn = mọi kho được phân quyền</p>
-              </div>
+              ) : (
+                <WarehouseMultiSelect
+                  value={state.warehouseIds}
+                  warehouses={warehouses}
+                  onChange={(warehouseIds) => onChange({ warehouseIds })}
+                />
+              )}
               <div className="border-t border-slate-100" />
             </>
           )}
@@ -120,47 +97,18 @@ export function ProductionFilterSidebar({
             </>
           )}
 
-          <div>
-            <div className={sectionTitle}>{timeLabel}</div>
-            <select
-              value={state.timeRange === 'custom' ? 'custom' : state.timeRange}
-              onChange={(e) => (e.target.value === 'custom' ? onChange({ timeRange: 'custom' }) : selectPreset(e.target.value))}
-              className="w-full h-8 px-2 text-xs border border-slate-300 rounded-[8px] bg-white focus:outline-none focus:border-[#0070f4] cursor-pointer"
-            >
-              {TIME_PRESETS.map((p) => (
-                <option key={p.key} value={p.key}>
-                  {p.label}
-                </option>
-              ))}
-              <option value="custom">Tùy chỉnh</option>
-            </select>
-            {state.timeRange === 'custom' && (
-              <div className="mt-2 grid grid-cols-1 gap-1.5">
-                <input
-                  type="date"
-                  value={state.dateFrom ?? ''}
-                  max={state.dateTo}
-                  onChange={(e) => {
-                    const newFrom = e.target.value || undefined;
-                    onChange({
-                      dateFrom: newFrom,
-                      ...(newFrom && state.dateTo && newFrom > state.dateTo ? { dateTo: newFrom } : {}),
-                    });
-                  }}
-                  className="h-8 px-2 text-xs border border-slate-300 rounded-[8px] focus:outline-none focus:border-[#0070f4]"
-                  title="Từ ngày"
-                />
-                <input
-                  type="date"
-                  value={state.dateTo ?? ''}
-                  min={state.dateFrom}
-                  onChange={(e) => onChange({ dateTo: e.target.value || undefined })}
-                  className="h-8 px-2 text-xs border border-slate-300 rounded-[8px] focus:outline-none focus:border-[#0070f4]"
-                  title="Đến ngày"
-                />
-              </div>
-            )}
-          </div>
+          <TimeRangeFilter
+            allowAllTime
+            label={timeLabel}
+            value={timeValue}
+            onChange={(r) =>
+              onChange(
+                r.timeRange === ALL_TIME_PRESET.key
+                  ? { timeRange: 'all', dateFrom: undefined, dateTo: undefined }
+                  : { timeRange: r.timeRange, dateFrom: r.dateFrom || undefined, dateTo: r.dateTo || undefined }
+              )
+            }
+          />
 
           {reviewLabel && (
             <>
@@ -194,6 +142,16 @@ export function SidebarToggle({ collapsed, onToggle }: { collapsed: boolean; onT
       {collapsed ? '›' : '‹'}
     </button>
   );
+}
+
+/**
+ * Bộ lọc khi mở màn từ link mã chứng từ (?code=&id=&date=): hiện mọi trạng thái được truyền vào,
+ * lọc đúng ngày của chứng từ nếu link có ngày, không có thì toàn thời gian.
+ */
+export function linkProductionFilter(statuses: string[], date: string | null): ProductionListFilter {
+  return date
+    ? { statuses, timeRange: 'custom', dateFrom: date, dateTo: date, warehouseIds: [], needsReviewOnly: false }
+    : { statuses, timeRange: 'all', dateFrom: undefined, dateTo: undefined, warehouseIds: [], needsReviewOnly: false };
 }
 
 /** Giá trị mặc định bộ lọc: tháng này */

@@ -95,7 +95,10 @@ public record ProductionOrderSummaryDto(
     List<ProductionOrderProductItemDto>? Items = null,
     /// <summary>Kế hoạch sản xuất sinh ra lệnh (null = lệnh lập trực tiếp, Q4)</summary>
     int? ProductionPlanId = null,
-    string? ProductionPlanCode = null
+    string? ProductionPlanCode = null,
+    // Kho xuất NVL của kế hoạch sinh ra lệnh: có thì phiếu xuất NVL bắt buộc xuất tại kho này
+    int? PlanWarehouseId = null,
+    string? PlanWarehouseName = null
 );
 
 public record ProductionMaterialDto(
@@ -331,6 +334,8 @@ public record ProductionProductLookupDto(
     string UnitName,
     string? ProductType,
     bool HasActiveBom,
-    decimal? AvailableQty
+    decimal? AvailableQty,
+    // Ảnh hàng hóa (đường dẫn /api/uploads/...) để hiện trong ô tìm của form sản xuất
+    string? ImageUrl = null
 );
 
