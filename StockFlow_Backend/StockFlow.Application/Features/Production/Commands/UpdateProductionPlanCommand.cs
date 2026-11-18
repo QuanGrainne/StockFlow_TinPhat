@@ -69,6 +69,13 @@ public class UpdateProductionPlanCommandHandler : IRequestHandler<UpdateProducti
 
         var refError = await ProductionPlanRules.ValidateReferencesAsync(_context, _currentUser, req.Items, ct);
         if (refError != null) return Result.Failure<ProductionPlanDetailDto>(refError);
+        // Chỉ kiểm khi đổi kho xuất NVL: giữ nguyên kho cũ thì vẫn lưu được (VD người lập sau này bị bỏ quyền kho đó)
+        if (req.WarehouseId != plan.WarehouseId)
+        {
+            var warehouseError = await ProductionPlanRules.ValidateMaterialWarehouseAsync(
+                _context, _currentUser, req.WarehouseId, plan.CreatedBy, ct);
+            if (warehouseError != null) return Result.Failure<ProductionPlanDetailDto>(warehouseError);
+        }
 
         var limited = plan.CanEditLimited();
         var existingByProduct = plan.DtlProductionPlanItems.ToDictionary(i => i.ProductId);
@@ -113,6 +120,8 @@ public class UpdateProductionPlanCommandHandler : IRequestHandler<UpdateProducti
             plan.PeriodEnd = req.PeriodEnd!.Value;
         }
         plan.Notes = ProductionPlanRules.NormalizeText(req.Notes);
+        // Kho xuất NVL đổi được cả khi kế hoạch đã duyệt: chỉ ảnh hưởng chỗ so tồn / đặt hàng nhập, không đụng lệnh đã lập
+        plan.WarehouseId = req.WarehouseId;
         ProductionPlanRules.Touch(plan, userId, VietnamTime.Now);
 
         // Đồng bộ dòng theo thành phẩm: sửa dòng có sẵn, thêm dòng mới, xóa dòng không còn trong request

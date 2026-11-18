@@ -14,7 +14,8 @@ public static class ProductionPlanReader
         string Status, int CreatedBy, string? CreatorFullName, string? CreatorUsername, int? ApprovedBy,
         string? ApproverFullName, string? ApproverUsername, DateTime? ApprovalDate, string? Notes,
         int ItemCount, decimal TotalPlanned, decimal TotalOrdered, int OrderCount,
-        DateTime? UpdatedAt, string? UpdaterFullName, string? UpdaterUsername);
+        DateTime? UpdatedAt, string? UpdaterFullName, string? UpdaterUsername,
+        int? WarehouseId, string? WarehouseName);
 
     private static IQueryable<PlanRow> PlanRows(IQueryable<TrxProductionPlan> plans) =>
         plans.AsNoTracking().Select(p => new PlanRow(
@@ -42,7 +43,9 @@ public static class ProductionPlanReader
             p.TrxProductionOrders.Count(o => o.Status != ProductionOrderStatus.Cancelled),
             p.UpdatedAt,
             p.UpdatedByNavigation != null ? p.UpdatedByNavigation.FullName : null,
-            p.UpdatedByNavigation != null ? p.UpdatedByNavigation.Username : null));
+            p.UpdatedByNavigation != null ? p.UpdatedByNavigation.Username : null,
+            p.WarehouseId,
+            p.Warehouse != null ? p.Warehouse.WarehouseName : null));
 
     private static string DisplayName(string? fullName, string? username) =>
         !string.IsNullOrWhiteSpace(fullName) ? fullName! : username ?? "";
@@ -66,7 +69,9 @@ public static class ProductionPlanReader
         p.TotalPlanned > 0 ? Math.Min(100, Math.Round(p.TotalOrdered * 100 / p.TotalPlanned, 1)) : 0,
         p.OrderCount,
         p.UpdatedAt,
-        p.UpdatedAt.HasValue ? DisplayName(p.UpdaterFullName, p.UpdaterUsername) : null);
+        p.UpdatedAt.HasValue ? DisplayName(p.UpdaterFullName, p.UpdaterUsername) : null,
+        p.WarehouseId,
+        p.WarehouseName);
 
     public static async Task<List<ProductionPlanSummaryDto>> SummariesAsync(
         IQueryable<TrxProductionPlan> plans, CancellationToken ct)
@@ -164,7 +169,8 @@ public static class ProductionPlanReader
             ProductionPlanPermissions.CheckClose(plan, user) == null,
             ProductionPlanPermissions.CheckCreateOrder(plan, user) == null && anyRemaining);
 
-        return new ProductionPlanDetailDto(ToSummary(row), row.Notes, items, orderDtos, actions);
+        var creatorWarehouseIds = await ProductionPlanRules.UserWarehouseIdsAsync(context, row.CreatedBy, ct);
+        return new ProductionPlanDetailDto(ToSummary(row), row.Notes, items, orderDtos, actions, creatorWarehouseIds);
     }
 
     /// <summary>

@@ -8,6 +8,7 @@ import React from 'react';
 import type { WarehouseItem } from '@/lib/warehouse/useActiveWarehouse';
 import { getDateRangeForPreset } from '@/lib/utils/date';
 import TimeRangeFilter, { ALL_TIME_PRESET } from '@/components/filters/TimeRangeFilter';
+import WarehouseMultiSelect from '@/components/filters/WarehouseMultiSelect';
 import type { ProductionListFilter } from '../types';
 
 interface ProductionFilterSidebarProps {
@@ -40,11 +41,6 @@ export function ProductionFilterSidebar({
       statuses: state.statuses.includes(value) ? state.statuses.filter((s) => s !== value) : [...state.statuses, value],
     });
 
-  const toggleWarehouse = (id: number) =>
-    onChange({
-      warehouseIds: state.warehouseIds.includes(id) ? state.warehouseIds.filter((w) => w !== id) : [...state.warehouseIds, id],
-    });
-
   // Màn Sản xuất dùng 'all' + ngày undefined cho "Toàn thời gian"; TimeRangeFilter dùng 'all_time' + chuỗi rỗng
   const timeValue = {
     timeRange: state.timeRange === 'all' ? ALL_TIME_PRESET.key : state.timeRange,
@@ -62,26 +58,19 @@ export function ProductionFilterSidebar({
         <div className="flex-1 min-h-0 p-3.5 space-y-4 overflow-y-auto">
           {warehouses && (
             <>
-              <div>
-                <div className={sectionTitle}>Chi nhánh</div>
-                <div className="space-y-2">
-                  {warehouses.map((w) => (
-                    <label key={w.warehouseId} className="flex items-center gap-2 text-xs hover:text-[#0070f4] cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={state.warehouseIds.includes(w.warehouseId)}
-                        onChange={() => toggleWarehouse(w.warehouseId)}
-                        className={checkCls}
-                      />
-                      <span className="truncate" title={w.name}>
-                        {w.name}
-                      </span>
-                    </label>
-                  ))}
-                  {warehouses.length === 0 && <div className="text-xs text-slate-400">Chưa được phân quyền kho nào</div>}
+              {/* Cùng ô chọn chi nhánh với màn Nhập hàng: thẻ chọn nhiều + danh sách thả xuống, [] = Tất cả */}
+              {warehouses.length === 0 ? (
+                <div>
+                  <div className={sectionTitle}>Chi nhánh</div>
+                  <div className="text-xs text-slate-400">Chưa được phân quyền kho nào</div>
                 </div>
-                <p className="mt-1.5 text-[11px] text-slate-400">Không chọn = mọi kho được phân quyền</p>
-              </div>
+              ) : (
+                <WarehouseMultiSelect
+                  value={state.warehouseIds}
+                  warehouses={warehouses}
+                  onChange={(warehouseIds) => onChange({ warehouseIds })}
+                />
+              )}
               <div className="border-t border-slate-100" />
             </>
           )}

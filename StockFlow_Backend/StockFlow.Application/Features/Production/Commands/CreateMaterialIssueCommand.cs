@@ -70,6 +70,18 @@ public class CreateMaterialIssueCommandHandler : IRequestHandler<CreateMaterialI
         if (!order.CanIssueMaterial())
             return Result.Failure<MaterialIssueDto>("Lệnh sản xuất đã hoàn thành hoặc đã huỷ nên không xuất được nguyên vật liệu.");
 
+        // Lệnh lập từ kế hoạch có Kho xuất NVL: bắt buộc xuất tại đúng kho đó (kế hoạch đã so tồn / đặt hàng theo kho này)
+        if (order.ProductionPlanId is int planId)
+        {
+            var planWarehouse = await _context.TrxProductionPlans.AsNoTracking()
+                .Where(p => p.ProductionPlanId == planId && p.WarehouseId != null)
+                .Select(p => new { p.PlanCode, p.WarehouseId, Name = p.Warehouse!.WarehouseName })
+                .FirstOrDefaultAsync(ct);
+            if (planWarehouse != null && planWarehouse.WarehouseId != req.WarehouseId)
+                return Result.Failure<MaterialIssueDto>(
+                    $"Lệnh lập từ kế hoạch {planWarehouse.PlanCode}: phải xuất nguyên vật liệu tại {planWarehouse.Name}.");
+        }
+
         // BR-04: quyền kho xuất
         if (!await ProductionHelper.IsActiveWarehouseAsync(_context, req.WarehouseId, ct))
             return Result.Failure<MaterialIssueDto>("Kho xuất không tồn tại hoặc đã ngừng hoạt động.");

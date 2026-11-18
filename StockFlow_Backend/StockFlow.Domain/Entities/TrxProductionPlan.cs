@@ -36,6 +36,11 @@ public partial class TrxProductionPlan
 
     public int? UpdatedBy { get; set; }
 
+    /// <summary>Kho xuất nguyên vật liệu của cả kế hoạch (mặc định kho làm việc của người lập). Mọi người xem kế hoạch đều so tồn nguyên vật liệu theo kho này. Null với kế hoạch cũ.</summary>
+    public int? WarehouseId { get; set; }
+
+    public virtual MstWarehouse? Warehouse { get; set; }
+
     public virtual SecUser CreatedByNavigation { get; set; } = null!;
 
     public virtual SecUser? ApprovedByNavigation { get; set; }

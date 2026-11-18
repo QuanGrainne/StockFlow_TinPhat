@@ -66,7 +66,8 @@ public static class ProductionReader
         int BomId, string? BomCode, string? BomVersion, decimal? Planned, decimal? Received, decimal Defect,
         DateTime? StartDate, DateTime? EndDate, string? Workshop, string? Status, string? CreatorFullName,
         string? CreatorUsername, int RequirementCount, int ShortageLines, int ReviewFlags, string? Notes,
-        List<OrderItemRow> Items, int? ProductionPlanId, string? ProductionPlanCode);
+        List<OrderItemRow> Items, int? ProductionPlanId, string? ProductionPlanCode,
+        int? PlanWarehouseId, string? PlanWarehouseName);
 
     private static IQueryable<OrderRow> OrderRows(IQueryable<TrxProductionOrder> orders) =>
         orders.AsNoTracking().Select(o => new OrderRow(
@@ -108,7 +109,9 @@ public static class ProductionReader
                     i.Notes))
                 .ToList(),
             o.ProductionPlanId,
-            o.ProductionPlan != null ? o.ProductionPlan.PlanCode : null));
+            o.ProductionPlan != null ? o.ProductionPlan.PlanCode : null,
+            o.ProductionPlan != null ? o.ProductionPlan.WarehouseId : null,
+            o.ProductionPlan != null && o.ProductionPlan.Warehouse != null ? o.ProductionPlan.Warehouse.WarehouseName : null));
 
     private static ProductionOrderSummaryDto ToSummary(OrderRow o)
     {
@@ -189,7 +192,9 @@ public static class ProductionReader
             isFullyReceived,
             items,
             o.ProductionPlanId,
-            o.ProductionPlanCode);
+            o.ProductionPlanCode,
+            o.PlanWarehouseId,
+            o.PlanWarehouseName);
     }
 
     public static async Task<List<ProductionOrderSummaryDto>> OrderSummariesAsync(

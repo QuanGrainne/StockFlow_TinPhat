@@ -12,7 +12,7 @@ import { readDocumentLink, scrollToWhenReady } from '@/lib/navigation/documentLi
 import { message } from 'antd';
 import * as XLSX from 'xlsx';
 import { FileDown, Inbox, Plus, RefreshCcw, Search } from 'lucide-react';
-import { useActiveWarehouse } from '@/lib/warehouse/useActiveWarehouse';
+import { useActiveWarehouse, type WarehouseItem } from '@/lib/warehouse/useActiveWarehouse';
 import { productionPlanService } from '../services/productionPlanService';
 import type { PlanMaterialRequirementLine, ProductionListFilter, ProductionPlanDetail, ProductionPlanSummary } from '../types';
 import { useProductionFeatures } from '../hooks/useProductionFeatures';
@@ -35,6 +35,9 @@ type Dialog =
 interface ProductionPlansScreenProps {
   mode?: 'plans' | 'approvals';
 }
+
+/** Khóa thông báo của nút Đặt hàng nhập: bấm lặp chỉ thay thông báo cũ */
+const ORDER_MSG_KEY = 'plan-order-materials';
 
 /** Trạng thái kế hoạch được đặt hàng nhập NVL từ màn Duyệt kế hoạch */
 const ORDERABLE_STATUSES: string[] = ['PENDING_APPROVAL', 'APPROVED'];
@@ -72,7 +75,9 @@ function initialFilter(mode: 'plans' | 'approvals'): ProductionListFilter {
 export default function ProductionPlansScreen({ mode = 'plans' }: ProductionPlansScreenProps) {
   const router = useRouter();
   const features = useProductionFeatures();
-  const { activeWarehouse, warehouses } = useActiveWarehouse();
+  const { activeWarehouse, setActiveWarehouse, warehouses } = useActiveWarehouse();
+  // Đặt hàng nhập khi kho làm việc khác kho xuất NVL của kế hoạch: hỏi đổi kho trước (phiếu đặt nhập về kho làm việc)
+  const [warehouseWarn, setWarehouseWarn] = useState<{ detail: ProductionPlanDetail; planWarehouse: WarehouseItem } | null>(null);
 
   // Link mở thẳng 1 kế hoạch (?code=KHSX00004&id=4, VD bấm mã kế hoạch ở chi tiết Lệnh sản xuất):
   // điền mã vào ô tìm, hiện mọi trạng thái, mở sẵn chi tiết và cuộn tới dòng đó
@@ -168,7 +173,7 @@ export default function ProductionPlansScreen({ mode = 'plans' }: ProductionPlan
   function handleAction(action: ProductionPlanAction) {
     if (!lastDetail) return;
     if (action === 'purchaseOrder') {
-      void orderMaterials(lastDetail);
+      orderMaterials(lastDetail);
       return;
     }
     setDialog({ kind: action, detail: lastDetail });
@@ -179,28 +184,51 @@ export default function ProductionPlansScreen({ mode = 'plans' }: ProductionPlan
     mode === 'approvals' && features.canOrderPurchase && !!d && ORDERABLE_STATUSES.includes(d.summary.status);
 
   /**
-   * Mở trang đặt hàng nhập, điền sẵn CHỈ các NVL đang thiếu so với tồn tại kho làm việc (số lượng = phần thiếu)
+   * Đặt hàng nhập NVL cho kế hoạch. Phiếu đặt nhập về kho làm việc, nên kho làm việc phải trùng kho xuất NVL của kế hoạch:
+   * khác kho → hỏi đổi kho làm việc trước; không có quyền kho xuất NVL → báo, không đặt.
+   * Kế hoạch cũ chưa có kho xuất NVL → dùng kho làm việc như trước.
+   */
+  function orderMaterials(d: ProductionPlanDetail) {
+    const planWarehouseId = d.summary.warehouseId;
+    if (planWarehouseId && planWarehouseId !== activeWarehouse.warehouseId) {
+      const planWarehouse = warehouses.find((w) => w.warehouseId === planWarehouseId);
+      if (!planWarehouse) {
+        message.error({
+          key: ORDER_MSG_KEY,
+          content: `Kho xuất nguyên vật liệu của kế hoạch là ${d.summary.warehouseName ?? 'kho khác'}, bạn không có quyền kho này nên không đặt hàng nhập được.`,
+        });
+        return;
+      }
+      setWarehouseWarn({ detail: d, planWarehouse });
+      return;
+    }
+    void openPurchaseOrder(d, activeWarehouse.warehouseId, activeWarehouse.name);
+  }
+
+  /**
+   * Mở trang đặt hàng nhập, điền sẵn CHỈ các NVL đang thiếu so với tồn tại kho đã chọn (số lượng = phần thiếu)
    * và ghi chú mã kế hoạch. Không thiếu NVL nào → báo, không mở trang đặt hàng.
    */
-  async function orderMaterials(d: ProductionPlanDetail) {
+  async function openPurchaseOrder(d: ProductionPlanDetail, warehouseId: number, warehouseName: string) {
     if (runningRef.current) return;
     runningRef.current = true;
     setBusy(true);
     try {
-      const warehouseId = activeWarehouse.warehouseId;
-      const warehouseName = warehouses.find((w) => w.warehouseId === warehouseId)?.name ?? 'kho làm việc';
       const req = await productionPlanService.getMaterialRequirements(d.summary.productionPlanId, warehouseId);
       const missingBom = req.productsWithoutBom.map((p) => p.productCode).join(', ');
       const products = purchaseItemsParam(req.materials);
       if (!products) {
-        message.info(
-          missingBom
+        // key: bấm nhiều lần chỉ thay thông báo cũ, không chồng nhiều dòng
+        message.info({
+          key: ORDER_MSG_KEY,
+          content: missingBom
             ? `Các thành phẩm chưa có định mức đang áp dụng (${missingBom}) nên chưa tính được nguyên vật liệu cần đặt.`
-            : `Không thiếu nguyên vật liệu nào tại ${warehouseName}, không cần đặt hàng nhập.`
-        );
+            : `Không thiếu nguyên vật liệu nào tại ${warehouseName}, không cần đặt hàng nhập.`,
+        });
         return;
       }
-      if (missingBom) message.warning(`Chưa có định mức đang áp dụng, không tính nguyên vật liệu cho: ${missingBom}.`);
+      if (missingBom)
+        message.warning({ key: ORDER_MSG_KEY, content: `Chưa có định mức đang áp dụng, không tính nguyên vật liệu cho: ${missingBom}.` });
       const notes = `Đặt NVL còn thiếu tại ${warehouseName} cho kế hoạch sản xuất ${d.summary.planCode}`;
       router.push(`/purchase-orders/create?products=${products}&notes=${encodeURIComponent(notes)}`);
     } catch (err) {
@@ -523,6 +551,28 @@ export default function ProductionPlansScreen({ mode = 'plans' }: ProductionPlan
               (d) => `Đã đóng kế hoạch ${d.summary.planCode}.`
             )
           }
+        />
+      )}
+      {warehouseWarn && (
+        <ConfirmDialog
+          title="Kho làm việc khác kho xuất NVL"
+          danger
+          busy={busy}
+          confirmText={`Chuyển sang ${warehouseWarn.planWarehouse.name}`}
+          message={
+            <span>
+              Kế hoạch <b>{warehouseWarn.detail.summary.planCode}</b> xuất nguyên vật liệu tại <b>{warehouseWarn.planWarehouse.name}</b>, nhưng bạn đang làm
+              việc tại <b>{activeWarehouse.name}</b>. Phiếu đặt hàng nhập sẽ nhập về kho làm việc, nên cần chuyển kho làm việc sang{' '}
+              <b>{warehouseWarn.planWarehouse.name}</b> để đặt đúng nguyên vật liệu còn thiếu tại kho đó.
+            </span>
+          }
+          onCancel={() => setWarehouseWarn(null)}
+          onConfirm={() => {
+            const { detail: d, planWarehouse } = warehouseWarn;
+            setWarehouseWarn(null);
+            setActiveWarehouse(planWarehouse);
+            void openPurchaseOrder(d, planWarehouse.warehouseId, planWarehouse.name);
+          }}
         />
       )}
       {dialog?.kind === 'createOrder' && (
