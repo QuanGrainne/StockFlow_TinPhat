@@ -13,11 +13,13 @@ public class UpdateProductCommandHandler : IRequestHandler<UpdateProductCommand,
 {
     private readonly IStockFlowDbContext _context;
     private readonly ICurrentUserService _currentUser;
+    private readonly IImageStorage _imageStorage;
 
-    public UpdateProductCommandHandler(IStockFlowDbContext context, ICurrentUserService currentUser)
+    public UpdateProductCommandHandler(IStockFlowDbContext context, ICurrentUserService currentUser, IImageStorage imageStorage)
     {
         _context = context;
         _currentUser = currentUser;
+        _imageStorage = imageStorage;
     }
 
     public async Task<Result<ProductDto>> Handle(UpdateProductCommand command, CancellationToken cancellationToken)
@@ -34,6 +36,17 @@ public class UpdateProductCommandHandler : IRequestHandler<UpdateProductCommand,
         }
 
         var req = command.Request;
+
+        // Lưu ảnh thành file trước mọi thay đổi (handler có SaveChanges giữa chừng khi tạo nhóm hàng/đơn vị mới)
+        ImageStoreResult? image = null;
+        if (req.ImageUrl != null)
+        {
+            image = await _imageStorage.StoreAsync(req.ImageUrl, cancellationToken);
+            if (image.Rejected)
+            {
+                return Result.Failure<ProductDto>(image.Error!);
+            }
+        }
 
         // Code update check
         if (!string.IsNullOrWhiteSpace(req.Code))
@@ -224,9 +237,9 @@ public class UpdateProductCommandHandler : IRequestHandler<UpdateProductCommand,
             product.HasRewardPoints = req.HasRewardPoints.Value;
         }
 
-        if (req.ImageUrl != null)
+        if (image != null)
         {
-            product.ImageUrl = req.ImageUrl.Trim();
+            product.ImageUrl = image.Url;
         }
 
         if (!string.IsNullOrEmpty(req.VariantsJson))

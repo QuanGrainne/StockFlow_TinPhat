@@ -7,7 +7,7 @@
 # Không dùng Docker vẫn chạy như cũ: dotnet run (StockFlow_Backend/StockFlow.API) + npm run dev (StockFlow_Frontend).
 # Hướng dẫn chi tiết: SETUP.md, mục 13 "Run with Docker".
 #
-# KHÔNG chạy "docker compose down -v": lệnh này xoá volume pgdata (toàn bộ dữ liệu).
+# KHÔNG chạy "docker compose down -v": lệnh này xoá volume pgdata (toàn bộ dữ liệu) và uploads (toàn bộ ảnh hàng hóa).
 name: stockflow
 
 services:
@@ -47,7 +47,11 @@ services:
       Jwt__SecretKey: ${JWT_SECRET_KEY:?đặt JWT_SECRET_KEY trong deploy/.env (ít nhất 32 ký tự)}
       # false = không tạo lại nhân viên / kho mẫu khi API khởi động (chỉ giữ admin)
       Seed__DemoData: ${SEED_DEMO_DATA:-true}
+      # File ảnh hàng hóa, nằm trong volume "uploads" (giữ nguyên khi build lại / restart)
+      Storage__UploadsPath: /app/uploads
       Logging__LogLevel__Microsoft.EntityFrameworkCore.Database.Command: Warning
+    volumes:
+      - uploads:/app/uploads
     healthcheck:
       # Image ASP.NET không có curl: gọi GET /api/health bằng bash /dev/tcp
       test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/8080 && printf 'GET /api/health HTTP/1.0\\r\\nHost: localhost\\r\\n\\r\\n' >&3 && grep -q healthy <&3"]
@@ -97,5 +101,7 @@ services:
 
 volumes:
   pgdata:
+  # Ảnh hàng hóa. "down -v" cũng xoá volume này.
+  uploads:
   caddy_data:
   caddy_config:
