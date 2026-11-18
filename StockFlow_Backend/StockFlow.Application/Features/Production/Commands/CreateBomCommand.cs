@@ -17,7 +17,7 @@ public class CreateBomCommandValidator : AbstractValidator<CreateBomCommand>
     public CreateBomCommandValidator()
     {
         RuleFor(x => x.Request.ProductId).GreaterThan(0).WithMessage("Vui lòng chọn thành phẩm.");
-        RuleFor(x => x.Request.BomCode).MaximumLength(100).WithMessage("Mã BOM tối đa 100 ký tự.");
+        RuleFor(x => x.Request.BomCode).MaximumLength(100).WithMessage("Mã định mức tối đa 100 ký tự.");
         RuleFor(x => x.Request.Version).MaximumLength(20).WithMessage("Phiên bản tối đa 20 ký tự.");
         RuleFor(x => x.Request.Description).MaximumLength(500).WithMessage("Ghi chú kỹ thuật tối đa 500 ký tự.");
     }
@@ -42,13 +42,13 @@ public class CreateBomCommandHandler : IRequestHandler<CreateBomCommand, Result<
             ? await BomRules.NextVersionAsync(_context, req.ProductId, ct)
             : req.Version.Trim();
         if (await _context.MstBoms.AnyAsync(b => b.ProductId == req.ProductId && b.Version == version, ct))
-            return Result.Failure<BomDetailDto>($"Thành phẩm đã có BOM phiên bản {version}.");
+            return Result.Failure<BomDetailDto>($"Thành phẩm đã có định mức phiên bản {version}.");
 
         var code = string.IsNullOrWhiteSpace(req.BomCode)
             ? $"BOM-{product!.ProductCode}-V{version}".ToUpperInvariant()
             : req.BomCode.Trim();
         if (await _context.MstBoms.AnyAsync(b => b.BomName == code, ct))
-            return Result.Failure<BomDetailDto>($"Mã BOM {code} đã tồn tại trong hệ thống.");
+            return Result.Failure<BomDetailDto>($"Mã định mức {code} đã tồn tại trong hệ thống.");
 
         await using var tx = await _context.BeginTransactionAsync(ct);
 

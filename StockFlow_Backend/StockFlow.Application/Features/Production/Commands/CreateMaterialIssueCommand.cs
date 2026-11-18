@@ -111,7 +111,7 @@ public class CreateMaterialIssueCommandHandler : IRequestHandler<CreateMaterialI
             return (r.IssuedQty ?? 0) + l.Quantity > (r.RequiredQty ?? 0);
         });
         if (exceeds && reason == null)
-            return Result.Failure<MaterialIssueDto>("Số lượng xuất luỹ kế vượt nhu cầu theo BOM. " + ProductionMessages.ReasonRequired);
+            return Result.Failure<MaterialIssueDto>("Số lượng xuất luỹ kế vượt nhu cầu theo định mức. " + ProductionMessages.ReasonRequired);
 
         await using var tx = await _context.BeginTransactionAsync(ct);
 

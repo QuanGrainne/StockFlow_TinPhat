@@ -28,7 +28,7 @@ public class DeleteBomCommandHandler : IRequestHandler<DeleteBomCommand, Result>
         if (bom == null) return Result.Failure(ProductionMessages.BomNotFound);
 
         if (await BomRules.IsUsedAsync(_context, bom.BomId, ct))
-            return Result.Failure("BOM đã được dùng cho lệnh sản xuất nên không xoá được. Bạn có thể ngừng áp dụng BOM.");
+            return Result.Failure("Định mức đã được dùng cho lệnh sản xuất nên không hủy được. Bạn có thể ngừng áp dụng định mức.");
 
         _context.DtlBomItems.RemoveRange(bom.DtlBomItems);
         _context.MstBoms.Remove(bom);

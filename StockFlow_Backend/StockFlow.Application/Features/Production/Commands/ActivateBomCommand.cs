@@ -27,7 +27,7 @@ public class ActivateBomCommandHandler : IRequestHandler<ActivateBomCommand, Res
         if (bom == null) return Result.Failure<BomDetailDto>(ProductionMessages.BomNotFound);
 
         if (!await _context.DtlBomItems.AnyAsync(i => i.BomId == bom.BomId, ct))
-            return Result.Failure<BomDetailDto>("BOM phải có ít nhất một nguyên vật liệu.");
+            return Result.Failure<BomDetailDto>("Định mức phải có ít nhất một nguyên vật liệu.");
 
         if (bom.IsActive != true)
         {

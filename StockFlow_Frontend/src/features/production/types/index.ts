@@ -308,6 +308,8 @@ export interface ProductionProductLookup {
   productType: string | null;
   hasActiveBom: boolean;
   availableQty: number | null;
+  /** Ảnh hàng hóa (null = chưa có ảnh) */
+  imageUrl?: string | null;
 }
 
 // ─── Bộ lọc danh sách ─────────────────────────────────────────────────────────

@@ -111,22 +111,4 @@ public static class ProductionStockOps
             new StockKey(warehouseId, product.ProductId, locationId, lotId),
             qty, unitCost, products, reference, ct, transactionDate: transactionDate);
     }
-
-    /// <summary>Tổng giá trị NVL đã xuất cho một lệnh sản xuất (theo giá vốn ghi trên thẻ kho lúc xuất).</summary>
-    public static async Task<decimal> IssuedMaterialValueAsync(
-        IStockFlowDbContext context, int productionOrderId, CancellationToken ct)
-    {
-        var issueIds = context.TrxStockIssues
-            .Where(i => i.ProductionOrderId == productionOrderId && i.IssueType == StockIssueType.Production)
-            .Select(i => i.StockIssueId);
-
-        var value = await context.TrxInventoryTransactions.AsNoTracking()
-            .Where(t => t.ReferenceType == IssueReferenceType
-                        && t.TransactionType == IssueTransactionType
-                        && t.ReferenceId != null
-                        && issueIds.Contains(t.ReferenceId.Value))
-            .SumAsync(t => -(t.Quantity ?? 0) * (t.TransactionPrice ?? 0), ct);
-
-        return value < 0 ? 0 : value;
-    }
 }

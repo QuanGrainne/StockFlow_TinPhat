@@ -93,13 +93,6 @@ public static class ProductionPolicy
         return Math.Floor(plannedQuantity * issuedQuantity / requiredQuantity * 100m) / 100m;
     }
 
-    /// <summary>
-    /// Đơn giá vốn thành phẩm khi nhập kho (quyết định nhóm 13/11/2026):
-    /// tổng giá trị NVL đã xuất cho lệnh (theo giá vốn lúc xuất) ÷ SL kế hoạch. Không phải giá thành đầy đủ.
-    /// </summary>
-    public static decimal CalculateFinishedGoodsUnitCost(decimal totalIssuedMaterialValue, decimal plannedQuantity)
-    {
-        if (plannedQuantity <= 0 || totalIssuedMaterialValue <= 0) return 0;
-        return Math.Round(totalIssuedMaterialValue / plannedQuantity, 2, MidpointRounding.AwayFromZero);
-    }
+    // Đã bỏ CalculateFinishedGoodsUnitCost (giá vốn thành phẩm = giá trị NVL đã xuất ÷ SL kế hoạch, quyết định 13/11/2026):
+    // từ 18/11/2026 nhập thành phẩm giữ nguyên giá vốn đang có, xem FinishedGoodsRules.ReceiveAsync.
 }

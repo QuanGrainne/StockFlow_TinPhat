@@ -13,15 +13,28 @@ import { ProductCodeLink } from '@/components/links/EntityLinks';
 import { productionService } from '../services/productionService';
 import type { FinishedGoodsReceipt, ProductionListFilter } from '../types';
 import { errorText, fmtDate, fmtDateTime, fmtQty } from '../utils/productionFormat';
-import { ProductionFilterSidebar, SidebarToggle, defaultProductionFilter } from '../components/ProductionFilterSidebar';
+import { useSearchParams } from 'next/navigation';
+import { readDocumentLink, scrollToWhenReady } from '@/lib/navigation/documentLink';
+import { ProductionFilterSidebar, SidebarToggle, defaultProductionFilter, linkProductionFilter } from '../components/ProductionFilterSidebar';
+import { ProductionDocLink } from '../components/ProductionDocLink';
 import { SmallTag } from '../components/ProductionStatusTag';
 
 export default function FinishedGoodsReceiptsScreen() {
   const { warehouses } = useActiveWarehouse();
-  const [query, setQuery] = useState('');
-  const [filter, setFilter] = useState<ProductionListFilter>(() => defaultProductionFilter([]));
+  // Link mở thẳng 1 phiếu nhập thành phẩm (?code=NTP...&id=&date=, VD bấm mã phiếu ở chi tiết lệnh sản xuất):
+  // điền mã vào ô tìm, lọc đúng ngày phiếu, mở sẵn chi tiết và cuộn tới dòng đó
+  const searchParams = useSearchParams();
+  const [docLink] = useState(() => readDocumentLink(searchParams));
+  const [query, setQuery] = useState(() => docLink?.code ?? '');
+  const [filter, setFilter] = useState<ProductionListFilter>(() =>
+    docLink ? linkProductionFilter([], docLink.date) : defaultProductionFilter([])
+  );
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [expandedId, setExpandedId] = useState<number | null>(() => docLink?.id ?? null);
+  useEffect(() => {
+    if (!docLink?.id) return;
+    return scrollToWhenReady(`[data-doc-row="${docLink.id}"]`);
+  }, [docLink]);
 
   const requestKey = JSON.stringify({
     warehouseIds: filter.warehouseIds,
@@ -181,12 +194,15 @@ export default function FinishedGoodsReceiptsScreen() {
                     return (
                       <React.Fragment key={r.fgrId}>
                         <tr
+                          data-doc-row={r.fgrId}
                           onClick={() => setExpandedId(isExpanded ? null : r.fgrId)}
                           className={`cursor-pointer text-[13px] ${isExpanded ? 'bg-[#e6f1fe]/80' : r.needsReview ? 'bg-[#fef2f2]/40 hover:bg-[#fef2f2]' : 'hover:bg-[#f7f8f9]'}`}
                         >
                           <td className="py-2.5 px-3 font-mono font-medium text-[#0070f4]">{r.fgrCode}</td>
                           <td className="py-2.5 px-3 whitespace-nowrap">{fmtDateTime(r.receivedDate)}</td>
-                          <td className="py-2.5 px-3 font-mono">{r.productionOrderCode}</td>
+                          <td className="py-2.5 px-3">
+                            <ProductionDocLink kind="order" code={r.productionOrderCode} id={r.productionOrderId} className="!font-normal" />
+                          </td>
                           <td className="py-2.5 px-3">
                             <div className="font-medium">{r.productName}</div>
                             <div className="text-[11px] text-[#677484]">{r.productCode}</div>

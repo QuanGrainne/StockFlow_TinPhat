@@ -1,14 +1,16 @@
 'use client';
 
-// Định mức BOM (UC-57, màn 3.2.2.6–3.2.2.8; Manager): danh sách BOM theo thành phẩm và phiên bản,
+// Định mức sản phẩm (BOM; UC-57, màn 3.2.2.6–3.2.2.8; Manager): danh sách BOM theo thành phẩm và phiên bản,
 // xem chi tiết NVL (định mức, hao hụt, định mức sau hao hụt), thêm / sửa (BOM chưa dùng), tạo phiên bản mới,
 // áp dụng / ngừng áp dụng (BR-30: mỗi thành phẩm tối đa 1 BOM đang áp dụng), xoá BOM chưa dùng (BR-06).
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { message } from 'antd';
 import * as XLSX from 'xlsx';
-import { CheckCircle2, Copy, FileDown, Inbox, Pencil, Plus, RefreshCcw, Search, Trash2, XCircle } from 'lucide-react';
+import { CheckCircle2, Copy, FileDown, Inbox, Pencil, Plus, Printer, RefreshCcw, Search, Trash2, XCircle } from 'lucide-react';
 import { ProductCodeLink } from '@/components/links/EntityLinks';
+import { useSearchParams } from 'next/navigation';
+import { readDocumentLink, scrollToWhenReady } from '@/lib/navigation/documentLink';
 import { productionService } from '../services/productionService';
 import type { BomDetail, BomSummary, ProductionListFilter } from '../types';
 import { useProductionFeatures } from '../hooks/useProductionFeatures';
@@ -17,6 +19,7 @@ import { ProductionFilterSidebar, SidebarToggle } from '../components/Production
 import { SmallTag } from '../components/ProductionStatusTag';
 import { ConfirmDialog } from '../components/ProductionDialog';
 import { BomFormModal } from '../components/BomFormModal';
+import { exportBomDetailToXLSX, printBom } from '../utils/bomDocument';
 
 const STATUS_OPTIONS = [
   { value: 'ACTIVE', label: 'Đang áp dụng' },
@@ -27,7 +30,11 @@ type Confirm = { kind: 'activate' | 'deactivate' | 'delete'; bom: BomSummary } |
 
 export default function BomManagementScreen() {
   const features = useProductionFeatures();
-  const [query, setQuery] = useState('');
+  // Link mở thẳng 1 định mức (?code=BOM-...&id=, VD bấm mã định mức ở chi tiết lệnh sản xuất):
+  // điền mã vào ô tìm, mở sẵn chi tiết và cuộn tới dòng đó (bộ lọc mặc định đã là mọi trạng thái, toàn thời gian)
+  const searchParams = useSearchParams();
+  const [docLink] = useState(() => readDocumentLink(searchParams));
+  const [query, setQuery] = useState(() => docLink?.code ?? '');
   const [filter, setFilter] = useState<ProductionListFilter>({
     statuses: ['ACTIVE', 'INACTIVE'],
     timeRange: 'all',
@@ -36,7 +43,11 @@ export default function BomManagementScreen() {
   });
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [reloadTick, setReloadTick] = useState(0);
-  const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [expandedId, setExpandedId] = useState<number | null>(() => docLink?.id ?? null);
+  useEffect(() => {
+    if (!docLink?.id) return;
+    return scrollToWhenReady(`[data-doc-row="${docLink.id}"]`);
+  }, [docLink]);
   const [details, setDetails] = useState<Record<number, BomDetail>>({});
   const [form, setForm] = useState<{ source: BomDetail | null; asNewVersion: boolean } | null>(null);
   const [confirm, setConfirm] = useState<Confirm>(null);
@@ -54,7 +65,7 @@ export default function BomManagementScreen() {
       })
       .catch((err: unknown) => {
         if (stale) return;
-        message.error(errorText(err, 'Không thể tải danh sách BOM'));
+        message.error(errorText(err, 'Không thể tải danh sách định mức'));
         setResult({ key: reloadTick, data: [] });
       });
     return () => {
@@ -86,7 +97,7 @@ export default function BomManagementScreen() {
         if (!stale) setDetails((prev) => ({ ...prev, [expandedId]: d }));
       })
       .catch((err: unknown) => {
-        if (!stale) message.error(errorText(err, 'Không tải được chi tiết BOM'));
+        if (!stale) message.error(errorText(err, 'Không tải được chi tiết định mức'));
       });
     return () => {
       stale = true;
@@ -103,13 +114,13 @@ export default function BomManagementScreen() {
     try {
       if (c.kind === 'activate') {
         await productionService.activateBom(c.bom.bomId);
-        message.success(`Đã áp dụng BOM ${c.bom.bomCode} (phiên bản ${c.bom.version}).`);
+        message.success(`Đã áp dụng định mức ${c.bom.bomCode} (phiên bản ${c.bom.version}).`);
       } else if (c.kind === 'deactivate') {
         await productionService.deactivateBom(c.bom.bomId);
-        message.success(`Đã ngừng áp dụng BOM ${c.bom.bomCode}.`);
+        message.success(`Đã ngừng áp dụng định mức ${c.bom.bomCode}.`);
       } else {
         await productionService.deleteBom(c.bom.bomId);
-        message.success(`Đã xoá BOM ${c.bom.bomCode}.`);
+        message.success(`Đã hủy định mức ${c.bom.bomCode}.`);
         setExpandedId(null);
       }
       setConfirm(null);
@@ -127,15 +138,15 @@ export default function BomManagementScreen() {
       const d = details[b.bomId] ?? (await productionService.getBom(b.bomId).catch(() => null));
       for (const it of d?.items ?? []) {
         rows.push({
-          'Mã BOM': b.bomCode,
+          'Mã định mức': b.bomCode,
           'Phiên bản': b.version,
           'Mã thành phẩm': b.productCode,
           'Thành phẩm': b.productName,
           'Trạng thái': b.isActive ? 'Đang áp dụng' : 'Ngừng áp dụng',
-          'Mã NVL': it.materialCode,
-          'Tên NVL': it.materialName,
-          'ĐVT': it.unitName,
-          'Định mức / 1 đv': it.quantity,
+          'Mã nguyên vật liệu': it.materialCode,
+          'Tên nguyên vật liệu': it.materialName,
+          'Đơn vị tính': it.unitName,
+          'Định mức cho 1 đơn vị thành phẩm': it.quantity,
           'Hao hụt (%)': it.wastageRate,
           'Định mức sau hao hụt': it.totalPerUnit,
         });
@@ -143,26 +154,28 @@ export default function BomManagementScreen() {
     }
     const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'DinhMucBOM');
-    XLSX.writeFile(wb, `DinhMucBOM_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    XLSX.utils.book_append_sheet(wb, ws, 'DinhMuc');
+    XLSX.writeFile(wb, `DinhMucSanPham_${new Date().toISOString().slice(0, 10)}.xlsx`);
   }
 
   const th = 'sticky top-0 z-20 bg-[#f7f8f9] py-2.5 px-3 border-b border-slate-200 whitespace-nowrap';
   const actionBtn = 'flex items-center gap-1.5 px-3 py-1.5 text-xs hover:bg-[#f7f8f9] rounded-[8px] border border-slate-300 bg-white cursor-pointer';
+  // Nút chữ (không viền) như thanh nút chi tiết đặt hàng nhập
+  const textBtn = 'inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-[#15171a] rounded-[8px] hover:bg-[#f7f8f9] cursor-pointer';
   const canEdit = features.canManageBom;
 
   return (
     <div className="flex-1 h-full min-h-0 flex flex-col bg-transparent overflow-hidden select-none text-[13px] text-[#15171a] font-sans">
       <header className="min-h-12 bg-white/84 backdrop-blur-[2px] border-b border-slate-200 px-3 sm:px-4 py-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 shrink-0">
         <div className="flex items-center gap-4 flex-1 basis-[320px] min-w-[260px] max-w-xl">
-          <h1 className="text-[20px] font-bold leading-7 tracking-tight whitespace-nowrap">Định mức BOM</h1>
+          <h1 className="text-[20px] font-bold leading-7 tracking-tight whitespace-nowrap">Định mức sản phẩm</h1>
           <div className="relative flex-1">
             <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#677484] pointer-events-none" />
             <input
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Theo mã BOM, mã / tên thành phẩm"
+              placeholder="Theo mã định mức, mã / tên thành phẩm"
               className="w-full h-8 pl-8 pr-3 rounded-full bg-[#f7f8f9] border border-slate-200 text-[13px] placeholder-[#677484] focus:outline-none focus:border-[#0070f4] focus:bg-white transition"
             />
           </div>
@@ -175,7 +188,7 @@ export default function BomManagementScreen() {
               className="inline-flex items-center gap-1.5 px-3.5 h-8 rounded-[8px] bg-[#0070f4] hover:bg-[#005ac3] text-white font-semibold text-[13px] shadow-xs transition cursor-pointer"
             >
               <Plus size={15} className="stroke-[2.5]" />
-              <span>Thêm BOM</span>
+              <span>Thêm định mức</span>
             </button>
           )}
           <button
@@ -206,10 +219,10 @@ export default function BomManagementScreen() {
             <table className="w-full text-left border-collapse min-w-[960px]">
               <thead className="text-[12px] font-semibold text-[#677484]">
                 <tr>
-                  <th className={th}>Mã BOM</th>
+                  <th className={th}>Mã định mức</th>
                   <th className={th}>Thành phẩm</th>
                   <th className={th}>Phiên bản</th>
-                  <th className={`${th} text-right`}>Số NVL</th>
+                  <th className={`${th} text-right`}>Số nguyên vật liệu</th>
                   <th className={th}>Ngày tạo</th>
                   <th className={th}>Ghi chú kỹ thuật</th>
                   <th className={`${th} text-center`}>Trạng thái</th>
@@ -220,14 +233,14 @@ export default function BomManagementScreen() {
                   <tr>
                     <td colSpan={7} className="py-20 text-center text-[#677484]">
                       <RefreshCcw size={18} className="animate-spin mx-auto mb-2 text-[#0070f4]" />
-                      Đang tải định mức BOM...
+                      Đang tải định mức...
                     </td>
                   </tr>
                 ) : filtered.length === 0 ? (
                   <tr>
                     <td colSpan={7} className="py-24 text-center text-[#677484]">
                       <Inbox size={28} className="mx-auto mb-2 text-[#0070f4]" />
-                      Không tìm thấy BOM nào phù hợp
+                      Không tìm thấy định mức nào phù hợp
                     </td>
                   </tr>
                 ) : (
@@ -237,6 +250,7 @@ export default function BomManagementScreen() {
                     return (
                       <React.Fragment key={b.bomId}>
                         <tr
+                          data-doc-row={b.bomId}
                           onClick={() => setExpandedId(isExpanded ? null : b.bomId)}
                           className={`cursor-pointer text-[13px] ${isExpanded ? 'bg-[#e6f1fe]/80' : 'hover:bg-[#f7f8f9]'}`}
                         >
@@ -245,7 +259,7 @@ export default function BomManagementScreen() {
                             <div className="font-medium">{b.productName}</div>
                             <div className="text-[11px] text-[#677484]">{b.productCode}</div>
                           </td>
-                          <td className="py-2.5 px-3">v{b.version}</td>
+                          <td className="py-2.5 px-3">{b.version}</td>
                           <td className="py-2.5 px-3 text-right">{b.materialCount}</td>
                           <td className="py-2.5 px-3 whitespace-nowrap">{fmtDateTime(b.createdAt)}</td>
                           <td className="py-2.5 px-3 max-w-[280px] truncate" title={b.description ?? ''}>
@@ -262,7 +276,7 @@ export default function BomManagementScreen() {
                                 {!d ? (
                                   <div className="py-8 text-center text-xs text-slate-400">
                                     <RefreshCcw size={18} className="animate-spin mx-auto mb-2 text-[#0070f4]" />
-                                    Đang tải chi tiết BOM...
+                                    Đang tải chi tiết định mức...
                                   </div>
                                 ) : (
                                   <>
@@ -280,7 +294,7 @@ export default function BomManagementScreen() {
                                       </div>
                                       <div>
                                         <span className="text-slate-400">Phiên bản: </span>
-                                        <span className="font-medium text-slate-800">v{d.summary.version}</span>
+                                        <span className="font-medium text-slate-800">{d.summary.version}</span>
                                       </div>
                                       <div>
                                         <span className="text-slate-400">Đơn vị thành phẩm: </span>
@@ -292,10 +306,10 @@ export default function BomManagementScreen() {
                                         <thead className="bg-[#f7f8f9] border-b border-slate-200 font-semibold text-[#677484]">
                                           <tr>
                                             <th className="py-2 px-3 w-10 text-center">STT</th>
-                                            <th className="py-2 px-3 w-36">Mã NVL</th>
-                                            <th className="py-2 px-3">Tên NVL</th>
-                                            <th className="py-2 px-3 w-16 text-center">ĐVT</th>
-                                            <th className="py-2 px-3 w-32 text-right">Định mức / 1 đv</th>
+                                            <th className="py-2 px-3 w-36">Mã nguyên vật liệu</th>
+                                            <th className="py-2 px-3">Tên nguyên vật liệu</th>
+                                            <th className="py-2 px-3 w-24 text-center">Đơn vị tính</th>
+                                            <th className="py-2 px-3 w-32 text-right">Định mức cho 1 thành phẩm</th>
                                             <th className="py-2 px-3 w-24 text-right">Hao hụt</th>
                                             <th className="py-2 px-3 w-36 text-right">Định mức sau hao hụt</th>
                                           </tr>
@@ -321,47 +335,64 @@ export default function BomManagementScreen() {
                                     <div className="p-2.5 text-xs border border-slate-200 rounded-[8px] bg-slate-50/60 min-h-[44px] text-slate-700 whitespace-pre-line mb-4">
                                       {d.summary.description || 'Chưa có ghi chú'}
                                     </div>
-                                    {canEdit && (
-                                      <div className="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-slate-100">
-                                        <div className="flex items-center gap-2">
-                                          {!d.summary.isUsed && (
-                                            <button
-                                              type="button"
-                                              onClick={() => setConfirm({ kind: 'delete', bom: d.summary })}
-                                              className={`${actionBtn} text-rose-600 border-rose-200 hover:bg-rose-50`}
-                                            >
-                                              <Trash2 size={13} />
-                                              <span>Xoá</span>
-                                            </button>
-                                          )}
-                                          <button type="button" onClick={() => setForm({ source: d, asNewVersion: true })} className={actionBtn}>
-                                            <Copy size={13} />
-                                            <span>Tạo phiên bản mới</span>
-                                          </button>
-                                          {!d.summary.isUsed && (
-                                            <button type="button" onClick={() => setForm({ source: d, asNewVersion: false })} className={actionBtn}>
-                                              <Pencil size={13} />
-                                              <span>Sửa</span>
-                                            </button>
-                                          )}
-                                        </div>
-                                        {d.summary.isActive ? (
-                                          <button type="button" onClick={() => setConfirm({ kind: 'deactivate', bom: d.summary })} className={actionBtn}>
-                                            <XCircle size={13} />
-                                            <span>Ngừng áp dụng</span>
-                                          </button>
-                                        ) : (
+                                    {/* Cùng bố cục với chi tiết đặt hàng nhập: trái Hủy / Xuất file, phải thao tác + In */}
+                                    <div className="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-slate-100">
+                                      <div className="flex items-center gap-1">
+                                        {canEdit && (
                                           <button
                                             type="button"
-                                            onClick={() => setConfirm({ kind: 'activate', bom: d.summary })}
-                                            className="flex items-center gap-1.5 px-4 py-1.5 text-xs bg-[#0070f4] hover:bg-[#005ac3] text-white rounded-[8px] font-semibold cursor-pointer"
+                                            disabled={d.summary.isUsed}
+                                            onClick={() => setConfirm({ kind: 'delete', bom: d.summary })}
+                                            title={
+                                              d.summary.isUsed
+                                                ? 'Định mức đã dùng cho lệnh sản xuất nên không hủy được; dùng "Ngừng áp dụng".'
+                                                : 'Hủy (xoá) định mức chưa dùng'
+                                            }
+                                            className={`${textBtn} !text-[#fb2c36] disabled:opacity-40 disabled:cursor-not-allowed`}
                                           >
-                                            <CheckCircle2 size={13} />
-                                            <span>Áp dụng</span>
+                                            <Trash2 size={14} /> Hủy
                                           </button>
                                         )}
+                                        <button type="button" onClick={() => exportBomDetailToXLSX(d)} className={textBtn}>
+                                          <FileDown size={14} /> Xuất file
+                                        </button>
                                       </div>
-                                    )}
+                                      <div className="flex flex-wrap items-center gap-2">
+                                        {canEdit && (
+                                          <>
+                                            <button type="button" onClick={() => setForm({ source: d, asNewVersion: true })} className={actionBtn}>
+                                              <Copy size={13} />
+                                              <span>Tạo phiên bản mới</span>
+                                            </button>
+                                            {!d.summary.isUsed && (
+                                              <button type="button" onClick={() => setForm({ source: d, asNewVersion: false })} className={actionBtn}>
+                                                <Pencil size={13} />
+                                                <span>Sửa</span>
+                                              </button>
+                                            )}
+                                            {d.summary.isActive ? (
+                                              <button type="button" onClick={() => setConfirm({ kind: 'deactivate', bom: d.summary })} className={actionBtn}>
+                                                <XCircle size={13} />
+                                                <span>Ngừng áp dụng</span>
+                                              </button>
+                                            ) : (
+                                              <button
+                                                type="button"
+                                                onClick={() => setConfirm({ kind: 'activate', bom: d.summary })}
+                                                className="flex items-center gap-1.5 px-4 py-1.5 text-xs bg-[#0070f4] hover:bg-[#005ac3] text-white rounded-[8px] font-semibold cursor-pointer"
+                                              >
+                                                <CheckCircle2 size={13} />
+                                                <span>Áp dụng</span>
+                                              </button>
+                                            )}
+                                          </>
+                                        )}
+                                        <button type="button" onClick={() => printBom(d)} className={actionBtn}>
+                                          <Printer size={13} />
+                                          <span>In</span>
+                                        </button>
+                                      </div>
+                                    </div>
                                   </>
                                 )}
                               </div>
@@ -376,7 +407,7 @@ export default function BomManagementScreen() {
             </table>
           </div>
           <footer className="h-10 bg-white/82 backdrop-blur-[2px] border-t border-slate-200 px-4 flex items-center text-[12px] text-[#677484] shrink-0">
-            Hiển thị <strong className="mx-1 text-[#15171a]">{filtered.length}</strong> BOM
+            Hiển thị <strong className="mx-1 text-[#15171a]">{filtered.length}</strong> định mức
           </footer>
         </div>
       </div>
@@ -396,15 +427,15 @@ export default function BomManagementScreen() {
 
       {confirm && (
         <ConfirmDialog
-          title={confirm.kind === 'activate' ? 'Áp dụng BOM' : confirm.kind === 'deactivate' ? 'Ngừng áp dụng BOM' : 'Xoá BOM'}
+          title={confirm.kind === 'activate' ? 'Áp dụng định mức' : confirm.kind === 'deactivate' ? 'Ngừng áp dụng định mức' : 'Hủy định mức'}
           danger={confirm.kind !== 'activate'}
           busy={busy}
           message={
             confirm.kind === 'activate'
-              ? `Áp dụng phiên bản ${confirm.bom.version} sẽ ngừng áp dụng BOM đang dùng của ${confirm.bom.productName}. Tiếp tục?`
+              ? `Áp dụng phiên bản ${confirm.bom.version} sẽ ngừng áp dụng định mức đang dùng của ${confirm.bom.productName}. Tiếp tục?`
               : confirm.kind === 'deactivate'
-                ? `Ngừng áp dụng BOM ${confirm.bom.bomCode}? Thành phẩm ${confirm.bom.productName} sẽ không lập được lệnh sản xuất mới cho đến khi có BOM đang áp dụng.`
-                : `Bạn có chắc chắn muốn xoá BOM ${confirm.bom.bomCode}? Thao tác này không thể hoàn tác.`
+                ? `Ngừng áp dụng định mức ${confirm.bom.bomCode}? Thành phẩm ${confirm.bom.productName} sẽ không lập được lệnh sản xuất mới cho đến khi có định mức đang áp dụng.`
+                : `Bạn có chắc chắn muốn hủy định mức ${confirm.bom.bomCode}? Định mức sẽ bị xoá và không thể khôi phục.`
           }
           onCancel={() => setConfirm(null)}
           onConfirm={() => void runConfirm(confirm)}

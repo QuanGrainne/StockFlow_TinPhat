@@ -17,7 +17,7 @@ namespace StockFlow.Application.Features.Production.Commands;
 /// - BR-35: luỹ kế SL đạt không vượt kế hoạch. BR-36: chỉ SL đạt vào tồn kho; SL lỗi ghi riêng trên báo cáo sản xuất.
 /// - BR-37: cần nhiều NVL hơn số đã xuất → bắt buộc ghi chú, phiếu được gắn cờ cho Manager (không chặn).
 /// - BR-38: luỹ kế SL đạt = kế hoạch → lệnh Hoàn thành (MSG45).
-/// Giá vốn nhập = tổng giá trị NVL đã xuất của lệnh ÷ SL kế hoạch (ProductionPolicy).
+/// Giá vốn: nhập thành phẩm không tính lại giá vốn, giữ giá vốn đang có của hàng (FinishedGoodsRules).
 /// </summary>
 public record CreateFinishedGoodsReceiptCommand(CreateFinishedGoodsReceiptRequest Request)
     : IRequest<Result<FinishedGoodsReceiptDto>>;

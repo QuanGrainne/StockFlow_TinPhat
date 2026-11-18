@@ -153,7 +153,7 @@ export function CreateOrderFromPlanModal({ detail, onClose, onCreated }: CreateO
                           <div className="text-[11px] text-[#677484]">
                             {item.productName} · {item.unitName}
                           </div>
-                          {!item.hasActiveBom && <div className="text-[11px] text-[#fb2c36]">Chưa có BOM đang áp dụng</div>}
+                          {!item.hasActiveBom && <div className="text-[11px] text-[#fb2c36]">Chưa có định mức đang áp dụng</div>}
                         </td>
                         <td className="py-1.5 px-2 text-[11px] text-[#677484]">
                           {fmtDateOnly(item.plannedStartDate)} – {fmtDateOnly(item.plannedEndDate)}

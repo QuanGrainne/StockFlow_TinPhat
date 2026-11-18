@@ -1,6 +1,6 @@
 'use client';
 
-// Thêm / sửa BOM (màn 3.2.2.7–3.2.2.8, UC-57 A51.6): chọn thành phẩm, phiên bản, ghi chú kỹ thuật,
+// Thêm / sửa định mức sản phẩm (BOM; màn 3.2.2.7–3.2.2.8, UC-57 A51.6): chọn thành phẩm, phiên bản, ghi chú kỹ thuật,
 // các dòng NVL với định mức cho 1 đơn vị thành phẩm (đơn vị cơ sở của NVL) và tỷ lệ hao hụt %.
 
 import React, { useMemo, useState } from 'react';
@@ -70,7 +70,7 @@ export function BomFormModal({ source, asNewVersion, onClose, onDone }: BomFormM
 
   function addMaterial(p: ProductionProductLookup) {
     if (product && p.productId === product.productId) {
-      message.warning('Thành phẩm không được là nguyên vật liệu trong BOM của chính nó.');
+      message.warning('Thành phẩm không được là nguyên vật liệu trong định mức của chính nó.');
       return;
     }
     setLines((prev) => [
@@ -85,7 +85,7 @@ export function BomFormModal({ source, asNewVersion, onClose, onDone }: BomFormM
       return;
     }
     if (lines.length === 0) {
-      message.error('BOM phải có ít nhất một nguyên vật liệu.');
+      message.error('Định mức phải có ít nhất một nguyên vật liệu.');
       return;
     }
     const bad = checked.find((c) => !c.qtyOk || !c.rateOk);
@@ -108,10 +108,10 @@ export function BomFormModal({ source, asNewVersion, onClose, onDone }: BomFormM
     setBusy(true);
     try {
       const saved = isEdit ? await productionService.updateBom(source!.summary.bomId, payload) : await productionService.createBom(payload);
-      message.success(`Đã lưu BOM ${saved.summary.bomCode}${saved.summary.isActive ? ' (đang áp dụng)' : ''}.`);
+      message.success(`Đã lưu định mức ${saved.summary.bomCode}${saved.summary.isActive ? ' (đang áp dụng)' : ''}.`);
       onDone(saved);
     } catch (err) {
-      message.error(errorText(err, 'Không lưu được BOM'));
+      message.error(errorText(err, 'Không lưu được định mức'));
     } finally {
       setBusy(false);
     }
@@ -124,7 +124,7 @@ export function BomFormModal({ source, asNewVersion, onClose, onDone }: BomFormM
 
   return (
     <ProductionDialog
-      title={isEdit ? `Sửa BOM ${source!.summary.bomCode}` : asNewVersion ? 'Tạo phiên bản BOM mới' : 'Thêm BOM'}
+      title={isEdit ? `Sửa định mức ${source!.summary.bomCode}` : asNewVersion ? 'Tạo phiên bản định mức mới' : 'Thêm định mức'}
       onClose={onClose}
       widthClass="max-w-4xl"
       footer={
@@ -133,7 +133,7 @@ export function BomFormModal({ source, asNewVersion, onClose, onDone }: BomFormM
             Bỏ qua
           </button>
           <button type="button" disabled={busy} onClick={submit} className={btnPrimary}>
-            {busy ? 'Đang lưu...' : 'Lưu BOM'}
+            {busy ? 'Đang lưu...' : 'Lưu định mức'}
           </button>
         </>
       }
@@ -154,14 +154,16 @@ export function BomFormModal({ source, asNewVersion, onClose, onDone }: BomFormM
           ) : (
             <ProductSearchInput
               placeholder="Tìm thành phẩm theo mã hoặc tên"
-              productType="FINISHED"
+              // Thành phẩm + bán thành phẩm; hàng chưa gán loại cũng tính là thành phẩm (giống danh mục hàng hóa)
+              productTypes={['FINISHED', 'SEMI_FINISHED']}
+              variant="catalog"
               onSelect={(p) => setProduct({ productId: p.productId, productCode: p.productCode, productName: p.productName })}
               excludeIds={lines.map((l) => l.materialId)}
             />
           )}
         </div>
         <div>
-          <label className={labelCls}>Mã BOM</label>
+          <label className={labelCls}>Mã định mức</label>
           <input value={bomCode} onChange={(e) => setBomCode(e.target.value)} maxLength={100} placeholder="Tự sinh nếu để trống" className={inputCls} />
         </div>
         <div>
@@ -181,7 +183,9 @@ export function BomFormModal({ source, asNewVersion, onClose, onDone }: BomFormM
         <div className="w-80">
           <ProductSearchInput
             placeholder="Thêm nguyên vật liệu (mã hoặc tên)"
-            productType="RAW_MATERIAL"
+            // Tìm trong toàn bộ danh mục hàng hóa: loại hàng trong danh mục mặc định là Thành phẩm nên
+            // không lọc theo loại; thành phẩm đang chọn và nguyên vật liệu đã thêm bị loại qua excludeIds
+            variant="catalog"
             onSelect={addMaterial}
             excludeIds={[...(product ? [product.productId] : []), ...lines.map((l) => l.materialId)]}
           />
@@ -192,10 +196,10 @@ export function BomFormModal({ source, asNewVersion, onClose, onDone }: BomFormM
           <thead className="bg-[#f7f8f9] border-b border-slate-200 font-semibold text-[#677484]">
             <tr>
               <th className="py-2 px-3 w-10 text-center">STT</th>
-              <th className="py-2 px-3 w-32">Mã NVL</th>
-              <th className="py-2 px-3">Tên NVL</th>
-              <th className="py-2 px-3 w-16 text-center">ĐVT</th>
-              <th className="py-2 px-3 w-32 text-right">Định mức / 1 đv</th>
+              <th className="py-2 px-3 w-32">Mã nguyên vật liệu</th>
+              <th className="py-2 px-3">Tên nguyên vật liệu</th>
+              <th className="py-2 px-3 w-24 text-center">Đơn vị tính</th>
+              <th className="py-2 px-3 w-32 text-right">Định mức cho 1 thành phẩm</th>
               <th className="py-2 px-3 w-24 text-right">Hao hụt %</th>
               <th className="py-2 px-3 w-28 text-right">Sau hao hụt</th>
               <th className="py-2 px-3 w-10" />
@@ -205,7 +209,7 @@ export function BomFormModal({ source, asNewVersion, onClose, onDone }: BomFormM
             {checked.length === 0 ? (
               <tr>
                 <td colSpan={8} className="py-6 text-center text-slate-400">
-                  Chưa có nguyên vật liệu. Tìm và thêm NVL ở ô phía trên.
+                  Chưa có nguyên vật liệu. Gõ mã hoặc tên ở ô phía trên để thêm nguyên vật liệu.
                 </td>
               </tr>
             ) : (
@@ -238,7 +242,7 @@ export function BomFormModal({ source, asNewVersion, onClose, onDone }: BomFormM
                       type="button"
                       onClick={() => setLines((prev) => prev.filter((x) => x.materialId !== l.materialId))}
                       className="text-slate-400 hover:text-rose-600 cursor-pointer"
-                      title="Bỏ NVL"
+                      title="Bỏ nguyên vật liệu"
                     >
                       <Trash2 size={14} />
                     </button>
@@ -259,7 +263,7 @@ export function BomFormModal({ source, asNewVersion, onClose, onDone }: BomFormM
         className="w-full px-2.5 py-1.5 text-[13px] border border-slate-300 rounded-[6px] focus:outline-none focus:border-[#0070f4]"
       />
       <p className="mt-2 text-[11px] text-[#677484]">
-        Định mức tính theo đơn vị cơ sở của NVL cho 1 đơn vị thành phẩm. Lệnh sản xuất đã lập giữ định mức tại thời điểm lập, sửa BOM sau đó không
+        Định mức tính theo đơn vị cơ sở của nguyên vật liệu cho 1 đơn vị thành phẩm. Lệnh sản xuất đã lập giữ định mức tại thời điểm lập, sửa định mức sau đó không
         ảnh hưởng lệnh cũ.
       </p>
     </ProductionDialog>

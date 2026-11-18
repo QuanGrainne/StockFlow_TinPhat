@@ -8,7 +8,7 @@ import { useRouter } from 'next/navigation';
 import { message } from 'antd';
 import { ArrowDownToLine, CheckCheck, Copy, FileDown, Loader2, Pencil, Printer, Save, Trash2 } from 'lucide-react';
 import { DocumentCodeLink, PartnerLink, ProductCodeLink } from '@/components/links/EntityLinks';
-import { formatDateTimeVN } from '@/lib/utils/date';
+import { formatDateOnlyVN, formatDateTimeVN } from '@/lib/utils/date';
 import { toLinkDate } from '@/lib/navigation/documentLink';
 import { purchaseOrderService } from '../services/purchaseOrderService';
 import type { PurchaseOrderDetail, PurchaseOrderItem } from '../types';
@@ -201,7 +201,7 @@ export default function PurchaseOrderExpandedRow({ poId, colSpan, onClose, onCha
               </div>
             )}
 
-            <div className="grid grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-4">
               <div>
                 <div className="text-[12px] text-[#677484] mb-1">Người tạo</div>
                 <div className="pb-2 border-b border-slate-200">{po.createdByName || '—'}</div>
@@ -209,6 +209,15 @@ export default function PurchaseOrderExpandedRow({ poId, colSpan, onClose, onCha
               <div>
                 <div className="text-[12px] text-[#677484] mb-1">Ngày đặt</div>
                 <div className="pb-2 border-b border-slate-200">{formatDateTimeVN(po.orderDate)}</div>
+              </div>
+              <div>
+                <div className="text-[12px] text-[#677484] mb-1">Ngày giao dự kiến</div>
+                <div
+                  className="pb-2 border-b border-slate-200"
+                  title={po.expectedDate ? undefined : 'Chưa có ngày giao: MRP chỉ hiển thị, không tính hàng đặt này vào nguồn cung'}
+                >
+                  {po.expectedDate ? formatDateOnlyVN(po.expectedDate) : <span className="text-[#677484]">Chưa có</span>}
+                </div>
               </div>
               <div>
                 <div className="text-[12px] text-[#677484] mb-1">Đã nhập / Đã đặt</div>

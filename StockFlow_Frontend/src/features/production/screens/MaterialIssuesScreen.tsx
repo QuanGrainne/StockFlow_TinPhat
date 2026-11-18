@@ -13,7 +13,10 @@ import { productionService } from '../services/productionService';
 import type { MaterialIssue, ProductionListFilter } from '../types';
 import { useProductionFeatures } from '../hooks/useProductionFeatures';
 import { errorText, fmtDateTime, fmtQty } from '../utils/productionFormat';
-import { ProductionFilterSidebar, SidebarToggle, defaultProductionFilter } from '../components/ProductionFilterSidebar';
+import { useSearchParams } from 'next/navigation';
+import { readDocumentLink, scrollToWhenReady } from '@/lib/navigation/documentLink';
+import { ProductionFilterSidebar, SidebarToggle, defaultProductionFilter, linkProductionFilter } from '../components/ProductionFilterSidebar';
+import { ProductionDocLink } from '../components/ProductionDocLink';
 import { SmallTag } from '../components/ProductionStatusTag';
 import { OrderPickerDialog } from '../components/OrderPickerDialog';
 import { MaterialIssueModal } from '../components/MaterialIssueModal';
@@ -26,11 +29,21 @@ const TYPE_OPTIONS = [
 export default function MaterialIssuesScreen() {
   const features = useProductionFeatures();
   const { warehouses } = useActiveWarehouse();
-  const [query, setQuery] = useState('');
-  const [filter, setFilter] = useState<ProductionListFilter>(() => defaultProductionFilter(['MAIN', 'SUPPLEMENTARY']));
+  // Link mở thẳng 1 phiếu xuất (?code=XK...&id=&date=, VD bấm mã phiếu ở chi tiết lệnh sản xuất):
+  // điền mã vào ô tìm, lọc đúng ngày phiếu, mở sẵn chi tiết và cuộn tới dòng đó
+  const searchParams = useSearchParams();
+  const [docLink] = useState(() => readDocumentLink(searchParams));
+  const [query, setQuery] = useState(() => docLink?.code ?? '');
+  const [filter, setFilter] = useState<ProductionListFilter>(() =>
+    docLink ? linkProductionFilter(['MAIN', 'SUPPLEMENTARY'], docLink.date) : defaultProductionFilter(['MAIN', 'SUPPLEMENTARY'])
+  );
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [reloadTick, setReloadTick] = useState(0);
-  const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [expandedId, setExpandedId] = useState<number | null>(() => docLink?.id ?? null);
+  useEffect(() => {
+    if (!docLink?.id) return;
+    return scrollToWhenReady(`[data-doc-row="${docLink.id}"]`);
+  }, [docLink]);
   const [picking, setPicking] = useState(false);
   const [issueOrderId, setIssueOrderId] = useState<number | null>(null);
 
@@ -189,12 +202,15 @@ export default function MaterialIssuesScreen() {
                     return (
                       <React.Fragment key={i.stockIssueId}>
                         <tr
+                          data-doc-row={i.stockIssueId}
                           onClick={() => setExpandedId(isExpanded ? null : i.stockIssueId)}
                           className={`cursor-pointer text-[13px] ${isExpanded ? 'bg-[#e6f1fe]/80' : 'hover:bg-[#f7f8f9]'}`}
                         >
                           <td className="py-2.5 px-3 font-mono font-medium text-[#0070f4]">{i.issueCode}</td>
                           <td className="py-2.5 px-3 whitespace-nowrap">{fmtDateTime(i.issueDate)}</td>
-                          <td className="py-2.5 px-3 font-mono">{i.productionOrderCode}</td>
+                          <td className="py-2.5 px-3">
+                            <ProductionDocLink kind="order" code={i.productionOrderCode} id={i.productionOrderId} className="!font-normal" />
+                          </td>
                           <td className="py-2.5 px-3">{i.productName}</td>
                           <td className="py-2.5 px-3">{i.warehouseName}</td>
                           <td className="py-2.5 px-3 text-right">{i.items.length}</td>

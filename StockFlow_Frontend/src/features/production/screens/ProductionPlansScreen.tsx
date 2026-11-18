@@ -195,12 +195,12 @@ export default function ProductionPlansScreen({ mode = 'plans' }: ProductionPlan
       if (!products) {
         message.info(
           missingBom
-            ? `Các thành phẩm chưa có BOM đang áp dụng (${missingBom}) nên chưa tính được nguyên vật liệu cần đặt.`
+            ? `Các thành phẩm chưa có định mức đang áp dụng (${missingBom}) nên chưa tính được nguyên vật liệu cần đặt.`
             : `Không thiếu nguyên vật liệu nào tại ${warehouseName}, không cần đặt hàng nhập.`
         );
         return;
       }
-      if (missingBom) message.warning(`Chưa có BOM đang áp dụng, không tính nguyên vật liệu cho: ${missingBom}.`);
+      if (missingBom) message.warning(`Chưa có định mức đang áp dụng, không tính nguyên vật liệu cho: ${missingBom}.`);
       const notes = `Đặt NVL còn thiếu tại ${warehouseName} cho kế hoạch sản xuất ${d.summary.planCode}`;
       router.push(`/purchase-orders/create?products=${products}&notes=${encodeURIComponent(notes)}`);
     } catch (err) {

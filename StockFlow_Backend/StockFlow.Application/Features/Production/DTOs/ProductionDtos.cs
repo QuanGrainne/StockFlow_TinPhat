@@ -331,6 +331,8 @@ public record ProductionProductLookupDto(
     string UnitName,
     string? ProductType,
     bool HasActiveBom,
-    decimal? AvailableQty
+    decimal? AvailableQty,
+    // Ảnh hàng hóa (đường dẫn /api/uploads/...) để hiện trong ô tìm của form sản xuất
+    string? ImageUrl = null
 );
 

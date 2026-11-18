@@ -182,7 +182,7 @@ export function MaterialIssueModal({ productionOrderId, supplementary = false, o
       return;
     }
     if (reasonMissing) {
-      message.error('Số lượng xuất luỹ kế vượt nhu cầu theo BOM. Vui lòng nhập lý do.');
+      message.error('Số lượng xuất luỹ kế vượt nhu cầu theo định mức. Vui lòng nhập lý do.');
       return;
     }
     setBusy(true);

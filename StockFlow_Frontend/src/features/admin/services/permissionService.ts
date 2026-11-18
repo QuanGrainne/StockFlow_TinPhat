@@ -568,15 +568,43 @@ export interface NavFeatureConfig {
   tabIds: string[];
 }
 
-/** Chức năng phân quyền = đúng các mục trên navbar (xem config/navbar.ts) */
-export const NAVBAR_FEATURES: NavFeatureConfig[] = NAV_ITEMS_FLAT.map((i) => ({
-  id: i.featureId,
-  name: i.title,
-  desc: i.desc,
-  group: i.groupLabel,
-  moduleKey: i.backendModule,
-  tabIds: [i.screen, ...(i.aliases ?? [])],
-}));
+/**
+ * Chức năng thao tác KHÔNG có mục riêng trên navbar nhưng backend vẫn phân quyền (FeatureConstants).
+ * Đặt ngay sau chức năng `after` trong ma trận (cùng nhóm navbar).
+ * - feat-prod-plan: mục "Lập lệnh sản xuất" đã gỡ khỏi navbar (17/11/2026, lệnh lập từ kế hoạch đã duyệt);
+ *   thiếu dòng này thì ma trận không tick được và lưu ma trận sẽ xoá mất quyền lập lệnh.
+ */
+const ACTION_FEATURES: (Omit<NavFeatureConfig, 'group'> & { after: string })[] = [
+  {
+    id: 'feat-prod-plan',
+    name: 'Lập lệnh sản xuất',
+    desc: 'Lập lệnh từ kế hoạch đã duyệt; sửa, hủy, đóng lệnh, điều chỉnh định mức',
+    moduleKey: 'PROD',
+    tabIds: [],
+    after: 'feat-prod',
+  },
+];
+
+/** Chức năng phân quyền = các mục trên navbar (xem lib/navigation/navbar.ts) + chức năng thao tác ở ACTION_FEATURES */
+export const NAVBAR_FEATURES: NavFeatureConfig[] = NAV_ITEMS_FLAT.flatMap((i) => {
+  const navFeature: NavFeatureConfig = {
+    id: i.featureId,
+    name: i.title,
+    desc: i.desc,
+    group: i.groupLabel,
+    moduleKey: i.backendModule,
+    tabIds: [i.screen, ...(i.aliases ?? [])],
+  };
+  const actions: NavFeatureConfig[] = ACTION_FEATURES.filter((a) => a.after === i.featureId).map((a) => ({
+    id: a.id,
+    name: a.name,
+    desc: a.desc,
+    group: i.groupLabel,
+    moduleKey: a.moduleKey,
+    tabIds: a.tabIds,
+  }));
+  return [navFeature, ...actions];
+});
 
 const GOODS_FEATS = ['feat-goods', 'feat-price-books'];
 const STOCK_FEATS = ['feat-transfers', 'feat-stocktake', 'feat-disposal'];
