@@ -6,6 +6,7 @@ import type { LucideIcon } from 'lucide-react';
 import {
   ArrowDownToLine,
   Building2,
+  Calculator,
   CalendarRange,
   ClipboardCheck,
   ClipboardList,
@@ -325,6 +326,16 @@ export const NAV_GROUPS: NavGroup[] = [
         title: 'Duyệt kế hoạch sản xuất',
         desc: 'Duyệt / từ chối kế hoạch chờ duyệt, điều chỉnh và đóng kế hoạch',
         icon: ClipboardCheck,
+        backendModule: 'PROD',
+      },
+      {
+        // Hoạch định Nhu cầu Nguyên vật liệu (MRP)
+        screen: 'production-mrp',
+        path: '/production/mrp',
+        featureId: 'feat-production-mrp',
+        title: 'Hoạch định NVL (MRP)',
+        desc: 'Tính toán nhu cầu nguyên vật liệu và đề xuất kế hoạch mua hàng',
+        icon: Calculator,
         backendModule: 'PROD',
       },
       {
