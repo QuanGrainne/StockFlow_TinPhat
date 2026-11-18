@@ -36,4 +36,6 @@ public partial class TrxMrpRun
     public virtual SecUser RunByNavigation { get; set; } = null!;
 
     public virtual ICollection<DtlMrpRunLine> DtlMrpRunLines { get; set; } = new List<DtlMrpRunLine>();
+
+    public virtual ICollection<DtlMrpRunDemand> DtlMrpRunDemands { get; set; } = new List<DtlMrpRunDemand>();
 }

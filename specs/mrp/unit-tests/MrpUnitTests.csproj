@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Kiểm thử đơn vị bộ tính MRP thuần (StockFlow.Domain/Services/MrpPolicy.cs). Không cần database.
+    Chỉ dùng ProjectReference, KHÔNG thêm NuGet package; không nằm trong StockFlow.sln.
+    Chạy: dotnet run (tham số project) specs/mrp/unit-tests
+    Khi nhóm duyệt thêm xUnit thì chuyển các ca này sang project test.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\StockFlow_Backend\StockFlow.Domain\StockFlow.Domain.csproj" />
+  </ItemGroup>
+
+</Project>

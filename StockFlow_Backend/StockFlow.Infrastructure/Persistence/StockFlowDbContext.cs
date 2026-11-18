@@ -123,6 +123,8 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
 
     public virtual DbSet<DtlMrpRunLine> DtlMrpRunLines { get; set; }
 
+    public virtual DbSet<DtlMrpRunDemand> DtlMrpRunDemands { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema("stockflow");
@@ -2503,6 +2505,65 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
                 .HasForeignKey(d => d.MaterialId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("fk_dtl_mrp_run_lines_material_id");
+        });
+
+        // MRP: truy vết nhu cầu từng NVL đến từ kế hoạch / lệnh nào và được cấp bao nhiêu (BR-MRP-21)
+        modelBuilder.Entity<DtlMrpRunDemand>(entity =>
+        {
+            entity.HasKey(e => e.MrpRunDemandId).HasName("dtl_mrp_run_demands_pkey");
+
+            entity.ToTable("dtl_mrp_run_demands", "stockflow");
+
+            entity.HasIndex(e => new { e.MrpRunId, e.MaterialId }, "ix_dtl_mrp_run_demands_run_material");
+            entity.HasIndex(e => e.MaterialId, "ix_dtl_mrp_run_demands_material_id");
+            entity.HasIndex(e => e.ProductId, "ix_dtl_mrp_run_demands_product_id");
+            entity.HasIndex(e => e.ProductionPlanId, "ix_dtl_mrp_run_demands_production_plan_id");
+            entity.HasIndex(e => e.ProductionOrderId, "ix_dtl_mrp_run_demands_production_order_id");
+
+            entity.Property(e => e.MrpRunDemandId).HasColumnName("mrp_run_demand_id");
+            entity.Property(e => e.MrpRunId).HasColumnName("mrp_run_id");
+            entity.Property(e => e.MaterialId).HasColumnName("material_id");
+            entity.Property(e => e.NeedDate).HasColumnName("need_date");
+            entity.Property(e => e.SourceType)
+                .HasMaxLength(10)
+                .HasColumnName("source_type");
+            entity.Property(e => e.ProductionPlanId).HasColumnName("production_plan_id");
+            entity.Property(e => e.ProductionOrderId).HasColumnName("production_order_id");
+            entity.Property(e => e.ProductId).HasColumnName("product_id");
+            entity.Property(e => e.RequiredQty)
+                .HasPrecision(18, 2)
+                .HasColumnName("required_qty");
+            entity.Property(e => e.AllocatedQty)
+                .HasPrecision(18, 2)
+                .HasColumnName("allocated_qty");
+            entity.Property(e => e.ShortageQty)
+                .HasPrecision(18, 2)
+                .HasColumnName("shortage_qty");
+
+            entity.HasOne(d => d.MrpRun).WithMany(p => p.DtlMrpRunDemands)
+                .HasForeignKey(d => d.MrpRunId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("fk_dtl_mrp_run_demands_mrp_run_id");
+
+            entity.HasOne(d => d.Material).WithMany()
+                .HasForeignKey(d => d.MaterialId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("fk_dtl_mrp_run_demands_material_id");
+
+            entity.HasOne(d => d.Product).WithMany()
+                .HasForeignKey(d => d.ProductId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("fk_dtl_mrp_run_demands_product_id");
+
+            entity.HasOne(d => d.ProductionPlan).WithMany()
+                .HasForeignKey(d => d.ProductionPlanId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("fk_dtl_mrp_run_demands_production_plan_id");
+
+            entity.HasOne(d => d.ProductionOrder).WithMany()
+                .HasForeignKey(d => d.ProductionOrderId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("fk_dtl_mrp_run_demands_production_order_id");
         });
 
         OnModelCreatingPartial(modelBuilder);

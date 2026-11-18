@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using StockFlow.Application.Common;
 using StockFlow.Application.Common.Interfaces;
 using StockFlow.Application.Features.Products.DTOs;
+using StockFlow.Application.Features.Products.Helpers;
 using StockFlow.Domain.Entities;
 
 namespace StockFlow.Application.Features.Products.Commands;
@@ -129,6 +130,10 @@ public class CreateProductCommandHandler : IRequestHandler<CreateProductCommand,
             baseUnitId = unit.UnitId;
         }
 
+        // MRP: thời gian giao 0–365 ngày (rỗng = chưa khai báo)
+        if (req.LeadTimeDays is < 0 or > ProductLeadTime.MaxDays)
+            return Result.Failure<ProductDto>(ProductLeadTime.RangeMessage);
+
         // 3. Create Product
         var minSafeStock = req.MinSafeStock ?? req.ReorderPoint ?? 0m;
         var standardPrice = req.StandardPrice ?? (req.CostPrice.HasValue && req.CostPrice.Value > 0 ? Math.Round(req.CostPrice.Value * 1.35m, 0) : 0m);
@@ -158,6 +163,7 @@ public class CreateProductCommandHandler : IRequestHandler<CreateProductCommand,
             MaxSafeStock = req.MaxSafeStock ?? 999999999m,
             MovingAverageCost = req.CostPrice ?? 0m,
             StandardPrice = standardPrice,
+            LeadTimeDays = req.LeadTimeDays,
             Barcode = req.Barcode?.Trim(),
             Brand = req.Brand?.Trim(),
             Weight = req.Weight,
@@ -253,7 +259,8 @@ public class CreateProductCommandHandler : IRequestHandler<CreateProductCommand,
             VariantsJson: createdProduct.VariantsJson,
             Description: createdProduct.Description,
             CreatedAt: createdProduct.CreatedAt,
-            Supplier: req.Supplier?.Trim()
+            Supplier: req.Supplier?.Trim(),
+            LeadTimeDays: createdProduct.LeadTimeDays
         );
 
         return Result.Success(dto);

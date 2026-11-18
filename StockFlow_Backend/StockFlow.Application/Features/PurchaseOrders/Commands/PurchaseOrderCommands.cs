@@ -93,6 +93,10 @@ public class PurchaseOrderCommandHandler :
                 return Result.Failure<int>($"Mã phiếu đặt hàng nhập '{code}' đã tồn tại.");
         }
 
+        var orderDate = VietnamTime.From(req.OrderDate);
+        var expectedError = PurchaseOrderHelper.ValidateExpectedDate(req.ExpectedDate, orderDate);
+        if (expectedError != null) return Result.Failure<int>(expectedError);
+
         var (discount, total) = PurchaseOrderHelper.ComputeTotal(req.Items, req.DiscountAmount);
         var po = new TrxPurchaseOrder
         {
@@ -100,7 +104,8 @@ public class PurchaseOrderCommandHandler :
             PartnerId = req.PartnerId,
             WarehouseId = warehouseId,
             Status = NormalizeStatus(req.Status),
-            OrderDate = VietnamTime.From(req.OrderDate),
+            OrderDate = orderDate,
+            ExpectedDate = req.ExpectedDate,
             DiscountAmount = discount,
             TotalAmount = total,
             Notes = string.IsNullOrWhiteSpace(req.Notes) ? null : req.Notes.Trim(),
@@ -142,9 +147,14 @@ public class PurchaseOrderCommandHandler :
         var refError = await ValidateReferencesAsync(req.PartnerId, req.Items, ct);
         if (refError != null) return Result.Failure<int>(refError);
 
+        var orderDate = VietnamTime.From(req.OrderDate);
+        var expectedError = PurchaseOrderHelper.ValidateExpectedDate(req.ExpectedDate, orderDate);
+        if (expectedError != null) return Result.Failure<int>(expectedError);
+
         var (discount, total) = PurchaseOrderHelper.ComputeTotal(req.Items, req.DiscountAmount);
         po.PartnerId = req.PartnerId;
-        po.OrderDate = VietnamTime.From(req.OrderDate);
+        po.OrderDate = orderDate;
+        po.ExpectedDate = req.ExpectedDate;
         po.Status = NormalizeStatus(req.Status);
         po.DiscountAmount = discount;
         po.TotalAmount = total;
@@ -258,6 +268,8 @@ public class PurchaseOrderCommandHandler :
                 WarehouseId = sources[0].WarehouseId,
                 Status = sources.Any(p => p.Status == PurchaseOrderHelper.Ordered) ? PurchaseOrderHelper.Ordered : PurchaseOrderHelper.Draft,
                 OrderDate = VietnamTime.Now,
+                // MRP: phiếu gộp lấy ngày giao dự kiến sớm nhất của các phiếu gốc (nếu có)
+                ExpectedDate = sources.Where(p => p.ExpectedDate.HasValue).Select(p => p.ExpectedDate).Min(),
                 DiscountAmount = discount,
                 TotalAmount = total,
                 Notes = notes,

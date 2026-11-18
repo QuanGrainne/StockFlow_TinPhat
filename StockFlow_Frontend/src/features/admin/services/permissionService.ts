@@ -589,12 +589,13 @@ const PROD_FEATS = [
   'feat-prod-plan',
   'feat-prod-issue',
   'feat-prod-receipt',
+  'feat-production-mrp',
 ];
 /**
  * Kế toán sản xuất: xem lệnh, xuất NVL, nhập thành phẩm; không lập lệnh, không sửa BOM (SRS 3.1.6).
- * Được lập / gửi duyệt kế hoạch sản xuất, không duyệt (khớp FeatureConstants backend).
+ * Được lập / gửi duyệt kế hoạch sản xuất, không duyệt; được chạy / xem MRP (khớp FeatureConstants backend, Q10).
  */
-const PROD_ACCOUNTANT_FEATS = ['feat-production-plans', 'feat-prod', 'feat-prod-issue', 'feat-prod-receipt'];
+const PROD_ACCOUNTANT_FEATS = ['feat-production-plans', 'feat-prod', 'feat-prod-issue', 'feat-prod-receipt', 'feat-production-mrp'];
 
 export const DEFAULT_ROLE_FEATURE_PERMS: Record<string, string[]> = {
   ROLE_ADMIN: NAVBAR_FEATURES.map((f) => f.id),

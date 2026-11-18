@@ -325,3 +325,5 @@ export interface ProductionListFilter {
 
 // ─── Kế hoạch sản xuất (UC-PP-01..06) ────────────────────────────────────────
 export * from './productionPlan';
+export * from './mrp';
+

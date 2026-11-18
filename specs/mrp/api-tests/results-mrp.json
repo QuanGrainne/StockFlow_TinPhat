@@ -1,0 +1,224 @@
+﻿[
+    {
+        "Id":  "MT-01",
+        "Name":  "Chạy MRP: có mã lần chạy, người chạy, kỳ từ hôm nay",
+        "Pass":  true,
+        "Actual":  "MRP00015 2026-11-18..2026-12-18 Nguyễn Văn Quản Lý"
+    },
+    {
+        "Id":  "MT-02",
+        "Name":  "Gỗ: tồn đầu 300; thiếu 200 ngày T+4 (đặt T+1), 400 ngày T+6 (đặt T+3)",
+        "Pass":  true,
+        "Actual":  "2026-11-22: 200.00 đặt 2026-11-19; 2026-11-24: 400.00 đặt 2026-11-21"
+    },
+    {
+        "Id":  "MT-03",
+        "Name":  "Sơn: đủ ngày T+4, thiếu 50 ngày T+6 (đặt T+4)",
+        "Pass":  true,
+        "Actual":  "2026-11-24: 50.00 đặt 2026-11-22"
+    },
+    {
+        "Id":  "MT-04",
+        "Name":  "Ốc vít: thiếu 200 (đặt T+3) và 1.600 (đặt T+5)",
+        "Pass":  true,
+        "Actual":  "2026-11-22: 200.00 đặt 2026-11-21; 2026-11-24: 1600.00 đặt 2026-11-23"
+    },
+    {
+        "Id":  "MT-05",
+        "Name":  "NVL thiếu gỗ: tổng 600, thiếu từ T+4, chỉ ra kế hoạch / thành phẩm bị thiếu (Bàn 200, Ghế 400)",
+        "Pass":  true,
+        "Actual":  "PLAN KHSX00006 M8ATABLE095537 200.00; PLAN KHSX00006 M8ACHAIR095537 400.00"
+    },
+    {
+        "Id":  "MT-06",
+        "Name":  "Keo (đủ tồn) không nằm trong danh sách thiếu",
+        "Pass":  true,
+        "Actual":  "keo đủ"
+    },
+    {
+        "Id":  "MT-07",
+        "Name":  "Nhu cầu theo ngày: gỗ T+4 = 500, nguồn KH + Bàn",
+        "Pass":  true,
+        "Actual":  "2 dòng; T+4 500.00 từ PLAN KHSX00006"
+    },
+    {
+        "Id":  "MT-08",
+        "Name":  "Gom tháng và tuần: tổng gỗ đều 900, số cột tuần ≥ 5",
+        "Pass":  true,
+        "Actual":  "tháng 900.00 [2026-11,2026-12]; tuần 900.00 (5 cột)"
+    },
+    {
+        "Id":  "MT-09",
+        "Name":  "Đề xuất mua gỗ: 2 dòng 200 / 400, kịp đặt",
+        "Pass":  true,
+        "Actual":  "200.00/2026-11-19/ON_TIME; 400.00/2026-11-21/ON_TIME"
+    },
+    {
+        "Id":  "MT-10",
+        "Name":  "Thành phẩm có tồn (Bàn) không bị kéo vào MRP như NVL",
+        "Pass":  true,
+        "Actual":  "400 Nguyên vật liệu này không có trong lần chạy MRP."
+    },
+    {
+        "Id":  "MT-11",
+        "Name":  "Số NVL của lần chạy chỉ gồm NVL có nhu cầu (không gồm mọi hàng có tồn)",
+        "Pass":  true,
+        "Actual":  "materialCount=11"
+    },
+    {
+        "Id":  "MT-12",
+        "Name":  "Lập đơn đặt có ngày giao dự kiến; xem lại trả đúng ngày",
+        "Pass":  true,
+        "Actual":  "200"
+    },
+    {
+        "Id":  "MT-13",
+        "Name":  "Đơn 250 về T+3 (trước ngày cần): T+4 đủ (còn 50), T+6 thiếu 350",
+        "Pass":  true,
+        "Actual":  "2026-11-24: 350.00 đặt 2026-11-21"
+    },
+    {
+        "Id":  "MT-14",
+        "Name":  "Sửa đơn đặt sau khi chạy → lần chạy cũ báo lỗi thời",
+        "Pass":  true,
+        "Actual":  "Đơn đặt hàng nhập PDN000006 được tạo / sửa sau lần tính"
+    },
+    {
+        "Id":  "MT-15",
+        "Name":  "Đơn dời về T+5 (sau ngày cần đầu): thiếu 200 ngày T+4, 150 ngày T+6",
+        "Pass":  true,
+        "Actual":  "2026-11-22: 200.00 đặt 2026-11-19; 2026-11-24: 150.00 đặt 2026-11-21"
+    },
+    {
+        "Id":  "MT-16",
+        "Name":  "Nhận 100 của đơn 250: tồn 400, còn chờ 150 (không tính hai lần); thiếu 100 + 250 = 350",
+        "Pass":  true,
+        "Actual":  "200 | 2026-11-22: 100.00 đặt 2026-11-19; 2026-11-24: 250.00 đặt 2026-11-21"
+    },
+    {
+        "Id":  "MT-17",
+        "Name":  "Thêm đơn 500 về T+2: gỗ B hết thiếu",
+        "Pass":  true,
+        "Actual":  "không thiếu"
+    },
+    {
+        "Id":  "MT-18",
+        "Name":  "Hủy đơn 500 → thiếu lại 350",
+        "Pass":  true,
+        "Actual":  "200 Đã hủy phiếu đặt hàng nhập. | thiếu 350.00"
+    },
+    {
+        "Id":  "MT-19",
+        "Name":  "Đơn không có ngày giao: hiện \"đặt chưa rõ ngày\" 77, không trừ vào thiếu",
+        "Pass":  true,
+        "Actual":  "chưa rõ ngày 77.00, thiếu 350.00"
+    },
+    {
+        "Id":  "MT-20",
+        "Name":  "Ngày giao dự kiến trước ngày đặt → 400",
+        "Pass":  true,
+        "Actual":  "400 Ngày giao dự kiến không được trước ngày đặt hàng."
+    },
+    {
+        "Id":  "MT-21",
+        "Name":  "NVL chưa có thời gian giao: thiếu 10, không có hạn đặt, trạng thái NO_LEAD_TIME",
+        "Pass":  true,
+        "Actual":  "10.00//NO_LEAD_TIME"
+    },
+    {
+        "Id":  "MT-22",
+        "Name":  "Cần T+2, thời gian giao 3 ngày → hạn đặt T−1, Trễ",
+        "Pass":  true,
+        "Actual":  "2026-11-17/LATE lateCount=1"
+    },
+    {
+        "Id":  "MT-23",
+        "Name":  "Thành phẩm mất BOM sau khi duyệt: liệt kê riêng, không tính nhu cầu",
+        "Pass":  true,
+        "Actual":  "M8CFG3095537"
+    },
+    {
+        "Id":  "MT-24",
+        "Name":  "Khai báo thời gian giao 1 ngày → hạn đặt T+4, kịp đặt",
+        "Pass":  true,
+        "Actual":  "200 | 2026-11-22/ON_TIME"
+    },
+    {
+        "Id":  "MT-25",
+        "Name":  "Xóa thời gian giao về rỗng; 400 ngày bị chặn",
+        "Pass":  true,
+        "Actual":  "xóa: 200 lead=; 400 ngày: 400 Thời gian giao hàng phải là số ngày từ 0 đến 365."
+    },
+    {
+        "Id":  "MT-26",
+        "Name":  "Hủy kế hoạch → nhu cầu của kế hoạch biến mất",
+        "Pass":  true,
+        "Actual":  "200"
+    },
+    {
+        "Id":  "MT-27",
+        "Name":  "Lập lệnh 40 từ kế hoạch 100: tổng nhu cầu không đổi (200), chia KH 120 + lệnh 80 cùng ngày T+5",
+        "Pass":  true,
+        "Actual":  "200 | ORDER LSX00002 80.00; PLAN KHSX00009 120.00"
+    },
+    {
+        "Id":  "MT-28",
+        "Name":  "Sửa kế hoạch sau khi chạy → lần chạy cũ báo lỗi thời, nêu mã kế hoạch",
+        "Pass":  true,
+        "Actual":  "Kế hoạch KHSX00009 được cập nhật lúc 18/11/2026 09:55"
+    },
+    {
+        "Id":  "MT-29",
+        "Name":  "Tính lại sau khi tăng kế hoạch lên 150: nhu cầu T+5 = 110×2 + 80 = 300",
+        "Pass":  true,
+        "Actual":  "T+5 = 300.00"
+    },
+    {
+        "Id":  "MT-30",
+        "Name":  "Đơn quá ngày giao (T−2) chưa về: tính là về hôm nay, không thiếu",
+        "Pass":  true,
+        "Actual":  "200 | hôm nay nhận 10.00"
+    },
+    {
+        "Id":  "MT-31",
+        "Name":  "Nhân viên bán hàng không xem được MRP (403)",
+        "Pass":  true,
+        "Actual":  "403 Vai trò của bạn chưa được phân quyền chức năng Hoạch định NVL (MRP) / Kế hoạch sản xuất / Duyệt kế hoạch sản xuất."
+    },
+    {
+        "Id":  "MT-32",
+        "Name":  "Nhân viên bán hàng không chạy được MRP (403)",
+        "Pass":  true,
+        "Actual":  "403 Vai trò của bạn chưa được phân quyền chức năng Hoạch định NVL (MRP) / Kế hoạch sản xuất / Duyệt kế hoạch sản xuất."
+    },
+    {
+        "Id":  "MT-33",
+        "Name":  "Kế toán sản xuất chạy được MRP trên kho được phân quyền; kho không được phân quyền bị chặn",
+        "Pass":  true,
+        "Actual":  "kho 4: 200 | kho 3: 400 Bạn không có quyền thao tác trên kho này."
+    },
+    {
+        "Id":  "MT-37",
+        "Name":  "Không xem được kết quả lần chạy của kho không được phân quyền",
+        "Pass":  true,
+        "Actual":  "400 Bạn không có quyền xem lần chạy MRP của kho này."
+    },
+    {
+        "Id":  "MT-34",
+        "Name":  "Validation: cuối kỳ trước hôm nay / quá 366 ngày / không chọn kho / kho không tồn tại → 400",
+        "Pass":  true,
+        "Actual":  "400 400 400 400 Kho không tồn tại hoặc đã ngừng hoạt động."
+    },
+    {
+        "Id":  "MT-35",
+        "Name":  "Lần chạy không tồn tại → 400 thông báo rõ",
+        "Pass":  true,
+        "Actual":  "400 Không tìm thấy lần chạy MRP này."
+    },
+    {
+        "Id":  "MT-36",
+        "Name":  "Lịch sử: lần chạy mới nhất đứng đầu",
+        "Pass":  true,
+        "Actual":  "29 lần chạy; đầu MRP00029"
+    }
+]
