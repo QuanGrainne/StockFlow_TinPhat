@@ -63,6 +63,7 @@ public interface IStockFlowDbContext
     // MRP: lần chạy và dòng chi tiết kết quả hoạch định NVL
     DbSet<TrxMrpRun> TrxMrpRuns { get; }
     DbSet<DtlMrpRunLine> DtlMrpRunLines { get; }
+    DbSet<DtlMrpRunDemand> DtlMrpRunDemands { get; }
 
     Task<long> GetNextSequenceValueAsync(string sequenceName, CancellationToken cancellationToken = default);
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);

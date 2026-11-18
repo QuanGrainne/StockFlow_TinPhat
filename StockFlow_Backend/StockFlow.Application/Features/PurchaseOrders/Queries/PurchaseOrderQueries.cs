@@ -94,7 +94,8 @@ public class PurchaseOrderQueryHandler :
             p.DtlPurchaseOrderItems.Sum(i => i.OrderedQty),
             receivedByPo.GetValueOrDefault(p.PoId),
             p.TotalAmount,
-            p.Notes)).ToList();
+            p.Notes,
+            p.ExpectedDate)).ToList();
 
         return Result.Success(result);
     }
@@ -182,6 +183,7 @@ public class PurchaseOrderQueryHandler :
             po.MergedIntoPoId,
             po.MergedIntoPo?.PoCode,
             po.MergedFromPos.OrderBy(m => m.PoId).Select(m => m.PoCode ?? "").ToList(),
-            paidAmount));
+            paidAmount,
+            po.ExpectedDate));
     }
 }

@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using StockFlow.Application.Common;
 using StockFlow.Application.Common.Interfaces;
 using StockFlow.Application.Features.Products.DTOs;
+using StockFlow.Application.Features.Products.Helpers;
 using StockFlow.Domain.Entities;
 
 namespace StockFlow.Application.Features.Products.Commands;
@@ -13,13 +14,16 @@ public class CreateProductCommandHandler : IRequestHandler<CreateProductCommand,
 {
     private readonly IStockFlowDbContext _context;
     private readonly ICurrentUserService _currentUserService;
+    private readonly IImageStorage _imageStorage;
 
     public CreateProductCommandHandler(
         IStockFlowDbContext context,
-        ICurrentUserService currentUserService)
+        ICurrentUserService currentUserService,
+        IImageStorage imageStorage)
     {
         _context = context;
         _currentUserService = currentUserService;
+        _imageStorage = imageStorage;
     }
 
     public async Task<Result<ProductDto>> Handle(CreateProductCommand command, CancellationToken cancellationToken)
@@ -72,6 +76,13 @@ public class CreateProductCommandHandler : IRequestHandler<CreateProductCommand,
             return Result.Failure<ProductDto>("Tên hàng hóa không được để trống.");
         }
 
+        // Lưu ảnh thành file trên máy chủ trước khi ghi DB (ảnh không hợp lệ thì dừng, chưa ghi gì)
+        var image = await _imageStorage.StoreAsync(req.ImageUrl, cancellationToken);
+        if (image.Rejected)
+        {
+            return Result.Failure<ProductDto>(image.Error!);
+        }
+
         // 1. Resolve Category
         int categoryId = req.CategoryId ?? 0;
         if (categoryId <= 0)
@@ -119,6 +130,10 @@ public class CreateProductCommandHandler : IRequestHandler<CreateProductCommand,
             baseUnitId = unit.UnitId;
         }
 
+        // MRP: thời gian giao 0–365 ngày (rỗng = chưa khai báo)
+        if (req.LeadTimeDays is < 0 or > ProductLeadTime.MaxDays)
+            return Result.Failure<ProductDto>(ProductLeadTime.RangeMessage);
+
         // 3. Create Product
         var minSafeStock = req.MinSafeStock ?? req.ReorderPoint ?? 0m;
         var standardPrice = req.StandardPrice ?? (req.CostPrice.HasValue && req.CostPrice.Value > 0 ? Math.Round(req.CostPrice.Value * 1.35m, 0) : 0m);
@@ -148,6 +163,7 @@ public class CreateProductCommandHandler : IRequestHandler<CreateProductCommand,
             MaxSafeStock = req.MaxSafeStock ?? 999999999m,
             MovingAverageCost = req.CostPrice ?? 0m,
             StandardPrice = standardPrice,
+            LeadTimeDays = req.LeadTimeDays,
             Barcode = req.Barcode?.Trim(),
             Brand = req.Brand?.Trim(),
             Weight = req.Weight,
@@ -155,7 +171,7 @@ public class CreateProductCommandHandler : IRequestHandler<CreateProductCommand,
             LocationName = req.LocationName?.Trim(),
             IsDirectSale = req.IsDirectSale ?? true,
             HasRewardPoints = req.HasRewardPoints ?? true,
-            ImageUrl = req.ImageUrl?.Trim(),
+            ImageUrl = string.IsNullOrEmpty(image.Url) ? null : image.Url,
             VariantsJson = variantsJson,
             IsActive = true,
             CreatedAt = req.CreatedAt ?? DateTime.UtcNow
@@ -243,7 +259,8 @@ public class CreateProductCommandHandler : IRequestHandler<CreateProductCommand,
             VariantsJson: createdProduct.VariantsJson,
             Description: createdProduct.Description,
             CreatedAt: createdProduct.CreatedAt,
-            Supplier: req.Supplier?.Trim()
+            Supplier: req.Supplier?.Trim(),
+            LeadTimeDays: createdProduct.LeadTimeDays
         );
 
         return Result.Success(dto);

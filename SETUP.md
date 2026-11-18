@@ -412,8 +412,31 @@ docker compose -f deploy/compose.yml down                   # remove containers,
 ```
 
 `docker compose ... down -v` also deletes the `pgdata` volume, which means
-**every record in the Docker database**. Use it only to reset a test
-database on purpose.
+**every record in the Docker database**, and the `uploads` volume, which
+holds **every product image**. Use it only to reset a test database on
+purpose.
+
+### Product images
+
+Product images are stored as files, not in the database. The API saves
+them under `Storage:UploadsPath` and serves them at `/api/uploads/...`
+without login (an `<img>` tag cannot send the JWT). The database only
+keeps that path.
+
+- **Docker:** `/app/uploads` inside the `api` container, kept in the
+  `uploads` volume (`stockflow_uploads`). Back it up together with the
+  database dump.
+- **Local `dotnet run`:** `StockFlow_Backend/StockFlow.API/uploads/`
+  (git-ignored). `npm run dev` forwards `/api/uploads/*` to the API
+  through a rewrite in `next.config.ts`.
+- **Upload from the computer:** the browser sends the image as base64;
+  the API checks it is a real JPG/PNG/GIF/WEBP (max 5 MB) and saves a file.
+- **Excel import (e.g. a KiotViet export):** the API downloads the first
+  link in the image column (6 at a time; the same link once) and saves
+  it, so images no longer depend on KiotViet. A link that fails, or that
+  points to a private network address, keeps its original URL and is
+  counted in the import message.
+- Old products whose `image_url` is still a base64 string keep working.
 
 ### Settings (`deploy/.env`)
 

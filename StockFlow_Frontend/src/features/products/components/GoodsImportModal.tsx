@@ -11,7 +11,8 @@ interface GoodsImportModalProps {
   isOpen: boolean;
   onClose: () => void;
   existingGoods: GoodsItem[];
-  onImportSuccess: (importedCount: number, fileName: string, newGoods: GoodsItem[]) => void;
+  /** serverMessage: thông báo từ API (gồm số ảnh không tải được về máy chủ, nếu có) */
+  onImportSuccess: (importedCount: number, fileName: string, newGoods: GoodsItem[], serverMessage?: string) => void;
 }
 
 /**
@@ -603,7 +604,7 @@ export default function GoodsImportModal({
           updateDescription,
           targetWarehouse: costPriceScope === 'BRANCH' ? selectedCostBranch : 'Kho Tổng Gia Lâm',
         });
-        onImportSuccess(importRes.totalCount || importRes.importedCount || importedCount, file.name, updatedGoodsList);
+        onImportSuccess(importRes.totalCount || importRes.importedCount || importedCount, file.name, updatedGoodsList, importRes.message);
         onClose();
       } catch (apiErr: any) {
         console.error('Lỗi API import vào CSDL:', apiErr);

@@ -21,6 +21,20 @@ public static class PurchaseOrderHelper
         return $"PDN{seq:D6}";
     }
 
+    /// <summary>Kiểm tra ngày giao dự kiến không được trước ngày đặt hàng.</summary>
+    public static string? ValidateExpectedDate(DateOnly? expectedDate, DateTime? orderDate)
+    {
+        if (expectedDate.HasValue && orderDate.HasValue)
+        {
+            var orderDay = DateOnly.FromDateTime(orderDate.Value);
+            if (expectedDate.Value < orderDay)
+            {
+                return "Ngày giao dự kiến không được trước ngày đặt hàng.";
+            }
+        }
+        return null;
+    }
+
     /// <summary>Kiểm tra dòng hàng; trả về thông báo lỗi hoặc null nếu hợp lệ.</summary>
     public static string? ValidateItems(List<PurchaseOrderItemRequest>? items)
     {

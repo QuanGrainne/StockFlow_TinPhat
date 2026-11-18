@@ -170,7 +170,8 @@ public class GetProductsQueryHandler : IRequestHandler<GetProductsQuery, Result<
                 Description: p.Description,
                 CreatedAt: p.CreatedAt,
                 Supplier: supplier,
-                Warehouses: warehouseStocks
+                Warehouses: warehouseStocks,
+                LeadTimeDays: p.LeadTimeDays
             );
         }).ToList();
 

@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using StockFlow.Application.Common;
@@ -11,11 +12,16 @@ public record ImportProductsCommand(ImportProductsRequest Request) : IRequest<Re
 
 public class ImportProductsCommandHandler : IRequestHandler<ImportProductsCommand, Result<ImportProductsResultDto>>
 {
-    private readonly IStockFlowDbContext _context;
+    /// <summary>Số ảnh tải song song khi import (đủ nhanh cho lô ~100 hàng, không làm nghẽn VPS 2 core).</summary>
+    private const int ImageDownloadParallelism = 6;
 
-    public ImportProductsCommandHandler(IStockFlowDbContext context)
+    private readonly IStockFlowDbContext _context;
+    private readonly IImageStorage _imageStorage;
+
+    public ImportProductsCommandHandler(IStockFlowDbContext context, IImageStorage imageStorage)
     {
         _context = context;
+        _imageStorage = imageStorage;
     }
 
     public async Task<Result<ImportProductsResultDto>> Handle(ImportProductsCommand command, CancellationToken cancellationToken)
@@ -46,6 +52,14 @@ public class ImportProductsCommandHandler : IRequestHandler<ImportProductsComman
                 defaultWarehouseId = firstWh.WarehouseId;
             }
         }
+
+        // Tải ảnh (link KiotViet...) về máy chủ TRƯỚC khi ghi DB, để hàng không phụ thuộc ảnh bên ngoài.
+        // Link trùng nhau chỉ tải một lần; link lỗi thì giữ nguyên link gốc và báo trong kết quả.
+        var images = await StoreImportImagesAsync(req.Products, cancellationToken);
+        string? ResolveImage(string? raw) =>
+            raw?.Trim() is { Length: > 0 } key && images.TryGetValue(key, out var stored) && !stored.Rejected
+                ? stored.Url
+                : null;
 
         int importedCount = 0;
         int updatedCount = 0;
@@ -116,6 +130,15 @@ public class ImportProductsCommandHandler : IRequestHandler<ImportProductsComman
                 if (pReq.Weight.HasValue)
                 {
                     existingProduct.Weight = pReq.Weight.Value;
+                }
+
+                // Import lại lô cũ: thay ảnh khi hàng chưa có ảnh lưu trên máy chủ (trống, link ngoài hoặc base64 cũ)
+                var importedImage = ResolveImage(pReq.ImageUrl);
+                if (!string.IsNullOrEmpty(importedImage)
+                    && (string.IsNullOrWhiteSpace(existingProduct.ImageUrl)
+                        || !existingProduct.ImageUrl.StartsWith(IImageStorage.PublicPathPrefix + "/", StringComparison.OrdinalIgnoreCase)))
+                {
+                    existingProduct.ImageUrl = importedImage;
                 }
 
                 if (req.UpdateStock && pReq.StockQuantity.HasValue)
@@ -200,7 +223,7 @@ public class ImportProductsCommandHandler : IRequestHandler<ImportProductsComman
                     Description = pReq.Description?.Trim(),
                     Weight = pReq.Weight ?? 0,
                     LocationName = pReq.LocationName?.Trim(),
-                    ImageUrl = pReq.ImageUrl?.Trim(),
+                    ImageUrl = ResolveImage(pReq.ImageUrl),
                     IsDirectSale = pReq.IsDirectSale ?? true,
                     HasRewardPoints = true,
                     IsActive = pReq.IsActive ?? true,
@@ -227,13 +250,40 @@ public class ImportProductsCommandHandler : IRequestHandler<ImportProductsComman
 
         await _context.SaveChangesAsync(cancellationToken);
 
+        var message = $"Nhập thành công {importedCount} sản phẩm mới và cập nhật {updatedCount} sản phẩm.";
+        var failedImages = images.Values.Count(r => r.Error != null);
+        if (failedImages > 0)
+        {
+            message += $" {failedImages} ảnh không tải được về máy chủ (vẫn giữ link gốc); có thể tải ảnh lên lại ở màn Sửa hàng hóa.";
+        }
+
         return Result.Success(new ImportProductsResultDto
         {
             ImportedCount = importedCount,
             UpdatedCount = updatedCount,
             TotalCount = importedCount + updatedCount,
-            Message = $"Nhập thành công {importedCount} sản phẩm mới và cập nhật {updatedCount} sản phẩm."
+            Message = message
         });
+    }
+
+    /// <summary>Tải song song các ảnh khác nhau trong file import; trả về bảng "giá trị gốc → kết quả lưu".</summary>
+    private async Task<Dictionary<string, ImageStoreResult>> StoreImportImagesAsync(
+        IEnumerable<ImportProductItemRequest> products, CancellationToken cancellationToken)
+    {
+        var distinctValues = products
+            .Select(p => p.ImageUrl?.Trim())
+            .Where(v => !string.IsNullOrEmpty(v))
+            .Select(v => v!)
+            .Distinct()
+            .ToList();
+
+        var results = new ConcurrentDictionary<string, ImageStoreResult>();
+        await Parallel.ForEachAsync(
+            distinctValues,
+            new ParallelOptions { MaxDegreeOfParallelism = ImageDownloadParallelism, CancellationToken = cancellationToken },
+            async (value, token) => results[value] = await _imageStorage.StoreAsync(value, token));
+
+        return new Dictionary<string, ImageStoreResult>(results);
     }
 }
 

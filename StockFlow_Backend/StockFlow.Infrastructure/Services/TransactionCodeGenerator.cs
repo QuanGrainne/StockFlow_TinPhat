@@ -51,6 +51,11 @@ public class TransactionCodeGenerator : ITransactionCodeGenerator
                 prefix = "KHSX";
                 sequenceName = "stockflow.seq_production_plan_code";
                 break;
+            case "MRP_RUN":
+                // Lần chạy hoạch định nhu cầu NVL (UC-MRP, mã tạm): MRP00001...
+                prefix = "MRP";
+                sequenceName = "stockflow.seq_mrp_run_code";
+                break;
             case "FINISHED_GOODS_RECEIPT":
                 // Phiếu nhập thành phẩm (UC-49)
                 prefix = "NTP";

@@ -11,7 +11,9 @@ public record CreatePurchaseOrderRequest(
     string? Notes,
     List<PurchaseOrderItemRequest> Items,
     string? PoCode = null,
-    decimal DiscountAmount = 0
+    decimal DiscountAmount = 0,
+    // MRP: ngày hàng dự kiến về kho (không trước ngày đặt); rỗng = chưa rõ
+    DateOnly? ExpectedDate = null
 );
 
 public record UpdatePurchaseOrderRequest(
@@ -20,7 +22,8 @@ public record UpdatePurchaseOrderRequest(
     string Status,
     string? Notes,
     List<PurchaseOrderItemRequest> Items,
-    decimal DiscountAmount = 0
+    decimal DiscountAmount = 0,
+    DateOnly? ExpectedDate = null
 );
 
 /// <summary>Sửa ghi chú phiếu (được sửa ở mọi trạng thái trừ Đã hủy).</summary>
@@ -58,7 +61,8 @@ public record PurchaseOrderListDto(
     decimal TotalOrderedQty,
     decimal TotalReceivedQty,
     decimal TotalAmount,
-    string? Notes
+    string? Notes,
+    DateOnly? ExpectedDate = null
 );
 
 /// <summary>
@@ -108,5 +112,6 @@ public record PurchaseOrderDetailDto(
     int? MergedIntoPoId = null,
     string? MergedIntoCode = null,
     List<string>? MergedFromCodes = null,
-    decimal PaidAmount = 0  // Đã trả NCC cho các phiếu nhập theo phiếu đặt (kể cả phiếu chi trả thêm sau)
+    decimal PaidAmount = 0, // Đã trả NCC cho các phiếu nhập theo phiếu đặt (kể cả phiếu chi trả thêm sau)
+    DateOnly? ExpectedDate = null
 );
