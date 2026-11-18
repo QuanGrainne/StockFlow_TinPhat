@@ -109,7 +109,9 @@ using (var scope = app.Services.CreateScope())
         logger.LogInformation("Applying EF Core database migrations if any pending...");
         await dbContext.Database.MigrateAsync();
         logger.LogInformation("Seeding initial database records if required...");
-        await StockFlow.Infrastructure.Persistence.DatabaseSeeder.SeedAsync(dbContext);
+        // Seed:DemoData=false (deploy) → không tạo lại nhân viên / kho mẫu; mặc định true cho môi trường dev
+        var seedDemoData = app.Configuration.GetValue("Seed:DemoData", true);
+        await StockFlow.Infrastructure.Persistence.DatabaseSeeder.SeedAsync(dbContext, seedDemoData);
         logger.LogInformation("Database is up to date and seeded.");
     }
     catch (Exception ex)

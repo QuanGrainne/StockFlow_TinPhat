@@ -134,7 +134,8 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
         }
       } catch {}
     }
-    return INITIAL_GOODS_LIST;
+    // Chưa có bản lưu: để trống chờ tải từ DB, không hiện hàng mẫu (dữ liệu giả không dùng trên màn hình thật)
+    return [];
   });
   const suggestedProductCode = getNextProductCode(goods);
   // Link mở thẳng 1 hàng hóa (?code=SP...&id=..., VD bấm mã hàng trong phiếu nhập / chuyển / kiểm kho...)
@@ -484,7 +485,15 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
       setIsLoadingDb(true);
       try {
         const apiProducts = await productService.getProducts();
-        if (!isMounted || !apiProducts || apiProducts.length === 0) return;
+        if (!isMounted || !apiProducts) return;
+        if (apiProducts.length === 0) {
+          // DB chưa có hàng hóa: hiện danh sách trống và xoá bản lưu cũ, không giữ hàng mẫu / hàng đã xoá
+          setGoods([]);
+          try {
+            localStorage.removeItem(STOCKFLOW_GOODS_STORAGE_KEY);
+          } catch {}
+          return;
+        }
 
         const dbItems: GoodsItem[] = apiProducts.map((p: any) => {
           let parsedUnits = p.units;

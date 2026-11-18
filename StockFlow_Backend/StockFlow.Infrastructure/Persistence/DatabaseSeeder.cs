@@ -6,7 +6,12 @@ namespace StockFlow.Infrastructure.Persistence;
 
 public static class DatabaseSeeder
 {
-    public static async Task SeedAsync(StockFlowDbContext context)
+    /// <param name="seedDemoData">
+    /// true (mặc định, dùng khi dev): tạo kho mẫu K001–K004, tài khoản nhân viên mẫu và phân quyền kho mẫu nếu thiếu.
+    /// false (bản deploy, cấu hình Seed:DemoData=false): chỉ đảm bảo vai trò và tài khoản admin;
+    /// không tạo lại nhân viên / kho mẫu đã bị xoá khi API khởi động lại.
+    /// </param>
+    public static async Task SeedAsync(StockFlowDbContext context, bool seedDemoData = true)
     {
         var seedTimestamp = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
 
@@ -57,7 +62,7 @@ public static class DatabaseSeeder
             new() { WarehouseId = 6, WarehouseCode = "K004", WarehouseName = "Kho Hoàn Kiếm", Address = "42 Phố Trần Hưng Đạo, Hoàn Kiếm, Hà Nội", IsActive = true, Description = "1,500 m² - Điểm giao hàng nhanh nội đô" }
         };
 
-        foreach (var warehouse in warehouses)
+        foreach (var warehouse in seedDemoData ? warehouses : [])
         {
             var existing = await context.MstWarehouses.FirstOrDefaultAsync(w => w.WarehouseId == warehouse.WarehouseId);
             if (existing == null)
@@ -106,7 +111,8 @@ public static class DatabaseSeeder
         };
         var userIds = new Dictionary<string, int>();
 
-        foreach (var seededUser in users)
+        // Bản deploy chỉ giữ tài khoản admin; nhân viên do Admin tạo qua màn hình Tài khoản
+        foreach (var seededUser in seedDemoData ? users : users.Where(u => u.Username == "admin"))
         {
             var username = seededUser.Username!;
             var user = await context.SecUsers.FirstOrDefaultAsync(u => u.Username == username);
@@ -137,7 +143,7 @@ public static class DatabaseSeeder
         var userRoles = new[] { (Username: "admin", RoleId: 1), (Username: "manager01", RoleId: 2), (Username: "sales01", RoleId: 3), (Username: "whstaff01", RoleId: 4), (Username: "prodstaff01", RoleId: 5) };
         foreach (var (username, roleId) in userRoles)
         {
-            var userId = userIds[username];
+            if (!userIds.TryGetValue(username, out var userId)) continue;
             if (!await context.JncUserRoles.AnyAsync(ur => ur.UserId == userId && ur.RoleId == roleId))
             {
                 await context.JncUserRoles.AddAsync(new JncUserRole { UserId = userId, RoleId = roleId, AssignedAt = seedTimestamp });
@@ -146,7 +152,7 @@ public static class DatabaseSeeder
 
         // Phân quyền kho mẫu CHỈ gán khi DB chưa có dòng phân quyền nào (DB mới).
         // Trước đây mỗi lần API khởi động đều thêm lại → Admin gỡ quyền kho xong, restart lại hiện ra như "gán cứng".
-        var seedWarehouseAccess = !await context.JncUserWarehouseAccesses.AnyAsync();
+        var seedWarehouseAccess = seedDemoData && !await context.JncUserWarehouseAccesses.AnyAsync();
 
         var warehouseAccesses = new[]
         {
@@ -179,7 +185,7 @@ public static class DatabaseSeeder
             new() { WarehouseId = 6, WarehouseCode = "K004", WarehouseName = "Kho Hoàn Kiếm", IsActive = true, Address = "42 Phố Trần Hưng Đạo, Hoàn Kiếm, Hà Nội", Description = "1,500 m² - Điểm giao hàng nhanh nội đô" }
         };
 
-        foreach (var wh in additionalWarehouses)
+        foreach (var wh in seedDemoData ? additionalWarehouses : [])
         {
             if (!await context.MstWarehouses.AnyAsync(w => w.WarehouseCode == wh.WarehouseCode))
             {
@@ -420,7 +426,8 @@ public static class DatabaseSeeder
         };
 
         var hasNewSuppliers = false;
-        foreach (var supplier in initialSuppliers)
+        // Bản deploy (seedDemoData=false) không tạo lại 8 nhà cung cấp mẫu
+        foreach (var supplier in seedDemoData ? initialSuppliers : [])
         {
             var exists = await context.MstBusinessPartners
                 .AnyAsync(bp => bp.PartnerCode == supplier.PartnerCode);
