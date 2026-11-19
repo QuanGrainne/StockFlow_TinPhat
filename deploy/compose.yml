@@ -49,6 +49,14 @@ services:
       Seed__DemoData: ${SEED_DEMO_DATA:-true}
       # File ảnh hàng hóa, nằm trong volume "uploads" (giữ nguyên khi build lại / restart)
       Storage__UploadsPath: /app/uploads
+      # payOS — QR thanh toán chuyển khoản (khóa đặt trong deploy/.env; để trống = tắt chức năng QR)
+      PayOS__ClientId: ${PAYOS_CLIENT_ID:-}
+      PayOS__ApiKey: ${PAYOS_API_KEY:-}
+      PayOS__ChecksumKey: ${PAYOS_CHECKSUM_KEY:-}
+      PayOS__ReturnUrl: ${PAYOS_RETURN_URL:-http://localhost:8080/pos}
+      PayOS__CancelUrl: ${PAYOS_CANCEL_URL:-http://localhost:8080/pos}
+      PayOS__BankName: ${PAYOS_BANK_NAME:-}
+      PayOS__BankAccountNumber: ${PAYOS_BANK_ACCOUNT_NUMBER:-}
       Logging__LogLevel__Microsoft.EntityFrameworkCore.Database.Command: Warning
     volumes:
       - uploads:/app/uploads

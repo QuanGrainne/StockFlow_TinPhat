@@ -26,6 +26,7 @@ import {
   Pencil,
   Plus,
   PlusCircle,
+  QrCode,
   RefreshCw,
   Search,
   ShoppingBag,
@@ -50,6 +51,8 @@ import { ReturnTabView } from '../components/ReturnTabView';
 import { PickBookingDialog, PickInvoiceDialog } from '../components/PosPickerDialogs';
 import { BookingShortageDialog, type BookingShortageLine } from '../components/BookingShortageDialog';
 import { CreditRequestDialog } from '../components/CreditRequestDialog';
+import PayosQrDialog from '../components/PayosQrDialog';
+import type { PayosPayment } from '../types';
 import { MyCreditRequestsDialog } from '../components/MyCreditRequestsDialog';
 import { isOverCreditLimitError } from '@/features/credit-requests';
 import { salesReturnService } from '@/features/sales-returns/services/salesReturnService';
@@ -314,6 +317,13 @@ export default function PosScreen() {
   const [customerFormOpen, setCustomerFormOpen] = useState(false);
   const [pricePopoverKey, setPricePopoverKey] = useState<string | null>(null);
   const [orderDiscountOpen, setOrderDiscountOpen] = useState(false);
+  // QR thanh toán payOS đang mở: chốt số tiền + tab lúc bấm (đổi tab trong lúc chờ vẫn điền đúng tab)
+  const [payosQr, setPayosQr] = useState<{
+    tabId: string;
+    amount: number;
+    kind: 'POS_INVOICE' | 'POS_BOOKING';
+    referenceCode: string | null;
+  } | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   /** Hóa đơn từ đơn đặt, khách lấy thiếu: các dòng thiếu (mở hộp hỏi tạo đơn chờ) */
@@ -709,6 +719,8 @@ export default function PosScreen() {
   const cashChange = change - debtPayment;
   /** Đặt hàng: tiền đã trả trước (khi sửa đơn) + trả thêm lần này không vượt giá trị đơn */
   const bookingPaidTotal = isBooking ? (tab.bookingPaid ?? 0) + paid : 0;
+  /** Số tiền tạo QR payOS: hóa đơn = Khách thanh toán; đặt hàng = tiền trả trước đã nhập, chưa nhập thì phần còn lại của đơn */
+  const payosAmount = Math.round(isBooking ? (paid > 0 ? paid : Math.max(0, due - (tab.bookingPaid ?? 0))) : paid);
 
   const qtyByProduct = useMemo(() => {
     const m = new Map<number, number>();
@@ -856,6 +868,10 @@ export default function PosScreen() {
   };
   /** Chuyển tab Hóa đơn ↔ Đặt hàng (giữ nguyên hàng hóa, khách hàng) */
   const switchTabKind = (t: PosTab) => {
+    if (t.payosPaid) {
+      message.warning('Đơn đã thanh toán qua payOS — không đổi Hóa đơn / Đặt hàng được.');
+      return;
+    }
     const next: PosTabKind = (t.kind ?? 'INVOICE') === 'BOOKING' ? 'INVOICE' : 'BOOKING';
     const others = tabs.filter((x) => x.id !== t.id);
     setTabs((prev) =>
@@ -1200,6 +1216,13 @@ export default function PosScreen() {
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
+                    if (
+                      t.payosPaid &&
+                      !window.confirm(
+                        `${t.name} đã nhận ${fmt(t.payosPaid.amount)} qua payOS nhưng chưa lưu. Đóng sẽ mất đơn (tiền vẫn đã vào tài khoản). Vẫn đóng?`
+                      )
+                    )
+                      return;
                     closeTab(t.id);
                   }}
                   className="p-0.5 rounded text-[#677484] hover:bg-black/5 hover:text-[#fb2c36] cursor-pointer"
@@ -1735,7 +1758,14 @@ export default function PosScreen() {
             <div className="flex items-center justify-between font-bold">
               <span>{isBooking ? (tab.bookingId ? 'Khách trả thêm' : 'Khách trả trước') : 'Khách thanh toán'}</span>
               <div className="w-36">
-                <MoneyInput value={paid} onChange={(v) => updateTab({ paid: v })} className="text-[18px] font-semibold" />
+                {tab.payosPaid ? (
+                  // Đã thu qua payOS: số tiền do payOS xác nhận, không sửa tay
+                  <div className="text-right text-[18px] font-semibold text-[#16a34a]" title="Số tiền payOS đã xác nhận">
+                    {fmt(paid)}
+                  </div>
+                ) : (
+                  <MoneyInput value={paid} onChange={(v) => updateTab({ paid: v })} className="text-[18px] font-semibold" />
+                )}
               </div>
             </div>
 
@@ -1756,6 +1786,7 @@ export default function PosScreen() {
                       type="radio"
                       name={`pay-${tab.id}`}
                       checked={selected}
+                      disabled={!!tab.payosPaid}
                       onChange={() => updateTab({ payMethod: m.value })}
                       className="h-4 w-4 accent-[#0070f4] cursor-pointer"
                     />
@@ -1766,9 +1797,43 @@ export default function PosScreen() {
             </div>
 
             {tab.payMethod === 'VIETQR' && (
-              <div className="rounded-xl bg-[#f7f8fa] px-4 py-5 text-center text-[14px] text-[#677484]">
-                Chưa cấu hình tài khoản ngân hàng nhận chuyển khoản.
-                <div className="mt-1 text-[13px]">Ghi nhận thủ công số tiền khách đã chuyển ở ô Khách thanh toán.</div>
+              <div className="rounded-xl bg-[#f7f8fa] px-4 py-4 text-center text-[14px] text-[#677484] space-y-2.5">
+                {tab.payosPaid ? (
+                  <div className="text-[#16a34a] font-semibold">
+                    ✓ payOS đã xác nhận nhận {fmt(tab.payosPaid.amount)}
+                    <div className="text-[12px] font-normal text-[#677484]">Mã đơn payOS {tab.payosPaid.orderCode}</div>
+                  </div>
+                ) : (
+                  <div className="text-[13px]">Tạo mã QR payOS cho khách quét — tiền được điền tự động khi payOS xác nhận.</div>
+                )}
+                {tab.payosPaid ? (
+                  // Đơn đã thu tiền qua payOS: không cho tạo thêm QR (backend cũng chặn theo mã đơn)
+                  <div className="text-[12px]">
+                    Đơn đã thanh toán — không tạo thêm QR. Bấm <b>{isBooking ? 'ĐẶT HÀNG' : 'THANH TOÁN'}</b> để hoàn tất.
+                  </div>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      disabled={payosAmount <= 0 || tab.lines.length === 0}
+                      onClick={() =>
+                        setPayosQr({
+                          tabId: tab.id,
+                          amount: payosAmount,
+                          kind: isBooking ? 'POS_BOOKING' : 'POS_INVOICE',
+                          // Mã đơn hiển thị: mã đơn đặt (nếu có), không thì mã hàng của dòng đầu (VD HH000009)
+                          referenceCode: tab.bookingCode || tab.lines[0]?.code || null,
+                        })
+                      }
+                      className="w-full h-10 rounded-lg bg-[#0070f4] hover:bg-[#005ac3] text-white text-[14px] font-semibold inline-flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <QrCode size={16} /> Tạo QR thanh toán · {fmt(payosAmount)}
+                    </button>
+                    <div className="text-[12px]">
+                      Hoặc ghi nhận thủ công số tiền khách đã chuyển ở ô {isBooking ? (tab.bookingId ? 'Khách trả thêm' : 'Khách trả trước') : 'Khách thanh toán'}.
+                    </div>
+                  </>
+                )}
               </div>
             )}
 
@@ -1909,6 +1974,29 @@ export default function PosScreen() {
           onSelect={(id) => {
             setPicker(null);
             openBookingTab(id, 'invoice');
+          }}
+        />
+      )}
+
+      {payosQr && (
+        <PayosQrDialog
+          amount={payosQr.amount}
+          referenceType={payosQr.kind}
+          warehouseId={warehouseId}
+          draftKey={payosQr.tabId}
+          referenceCode={payosQr.referenceCode}
+          onClose={() => setPayosQr(null)}
+          onPaid={(p: PayosPayment) => {
+            const received = Math.round(p.paidAmount ?? p.amount);
+            // payOS đã xác nhận (backend kiểm): điền tiền khách trả bằng chuyển khoản vào đúng tab đã mở QR
+            setTabs((prev) =>
+              prev.map((t) =>
+                t.id === payosQr.tabId
+                  ? { ...t, paid: received, payMethod: 'VIETQR', payosPaid: { orderCode: p.orderCode, amount: received } }
+                  : t
+              )
+            );
+            message.success(`payOS đã xác nhận nhận ${fmt(received)} — đã điền vào ô tiền khách trả.`);
           }}
         />
       )}
