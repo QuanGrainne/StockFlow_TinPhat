@@ -17,8 +17,6 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
 
     public virtual DbSet<DtlGoodsReceiptItem> DtlGoodsReceiptItems { get; set; }
 
-    public virtual DbSet<DtlInboundCostAllocation> DtlInboundCostAllocations { get; set; }
-
     public virtual DbSet<DtlInventoryDisposalItem> DtlInventoryDisposalItems { get; set; }
 
     public virtual DbSet<DtlOrderItem> DtlOrderItems { get; set; }
@@ -77,11 +75,11 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
 
     public virtual DbSet<DtlPurchaseReturnItem> DtlPurchaseReturnItems { get; set; }
 
-    public virtual DbSet<TrxInboundCost> TrxInboundCosts { get; set; }
-
     public virtual DbSet<TrxInventoryBalance> TrxInventoryBalances { get; set; }
 
     public virtual DbSet<TrxInventoryDisposal> TrxInventoryDisposals { get; set; }
+
+    public virtual DbSet<TrxPayosPayment> TrxPayosPayments { get; set; }
 
     public virtual DbSet<TrxInventoryTransaction> TrxInventoryTransactions { get; set; }
 
@@ -98,8 +96,6 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
     public virtual DbSet<TrxProductionPlan> TrxProductionPlans { get; set; }
 
     public virtual DbSet<DtlProductionPlanItem> DtlProductionPlanItems { get; set; }
-
-    public virtual DbSet<TrxReturnProcessing> TrxReturnProcessings { get; set; }
 
     public virtual DbSet<TrxReturnRequest> TrxReturnRequests { get; set; }
 
@@ -218,30 +214,6 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
                 .HasForeignKey(d => d.ProductId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("fk_dtl_goods_receipt_items_product_id");
-        });
-
-        modelBuilder.Entity<DtlInboundCostAllocation>(entity =>
-        {
-            entity.HasKey(e => e.AllocationId).HasName("dtl_inbound_cost_allocations_pkey");
-
-            entity.ToTable("dtl_inbound_cost_allocations", "stockflow");
-
-            entity.Property(e => e.AllocationId).HasColumnName("allocation_id");
-            entity.Property(e => e.AllocatedAmount)
-                .HasPrecision(18, 4)
-                .HasColumnName("allocated_amount");
-            entity.Property(e => e.GrItemId).HasColumnName("gr_item_id");
-            entity.Property(e => e.InboundCostId).HasColumnName("inbound_cost_id");
-
-            entity.HasOne(d => d.GrItem).WithMany(p => p.DtlInboundCostAllocations)
-                .HasForeignKey(d => d.GrItemId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("fk_dtl_inbound_cost_allocations_gr_item_id");
-
-            entity.HasOne(d => d.InboundCost).WithMany(p => p.DtlInboundCostAllocations)
-                .HasForeignKey(d => d.InboundCostId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("fk_dtl_inbound_cost_allocations_inbound_cost_id");
         });
 
         modelBuilder.Entity<DtlInventoryDisposalItem>(entity =>
@@ -1301,39 +1273,6 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
                 .HasConstraintName("fk_dtl_purchase_order_items_product_id");
         });
 
-        modelBuilder.Entity<TrxInboundCost>(entity =>
-        {
-            entity.HasKey(e => e.InboundCostId).HasName("trx_inbound_costs_pkey");
-
-            entity.ToTable("trx_inbound_costs", "stockflow");
-
-            entity.Property(e => e.InboundCostId).HasColumnName("inbound_cost_id");
-            entity.Property(e => e.AllocatedBy).HasColumnName("allocated_by");
-            entity.Property(e => e.Amount)
-                .HasPrecision(18, 2)
-                .HasColumnName("amount");
-            entity.Property(e => e.CostType)
-                .HasMaxLength(50)
-                .HasColumnName("cost_type");
-            entity.Property(e => e.CreatedAt)
-                .HasColumnType("timestamp without time zone")
-                .HasColumnName("created_at");
-            entity.Property(e => e.Description)
-                .HasMaxLength(255)
-                .HasColumnName("description");
-            entity.Property(e => e.GrId).HasColumnName("gr_id");
-
-            entity.HasOne(d => d.AllocatedByNavigation).WithMany(p => p.TrxInboundCosts)
-                .HasForeignKey(d => d.AllocatedBy)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("fk_trx_inbound_costs_allocated_by");
-
-            entity.HasOne(d => d.Gr).WithMany(p => p.TrxInboundCosts)
-                .HasForeignKey(d => d.GrId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("fk_trx_inbound_costs_gr_id");
-        });
-
         modelBuilder.Entity<TrxInventoryBalance>(entity =>
         {
             entity.HasKey(e => e.InventoryId).HasName("trx_inventory_balances_pkey");
@@ -1418,6 +1357,50 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
                 .HasConstraintName("fk_trx_inventory_disposals_warehouse_id");
         });
 
+        // Yêu cầu thanh toán chuyển khoản qua payOS (QR) từ màn Bán hàng
+        modelBuilder.Entity<TrxPayosPayment>(entity =>
+        {
+            entity.HasKey(e => e.PayosPaymentId).HasName("trx_payos_payments_pkey");
+
+            entity.ToTable("trx_payos_payments", "stockflow");
+
+            entity.HasIndex(e => e.OrderCode, "uq_trx_payos_payments_order_code").IsUnique();
+
+            entity.Property(e => e.PayosPaymentId).HasColumnName("payos_payment_id");
+            entity.Property(e => e.OrderCode).HasColumnName("order_code");
+            entity.Property(e => e.PaymentLinkId).HasMaxLength(100).HasColumnName("payment_link_id");
+            entity.Property(e => e.ReferenceType).HasMaxLength(30).HasColumnName("reference_type");
+            entity.Property(e => e.WarehouseId).HasColumnName("warehouse_id");
+            entity.Property(e => e.DraftKey).HasMaxLength(64).HasColumnName("draft_key");
+            entity.Property(e => e.ReferenceCode).HasMaxLength(30).HasColumnName("reference_code");
+            entity.HasIndex(e => e.DraftKey, "ix_trx_payos_payments_draft_key");
+            entity.Property(e => e.Amount).HasPrecision(18, 2).HasColumnName("amount");
+            entity.Property(e => e.Description).HasMaxLength(50).HasColumnName("description");
+            entity.Property(e => e.Status).HasMaxLength(20).HasColumnName("status");
+            entity.Property(e => e.CheckoutUrl).HasMaxLength(500).HasColumnName("checkout_url");
+            entity.Property(e => e.QrCode).HasColumnName("qr_code");
+            entity.Property(e => e.Bin).HasMaxLength(20).HasColumnName("bin");
+            entity.Property(e => e.AccountNumber).HasMaxLength(50).HasColumnName("account_number");
+            entity.Property(e => e.AccountName).HasMaxLength(200).HasColumnName("account_name");
+            entity.Property(e => e.ExpiredAt).HasColumnType("timestamp without time zone").HasColumnName("expired_at");
+            entity.Property(e => e.PaidAt).HasColumnType("timestamp without time zone").HasColumnName("paid_at");
+            entity.Property(e => e.PaidAmount).HasPrecision(18, 2).HasColumnName("paid_amount");
+            entity.Property(e => e.PayosReference).HasMaxLength(100).HasColumnName("payos_reference");
+            entity.Property(e => e.CreatedBy).HasColumnName("created_by");
+            entity.Property(e => e.CreatedAt).HasColumnType("timestamp without time zone").HasColumnName("created_at");
+            entity.Property(e => e.UpdatedAt).HasColumnType("timestamp without time zone").HasColumnName("updated_at");
+
+            entity.HasOne(d => d.CreatedByNavigation).WithMany()
+                .HasForeignKey(d => d.CreatedBy)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("fk_trx_payos_payments_created_by");
+
+            entity.HasOne(d => d.Warehouse).WithMany()
+                .HasForeignKey(d => d.WarehouseId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("fk_trx_payos_payments_warehouse_id");
+        });
+
         modelBuilder.Entity<TrxInventoryTransaction>(entity =>
         {
             entity.HasKey(e => e.TransactionId).HasName("trx_inventory_transactions_pkey");
@@ -1446,8 +1429,9 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
             entity.Property(e => e.TransactionPrice)
                 .HasPrecision(18, 2)
                 .HasColumnName("transaction_price");
+            // Giá vốn lưu 4 chữ số thập phân (hiển thị 3 số, VD 33.257,062) — giống trx_inventory_balances.unit_cost
             entity.Property(e => e.UnitCost)
-                .HasPrecision(18, 2)
+                .HasPrecision(18, 4)
                 .HasColumnName("unit_cost");
             entity.Property(e => e.BalanceAfter)
                 .HasPrecision(18, 2)
@@ -1872,47 +1856,6 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
                 .HasForeignKey(d => d.ReportedBy)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("fk_trx_production_reports_reported_by");
-        });
-
-        modelBuilder.Entity<TrxReturnProcessing>(entity =>
-        {
-            entity.HasKey(e => e.ProcessingId).HasName("trx_return_processing_pkey");
-
-            entity.ToTable("trx_return_processing", "stockflow");
-
-            entity.Property(e => e.ProcessingId).HasColumnName("processing_id");
-            entity.Property(e => e.Category)
-                .HasMaxLength(20)
-                .HasColumnName("category");
-            entity.Property(e => e.Notes)
-                .HasMaxLength(500)
-                .HasColumnName("notes");
-            entity.Property(e => e.ProcessDate)
-                .HasColumnType("timestamp without time zone")
-                .HasColumnName("process_date");
-            entity.Property(e => e.ProcessedBy).HasColumnName("processed_by");
-            entity.Property(e => e.Quantity)
-                .HasPrecision(18, 2)
-                .HasColumnName("quantity");
-            entity.Property(e => e.ReturnItemId).HasColumnName("return_item_id");
-            entity.Property(e => e.Status)
-                .HasMaxLength(20)
-                .HasColumnName("status");
-            entity.Property(e => e.WarehouseId).HasColumnName("warehouse_id");
-
-            entity.HasOne(d => d.ProcessedByNavigation).WithMany(p => p.TrxReturnProcessings)
-                .HasForeignKey(d => d.ProcessedBy)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("fk_trx_return_processing_processed_by");
-
-            entity.HasOne(d => d.ReturnItem).WithMany(p => p.TrxReturnProcessings)
-                .HasForeignKey(d => d.ReturnItemId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("fk_trx_return_processing_return_item_id");
-
-            entity.HasOne(d => d.Warehouse).WithMany(p => p.TrxReturnProcessings)
-                .HasForeignKey(d => d.WarehouseId)
-                .HasConstraintName("fk_trx_return_processing_warehouse_id");
         });
 
         modelBuilder.Entity<TrxReturnRequest>(entity =>
@@ -2379,6 +2322,7 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
             entity.Property(e => e.PartnerId).HasColumnName("partner_id");
             entity.Property(e => e.ReturnDate).HasColumnType("timestamp without time zone").HasColumnName("return_date");
             entity.Property(e => e.Status).HasMaxLength(20).HasColumnName("status");
+            entity.Property(e => e.ReturnType).HasMaxLength(20).HasDefaultValue("STOCK").HasColumnName("return_type");
             entity.Property(e => e.DiscountAmount).HasPrecision(18, 2).HasColumnName("discount_amount");
             entity.Property(e => e.TotalAmount).HasPrecision(18, 2).HasColumnName("total_amount");
             entity.Property(e => e.RefundAmount).HasPrecision(18, 2).HasColumnName("refund_amount");

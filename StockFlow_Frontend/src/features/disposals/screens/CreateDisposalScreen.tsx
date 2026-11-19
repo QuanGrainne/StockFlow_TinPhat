@@ -19,6 +19,7 @@ import { transferService } from '@/features/transfers/services/transferService';
 import type { ProductForTransfer } from '@/features/transfers/types';
 import { disposalService } from '@/features/disposals/services/disposalService';
 import type { SaveDisposalPayload } from '@/features/disposals/types';
+import { formatCost } from '@/lib/utils/cost';
 
 /** Trạng thái gửi khi lưu phiếu: Lưu tạm hoặc Hoàn thành */
 type SaveStatus = SaveDisposalPayload['status'];
@@ -530,7 +531,7 @@ export default function CreateDisposalScreen() {
                           }`}
                         />
                       </span>
-                      <span className="text-right">{money.format(r.unitCost)}</span>
+                      <span className="text-right">{formatCost(r.unitCost)}</span>
                       <span className="text-right font-medium">{money.format(Math.round((r.quantity ?? 0) * r.unitCost))}</span>
                     </div>
                   );

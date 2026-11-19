@@ -40,6 +40,7 @@ import { toLocalDatetimeInputString } from '@/lib/utils/date';
 import { QuickAddSupplierModal } from '@/features/purchases/components/QuickAddSupplierModal';
 import { AddFromCategoryPopover } from '@/features/purchases/components/AddFromCategoryPopover';
 import { NumberInput } from '@/components/inputs/NumberInput';
+import { formatCost } from '@/lib/utils/cost';
 import { ProductThumb } from '@/components/ProductThumb';
 import { DiscountInput, discountAmount, type DiscountType } from '@/components/inputs/DiscountInput';
 import {
@@ -242,6 +243,8 @@ export default function CreatePurchaseScreen({ mode = 'receipt' }: CreatePurchas
   const [orderOriginalStatus, setOrderOriginalStatus] = useState<'DRAFT' | 'ORDERED' | null>(null);
   // Phiếu nhập theo phiếu đặt hàng nhập
   const [linkedPo, setLinkedPo] = useState<{ id: number; code: string; orderDate?: string | null } | null>(null);
+  // Nhập theo phiếu đặt: SL còn phải nhập từng mặt hàng (SL đặt − SL đạt đã nhập) → cảnh báo nhập vượt
+  const [poRemaining, setPoRemaining] = useState<Map<number, number> | null>(null);
   // Kho cố định theo phiếu nguồn (sửa phiếu đặt / nhập theo phiếu đặt), không theo kho làm việc
   const [fixedWarehouse, setFixedWarehouse] = useState<{ id: number; name: string } | null>(null);
 
@@ -263,7 +266,7 @@ export default function CreatePurchaseScreen({ mode = 'receipt' }: CreatePurchas
       ...(columns.stock ? ([['90px', 90]] as [string, number][]) : []),
       ...(columns.costPrice ? ([['100px', 100]] as [string, number][]) : []),
       ...(columns.salePrice ? ([['100px', 100]] as [string, number][]) : []),
-      ['90px', 90], // Số lượng (SL đạt)
+      ['90px', 90], // Số lượng (phiếu đặt) / SL thực nhận (phiếu nhập)
       ...(isOrder ? [] : ([['80px', 80]] as [string, number][])), // SL lỗi
       ['110px', 110], // Đơn giá
       ['90px', 90], // Giảm giá
@@ -291,6 +294,8 @@ export default function CreatePurchaseScreen({ mode = 'receipt' }: CreatePurchas
     isOpen: boolean;
     title: string;
     message: string;
+    /** Cảnh báo cần người dùng xác nhận (vd nhập vượt SL còn lại của phiếu đặt) */
+    warnings?: string[];
     onConfirm: () => void;
   } | null>(null);
 
@@ -467,6 +472,13 @@ export default function CreatePurchaseScreen({ mode = 'receipt' }: CreatePurchas
           const remaining = po.items.filter((it) => it.orderedQty > it.receivedQty);
           setItems(remaining.map((it) => buildRowFromOrderItem(it, it.orderedQty - it.receivedQty, productMap.get(it.productId))));
           setLinkedPo({ id: po.poId, code: po.poCode, orderDate: po.orderDate });
+          setPoRemaining(
+            new Map(
+              po.items
+                .filter((it) => it.orderedQty > 0)
+                .map((it) => [it.productId, Math.max(0, it.orderedQty - it.receivedQty)] as [number, number])
+            )
+          );
           setFixedWarehouse({ id: po.warehouseId, name: po.warehouseName });
           setExternalPoNumber(po.poCode);
           // Giảm giá phiếu đặt chỉ áp vào lần nhập đầu tiên
@@ -656,9 +668,31 @@ export default function CreatePurchaseScreen({ mode = 'receipt' }: CreatePurchas
     );
   };
 
-  // SL lỗi: không âm, chỉ ghi nhận trên phiếu (không vào kho, không tính tiền)
+  // Phiếu nhập: người dùng nhập SL thực nhận + SL lỗi; SL đạt (quantity) = nhận − lỗi
+  // (chỉ SL đạt vào kho và tính tiền). SL đạt = 0 khi cả dòng là hàng lỗi.
+  // SL nhận được về 0 khi đang gõ (xoá ô để gõ lại); SL nhận phải > 0 mới lưu được (kiểm ở executeSave).
+  const handleUpdateReceived = (productId: number, received: number) => {
+    setItems((prev) =>
+      prev.map((it) => {
+        if (it.productId !== productId) return it;
+        const total = Math.max(0, received);
+        const defect = Math.min(it.defectQuantity ?? 0, total);
+        return recalcRow({ ...it, quantity: total - defect, defectQuantity: defect });
+      })
+    );
+  };
+
+  // SL lỗi: không âm. Giữ nguyên SL nhận, SL đạt giảm tương ứng; nếu SL lỗi lớn hơn SL nhận
+  // (VD nhận 0 rồi gõ lỗi 10 = hỏng hết) thì SL nhận tăng theo SL lỗi, SL đạt = 0.
   const handleUpdateDefect = (productId: number, qty: number) => {
-    setItems((prev) => prev.map((it) => (it.productId === productId ? { ...it, defectQuantity: Math.max(0, qty) } : it)));
+    setItems((prev) =>
+      prev.map((it) => {
+        if (it.productId !== productId) return it;
+        const defect = Math.max(0, qty);
+        const received = Math.max(it.quantity + (it.defectQuantity ?? 0), defect);
+        return recalcRow({ ...it, quantity: received - defect, defectQuantity: defect });
+      })
+    );
   };
 
   const handleUpdatePrice = (productId: number, price: number) => {
@@ -808,6 +842,14 @@ export default function CreatePurchaseScreen({ mode = 'receipt' }: CreatePurchas
   };
 
   // ─── Submit Actions (Save Draft / Complete) ──────────────────────────────────
+  /** Dòng có SL nhận (đạt + lỗi) = 0 → báo lỗi, trả về true nếu có */
+  const warnZeroReceived = (): boolean => {
+    const zero = items.find((it) => it.quantity + (it.defectQuantity ?? 0) <= 0);
+    if (!zero) return false;
+    showToast(`SL nhận của ${zero.productCode} phải lớn hơn 0 (hàng hỏng hết thì nhập SL lỗi bằng SL nhận)`, 'warning');
+    return true;
+  };
+
   const executeSave = async (targetStatus: 'DRAFT' | 'COMPLETED') => {
     if (items.length === 0) {
       showToast('Vui lòng chọn ít nhất 1 mặt hàng vào phiếu nhập', 'warning');
@@ -820,6 +862,8 @@ export default function CreatePurchaseScreen({ mode = 'receipt' }: CreatePurchas
       setIsSidebarCollapsed(false);
       return;
     }
+
+    if (warnZeroReceived()) return;
 
     try {
       setIsSubmitting(true);
@@ -917,11 +961,30 @@ export default function CreatePurchaseScreen({ mode = 'receipt' }: CreatePurchas
       return;
     }
 
+    if (warnZeroReceived()) return;
+
+    // Nhập theo phiếu đặt: cảnh báo dòng nhận (đạt + lỗi) vượt SL còn phải nhập, hoặc hàng ngoài phiếu đặt
+    const overReceipt: string[] = [];
+    if (poRemaining) {
+      for (const it of items) {
+        const received = it.quantity + (it.defectQuantity ?? 0);
+        const remaining = poRemaining.get(it.productId);
+        if (remaining === undefined) {
+          overReceipt.push(`${it.productCode}: nhận ${received.toLocaleString('vi-VN')} nhưng không có trong phiếu đặt`);
+        } else if (received > remaining) {
+          overReceipt.push(
+            `${it.productCode}: nhận ${received.toLocaleString('vi-VN')}, phiếu đặt còn ${remaining.toLocaleString('vi-VN')} (vượt ${(received - remaining).toLocaleString('vi-VN')})`
+          );
+        }
+      }
+    }
+
     setConfirmModal({
       isOpen: true,
-      title: 'Xác nhận hoàn thành nhập kho',
+      title: overReceipt.length > 0 ? 'Nhập vượt số lượng phiếu đặt' : 'Xác nhận hoàn thành nhập kho',
       message:
         `Bạn có chắc chắn muốn hoàn thành phiếu nhập hàng từ nhà cung cấp "${selectedSupplier.name}"? Tồn kho tại kho "${fixedWarehouse?.name || activeWarehouse?.name || 'Kho làm việc'}" sẽ được cập nhật ngay lập tức.`,
+      warnings: overReceipt.length > 0 ? overReceipt : undefined,
       onConfirm: () => {
         setConfirmModal(null);
         executeSave('COMPLETED');
@@ -954,11 +1017,24 @@ export default function CreatePurchaseScreen({ mode = 'receipt' }: CreatePurchas
         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-[8px] shadow-[rgba(169,180,203,0.32)_0px_8px_20px_0px] max-w-md w-full p-5 flex flex-col gap-4 border border-slate-200 animate-in fade-in zoom-in-95">
             <div className="flex items-start gap-3">
-              <div className="p-2 rounded-full bg-emerald-100 text-emerald-600 shrink-0">
-                <CheckCircle2 size={20} />
-              </div>
-              <div>
+              {confirmModal.warnings ? (
+                <div className="p-2 rounded-full bg-amber-100 text-amber-600 shrink-0">
+                  <AlertTriangle size={20} />
+                </div>
+              ) : (
+                <div className="p-2 rounded-full bg-emerald-100 text-emerald-600 shrink-0">
+                  <CheckCircle2 size={20} />
+                </div>
+              )}
+              <div className="min-w-0">
                 <h3 className="text-sm font-bold text-[#15171a]">{confirmModal.title}</h3>
+                {confirmModal.warnings && (
+                  <ul className="mt-2 p-2.5 rounded-[8px] border border-amber-200 bg-amber-50 text-xs text-amber-800 space-y-1 list-disc pl-6">
+                    {confirmModal.warnings.map((w) => (
+                      <li key={w}>{w}</li>
+                    ))}
+                  </ul>
+                )}
                 <p className="text-xs text-[#677484] mt-1 leading-relaxed">{confirmModal.message}</p>
               </div>
             </div>
@@ -973,9 +1049,11 @@ export default function CreatePurchaseScreen({ mode = 'receipt' }: CreatePurchas
               <button
                 type="button"
                 onClick={confirmModal.onConfirm}
-                className="px-4 py-1.5 rounded-[8px] bg-[#00b63e] hover:bg-[#009e35] text-white font-semibold shadow-xs transition cursor-pointer"
+                className={`px-4 py-1.5 rounded-[8px] text-white font-semibold shadow-xs transition cursor-pointer ${
+                  confirmModal.warnings ? 'bg-amber-600 hover:bg-amber-700' : 'bg-[#00b63e] hover:bg-[#009e35]'
+                }`}
               >
-                Đồng ý hoàn thành
+                {confirmModal.warnings ? 'Vẫn nhập hàng' : 'Đồng ý hoàn thành'}
               </button>
             </div>
           </div>
@@ -1206,8 +1284,11 @@ export default function CreatePurchaseScreen({ mode = 'receipt' }: CreatePurchas
                 {columns.stock && <div className="text-right pr-2">Tồn kho</div>}
                 {columns.costPrice && <div className="text-right pr-2">Giá vốn</div>}
                 {columns.salePrice && <div className="text-right pr-2">Giá bán</div>}
-                <div className="text-right pr-2" title={isOrder ? undefined : "SL đạt: vào tồn kho và tính tiền trả NCC"}>
-                  {isOrder ? "Số lượng" : "SL đạt"}
+                <div
+                  className="text-right pr-2"
+                  title={isOrder ? undefined : 'SL thực nhận = SL đạt + SL lỗi. Chỉ SL đạt vào tồn kho và tính tiền trả NCC'}
+                >
+                  {isOrder ? 'Số lượng' : 'SL nhận'}
                 </div>
                 {!isOrder && (
                   <div className="text-right pr-2" title="SL lỗi: chỉ ghi nhận trên phiếu, không vào tồn kho, không tính tiền">
@@ -1342,7 +1423,7 @@ export default function CreatePurchaseScreen({ mode = 'receipt' }: CreatePurchas
                         {/* Giá vốn */}
                         {columns.costPrice && (
                           <div className="text-right pr-2 pt-1.5 text-[#15171a]">
-                            {formatVnd(row.costPrice)}
+                            {formatCost(row.costPrice)}
                           </div>
                         )}
 
@@ -1353,13 +1434,31 @@ export default function CreatePurchaseScreen({ mode = 'receipt' }: CreatePurchas
                           </div>
                         )}
 
-                        {/* Số lượng */}
+                        {/* Số lượng (phiếu đặt) / SL thực nhận = SL đạt + SL lỗi (phiếu nhập) */}
                         <div className="px-1">
-                          <NumberInput
-                            value={row.quantity}
-                            onChange={(v) => handleUpdateQuantity(row.productId, v)}
-                            className="w-full"
-                          />
+                          {isOrder ? (
+                            <NumberInput
+                              value={row.quantity}
+                              onChange={(v) => handleUpdateQuantity(row.productId, v)}
+                              className="w-full"
+                            />
+                          ) : (
+                            <>
+                              <NumberInput
+                                value={row.quantity + (row.defectQuantity ?? 0)}
+                                onChange={(v) => handleUpdateReceived(row.productId, v)}
+                                className="w-full"
+                              />
+                              {(row.defectQuantity ?? 0) > 0 && (
+                                <div
+                                  className="text-right text-[11px] text-[#677484] mt-0.5 pr-1"
+                                  title="SL đạt = SL nhận − SL lỗi: vào tồn kho và tính tiền trả NCC"
+                                >
+                                  Đạt: <b className="text-[#15171a]">{row.quantity.toLocaleString('vi-VN')}</b>
+                                </div>
+                              )}
+                            </>
+                          )}
                         </div>
 
                         {/* SL lỗi (chỉ phiếu nhập) */}

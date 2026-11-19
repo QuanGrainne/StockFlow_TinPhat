@@ -19,6 +19,12 @@ public partial class TrxPurchaseReturn
     /// <summary>DRAFT | COMPLETED | CANCELLED</summary>
     public string? Status { get; set; }
 
+    /// <summary>
+    /// STOCK: trả hàng đã nhập kho (trừ tồn, giảm công nợ NCC).
+    /// DEFECT: trả hàng lỗi ghi nhận lúc nhận hàng (hàng lỗi chưa vào kho, chưa tính tiền → không trừ tồn, không tính tiền).
+    /// </summary>
+    public string ReturnType { get; set; } = "STOCK";
+
     /// <summary>Giảm giá trên toàn phiếu (VND)</summary>
     public decimal? DiscountAmount { get; set; }
 

@@ -2,6 +2,7 @@ using MediatR;
 using Microsoft.EntityFrameworkCore;
 using StockFlow.Application.Common;
 using StockFlow.Application.Common.Interfaces;
+using StockFlow.Application.Common.Inventory;
 using StockFlow.Application.Features.Products.DTOs;
 using StockFlow.Application.Features.SalesBookings.Common;
 using StockFlow.Application.Features.Products.Helpers;
@@ -131,7 +132,7 @@ public class GetProductsQueryHandler : IRequestHandler<GetProductsQuery, Result<
                         WarehouseCode: first.Warehouse?.WarehouseCode ?? $"WH-{g.Key}",
                         WarehouseName: first.Warehouse?.WarehouseName ?? $"Kho #{g.Key}",
                         Quantity: g.Sum(x => x.Quantity ?? 0),
-                        UnitCost: g.Average(x => x.UnitCost ?? costPrice),
+                        UnitCost: InventoryCosting.CostOf(g, costPrice), // bình quân theo SL mọi lô / vị trí của kho
                         ReservedQuantity: reservedMap.GetValueOrDefault((g.Key, p.ProductId))
                     );
                 }).ToList();

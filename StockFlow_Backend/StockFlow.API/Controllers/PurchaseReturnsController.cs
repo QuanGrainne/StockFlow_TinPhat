@@ -37,14 +37,15 @@ public class PurchaseReturnsController : ControllerBase
         [FromQuery] DateTime? fromDate,
         [FromQuery] DateTime? toDate,
         [FromQuery] string? search,
-        [FromQuery] int? grId)
+        [FromQuery] int? grId,
+        [FromQuery] string? returnType)
     {
         var whIds = SplitList<int>(warehouseIds, s => int.TryParse(s, out var v) && v > 0 ? v : null);
         var statusList = string.IsNullOrWhiteSpace(statuses)
             ? null
             : statuses.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
 
-        var result = await _mediator.Send(new GetPurchaseReturnsQuery(whIds, statusList, fromDate, toDate, search, grId));
+        var result = await _mediator.Send(new GetPurchaseReturnsQuery(whIds, statusList, fromDate, toDate, search, grId, returnType));
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { message = result.Error });
     }
 
@@ -58,14 +59,17 @@ public class PurchaseReturnsController : ControllerBase
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { message = result.Error });
     }
 
-    /// <summary>Dữ liệu phiếu nhập để lập phiếu trả (SL đã nhập / đã trả / còn được trả từng dòng).</summary>
+    /// <summary>
+    /// Dữ liệu phiếu nhập để lập phiếu trả (SL đã nhập / đã trả / còn được trả từng dòng).
+    /// returnType=DEFECT: lập phiếu trả hàng lỗi (SL theo SL lỗi của phiếu nhập).
+    /// </summary>
     [HttpGet("source/{grId:int}")]
     [ProducesResponseType(typeof(ReturnSourceDto), StatusCodes.Status200OK)]
     [RequirePermission("PURCHASE_READ")]
     [RequireFeature("feat-purchase-returns")]
-    public async Task<IActionResult> GetSource(int grId, [FromQuery] int? excludeReturnId)
+    public async Task<IActionResult> GetSource(int grId, [FromQuery] int? excludeReturnId, [FromQuery] string? returnType)
     {
-        var result = await _mediator.Send(new GetPurchaseReturnSourceQuery(grId, excludeReturnId));
+        var result = await _mediator.Send(new GetPurchaseReturnSourceQuery(grId, excludeReturnId, returnType));
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { message = result.Error });
     }
 

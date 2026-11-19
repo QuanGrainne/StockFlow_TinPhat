@@ -109,3 +109,39 @@ export interface PosCategory {
   categoryName: string;
   description?: string;
 }
+
+/** Trạng thái QR thanh toán payOS (chỉ backend đổi, theo webhook / tra cứu payOS) */
+export type PayosPaymentStatus = 'PENDING' | 'PAID' | 'CANCELLED' | 'EXPIRED';
+
+/** QR thanh toán chuyển khoản qua payOS (GET/POST /api/payments/payos) */
+export interface PayosPayment {
+  orderCode: number;
+  /** Mã đơn hiển thị trên QR / nội dung CK (VD HH000009) */
+  referenceCode?: string | null;
+  amount: number;
+  description: string;
+  status: PayosPaymentStatus;
+  checkoutUrl?: string | null;
+  /** Chuỗi VietQR — vẽ thành mã QR */
+  qrCode?: string | null;
+  bin?: string | null;
+  bankName?: string | null;
+  accountNumber?: string | null;
+  accountName?: string | null;
+  expiredAt?: string | null;
+  /** Số giây QR còn hiệu lực (server tính) */
+  secondsLeft: number;
+  paidAt?: string | null;
+  paidAmount?: number | null;
+  payosReference?: string | null;
+}
+
+export interface CreatePayosPaymentPayload {
+  amount: number;
+  referenceType: 'POS_INVOICE' | 'POS_BOOKING';
+  warehouseId?: number | null;
+  /** Khóa đơn đang lập (id tab) — backend chặn tạo thêm QR khi đơn đã thanh toán */
+  draftKey: string;
+  /** Mã đơn hiển thị (VD HH000009) → nội dung CK ThanhToan-HH000009 */
+  referenceCode?: string | null;
+}

@@ -136,7 +136,7 @@ Mọi bảng thuộc schema `stockflow`. SPEC này không đề xuất bảng ha
 |---|---|---|
 | trx_return_requests | Phiếu / yêu cầu trả | Có; trạng thái chỉ COMPLETED / CANCELLED |
 | dtl_return_request_items | Dòng trả: số lượng, giá bán, giá trả, tình trạng | Có |
-| trx_return_processing | Xử lý phân loại | Có bảng, không có code |
+| trx_return_processing | Xử lý phân loại | Đã xoá bảng (migration `DropInboundCostAndReturnProcessing`, 19/11/2026) vì chưa có code dùng. Làm UC-42 thì tạo lại bằng migration mới |
 | trx_inventory_* | Tồn và thẻ kho | Có |
 | trx_financial_transactions | Phiếu chi trả khách | Có |
 

@@ -18,6 +18,7 @@ import { salesReturnService } from '@/features/sales-returns/services/salesRetur
 import { PO_STATUS } from '@/features/purchase-orders/utils/purchaseOrderUtils';
 import { documentLinkHref, toLinkDate } from '@/lib/navigation/documentLink';
 import { ProductCodeLink } from '@/components/links/EntityLinks';
+import { formatCost } from '@/lib/utils/cost';
 
 /** Mở trang ở tab mới (không rời màn hình đang làm việc) */
 const openInNewTab = (href: string) => window.open(href, '_blank', 'noopener,noreferrer');
@@ -239,7 +240,7 @@ async function loadDocument(ref: StockCardDocumentRef): Promise<DocView> {
       ],
       rows: d.items.map((i) => ({
         code: i.productCode, productId: i.productId, name: i.productName, qty: qtyFmt(i.quantity),
-        cost: money(i.unitCost), value: money(i.value),
+        cost: formatCost(i.unitCost), value: money(i.value),
       })),
       totals: [
         { label: 'Tổng SL hủy', value: qtyFmt(s.totalQuantity) },

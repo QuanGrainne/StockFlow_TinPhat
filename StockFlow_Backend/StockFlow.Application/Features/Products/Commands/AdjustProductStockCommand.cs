@@ -2,6 +2,7 @@ using MediatR;
 using Microsoft.EntityFrameworkCore;
 using StockFlow.Application.Common;
 using StockFlow.Application.Common.Interfaces;
+using StockFlow.Application.Common.Inventory;
 using StockFlow.Application.Features.Products.DTOs;
 using StockFlow.Application.Features.Stocktakes.DTOs;
 using StockFlow.Application.Features.Stocktakes.Helpers;
@@ -109,13 +110,6 @@ public class AdjustProductStockHandler : IRequestHandler<AdjustProductStockComma
     }
 
     /// <summary>Giá vốn hiện tại của kho: bình quân theo SL các dòng còn hàng, nếu không có thì giá vốn chung của hàng hóa.</summary>
-    private static decimal CurrentCost(IReadOnlyCollection<TrxInventoryBalance> balances, MstProduct product)
-    {
-        var positive = balances.Where(b => (b.Quantity ?? 0) > 0).ToList();
-        var qty = positive.Sum(b => b.Quantity ?? 0);
-        if (qty > 0)
-            return Math.Round(positive.Sum(b => (b.Quantity ?? 0) * (b.UnitCost ?? 0)) / qty, 2);
-        return balances.Select(b => b.UnitCost).FirstOrDefault(c => c.HasValue && c.Value > 0)
-               ?? product.MovingAverageCost ?? 0;
-    }
+    private static decimal CurrentCost(IReadOnlyCollection<TrxInventoryBalance> balances, MstProduct product) =>
+        InventoryCosting.CostOf(balances, product.MovingAverageCost ?? 0);
 }

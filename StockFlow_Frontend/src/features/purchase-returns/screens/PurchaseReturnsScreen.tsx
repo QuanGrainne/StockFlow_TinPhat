@@ -56,6 +56,19 @@ function formatDateTimeVN(value?: string | null): string {
   return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
+/** Nhãn phiếu trả hàng lỗi (BR-24: hàng lỗi lúc nhận hàng, không trừ kho, không tính tiền) */
+function defectTag(returnType?: string) {
+  if (returnType !== 'DEFECT') return null;
+  return (
+    <span
+      className="inline-block ml-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold border bg-[#fef2f2] text-[#fb2c36] border-[#fecaca] font-sans align-middle"
+      title="Trả hàng lỗi ghi nhận lúc nhận hàng: không trừ tồn kho, không tính tiền"
+    >
+      Hàng lỗi
+    </span>
+  );
+}
+
 function statusTag(status: string) {
   switch (status?.toUpperCase()) {
     case 'COMPLETED':
@@ -564,7 +577,10 @@ export default function PurchaseReturnsScreen() {
                               {favorites.includes(r.purchaseReturnId) ? <StarFilled /> : <StarOutlined />}
                             </button>
                           </td>
-                          <td className="py-2.5 px-3 font-mono font-medium text-[#0070f4]">{r.returnCode}</td>
+                          <td className="py-2.5 px-3 font-mono font-medium text-[#0070f4]">
+                            {r.returnCode}
+                            {defectTag(r.returnType)}
+                          </td>
                           <td className="py-2.5 px-3">{formatDateTimeVN(r.returnDate)}</td>
                           <td className="py-2.5 px-3 truncate max-w-[220px]" title={r.partnerName}>{r.partnerName}</td>
                           <td className="py-2.5 px-3 text-right">{money.format(r.totalGoodsAmount)}</td>
@@ -654,6 +670,7 @@ export default function PurchaseReturnsScreen() {
                                       <div className="flex items-center gap-2.5 mb-2">
                                         <span className="text-base font-bold font-mono">{detail.returnCode}</span>
                                         {statusTag(detail.status)}
+                                        {defectTag(detail.returnType)}
                                       </div>
                                       <div className="grid grid-cols-3 gap-x-8 gap-y-1.5 text-xs text-slate-600">
                                         <div>

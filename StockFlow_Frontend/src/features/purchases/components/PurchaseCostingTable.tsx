@@ -5,6 +5,7 @@
 // Số liệu lấy từ thẻ kho tại thời điểm nhập (đúng kho nhận). Công thức chỉ hiện khi di chuột lên cột "Giá vốn sau".
 
 import { ProductCodeLink } from '@/components/links/EntityLinks';
+import { formatCost } from '@/lib/utils/cost';
 import type { PurchaseCosting } from '../types';
 
 const money = (v: number) => (v || 0).toLocaleString('vi-VN', { maximumFractionDigits: 2 });
@@ -47,11 +48,11 @@ export default function PurchaseCostingTable({ costing, status }: { costing?: Pu
                 </td>
                 <td className="py-2 px-3 font-medium">{c.productName}</td>
                 <td className="py-2 px-3 text-right font-mono">{qty(c.qtyBefore)}</td>
-                <td className="py-2 px-3 text-right font-mono">{money(c.costBefore)}</td>
+                <td className="py-2 px-3 text-right font-mono">{formatCost(c.costBefore)}</td>
                 <td className="py-2 px-3 text-right font-mono">{qty(c.qtyIn)}</td>
                 <td className="py-2 px-3 text-right font-mono">{money(c.priceIn)}</td>
                 <td className="py-2 px-3 text-right font-mono">{qty(c.qtyAfter)}</td>
-                <td className="py-2 px-3 text-right font-mono font-semibold text-[#0070f4]">{money(c.costAfter)}</td>
+                <td className="py-2 px-3 text-right font-mono font-semibold text-[#0070f4]">{formatCost(c.costAfter)}</td>
               </tr>
             ))}
           </tbody>

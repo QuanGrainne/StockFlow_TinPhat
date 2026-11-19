@@ -2,6 +2,8 @@
 
 // Màn Trả hàng nhập (trả hàng cho nhà cung cấp) — bố cục giống màn Nhập hàng (theo KiotViet):
 // - ?grId=<id>  : trả theo phiếu nhập (NCC + kho theo phiếu nhập, SL trả ≤ SL còn được trả "/x")
+// - ?grId=<id>&type=defect : trả hàng lỗi ghi nhận trên phiếu nhập (BR-24) — SL ≤ SL lỗi chưa trả,
+//                            không trừ tồn kho, không tính tiền (hàng lỗi chưa vào kho, chưa trả tiền NCC)
 // - ?edit=<id>  : mở lại phiếu tạm để sửa / hoàn thành
 // - không tham số: trả hàng tự do (chọn NCC + tìm hàng hóa trong kho làm việc)
 
@@ -29,7 +31,7 @@ import { productService, type BackendProduct } from '@/features/products/service
 import { supplierService } from '@/features/suppliers/services/supplierService';
 import type { Supplier } from '@/features/suppliers/types';
 import { purchaseReturnService } from '@/features/purchase-returns/services/purchaseReturnService';
-import type { ReturnSource, SavePurchaseReturnPayload } from '@/features/purchase-returns/types';
+import type { PurchaseReturnType, ReturnSource, SavePurchaseReturnPayload } from '@/features/purchase-returns/types';
 import { toLocalDatetimeInputString } from '@/lib/utils/date';
 import { NumberInput } from '@/components/inputs/NumberInput';
 import { ProductThumb } from '@/components/ProductThumb';
@@ -85,6 +87,13 @@ export default function CreatePurchaseReturnScreen() {
   const searchParams = useSearchParams();
   const grIdParam = searchParams.get('grId');
   const editId = searchParams.get('edit');
+  const typeParam = searchParams.get('type');
+
+  // Loại phiếu: trả hàng lỗi (?type=defect hoặc phiếu tạm DEFECT khi sửa) / trả hàng đã nhập kho
+  const [returnType, setReturnType] = useState<PurchaseReturnType>(
+    typeParam === 'defect' && !editId ? 'DEFECT' : 'STOCK'
+  );
+  const isDefect = returnType === 'DEFECT';
 
   const { activeWarehouse } = useActiveWarehouse();
   const [userDisplay] = useState(getUserDisplay);
@@ -138,10 +147,11 @@ export default function CreatePurchaseReturnScreen() {
 
   // ─── Nạp phiếu nhập gốc / phiếu tạm ─────────────────────────────────────────
   useEffect(() => {
-    const key = `${grIdParam ?? ''}|${editId ?? ''}`;
+    const key = `${grIdParam ?? ''}|${editId ?? ''}|${typeParam ?? ''}`;
     if ((!grIdParam && !editId) || loadedRef.current === key) return;
     loadedRef.current = key;
 
+    // Trả hàng lỗi: mặc định trả hết SL lỗi còn lại (thường trả cả lô lỗi cho NCC)
     const toSourceRows = (src: ReturnSource): ReturnRow[] =>
       src.items.map((it) => ({
         key: `gr-${it.grItemId}`,
@@ -153,9 +163,9 @@ export default function CreatePurchaseReturnScreen() {
         imageUrl: it.imageUrl,
         currentStock: it.currentStock,
         maxQty: it.remainingQty,
-        quantity: 0,
+        quantity: src.returnType === 'DEFECT' ? it.remainingQty : 0,
         importPrice: it.importPrice,
-        returnPrice: it.importPrice,
+        returnPrice: src.returnType === 'DEFECT' ? 0 : it.importPrice,
         landedCost: it.landedCost,
       }));
 
@@ -181,6 +191,8 @@ export default function CreatePurchaseReturnScreen() {
             return;
           }
           setReturnCode(detail.returnCode);
+          const detailType: PurchaseReturnType = detail.returnType === 'DEFECT' ? 'DEFECT' : 'STOCK';
+          setReturnType(detailType);
           if (detail.returnDate) setReturnDateTime(toLocalDatetimeInputString(detail.returnDate));
           setDiscountType('VND');
           setDiscountValue(detail.discountAmount || 0);
@@ -197,13 +209,14 @@ export default function CreatePurchaseReturnScreen() {
           });
 
           if (detail.grId) {
-            const src = await purchaseReturnService.getSource(detail.grId, detail.purchaseReturnId);
+            const src = await purchaseReturnService.getSource(detail.grId, detail.purchaseReturnId, detailType);
             applySource(src);
             const saved = new Map(detail.items.map((i) => [i.grItemId ?? -1, i]));
             setRows(
               toSourceRows(src).map((r) => {
                 const s = saved.get(r.grItemId ?? -2);
-                return s ? { ...r, quantity: s.quantity, returnPrice: s.returnPrice } : r;
+                // Phiếu tạm: dòng chưa có trong phiếu thì để SL 0 (kể cả trả hàng lỗi)
+                return s ? { ...r, quantity: s.quantity, returnPrice: s.returnPrice } : { ...r, quantity: 0 };
               })
             );
           } else {
@@ -222,11 +235,15 @@ export default function CreatePurchaseReturnScreen() {
             );
           }
         } else if (grIdParam) {
-          const src = await purchaseReturnService.getSource(grIdParam);
+          const defect = typeParam === 'defect';
+          const src = await purchaseReturnService.getSource(grIdParam, undefined, defect ? 'DEFECT' : undefined);
           applySource(src);
           setRows(toSourceRows(src));
           if (src.items.every((i) => i.remainingQty <= 0)) {
-            showToast(`Phiếu nhập ${src.grCode} đã được trả hết hàng`, 'warning');
+            showToast(
+              defect ? `Phiếu nhập ${src.grCode} không còn hàng lỗi chưa trả` : `Phiếu nhập ${src.grCode} đã được trả hết hàng`,
+              'warning'
+            );
           }
         }
       } catch (err) {
@@ -236,7 +253,7 @@ export default function CreatePurchaseReturnScreen() {
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [grIdParam, editId]);
+  }, [grIdParam, editId, typeParam]);
 
   // NCC cho chế độ trả tự do
   useEffect(() => {
@@ -338,9 +355,9 @@ export default function CreatePurchaseReturnScreen() {
         imageUrl: it.imageUrl,
         currentStock: it.currentStock,
         maxQty: it.remainingQty,
-        quantity: 0,
+        quantity: isDefect ? it.remainingQty : 0,
         importPrice: it.importPrice,
-        returnPrice: it.importPrice,
+        returnPrice: isDefect ? 0 : it.importPrice,
       },
     ]);
     setSearchQuery('');
@@ -406,14 +423,16 @@ export default function CreatePurchaseReturnScreen() {
       returnCode: returnCode.trim() || null,
       returnDate: returnDateTime ? new Date(returnDateTime).toISOString() : new Date().toISOString(),
       status,
-      discountAmount: orderDiscount,
-      refundAmount: status === 'COMPLETED' ? refund : 0,
+      // Trả hàng lỗi: không tính tiền (hàng lỗi chưa trả tiền NCC)
+      discountAmount: isDefect ? 0 : orderDiscount,
+      refundAmount: status === 'COMPLETED' && !isDefect ? refund : 0,
       paymentMethod,
       notes: notes.trim() || null,
+      returnType,
       items: activeRows.map((r) => ({
         productId: r.productId,
         quantity: r.quantity,
-        returnPrice: r.returnPrice,
+        returnPrice: isDefect ? 0 : r.returnPrice,
         grItemId: r.grItemId ?? null,
       })),
     };
@@ -425,8 +444,10 @@ export default function CreatePurchaseReturnScreen() {
         : await purchaseReturnService.create(payload);
       showToast(
         status === 'COMPLETED'
-          ? `Trả hàng thành công! Mã phiếu: ${result.returnCode}. Tồn kho và công nợ đã cập nhật.`
-          : `Đã lưu tạm phiếu trả hàng nhập: ${result.returnCode}`
+          ? isDefect
+            ? `Đã trả hàng lỗi cho NCC. Mã phiếu: ${result.returnCode}.`
+            : `Trả hàng thành công! Mã phiếu: ${result.returnCode}. Tồn kho và công nợ đã cập nhật.`
+          : `Đã lưu tạm phiếu ${isDefect ? 'trả hàng lỗi' : 'trả hàng nhập'}: ${result.returnCode}`
       );
       setTimeout(() => router.push('/purchase-returns'), 700);
     } catch (err) {
@@ -436,7 +457,10 @@ export default function CreatePurchaseReturnScreen() {
     }
   };
 
-  const gridTemplate = '36px 44px 48px 110px minmax(180px,1fr) 70px 120px 110px 120px 120px';
+  // Trả hàng lỗi: bỏ cột Giá trả lại / Thành tiền (không tính tiền)
+  const gridTemplate = isDefect
+    ? '36px 44px 48px 110px minmax(180px,1fr) 70px 120px 110px'
+    : '36px 44px 48px 110px minmax(180px,1fr) 70px 120px 110px 120px 120px';
 
   return (
     <div className="flex flex-col h-[calc(100vh-56px)] bg-transparent text-[13px] text-[#15171a] select-none overflow-hidden font-sans">
@@ -463,12 +487,22 @@ export default function CreatePurchaseReturnScreen() {
                 <CheckCircle2 size={20} />
               </div>
               <div>
-                <h3 className="text-sm font-bold text-[#15171a]">Xác nhận trả hàng nhập</h3>
-                <p className="text-xs text-[#677484] mt-1 leading-relaxed">
-                  Trả {totalQty.toLocaleString('vi-VN')} sản phẩm cho nhà cung cấp &quot;{partner?.name}&quot;. Tồn kho tại
-                  &quot;{effectiveWarehouseName}&quot; sẽ bị trừ và công nợ phải trả NCC giảm{' '}
-                  <strong className="text-[#15171a]">{formatVnd(debtChange)}</strong>.
-                </p>
+                <h3 className="text-sm font-bold text-[#15171a]">
+                  {isDefect ? 'Xác nhận trả hàng lỗi' : 'Xác nhận trả hàng nhập'}
+                </h3>
+                {isDefect ? (
+                  <p className="text-xs text-[#677484] mt-1 leading-relaxed">
+                    Trả {totalQty.toLocaleString('vi-VN')} sản phẩm lỗi của phiếu nhập {source?.grCode} cho nhà cung cấp
+                    &quot;{partner?.name}&quot;. Hàng lỗi chưa nhập kho và chưa tính tiền nên tồn kho và công nợ NCC không
+                    thay đổi.
+                  </p>
+                ) : (
+                  <p className="text-xs text-[#677484] mt-1 leading-relaxed">
+                    Trả {totalQty.toLocaleString('vi-VN')} sản phẩm cho nhà cung cấp &quot;{partner?.name}&quot;. Tồn kho tại
+                    &quot;{effectiveWarehouseName}&quot; sẽ bị trừ và công nợ phải trả NCC giảm{' '}
+                    <strong className="text-[#15171a]">{formatVnd(debtChange)}</strong>.
+                  </p>
+                )}
               </div>
             </div>
             <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
@@ -505,7 +539,7 @@ export default function CreatePurchaseReturnScreen() {
             <ArrowLeft size={18} className="stroke-[2.5]" />
           </Link>
           <span className="text-[20px] font-semibold text-[#15171a] tracking-tight whitespace-nowrap leading-[36px]">
-            Trả hàng nhập
+            {isDefect ? 'Trả hàng lỗi' : 'Trả hàng nhập'}
           </span>
         </div>
 
@@ -546,7 +580,7 @@ export default function CreatePurchaseReturnScreen() {
                         </span>
                       </span>
                       <span className="text-[11px] text-[#677484]">
-                        Còn được trả: <strong className="text-[#15171a]">{it.remainingQty.toLocaleString('vi-VN')}</strong>
+                        {isDefect ? 'Hàng lỗi chưa trả' : 'Còn được trả'}: <strong className="text-[#15171a]">{it.remainingQty.toLocaleString('vi-VN')}</strong>
                       </span>
                     </button>
                   ))
@@ -610,17 +644,23 @@ export default function CreatePurchaseReturnScreen() {
                 <div className="pl-2">Mã hàng</div>
                 <div className="pl-2">Tên hàng</div>
                 <div className="pl-2">ĐVT</div>
-                <div className="text-right pr-2">Số lượng</div>
+                <div className="text-right pr-2" title={isDefect ? 'SL hàng lỗi trả NCC / SL lỗi chưa trả' : undefined}>
+                  {isDefect ? 'SL lỗi trả' : 'Số lượng'}
+                </div>
                 <div className="text-right pr-2">Giá nhập</div>
-                <div className="text-right pr-2">Giá trả lại</div>
-                <div className="text-right pr-2">Thành tiền</div>
+                {!isDefect && <div className="text-right pr-2">Giá trả lại</div>}
+                {!isDefect && <div className="text-right pr-2">Thành tiền</div>}
               </div>
 
               {loading ? (
                 <div className="py-24 text-center text-[#677484]">Đang tải dữ liệu phiếu...</div>
               ) : rows.length === 0 ? (
                 <div className="py-24 text-center text-[#677484]">
-                  {source ? 'Phiếu nhập không còn hàng hóa để trả' : 'Tìm và chọn hàng hóa cần trả cho nhà cung cấp'}
+                  {isDefect
+                    ? 'Phiếu nhập không có hàng lỗi để trả'
+                    : source
+                      ? 'Phiếu nhập không còn hàng hóa để trả'
+                      : 'Tìm và chọn hàng hóa cần trả cho nhà cung cấp'}
                 </div>
               ) : (
                 rows.map((row, index) => (
@@ -671,14 +711,18 @@ export default function CreatePurchaseReturnScreen() {
                       )}
                     </div>
                     <div className="text-right pr-2 pt-1.5">{formatVnd(row.importPrice)}</div>
-                    <div className="px-1">
-                      <NumberInput
-                        value={row.returnPrice}
-                        onChange={(v) => updateRow(row.key, { returnPrice: Math.max(0, v) })}
-                        className="w-full"
-                      />
-                    </div>
-                    <div className="text-right pr-2 pt-1.5 font-medium">{formatVnd(lineTotal(row))}</div>
+                    {!isDefect && (
+                      <div className="px-1">
+                        <NumberInput
+                          value={row.returnPrice}
+                          onChange={(v) => updateRow(row.key, { returnPrice: Math.max(0, v) })}
+                          className="w-full"
+                        />
+                      </div>
+                    )}
+                    {!isDefect && (
+                      <div className="text-right pr-2 pt-1.5 font-medium">{formatVnd(lineTotal(row))}</div>
+                    )}
                   </div>
                 ))
               )}
@@ -693,9 +737,11 @@ export default function CreatePurchaseReturnScreen() {
                   Tổng số lượng trả: <strong className="text-[#0070f4] text-sm">{totalQty.toLocaleString('vi-VN')}</strong>
                 </span>
               </span>
-              <span>
-                Tổng tiền hàng: <strong className="text-sm text-[#15171a]">{formatVnd(totalGoods)} đ</strong>
-              </span>
+              {!isDefect && (
+                <span>
+                  Tổng tiền hàng: <strong className="text-sm text-[#15171a]">{formatVnd(totalGoods)} đ</strong>
+                </span>
+              )}
             </div>
           )}
         </div>
@@ -828,6 +874,18 @@ export default function CreatePurchaseReturnScreen() {
                 <span>Phiếu tạm</span>
               </div>
 
+              {isDefect && (
+                <div className="flex items-start gap-2 p-2.5 rounded-[8px] border border-amber-200 bg-amber-50 text-[12px] text-amber-800 leading-snug">
+                  <AlertTriangle size={14} className="shrink-0 mt-0.5" />
+                  <span>
+                    Hàng lỗi ghi nhận lúc nhận hàng chưa nhập kho và chưa tính tiền NCC. Phiếu trả hàng lỗi không trừ tồn
+                    kho và không thay đổi công nợ; phiếu đặt (nếu có) vẫn chờ NCC giao bù phần lỗi.
+                  </span>
+                </div>
+              )}
+
+              {!isDefect && (
+              <>
               {/* Tổng tiền hàng */}
               <div className="flex items-center justify-between gap-3">
                 <span className="flex items-center gap-1.5">
@@ -911,6 +969,8 @@ export default function CreatePurchaseReturnScreen() {
                 <span>Tính vào công nợ</span>
                 <span>{formatVnd(debtChange)}</span>
               </div>
+              </>
+              )}
 
               <textarea
                 value={notes}

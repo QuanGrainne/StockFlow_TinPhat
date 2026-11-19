@@ -51,13 +51,7 @@ public static class ProductionStockOps
     /// <summary>Giá vốn bình quân của 1 hàng tại 1 kho theo các dòng tồn còn hàng.</summary>
     private static decimal WarehouseCost(IReadOnlyCollection<TrxInventoryBalance> rows, MstProduct product)
     {
-        var positive = rows.Where(b => (b.Quantity ?? 0) > 0).ToList();
-        var qty = positive.Sum(b => b.Quantity ?? 0);
-        if (qty > 0)
-        {
-            return Math.Round(positive.Sum(b => (b.Quantity ?? 0) * (b.UnitCost ?? 0)) / qty, 2, MidpointRounding.AwayFromZero);
-        }
-        return rows.Select(b => b.UnitCost).FirstOrDefault(c => c.HasValue && c.Value > 0) ?? product.MovingAverageCost ?? 0;
+        return InventoryCosting.CostOf(rows, product.MovingAverageCost ?? 0);
     }
 
     /// <summary>
