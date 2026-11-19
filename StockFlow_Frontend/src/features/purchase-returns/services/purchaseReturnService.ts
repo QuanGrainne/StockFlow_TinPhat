@@ -6,6 +6,7 @@ import type {
   CreateSupplierRefundPayload,
   PurchaseReturnDetail,
   PurchaseReturnListRecord,
+  PurchaseReturnType,
   ReturnSource,
   SavePurchaseReturnPayload,
 } from '../types';
@@ -18,6 +19,7 @@ export const purchaseReturnService = {
     toDate?: string;
     search?: string;
     grId?: number;
+    returnType?: PurchaseReturnType;
   }): Promise<PurchaseReturnListRecord[]> {
     const query = new URLSearchParams();
     if (params?.warehouseIds?.length) query.append('warehouseIds', params.warehouseIds.join(','));
@@ -26,6 +28,7 @@ export const purchaseReturnService = {
     if (params?.toDate) query.append('toDate', params.toDate);
     if (params?.search?.trim()) query.append('search', params.search.trim());
     if (params?.grId) query.append('grId', String(params.grId));
+    if (params?.returnType) query.append('returnType', params.returnType);
     const qs = query.toString() ? `?${query.toString()}` : '';
     const data = await apiClient.get<PurchaseReturnListRecord[]>(`/api/PurchaseReturns${qs}`);
     return Array.isArray(data) ? data : [];
@@ -35,9 +38,15 @@ export const purchaseReturnService = {
     return apiClient.get<PurchaseReturnDetail>(`/api/PurchaseReturns/${id}`);
   },
 
-  /** Phiếu nhập gốc + SL còn được trả từng dòng (excludeReturnId: khi sửa phiếu tạm) */
-  getSource(grId: number | string, excludeReturnId?: number | string): Promise<ReturnSource> {
-    const qs = excludeReturnId ? `?excludeReturnId=${excludeReturnId}` : '';
+  /**
+   * Phiếu nhập gốc + SL còn được trả từng dòng (excludeReturnId: khi sửa phiếu tạm).
+   * returnType = DEFECT: SL tính theo SL lỗi (lập phiếu trả hàng lỗi).
+   */
+  getSource(grId: number | string, excludeReturnId?: number | string, returnType?: PurchaseReturnType): Promise<ReturnSource> {
+    const query = new URLSearchParams();
+    if (excludeReturnId) query.append('excludeReturnId', String(excludeReturnId));
+    if (returnType) query.append('returnType', returnType);
+    const qs = query.toString() ? `?${query.toString()}` : '';
     return apiClient.get<ReturnSource>(`/api/PurchaseReturns/source/${grId}${qs}`);
   },
 

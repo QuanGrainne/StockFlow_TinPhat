@@ -80,6 +80,18 @@ public static class PurchaseOrderHelper
         await context.SaveChangesAsync(ct);
     }
 
+    /// <summary>SL đặt theo từng mặt hàng của phiếu đặt (ghi vào ordered_qty của dòng phiếu nhập theo phiếu đặt).</summary>
+    public static async Task<Dictionary<int, decimal>> OrderedQtyByProductAsync(
+        IStockFlowDbContext context, int? poId, CancellationToken ct)
+    {
+        if (!poId.HasValue) return new Dictionary<int, decimal>();
+        return await context.DtlPurchaseOrderItems.AsNoTracking()
+            .Where(i => i.PoId == poId.Value)
+            .GroupBy(i => i.ProductId)
+            .Select(g => new { g.Key, Qty = g.Sum(i => i.OrderedQty) })
+            .ToDictionaryAsync(x => x.Key, x => x.Qty, ct);
+    }
+
     public static void ReplaceItems(IStockFlowDbContext context, TrxPurchaseOrder po, List<PurchaseOrderItemRequest> items)
     {
         context.DtlPurchaseOrderItems.RemoveRange(po.DtlPurchaseOrderItems);

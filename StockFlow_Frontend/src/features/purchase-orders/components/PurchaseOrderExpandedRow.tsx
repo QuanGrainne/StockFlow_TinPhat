@@ -235,7 +235,13 @@ export default function PurchaseOrderExpandedRow({ poId, colSpan, onClose, onCha
                     <th className="py-2 px-3 w-32">Mã hàng</th>
                     <th className="py-2 px-3">Tên hàng</th>
                     <th className="py-2 px-3 w-24 text-right">SL đặt</th>
-                    <th className="py-2 px-3 w-24 text-right">SL đã nhập</th>
+                    <th className="py-2 px-3 w-24 text-right" title="SL đạt đã vào kho ở các phiếu nhập hoàn thành">SL đã nhập</th>
+                    <th
+                      className="py-2 px-3 w-20 text-right"
+                      title="SL lỗi lúc nhận hàng: không vào kho, không tính tiền, chờ NCC giao bù"
+                    >
+                      SL lỗi
+                    </th>
                     <th className="py-2 px-3 w-24 text-right">Chênh lệch</th>
                     <th className="py-2 px-3 w-28 text-right">Đơn giá</th>
                     <th className="py-2 px-3 w-32 text-right">Thành tiền</th>
@@ -258,6 +264,11 @@ export default function PurchaseOrderExpandedRow({ poId, colSpan, onClose, onCha
                       </td>
                       <td className="py-2.5 px-3 text-right font-mono">{qty(it.orderedQty)}</td>
                       <td className="py-2.5 px-3 text-right font-mono">{qty(it.receivedQty)}</td>
+                      <td
+                        className={`py-2.5 px-3 text-right font-mono ${(it.defectiveQty ?? 0) > 0 ? 'text-[#fb2c36] font-semibold' : 'text-[#677484]'}`}
+                      >
+                        {qty(it.defectiveQty ?? 0)}
+                      </td>
                       <td className="py-2.5 px-3 text-right font-mono">
                         <DiffCell item={it} />
                       </td>

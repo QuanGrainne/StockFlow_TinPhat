@@ -7,7 +7,10 @@ public record PurchaseReturnItemRequest(
     decimal ReturnPrice,
     int? GrItemId = null);
 
-/// <summary>Tạo / cập nhật phiếu trả hàng nhập. Status: DRAFT (lưu tạm) | COMPLETED (hoàn thành).</summary>
+/// <summary>
+/// Tạo / cập nhật phiếu trả hàng nhập. Status: DRAFT (lưu tạm) | COMPLETED (hoàn thành).
+/// ReturnType: STOCK (trả hàng đã nhập kho) | DEFECT (trả hàng lỗi ghi nhận lúc nhận hàng, bắt buộc có GrId).
+/// </summary>
 public record SavePurchaseReturnRequest(
     int PartnerId,
     List<PurchaseReturnItemRequest> Items,
@@ -19,7 +22,8 @@ public record SavePurchaseReturnRequest(
     decimal DiscountAmount = 0,
     decimal RefundAmount = 0,
     string? PaymentMethod = null,
-    string? Notes = null);
+    string? Notes = null,
+    string ReturnType = "STOCK");
 
 public record PurchaseReturnItemDto(
     int PrItemId,
@@ -52,7 +56,9 @@ public record PurchaseReturnListDto(
     string CreatedByName,
     string? Notes,
     // Phần "tính vào công nợ" đã được trừ vào số còn nợ của phiếu nhập gốc
-    decimal OffsetAmount = 0);
+    decimal OffsetAmount = 0,
+    // STOCK | DEFECT (trả hàng lỗi)
+    string ReturnType = "STOCK");
 
 public record PurchaseReturnDetailDto(
     int PurchaseReturnId,
@@ -80,7 +86,9 @@ public record PurchaseReturnDetailDto(
     List<PurchaseReturnItemDto> Items,
     List<PurchaseReturnPaymentDto>? Payments = null,
     // Phần "tính vào công nợ" đã được trừ vào số còn nợ của phiếu nhập gốc
-    decimal OffsetAmount = 0);
+    decimal OffsetAmount = 0,
+    // STOCK | DEFECT (trả hàng lỗi)
+    string ReturnType = "STOCK");
 
 /// <summary>Lịch sử thanh toán (tiền NCC trả lại) của phiếu trả hàng nhập.</summary>
 public record PurchaseReturnPaymentDto(
@@ -124,4 +132,6 @@ public record ReturnSourceDto(
     string PartnerCode,
     string PartnerName,
     decimal PartnerCurrentPayable,
-    List<ReturnSourceItemDto> Items);
+    List<ReturnSourceItemDto> Items,
+    // STOCK: SL theo SL đạt; DEFECT: ReceivedQty/ReturnedQty/RemainingQty theo SL lỗi
+    string ReturnType = "STOCK");

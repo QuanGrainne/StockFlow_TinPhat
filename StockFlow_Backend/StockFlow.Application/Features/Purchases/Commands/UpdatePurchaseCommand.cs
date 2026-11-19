@@ -83,12 +83,8 @@ public class UpdatePurchaseCommandHandler : IRequestHandler<UpdatePurchaseComman
 
             foreach (var item in req.Items)
             {
-                var defectError = PurchaseItemMapper.ValidateDefect(item);
-                if (defectError != null) return Result.Failure<PurchaseDetailDto>(defectError);
-                if (item.Quantity <= 0)
-                {
-                    return Result.Failure<PurchaseDetailDto>($"Số lượng nhập của sản phẩm ID #{item.ProductId} phải lớn hơn 0.");
-                }
+                var qtyError = PurchaseItemMapper.ValidateQuantities(item);
+                if (qtyError != null) return Result.Failure<PurchaseDetailDto>(qtyError);
                 if (item.UnitPrice < 0)
                 {
                     return Result.Failure<PurchaseDetailDto>($"Đơn giá nhập của sản phẩm ID #{item.ProductId} không được âm.");
@@ -142,10 +138,13 @@ public class UpdatePurchaseCommandHandler : IRequestHandler<UpdatePurchaseComman
             var pricing = PurchasePricing.Compute(req.Items, req.DiscountAmount);
             receipt.DiscountAmount = pricing.DiscountApplied;
             var newItems = new List<DtlGoodsReceiptItem>();
+            // SL đặt từng mặt hàng nếu phiếu nhập theo phiếu đặt → ghi vào ordered_qty
+            var orderedByProduct = await PurchaseOrderHelper.OrderedQtyByProductAsync(_context, receipt.PurchaseOrderId, cancellationToken);
 
             foreach (var line in pricing.Lines)
             {
-                var dtl = PurchaseItemMapper.NewItem(line.Request, line.LandedCost);
+                var dtl = PurchaseItemMapper.NewItem(line.Request, line.LandedCost,
+                    receipt.PurchaseOrderId.HasValue ? orderedByProduct.GetValueOrDefault(line.Request.ProductId) : null);
                 dtl.GrId = receipt.GrId;
                 newItems.Add(dtl);
                 _context.DtlGoodsReceiptItems.Add(dtl);

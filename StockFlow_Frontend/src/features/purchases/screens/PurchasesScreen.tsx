@@ -236,6 +236,14 @@ function PurchaseReturnHistory({ returns }: { returns: PurchaseReturnSummary[] }
                       date={toLinkDate(r.returnDate)}
                       className="font-mono font-medium"
                     />
+                    {r.returnType === 'DEFECT' && (
+                      <span
+                        className="ml-1.5 inline-block px-1.5 py-0.5 rounded-[4px] text-[10px] font-semibold border bg-[#fef2f2] text-[#fb2c36] border-[#fecaca]"
+                        title="Trả hàng lỗi: không trừ tồn kho, không tính tiền"
+                      >
+                        Hàng lỗi
+                      </span>
+                    )}
                   </td>
                   <td className="py-2 px-3">{formatDateTimeVN(r.returnDate)}</td>
                   <td className="py-2 px-3">{r.createdByName || '—'}</td>
@@ -1173,8 +1181,9 @@ export default function PurchasesScreen({ onNavigate }: { onNavigate?: (screen: 
                                             <th className="py-2 px-3 w-32">Mã hàng</th>
                                             <th className="py-2 px-3">Tên hàng hóa</th>
                                             <th className="py-2 px-3 w-16 text-center">ĐVT</th>
-                                            <th className="py-2 px-3 w-24 text-right" title="SL đạt: vào tồn kho, tính tiền">SL đạt</th>
+                                            <th className="py-2 px-3 w-20 text-right" title="SL thực nhận = SL đạt + SL lỗi">SL nhận</th>
                                             <th className="py-2 px-3 w-20 text-right" title="SL lỗi: không vào tồn kho, không tính tiền">SL lỗi</th>
+                                            <th className="py-2 px-3 w-20 text-right" title="SL đạt: vào tồn kho, tính tiền">SL đạt</th>
                                             <th className="py-2 px-3 w-28 text-right">Đơn giá</th>
                                             <th className="py-2 px-3 w-24 text-right">Giảm giá</th>
                                             <th className="py-2 px-3 w-28 text-right">Giá nhập</th>
@@ -1198,14 +1207,14 @@ export default function PurchasesScreen({ onNavigate }: { onNavigate?: (screen: 
                                                 className="w-full h-7 px-2 text-xs font-normal border border-slate-300 rounded-[6px] focus:outline-none focus:border-[#0070f4]"
                                               />
                                             </th>
-                                            <th colSpan={7} />
+                                            <th colSpan={8} />
                                           </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-100">
                                           {detail?.items && detail.items.length > 0 ? (
                                             detail.items.filter(matchItemSearch).length === 0 ? (
                                               <tr>
-                                                <td colSpan={10} className="py-6 text-center text-xs text-slate-400">
+                                                <td colSpan={11} className="py-6 text-center text-xs text-slate-400">
                                                   Không có mặt hàng nào phù hợp
                                                 </td>
                                               </tr>
@@ -1217,10 +1226,13 @@ export default function PurchasesScreen({ onNavigate }: { onNavigate?: (screen: 
                                                 </td>
                                                 <td className="py-2 px-3 font-medium text-[#15171a]">{item.productName}</td>
                                                 <td className="py-2 px-3 text-center text-slate-500">{item.unit || 'Cái'}</td>
-                                                <td className="py-2 px-3 text-right font-mono font-medium">{item.quantity.toLocaleString('vi-VN')}</td>
+                                                <td className="py-2 px-3 text-right font-mono">
+                                                  {(item.quantity + (item.defectQuantity ?? 0)).toLocaleString('vi-VN')}
+                                                </td>
                                                 <td className={`py-2 px-3 text-right font-mono ${(item.defectQuantity ?? 0) > 0 ? 'text-[#fb2c36] font-semibold' : 'text-slate-400'}`}>
                                                   {(item.defectQuantity ?? 0).toLocaleString('vi-VN')}
                                                 </td>
+                                                <td className="py-2 px-3 text-right font-mono font-medium">{item.quantity.toLocaleString('vi-VN')}</td>
                                                 <td className="py-2 px-3 text-right font-mono">{currencyFormatter.format(item.unitPrice)} đ</td>
                                                 <td className="py-2 px-3 text-right font-mono" title={item.discountPercent > 0 ? `Giảm ${item.discountPercent}%` : undefined}>
                                                   {currencyFormatter.format(lineDiscountPerUnit(item))} đ
@@ -1235,7 +1247,7 @@ export default function PurchasesScreen({ onNavigate }: { onNavigate?: (screen: 
                                             ))
                                           ) : (
                                             <tr>
-                                              <td colSpan={10} className="py-6 text-center text-xs text-slate-400">
+                                              <td colSpan={11} className="py-6 text-center text-xs text-slate-400">
                                                 Phiếu chưa có danh sách mặt hàng
                                               </td>
                                             </tr>
@@ -1352,6 +1364,22 @@ export default function PurchasesScreen({ onNavigate }: { onNavigate?: (screen: 
                                           >
                                             <Undo2 size={13} />
                                             <span>Trả hàng nhập</span>
+                                          </button>
+                                        )}
+                                        {/* Chỉ hiện khi còn hàng lỗi chưa trả NCC */}
+                                        {!isDraft &&
+                                          !isCanceled &&
+                                          (detail?.items ?? []).some(
+                                            (it) => (it.defectQuantity ?? 0) - (it.defectReturnedQty ?? 0) > 0
+                                          ) && (
+                                          <button
+                                            type="button"
+                                            onClick={() => router.push(`/purchase-returns/create?grId=${record.grId}&type=defect`)}
+                                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-[#fb2c36] hover:bg-[#fef2f2] rounded-[8px] transition cursor-pointer border border-[#fecaca] bg-white font-medium"
+                                            title="Lập phiếu trả hàng lỗi cho NCC (không trừ tồn kho, không tính tiền)"
+                                          >
+                                            <AlertTriangle size={13} />
+                                            <span>Trả hàng lỗi</span>
                                           </button>
                                         )}
                                         {isDraft && (

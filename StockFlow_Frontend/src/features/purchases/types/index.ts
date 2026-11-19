@@ -21,6 +21,8 @@ export interface PurchaseItem {
   currentUnitCost?: number;
   /** SL lỗi khi nhận hàng: không vào tồn kho, không tính tiền trả NCC */
   defectQuantity?: number;
+  /** SL lỗi đã trả NCC (phiếu trả hàng lỗi đã hoàn thành) */
+  defectReturnedQty?: number;
 }
 
 /** Cách tính giá vốn bình quân gia quyền của 1 dòng phiếu nhập đã hoàn thành (lấy từ thẻ kho) */
@@ -101,6 +103,8 @@ export interface PurchaseReturnSummary {
   createdByName: string;
   totalAmount: number;
   status: string;
+  /** STOCK: trả hàng đã nhập kho; DEFECT: trả hàng lỗi (không trừ kho, không tính tiền) */
+  returnType?: 'STOCK' | 'DEFECT';
 }
 
 export interface PurchasePayment {

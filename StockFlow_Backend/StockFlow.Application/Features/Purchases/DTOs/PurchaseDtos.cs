@@ -15,7 +15,8 @@ public record PurchaseItemDto(
     decimal TotalPrice,
     int? LotId,
     string? LotNumber,
-    decimal DefectQuantity = 0 // SL lỗi khi nhận hàng: không vào tồn kho, không tính tiền trả NCC
+    decimal DefectQuantity = 0, // SL lỗi khi nhận hàng: không vào tồn kho, không tính tiền trả NCC
+    decimal DefectReturnedQty = 0 // SL lỗi đã trả NCC ở các phiếu trả hàng lỗi đã hoàn thành
 );
 
 /// <summary>
@@ -94,7 +95,9 @@ public record PurchaseReturnSummaryDto(
     DateTime? ReturnDate,
     string CreatedByName,
     decimal TotalAmount,
-    string Status
+    string Status,
+    // STOCK | DEFECT (trả hàng lỗi)
+    string ReturnType = "STOCK"
 );
 
 /// <summary>Lịch sử thanh toán của phiếu nhập (trả lúc nhập + các phiếu chi PC phân bổ vào phiếu).</summary>

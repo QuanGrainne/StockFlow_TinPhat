@@ -55,7 +55,7 @@ public static class PurchaseStockOps
     private static StockKey KeyOf(TrxGoodsReceipt receipt, DtlGoodsReceiptItem item) =>
         new(receipt.WarehouseId, item.ProductId, item.LocationId, item.LotId);
 
-    /// <summary>Nhập kho 1 dòng phiếu nhập (giống lúc hoàn thành phiếu nhập).</summary>
+    /// <summary>Nhập kho 1 dòng phiếu nhập (giống lúc hoàn thành phiếu nhập). Dòng toàn hàng lỗi (SL đạt = 0) bỏ qua.</summary>
     public static Task ApplyInboundAsync(
         IStockFlowDbContext context,
         TrxGoodsReceipt receipt,
@@ -64,10 +64,12 @@ public static class PurchaseStockOps
         string transactionType,
         int userId,
         CancellationToken ct) =>
-        InboundAsync(context, KeyOf(receipt, item), Quantity(item), item.UnitLandedCost ?? 0, products,
-            new StockRef(transactionType, "GOODS_RECEIPT", receipt.GrId, userId), ct, LinePrice(item));
+        Quantity(item) <= 0
+            ? Task.CompletedTask
+            : InboundAsync(context, KeyOf(receipt, item), Quantity(item), item.UnitLandedCost ?? 0, products,
+                new StockRef(transactionType, "GOODS_RECEIPT", receipt.GrId, userId), ct, LinePrice(item));
 
-    /// <summary>Đảo nhập kho 1 dòng phiếu nhập (khi hủy / sửa phiếu đã nhập).</summary>
+    /// <summary>Đảo nhập kho 1 dòng phiếu nhập (khi hủy / sửa phiếu đã nhập). Dòng toàn hàng lỗi (SL đạt = 0) bỏ qua.</summary>
     public static Task ReverseInboundAsync(
         IStockFlowDbContext context,
         TrxGoodsReceipt receipt,
@@ -76,6 +78,8 @@ public static class PurchaseStockOps
         string transactionType,
         int userId,
         CancellationToken ct) =>
-        OutboundAsync(context, KeyOf(receipt, item), Quantity(item), item.UnitLandedCost ?? 0, products,
-            new StockRef(transactionType, "GOODS_RECEIPT", receipt.GrId, userId), ct, LinePrice(item));
+        Quantity(item) <= 0
+            ? Task.CompletedTask
+            : OutboundAsync(context, KeyOf(receipt, item), Quantity(item), item.UnitLandedCost ?? 0, products,
+                new StockRef(transactionType, "GOODS_RECEIPT", receipt.GrId, userId), ct, LinePrice(item));
 }

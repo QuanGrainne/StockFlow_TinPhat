@@ -51,8 +51,8 @@ public class SavePurchaseReturnHandler :
                 return Result.Failure<PurchaseReturnDetailDto>("Bạn không có quyền truy cập phiếu trả hàng của kho này.");
             if (!PurchaseReturnLogic.Is(ret.Status, PurchaseReturnLogic.Draft))
                 return Result.Failure<PurchaseReturnDetailDto>("Chỉ sửa được phiếu trả hàng nhập ở trạng thái Phiếu tạm.");
-            // Giữ nguyên phiếu nhập gốc của phiếu tạm
-            req = req with { GrId = ret.GrId, WarehouseId = ret.WarehouseId };
+            // Giữ nguyên phiếu nhập gốc và loại phiếu (trả hàng thường / trả hàng lỗi) của phiếu tạm
+            req = req with { GrId = ret.GrId, WarehouseId = ret.WarehouseId, ReturnType = ret.ReturnType };
         }
 
         var prepared = await PurchaseReturnLogic.PrepareAsync(_context, _currentUser, req, id, ct);
@@ -85,6 +85,7 @@ public class SavePurchaseReturnHandler :
             // Client gửi ISO UTC (toISOString) → đổi về giờ Việt Nam trước khi lưu
             ret.ReturnDate = VietnamTime.From(req.ReturnDate);
             ret.Status = p.Status;
+            ret.ReturnType = p.ReturnType;
             ret.DiscountAmount = p.Discount;
             ret.TotalAmount = p.Total;
             ret.RefundAmount = p.Refund;

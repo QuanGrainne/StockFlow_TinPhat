@@ -8,19 +8,27 @@ using StockFlow.Application.Features.Purchases.Helpers;
 
 namespace StockFlow.Application.Features.PurchaseReturns.Queries;
 
-/// <summary>Danh sách phiếu trả hàng nhập. Statuses: danh sách trạng thái (DRAFT,COMPLETED,CANCELLED), rỗng = tất cả.</summary>
+/// <summary>
+/// Danh sách phiếu trả hàng nhập. Statuses: danh sách trạng thái (DRAFT,COMPLETED,CANCELLED), rỗng = tất cả.
+/// ReturnType: STOCK | DEFECT, rỗng = tất cả.
+/// </summary>
 public record GetPurchaseReturnsQuery(
     List<int>? WarehouseIds,
     List<string>? Statuses,
     DateTime? FromDate,
     DateTime? ToDate,
     string? Search,
-    int? GrId = null) : IRequest<Result<List<PurchaseReturnListDto>>>;
+    int? GrId = null,
+    string? ReturnType = null) : IRequest<Result<List<PurchaseReturnListDto>>>;
 
 public record GetPurchaseReturnByIdQuery(int Id) : IRequest<Result<PurchaseReturnDetailDto>>;
 
-/// <summary>Dữ liệu phiếu nhập để lập phiếu trả hàng nhập (kèm SL còn được trả).</summary>
-public record GetPurchaseReturnSourceQuery(int GrId, int? ExcludeReturnId = null) : IRequest<Result<ReturnSourceDto>>;
+/// <summary>
+/// Dữ liệu phiếu nhập để lập phiếu trả hàng nhập (kèm SL còn được trả).
+/// ReturnType = DEFECT: SL theo SL lỗi của phiếu nhập (lập phiếu trả hàng lỗi).
+/// </summary>
+public record GetPurchaseReturnSourceQuery(int GrId, int? ExcludeReturnId = null, string? ReturnType = null)
+    : IRequest<Result<ReturnSourceDto>>;
 
 public class PurchaseReturnQueryHandler :
     IRequestHandler<GetPurchaseReturnsQuery, Result<List<PurchaseReturnListDto>>>,
@@ -60,6 +68,12 @@ public class PurchaseReturnQueryHandler :
 
         if (request.GrId.HasValue)
             query = query.Where(r => r.GrId == request.GrId.Value);
+
+        if (!string.IsNullOrWhiteSpace(request.ReturnType))
+        {
+            var type = PurchaseReturnLogic.NormalizeType(request.ReturnType);
+            query = query.Where(r => r.ReturnType == type);
+        }
 
         if (request.FromDate.HasValue)
             query = query.Where(r => r.ReturnDate >= request.FromDate.Value);
@@ -111,7 +125,8 @@ public class PurchaseReturnQueryHandler :
             r.Status ?? PurchaseReturnLogic.Draft,
             r.CreatedByNavigation?.FullName ?? r.CreatedByNavigation?.Username ?? $"NV #{r.CreatedBy}",
             r.Notes,
-            offsets.OffsetByReturn.GetValueOrDefault(r.PurchaseReturnId))).ToList());
+            offsets.OffsetByReturn.GetValueOrDefault(r.PurchaseReturnId),
+            PurchaseReturnLogic.NormalizeType(r.ReturnType))).ToList());
     }
 
     public async Task<Result<PurchaseReturnDetailDto>> Handle(GetPurchaseReturnByIdQuery request, CancellationToken ct)
@@ -140,7 +155,9 @@ public class PurchaseReturnQueryHandler :
         if (!PurchaseReturnLogic.Is(receipt.Status, PurchaseReturnLogic.Completed))
             return Result.Failure<ReturnSourceDto>("Chỉ trả hàng được cho phiếu nhập đã nhập hàng.");
 
-        var returned = await PurchaseReturnLogic.ReturnedQtyByGrItemAsync(_context, receipt.GrId, request.ExcludeReturnId, ct);
+        var returnType = PurchaseReturnLogic.NormalizeType(request.ReturnType);
+        var returned = await PurchaseReturnLogic.ReturnedQtyByGrItemAsync(
+            _context, receipt.GrId, request.ExcludeReturnId, ct, returnType);
 
         var productIds = receipt.DtlGoodsReceiptItems.Select(i => i.ProductId).Distinct().ToList();
         var stocks = await _context.TrxInventoryBalances
@@ -154,7 +171,8 @@ public class PurchaseReturnQueryHandler :
             .OrderBy(i => i.GrItemId)
             .Select(i =>
             {
-                var received = PurchaseStockOps.Quantity(i);
+                // Trả hàng lỗi: "đã nhập" = SL lỗi; trả hàng thường: SL đạt
+                var received = PurchaseReturnLogic.ReturnableQty(i, returnType);
                 var done = returned.GetValueOrDefault(i.GrItemId);
                 return new ReturnSourceItemDto(
                     i.GrItemId,
@@ -181,6 +199,8 @@ public class PurchaseReturnQueryHandler :
             receipt.Partner?.PartnerCode ?? $"NCC{receipt.PartnerId}",
             receipt.Partner?.PartnerName ?? "Nhà cung cấp",
             receipt.Partner?.CurrentPayable ?? 0,
-            items));
+            // Trả hàng lỗi chỉ lấy dòng có hàng lỗi
+            returnType == PurchaseReturnLogic.TypeDefect ? items.Where(i => i.ReceivedQty > 0).ToList() : items,
+            returnType));
     }
 }

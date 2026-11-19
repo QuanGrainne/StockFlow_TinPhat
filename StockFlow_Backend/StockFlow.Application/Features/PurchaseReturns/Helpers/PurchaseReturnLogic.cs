@@ -14,6 +14,8 @@ namespace StockFlow.Application.Features.PurchaseReturns.Helpers;
 /// - Hoàn thành: trừ tồn kho (tính ngược giá vốn BQ theo giá trả lại sau giảm giá),
 ///   giảm công nợ phải trả NCC = NCC cần trả − tiền NCC đã trả lại, ghi giao dịch SUPPLIER_REFUND nếu NCC trả tiền.
 /// - Trả theo phiếu nhập: SL trả mỗi dòng ≤ SL đã nhập − SL đã trả ở các phiếu trả đã hoàn thành khác.
+/// - Trả hàng lỗi (ReturnType = DEFECT, BR-24): bắt buộc theo phiếu nhập, SL trả mỗi dòng ≤ SL lỗi − SL lỗi đã trả.
+///   Hàng lỗi chưa vào kho và chưa tính tiền nên phiếu không trừ tồn, không tính tiền, không đổi công nợ.
 /// </summary>
 public static class PurchaseReturnLogic
 {
@@ -22,6 +24,16 @@ public static class PurchaseReturnLogic
     public const string Draft = "DRAFT";
     public const string Completed = "COMPLETED";
     public const string Cancelled = "CANCELLED";
+
+    /// <summary>Trả hàng đã nhập kho (trừ tồn, giảm công nợ NCC).</summary>
+    public const string TypeStock = "STOCK";
+    /// <summary>Trả hàng lỗi ghi nhận lúc nhận hàng (không trừ tồn, không tính tiền).</summary>
+    public const string TypeDefect = "DEFECT";
+
+    public static bool IsDefect(string? returnType) => Is(returnType, TypeDefect);
+
+    /// <summary>Chuẩn hoá loại phiếu trả: chỉ nhận DEFECT, còn lại là STOCK.</summary>
+    public static string NormalizeType(string? returnType) => IsDefect(returnType) ? TypeDefect : TypeStock;
 
     /// <summary>
     /// Giá nhập của 1 dòng phiếu nhập = Đơn giá − Giảm giá dòng (giống cột "Giá nhập" trên phiếu nhập).
@@ -45,7 +57,8 @@ public static class PurchaseReturnLogic
         decimal Total,
         decimal Refund,
         string PaymentMethod,
-        string Status);
+        string Status,
+        string ReturnType);
 
     public static bool Is(string? status, string expected) =>
         string.Equals(status, expected, StringComparison.OrdinalIgnoreCase);
@@ -53,14 +66,19 @@ public static class PurchaseReturnLogic
     public static decimal GoodsTotal(IEnumerable<DtlPurchaseReturnItem> items) =>
         Math.Round(items.Sum(i => i.Quantity * (i.ReturnPrice ?? 0)), 0, MidpointRounding.AwayFromZero);
 
-    /// <summary>SL đã trả theo từng dòng phiếu nhập ở các phiếu trả ĐÃ HOÀN THÀNH (trừ phiếu đang xử lý).</summary>
+    /// <summary>
+    /// SL đã trả theo từng dòng phiếu nhập ở các phiếu trả ĐÃ HOÀN THÀNH cùng loại (trừ phiếu đang xử lý).
+    /// Trả hàng lỗi và trả hàng đã nhập kho tính riêng vì giới hạn khác nhau (SL lỗi / SL đạt).
+    /// </summary>
     public static async Task<Dictionary<int, decimal>> ReturnedQtyByGrItemAsync(
-        IStockFlowDbContext context, int grId, int? excludeReturnId, CancellationToken ct)
+        IStockFlowDbContext context, int grId, int? excludeReturnId, CancellationToken ct, string returnType = TypeStock)
     {
+        var type = NormalizeType(returnType);
         return await context.DtlPurchaseReturnItems
             .Where(i => i.GrItemId != null
                         && i.PurchaseReturn.GrId == grId
                         && i.PurchaseReturn.Status == Completed
+                        && i.PurchaseReturn.ReturnType == type
                         && (excludeReturnId == null || i.PurchaseReturnId != excludeReturnId))
             .GroupBy(i => i.GrItemId!.Value)
             .Select(g => new { g.Key, Qty = g.Sum(i => i.Quantity) })
@@ -88,6 +106,11 @@ public static class PurchaseReturnLogic
             return Result.Failure<Prepared>("Số lượng trả của mỗi mặt hàng phải lớn hơn 0.");
         if (req.Items.Any(i => i.ReturnPrice < 0))
             return Result.Failure<Prepared>("Giá trả lại không được âm.");
+
+        var returnType = NormalizeType(req.ReturnType);
+        var isDefect = returnType == TypeDefect;
+        if (isDefect && !req.GrId.HasValue)
+            return Result.Failure<Prepared>("Phiếu trả hàng lỗi phải lập theo phiếu nhập có ghi nhận hàng lỗi.");
 
         // Phiếu nhập gốc (nếu trả theo phiếu nhập)
         TrxGoodsReceipt? receipt = null;
@@ -137,7 +160,7 @@ public static class PurchaseReturnLogic
         if (receipt != null)
         {
             var grItems = receipt.DtlGoodsReceiptItems.ToDictionary(i => i.GrItemId);
-            var returned = await ReturnedQtyByGrItemAsync(context, receipt.GrId, excludeReturnId, ct);
+            var returned = await ReturnedQtyByGrItemAsync(context, receipt.GrId, excludeReturnId, ct, returnType);
 
             foreach (var group in req.Items.GroupBy(i => i.GrItemId))
             {
@@ -145,12 +168,15 @@ public static class PurchaseReturnLogic
                     return Result.Failure<Prepared>("Mặt hàng trả không thuộc phiếu nhập gốc.");
 
                 var product = products[grItem.ProductId];
-                var remaining = PurchaseStockOps.Quantity(grItem) - returned.GetValueOrDefault(grItem.GrItemId);
+                // Trả hàng lỗi: giới hạn theo SL lỗi; trả hàng thường: giới hạn theo SL đạt (đã vào kho)
+                var limit = ReturnableQty(grItem, returnType);
+                var remaining = limit - returned.GetValueOrDefault(grItem.GrItemId);
                 var requested = group.Sum(i => i.Quantity);
                 if (requested > remaining)
                 {
-                    return Result.Failure<Prepared>(
-                        $"Mặt hàng {product.ProductCode} chỉ còn được trả tối đa {remaining:0.###} (đã nhập {PurchaseStockOps.Quantity(grItem):0.###}).");
+                    return Result.Failure<Prepared>(isDefect
+                        ? $"Mặt hàng {product.ProductCode} chỉ còn {remaining:0.###} hàng lỗi chưa trả (SL lỗi {limit:0.###})."
+                        : $"Mặt hàng {product.ProductCode} chỉ còn được trả tối đa {remaining:0.###} (đã nhập {limit:0.###}).");
                 }
 
                 foreach (var line in group)
@@ -163,7 +189,8 @@ public static class PurchaseReturnLogic
                         GrItemId = grItem.GrItemId,
                         Quantity = line.Quantity,
                         ImportPrice = GrImportPrice(grItem),
-                        ReturnPrice = line.ReturnPrice,
+                        // Hàng lỗi chưa tính tiền NCC → không có tiền trả lại
+                        ReturnPrice = isDefect ? 0 : line.ReturnPrice,
                         LotId = grItem.LotId,
                         LocationId = grItem.LocationId,
                     });
@@ -197,8 +224,12 @@ public static class PurchaseReturnLogic
             : 0;
         var method = string.IsNullOrWhiteSpace(req.PaymentMethod) ? "CASH" : req.PaymentMethod.Trim().ToUpperInvariant();
 
-        return Result.Success(new Prepared(warehouseId, partner, receipt, items, products, goods, discount, total, refund, method, status));
+        return Result.Success(new Prepared(warehouseId, partner, receipt, items, products, goods, discount, total, refund, method, status, returnType));
     }
+
+    /// <summary>SL tối đa được trả của 1 dòng phiếu nhập: SL lỗi (trả hàng lỗi) hoặc SL đạt (trả hàng đã nhập kho).</summary>
+    public static decimal ReturnableQty(DtlGoodsReceiptItem item, string? returnType) =>
+        IsDefect(returnType) ? item.DefectiveQty ?? 0 : PurchaseStockOps.Quantity(item);
 
     /// <summary>Sinh mã THN000001... hoặc dùng mã người dùng nhập (kiểm tra trùng).</summary>
     public static async Task<Result<string>> ResolveCodeAsync(
@@ -240,6 +271,9 @@ public static class PurchaseReturnLogic
         int userId,
         CancellationToken ct)
     {
+        // Trả hàng lỗi: hàng lỗi chưa vào kho, chưa tính tiền → không trừ tồn, không đổi công nợ
+        if (IsDefect(ret.ReturnType)) return;
+
         var factor = NetFactor(ret, items);
         var reference = new StockRef("OUTBOUND_PURCHASE_RETURN", ReferenceType, ret.PurchaseReturnId, userId);
         foreach (var item in items)
@@ -284,6 +318,9 @@ public static class PurchaseReturnLogic
         int userId,
         CancellationToken ct)
     {
+        // Trả hàng lỗi không trừ tồn / không tính tiền nên hủy cũng không có gì để đảo
+        if (IsDefect(ret.ReturnType)) return;
+
         var items = ret.DtlPurchaseReturnItems.ToList();
         var productIds = items.Select(i => i.ProductId).Distinct().ToList();
         var products = await context.MstProducts
@@ -412,6 +449,7 @@ public static class PurchaseReturnLogic
             r.CreatedByNavigation?.FullName ?? r.CreatedByNavigation?.Username ?? $"NV #{r.CreatedBy}",
             r.Notes,
             items,
-            payments);
+            payments,
+            ReturnType: NormalizeType(r.ReturnType));
     }
 }

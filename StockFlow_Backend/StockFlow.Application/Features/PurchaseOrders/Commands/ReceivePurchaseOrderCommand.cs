@@ -57,9 +57,7 @@ public class ReceivePurchaseOrderCommandHandler : IRequestHandler<ReceivePurchas
         {
             if (!orderLines.TryGetValue(line.ProductId, out var orderLine))
                 return Result.Failure<PurchaseOrderDetailDto>("Mặt hàng không có trong phiếu đặt hàng nhập.");
-            if (line.Quantity <= 0)
-                return Result.Failure<PurchaseOrderDetailDto>(
-                    "Số lượng đạt phải lớn hơn 0. Mặt hàng lỗi toàn bộ thì để trống dòng và ghi chú lý do.");
+            // SL đạt = 0 được phép khi cả dòng là hàng lỗi (lập phiếu trả hàng lỗi sau đó)
             items.Add(new CreatePurchaseItemRequest(
                 line.ProductId, line.Quantity, orderLine.UnitPrice, orderLine.DiscountPercent,
                 DefectQuantity: line.DefectQuantity));

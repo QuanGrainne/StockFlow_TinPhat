@@ -94,6 +94,8 @@ public class CompletePurchaseCommandHandler : IRequestHandler<CompletePurchaseCo
                 decimal incomingQty = item.AcceptedQty ?? item.ReceivedQty ?? item.OrderedQty ?? 0;
                 decimal unitPrice = item.UnitLandedCost ?? 0;
                 totalAmount += incomingQty * unitPrice;
+                // Dòng toàn hàng lỗi (SL đạt = 0): không vào kho, không ghi thẻ kho
+                if (incomingQty <= 0) continue;
 
                 // Cộng tồn, tính giá vốn BQ gia quyền (cập nhật giá vốn chung MstProduct) và ghi thẻ kho
                 // qua sổ tồn kho dùng chung
