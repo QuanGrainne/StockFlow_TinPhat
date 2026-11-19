@@ -7,6 +7,15 @@
     "Audience": "StockFlowClient",
     "SecretKey": "CHANGE_THIS_SECRET_KEY_TO_A_LONG_RANDOM_STRING_AT_LEAST_32_CHARS"
   },
+  "PayOS": {
+    "ClientId": "your-payos-client-id",
+    "ApiKey": "your-payos-api-key",
+    "ChecksumKey": "your-payos-checksum-key",
+    "ReturnUrl": "http://localhost:3000/pos",
+    "CancelUrl": "http://localhost:3000/pos",
+    "BankName": "ACB",
+    "BankAccountNumber": "82004268"
+  },
   "Logging": {
     "LogLevel": {
       "Default": "Debug",
