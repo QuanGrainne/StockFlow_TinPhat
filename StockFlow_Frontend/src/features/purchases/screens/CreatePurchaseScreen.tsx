@@ -40,6 +40,7 @@ import { toLocalDatetimeInputString } from '@/lib/utils/date';
 import { QuickAddSupplierModal } from '@/features/purchases/components/QuickAddSupplierModal';
 import { AddFromCategoryPopover } from '@/features/purchases/components/AddFromCategoryPopover';
 import { NumberInput } from '@/components/inputs/NumberInput';
+import { formatCost } from '@/lib/utils/cost';
 import { ProductThumb } from '@/components/ProductThumb';
 import { DiscountInput, discountAmount, type DiscountType } from '@/components/inputs/DiscountInput';
 import {
@@ -1422,7 +1423,7 @@ export default function CreatePurchaseScreen({ mode = 'receipt' }: CreatePurchas
                         {/* Giá vốn */}
                         {columns.costPrice && (
                           <div className="text-right pr-2 pt-1.5 text-[#15171a]">
-                            {formatVnd(row.costPrice)}
+                            {formatCost(row.costPrice)}
                           </div>
                         )}
 

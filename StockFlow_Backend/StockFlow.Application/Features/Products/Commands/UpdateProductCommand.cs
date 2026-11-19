@@ -2,9 +2,11 @@ using MediatR;
 using Microsoft.EntityFrameworkCore;
 using StockFlow.Application.Common;
 using StockFlow.Application.Common.Interfaces;
+using StockFlow.Application.Common.Inventory;
 using StockFlow.Application.Features.Products.DTOs;
 using StockFlow.Application.Features.Products.Helpers;
 using StockFlow.Domain.Entities;
+using StockFlow.Domain.Services;
 
 namespace StockFlow.Application.Features.Products.Commands;
 
@@ -128,48 +130,50 @@ public class UpdateProductCommandHandler : IRequestHandler<UpdateProductCommand,
         {
             // Giá vốn hiển thị theo từng kho lấy từ TrxInventoryBalances.UnitCost → phải cập nhật cả các dòng tồn,
             // nếu chỉ sửa MovingAverageCost thì màn hình vẫn hiện giá vốn cũ của kho.
-            var newCost = Math.Max(0, req.CostPrice.Value);
+            var newCost = CostingPolicy.RoundCost(Math.Max(0, req.CostPrice.Value));
             var scopeIds = req.CostWarehouseIds?.Where(id => id > 0).Distinct().ToList();
             var applyAll = scopeIds == null || scopeIds.Count == 0;
 
-            // Thẻ kho: mỗi kho có giá vốn thay đổi ghi 1 dòng "Cập nhật giá vốn" (SL 0), dùng chung 1 mã CB cho lần sửa này
+            // Thẻ kho: mỗi kho có giá vốn thay đổi ghi 1 dòng "Cập nhật giá vốn" (SL 0, tồn cuối = tổng tồn của kho),
+            // dùng chung 1 mã CB cho lần sửa này. Giá vốn tính theo cả kho nên mọi dòng tồn (lô / vị trí) cùng nhận giá mới.
             int? costUpdateRef = null;
             var now = VietnamTime.Now;
 
-            foreach (var balance in product.TrxInventoryBalances)
+            foreach (var warehouse in product.TrxInventoryBalances
+                         .Where(b => applyAll || scopeIds!.Contains(b.WarehouseId))
+                         .GroupBy(b => b.WarehouseId))
             {
-                if (applyAll || scopeIds!.Contains(balance.WarehouseId))
+                var rows = warehouse.ToList();
+                var changed = rows.Any(b => CostingPolicy.RoundCost(b.UnitCost ?? 0) != newCost);
+                foreach (var balance in rows)
                 {
-                    var changed = Math.Round(balance.UnitCost ?? 0, 2) != Math.Round(newCost, 2);
                     balance.UnitCost = newCost;
                     balance.LastUpdated = now;
+                }
 
-                    if (changed && _currentUser.UserId.HasValue)
+                if (changed && _currentUser.UserId.HasValue)
+                {
+                    costUpdateRef ??= (int)await _context.GetNextSequenceValueAsync("stockflow.seq_cost_update", cancellationToken);
+                    _context.TrxInventoryTransactions.Add(new TrxInventoryTransaction
                     {
-                        costUpdateRef ??= (int)await _context.GetNextSequenceValueAsync("stockflow.seq_cost_update", cancellationToken);
-                        _context.TrxInventoryTransactions.Add(new TrxInventoryTransaction
-                        {
-                            WarehouseId = balance.WarehouseId,
-                            ProductId = product.ProductId,
-                            LocationId = balance.LocationId,
-                            LotId = balance.LotId,
-                            TransactionType = "COST_UPDATE",
-                            Quantity = 0,
-                            ReferenceType = "COST_UPDATE",
-                            ReferenceId = costUpdateRef,
-                            TransactionDate = now,
-                            CreatedBy = _currentUser.UserId.Value,
-                            UnitCost = newCost,
-                            BalanceAfter = balance.Quantity ?? 0,
-                        });
-                    }
+                        WarehouseId = warehouse.Key,
+                        ProductId = product.ProductId,
+                        TransactionType = "COST_UPDATE",
+                        Quantity = 0,
+                        ReferenceType = "COST_UPDATE",
+                        ReferenceId = costUpdateRef,
+                        TransactionDate = now,
+                        CreatedBy = _currentUser.UserId.Value,
+                        UnitCost = newCost,
+                        BalanceAfter = rows.Sum(b => b.Quantity ?? 0),
+                    });
                 }
             }
 
-            if (applyAll || product.TrxInventoryBalances.All(b => scopeIds!.Contains(b.WarehouseId)))
-            {
-                product.MovingAverageCost = newCost;
-            }
+            // Giá vốn chung = bình quân theo SL trên mọi kho (đổi giá vốn tất cả kho thì bằng đúng giá mới)
+            product.MovingAverageCost = applyAll
+                ? newCost
+                : InventoryCosting.CostOf(product.TrxInventoryBalances, newCost);
         }
 
         if (req.StandardPrice.HasValue)

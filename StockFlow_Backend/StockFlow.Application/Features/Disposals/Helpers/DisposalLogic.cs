@@ -5,6 +5,7 @@ using StockFlow.Application.Common.Inventory;
 using StockFlow.Application.Features.Disposals.DTOs;
 using StockFlow.Application.Features.Production.Helpers;
 using StockFlow.Domain.Entities;
+using StockFlow.Domain.Services;
 
 namespace StockFlow.Application.Features.Disposals.Helpers;
 
@@ -233,7 +234,7 @@ public static class DisposalLogic
         foreach (var g in issued.GroupBy(x => (x.DisposalId, x.ProductId)))
         {
             var qty = g.Sum(x => x.Qty);
-            result[g.Key] = qty > 0 ? Math.Round(g.Sum(x => x.Qty * x.Cost) / qty, 2, MidpointRounding.AwayFromZero) : 0;
+            result[g.Key] = qty > 0 ? CostingPolicy.RoundCost(g.Sum(x => x.Qty * x.Cost) / qty) : 0;
         }
 
         // Dòng chưa có trên thẻ kho (phiếu tạm / phiếu tạm đã hủy) → giá vốn hiện tại của kho
@@ -251,7 +252,7 @@ public static class DisposalLogic
             .ToListAsync(ct);
         var costByStock = balances
             .GroupBy(b => (b.WarehouseId, b.ProductId))
-            .ToDictionary(g => g.Key, g => Math.Round(g.Sum(x => x.Qty * x.Cost) / g.Sum(x => x.Qty), 2, MidpointRounding.AwayFromZero));
+            .ToDictionary(g => g.Key, g => CostingPolicy.RoundCost(g.Sum(x => x.Qty * x.Cost) / g.Sum(x => x.Qty)));
         var fallback = await context.MstProducts.AsNoTracking()
             .Where(p => productIds.Contains(p.ProductId))
             .ToDictionaryAsync(p => p.ProductId, p => p.MovingAverageCost ?? 0, ct);

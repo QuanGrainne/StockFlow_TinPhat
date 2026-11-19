@@ -1429,8 +1429,9 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
             entity.Property(e => e.TransactionPrice)
                 .HasPrecision(18, 2)
                 .HasColumnName("transaction_price");
+            // Giá vốn lưu 4 chữ số thập phân (hiển thị 3 số, VD 33.257,062) — giống trx_inventory_balances.unit_cost
             entity.Property(e => e.UnitCost)
-                .HasPrecision(18, 2)
+                .HasPrecision(18, 4)
                 .HasColumnName("unit_cost");
             entity.Property(e => e.BalanceAfter)
                 .HasPrecision(18, 2)

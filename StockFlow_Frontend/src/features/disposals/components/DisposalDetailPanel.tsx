@@ -15,6 +15,7 @@ import { ProductCodeLink } from '@/components/links/EntityLinks';
 import { disposalService } from '../services/disposalService';
 import { exportDisposalExcel, printDisposal } from '../utils/disposalDocs';
 import { DISPOSAL_STATUS_LABEL, type DisposalDetail, type DisposalStaffOption, type DisposalStatus } from '../types';
+import { formatCost } from '@/lib/utils/cost';
 
 const money = new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 0 });
 const qty = (n: number) => n.toLocaleString('vi-VN', { maximumFractionDigits: 2 });
@@ -268,7 +269,7 @@ export function DisposalDetailPanel({ detail, onChanged, onCopy, onOpenDraft }: 
                   </td>
                   <td className="py-2 px-3 text-center text-slate-500">{it.unit}</td>
                   <td className="py-2 px-3 text-right">{qty(it.quantity)}</td>
-                  <td className="py-2 px-3 text-right">{money.format(it.unitCost)}</td>
+                  <td className="py-2 px-3 text-right">{formatCost(it.unitCost)}</td>
                   <td className="py-2 px-3 text-right font-semibold">{money.format(it.value)}</td>
                 </tr>
               ))

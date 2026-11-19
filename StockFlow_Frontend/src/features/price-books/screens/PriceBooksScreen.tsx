@@ -15,6 +15,7 @@ import { priceBookService } from '../services/priceBookService';
 import { apiClient } from '@/lib/api/client';
 import { useActiveWarehouse } from '@/lib/warehouse/useActiveWarehouse';
 import { ProductCodeLink } from '@/components/links/EntityLinks';
+import { formatCost } from '@/lib/utils/cost';
 
 interface CategoryItem {
   categoryId: number;
@@ -22,10 +23,6 @@ interface CategoryItem {
 }
 
 const currencyFormatter = new Intl.NumberFormat('vi-VN');
-function formatCurrency(value?: number | null) {
-  if (value === undefined || value === null) return '—';
-  return `${currencyFormatter.format(Math.round(value))} ₫`;
-}
 
 export default function PriceBooksClient() {
   const [api, contextHolder] = notification.useNotification();
@@ -380,7 +377,7 @@ export default function PriceBooksClient() {
         width: 120,
         align: 'right',
         render: (val: number) => (
-          <span className="text-xs font-medium text-slate-700">{formatCurrency(val)}</span>
+          <span className="text-xs font-medium text-slate-700">{val === undefined || val === null ? '—' : `${formatCost(val)} ₫`}</span>
         ),
       },
     ];
