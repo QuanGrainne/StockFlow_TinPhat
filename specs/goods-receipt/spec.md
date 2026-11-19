@@ -146,7 +146,7 @@ Mọi bảng thuộc schema `stockflow`. SPEC này không đề xuất bảng ha
 |---|---|---|
 | trx_goods_receipts, dtl_goods_receipt_items | Phiếu nhập và dòng (đặt / nhận / chấp nhận / lỗi / hỏng) | Có; cột lỗi, hỏng không dùng |
 | trx_purchase_returns, dtl_purchase_return_items | Trả hàng nhập | Có, ngoài SRS |
-| trx_inbound_costs, dtl_inbound_cost_allocations | Chi phí nhập | Có bảng, không có code |
+| trx_inbound_costs, dtl_inbound_cost_allocations | Chi phí nhập | Đã xoá bảng (migration `DropInboundCostAndReturnProcessing`, 19/11/2026) vì chưa có code dùng. Làm UC-34 thì tạo lại bằng migration mới |
 | trx_inventory_balances, trx_inventory_transactions | Tồn (có giá vốn theo kho), thẻ kho | Có |
 | mst_business_partners.current_payable | Công nợ nhà cung cấp | Có |
 | mst_inventory_lots | Lô, hạn dùng | Có bảng |

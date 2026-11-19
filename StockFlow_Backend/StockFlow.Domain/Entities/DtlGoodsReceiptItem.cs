@@ -35,8 +35,6 @@ public partial class DtlGoodsReceiptItem
 
     public int? LotId { get; set; }
 
-    public virtual ICollection<DtlInboundCostAllocation> DtlInboundCostAllocations { get; set; } = new List<DtlInboundCostAllocation>();
-
     public virtual TrxGoodsReceipt Gr { get; set; } = null!;
 
     public virtual MstWarehouseLocation? Location { get; set; }

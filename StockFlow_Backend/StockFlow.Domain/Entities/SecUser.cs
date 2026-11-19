@@ -43,8 +43,6 @@ public partial class SecUser
 
     public virtual ICollection<TrxGoodsReceipt> TrxGoodsReceipts { get; set; } = new List<TrxGoodsReceipt>();
 
-    public virtual ICollection<TrxInboundCost> TrxInboundCosts { get; set; } = new List<TrxInboundCost>();
-
     public virtual ICollection<TrxInventoryDisposal> TrxInventoryDisposals { get; set; } = new List<TrxInventoryDisposal>();
 
     public virtual ICollection<TrxInventoryTransaction> TrxInventoryTransactions { get; set; } = new List<TrxInventoryTransaction>();
@@ -56,8 +54,6 @@ public partial class SecUser
     public virtual ICollection<TrxProductionOrder> TrxProductionOrderCreatedByNavigations { get; set; } = new List<TrxProductionOrder>();
 
     public virtual ICollection<TrxProductionReport> TrxProductionReports { get; set; } = new List<TrxProductionReport>();
-
-    public virtual ICollection<TrxReturnProcessing> TrxReturnProcessings { get; set; } = new List<TrxReturnProcessing>();
 
     public virtual ICollection<TrxReturnRequest> TrxReturnRequests { get; set; } = new List<TrxReturnRequest>();
 

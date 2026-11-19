@@ -314,25 +314,6 @@ package "Inbound" {
         location_id : INT <<FK, NULL>>
         lot_id : INT <<FK, NULL>>
     }
-
-    entity "trx_inbound_costs" as IC {
-        * inbound_cost_id : INT <<PK>>
-        --
-        gr_id : INT <<FK>>
-        cost_type : NVARCHAR(50)
-        amount : DECIMAL(18,2)
-        description : NVARCHAR(255)
-        allocated_by : INT <<FK>>
-        created_at : DATETIME
-    }
-
-    entity "dtl_inbound_cost_allocations" as ICA {
-        * allocation_id : INT <<PK>>
-        --
-        inbound_cost_id : INT <<FK>>
-        gr_item_id : INT <<FK>>
-        allocated_amount : DECIMAL(18,4)
-    }
 }
 
 ' =========================================================
@@ -532,19 +513,6 @@ package "Returns" {
         condition : NVARCHAR(50)
         notes : NVARCHAR(255)
     }
-
-    entity "trx_return_processing" as RTP {
-        * processing_id : INT <<PK>>
-        --
-        return_item_id : INT <<FK>>
-        category : NVARCHAR(20)
-        quantity : DECIMAL(18,2)
-        warehouse_id : INT <<FK, NULL>>
-        status : NVARCHAR(20)
-processed_by : INT <<FK>>
-        process_date : DATETIME
-        notes : NVARCHAR(500)
-    }
 }
 
 ' =========================================================
@@ -648,12 +616,6 @@ PROD ||--o{ GRI : product
 LOC |o--o{ GRI : location
 LOT |o--o{ GRI : lot
 
-GR ||--o{ IC : inbound_costs
-USR ||--o{ IC : allocated_by
-
-IC ||--o{ ICA : allocations
-GRI ||--o{ ICA : allocated_items
-
 ' =========================================================
 ' RELATIONSHIPS - SALES / OUTBOUND
 ' =========================================================
@@ -737,10 +699,6 @@ USR ||--o{ RR : created_by
 RR ||--o{ RRI : items
 PROD ||--o{ RRI : product
 ORDI |o--o{ RRI : original_item
-
-RRI ||--o{ RTP : processing
-WH |o--o{ RTP : warehouse
-USR ||--o{ RTP : processed_by
 
 ' =========================================================
 ' RELATIONSHIPS - FINANCE
