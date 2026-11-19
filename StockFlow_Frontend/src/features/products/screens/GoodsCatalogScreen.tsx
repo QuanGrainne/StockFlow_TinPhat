@@ -89,6 +89,7 @@ import { QuickCreateLocationModal } from '../components/catalog/QuickCreateLocat
 import { QuickCreateBrandModal } from '../components/catalog/QuickCreateBrandModal';
 import { GoodsCatalogPagination } from '../components/catalog/GoodsCatalogPagination';
 import { CostScopeConfirmModal } from '../components/catalog/CostScopeConfirmModal';
+import { formatCost } from '@/lib/utils/cost';
 
 // T19 lát 1: re-export để các file đang import từ màn hình này (GoodsItem...) không phải sửa.
 export type { GoodsItem, GoodsVariantItem, GoodsUnitConversion, GoodsAttributeDef } from '../types/goodsCatalog';
@@ -2716,11 +2717,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                       {/* Giá Vốn */}
                       <td className="py-3 px-4 text-right font-mono text-xs text-slate-600">
                         {canViewCostPrice ? (
-                          (itemStock.costPrice || 0) > 0 ? (
-                            `${itemStock.costPrice.toLocaleString('vi-VN')}`
-                          ) : (
-                            '0'
-                          )
+                          formatCost(itemStock.costPrice)
                         ) : (
                           <span className="text-slate-300 italic">Bảo mật</span>
                         )}
@@ -3024,7 +3021,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                                           Giá vốn tại {warehouseFilter.replace(/^Kho\s*/i, '')}
                                         </div>
                                         <div className="font-mono font-semibold text-slate-800 mt-0.5">
-                                          {canViewCostPrice ? `${(itemStock.costPrice || 0).toLocaleString('vi-VN')} đ` : '***'}
+                                          {canViewCostPrice ? `${formatCost(itemStock.costPrice)} đ` : '***'}
                                         </div>
                                       </div>
                                       <div>
@@ -3392,7 +3389,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                                               {v.salePrice.toLocaleString('vi-VN')} đ
                                             </td>
                                             <td className="py-2.5 px-3 text-right font-mono text-slate-600">
-                                              {canViewCostPrice ? `${v.costPrice.toLocaleString('vi-VN')} đ` : '***'}
+                                              {canViewCostPrice ? `${formatCost(v.costPrice)} đ` : '***'}
                                             </td>
                                             <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-900">
                                               {v.stock}

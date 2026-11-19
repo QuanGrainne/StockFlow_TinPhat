@@ -7,6 +7,7 @@ using MediatR;
 using Microsoft.EntityFrameworkCore;
 using StockFlow.Application.Common;
 using StockFlow.Application.Common.Interfaces;
+using StockFlow.Application.Common.Inventory;
 using StockFlow.Application.Features.PriceBooks.DTOs;
 using StockFlow.Application.Features.PriceBooks.Services;
 
@@ -172,11 +173,7 @@ public class GetPriceBookMatrixQueryHandler : IRequestHandler<GetPriceBookMatrix
                 // Một kho có thể có nhiều dòng tồn (vị trí / lô): cộng dồn SL, giá vốn bình quân theo SL dương
                 var bals = p.TrxInventoryBalances.Where(b => b.WarehouseId == request.WarehouseId.Value).ToList();
                 stockQty = bals.Sum(b => b.Quantity ?? 0);
-                var positive = bals.Where(b => (b.Quantity ?? 0) > 0).ToList();
-                var positiveQty = positive.Sum(b => b.Quantity ?? 0);
-                costPrice = positiveQty > 0
-                    ? Math.Round(positive.Sum(b => (b.Quantity ?? 0) * (b.UnitCost ?? 0)) / positiveQty, 2)
-                    : bals.Select(b => b.UnitCost).FirstOrDefault(c => c.HasValue && c.Value > 0) ?? p.MovingAverageCost ?? 0;
+                costPrice = InventoryCosting.CostOf(bals, p.MovingAverageCost ?? 0);
             }
             else
             {

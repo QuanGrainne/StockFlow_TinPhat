@@ -37,15 +37,8 @@ public static class TransferStockOps
     }
 
     /// <summary>Giá vốn của 1 hàng tại 1 kho từ các dòng tồn của kho đó (bình quân theo SL dương).</summary>
-    public static decimal CostOf(IEnumerable<TrxInventoryBalance> rows, MstProduct product)
-    {
-        rows = rows.ToList();
-        var positive = rows.Where(b => (b.Quantity ?? 0) > 0).ToList();
-        var qty = positive.Sum(b => b.Quantity ?? 0);
-        if (qty > 0)
-            return Math.Round(positive.Sum(b => (b.Quantity ?? 0) * (b.UnitCost ?? 0)) / qty, 2, MidpointRounding.AwayFromZero);
-        return rows.Select(b => b.UnitCost).FirstOrDefault(c => c.HasValue && c.Value > 0) ?? product.MovingAverageCost ?? 0;
-    }
+    public static decimal CostOf(IEnumerable<TrxInventoryBalance> rows, MstProduct product) =>
+        InventoryCosting.CostOf(rows, product.MovingAverageCost ?? 0);
 
     /// <summary>
     /// Trừ tồn tại 1 kho: lần lượt vào các dòng còn hàng (vị trí / lô), phần còn lại vào dòng mặc định.

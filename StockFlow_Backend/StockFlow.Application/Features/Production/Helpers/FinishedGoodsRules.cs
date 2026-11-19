@@ -192,9 +192,11 @@ public static class FinishedGoodsRules
         // Giá vốn: nhập thành phẩm KHÔNG tính lại giá vốn (quyết định nhóm 18/11/2026, thay cách tính theo NVL đã xuất
         // ngày 13/11). Nhập theo giá vốn đang có: giá vốn tại vị trí/lô này nếu còn tồn, nếu không thì giá vốn của hàng
         // hóa (đặt trong danh mục hoặc từ lần nhập mua gần nhất). Giá vốn chỉ đổi khi nhập hàng mua từ nhà cung cấp.
-        var (balanceQty, balanceCost) = await ledger.GetBalanceAsync(
+        // Giá vốn tính theo cả kho (mọi lô cùng giá) → lô mới vẫn lấy giá vốn hiện tại của kho, nên nhập thành phẩm
+        // không làm đổi giá vốn bình quân; kho chưa có giá vốn thì lấy giá vốn chung của hàng hóa.
+        var (_, warehouseCost) = await ledger.GetBalanceAsync(
             new StockKey(input.WarehouseId, product.ProductId, input.LocationId, lot.LotId), ct);
-        var unitCost = balanceQty > 0 && balanceCost > 0 ? balanceCost : product.MovingAverageCost ?? 0;
+        var unitCost = warehouseCost > 0 ? warehouseCost : product.MovingAverageCost ?? 0;
         await ProductionStockOps.ReceiveAsync(ledger, input.WarehouseId, input.LocationId, lot.LotId, product,
             input.AcceptedQuantity, unitCost,
             new StockRef(ProductionStockOps.ReceiptTransactionType, ProductionStockOps.ReceiptReferenceType, receipt.FgrId, userId),

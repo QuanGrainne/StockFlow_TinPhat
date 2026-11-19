@@ -2439,8 +2439,8 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                         .HasColumnName("transaction_type");
 
                     b.Property<decimal?>("UnitCost")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
                         .HasColumnName("unit_cost");
 
                     b.Property<int>("WarehouseId")

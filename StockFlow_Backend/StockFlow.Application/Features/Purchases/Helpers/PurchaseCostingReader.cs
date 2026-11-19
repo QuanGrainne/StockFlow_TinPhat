@@ -8,7 +8,7 @@ namespace StockFlow.Application.Features.Purchases.Helpers;
 /// <summary>
 /// Đọc lại cách tính giá vốn bình quân gia quyền của phiếu nhập đã hoàn thành từ thẻ kho:
 /// mỗi dòng nhập ghi 1 dòng thẻ kho (SL nhập, giá vốn sau, tồn sau); tồn trước = tồn sau − SL nhập,
-/// giá vốn trước = giá vốn của dòng thẻ kho liền trước cùng kho / hàng / vị trí / lô.
+/// giá vốn trước = giá vốn của dòng thẻ kho liền trước cùng kho / hàng (giá vốn tính theo cả kho, tồn sau = tổng tồn của kho).
 /// </summary>
 public static class PurchaseCostingReader
 {
@@ -43,9 +43,9 @@ public static class PurchaseCostingReader
                 var qtyIn = entry.Quantity ?? 0;
                 var qtyAfter = entry.BalanceAfter ?? qtyIn;
 
+                // Giá vốn tính theo cả kho (gộp mọi vị trí / lô) → lấy dòng thẻ kho liền trước của hàng trong kho
                 var costBefore = await context.TrxInventoryTransactions.AsNoTracking()
                     .Where(t => t.WarehouseId == entry.WarehouseId && t.ProductId == entry.ProductId
-                                && t.LocationId == entry.LocationId && t.LotId == entry.LotId
                                 && t.TransactionId < entry.TransactionId)
                     .OrderByDescending(t => t.TransactionId)
                     .Select(t => t.UnitCost)

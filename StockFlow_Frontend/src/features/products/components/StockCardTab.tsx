@@ -9,6 +9,7 @@ import * as XLSX from 'xlsx';
 import { ChevronLeft, ChevronRight, FileOutput, Info, Loader2, Warehouse } from 'lucide-react';
 import { productService, type StockCardEntry } from '../services/goodsCatalogService';
 import { StockCardDocumentModal, type StockCardDocumentRef } from './StockCardDocumentModal';
+import { formatCost } from '@/lib/utils/cost';
 
 export interface StockCardWarehouseOption {
   warehouseId: number;
@@ -214,7 +215,7 @@ export function StockCardTab({
                   <td className="py-2.5 px-3 text-slate-700 whitespace-nowrap">{fmtDateTime(r.transactionDate)}</td>
                   <td className="py-2.5 px-3 text-slate-800">{r.transactionTypeName}</td>
                   <td className="py-2.5 px-3 text-right text-slate-800">{fmtNumber(r.transactionPrice)}</td>
-                  {canViewCost && <td className="py-2.5 px-3 text-right text-slate-800">{fmtNumber(r.unitCost)}</td>}
+                  {canViewCost && <td className="py-2.5 px-3 text-right text-slate-800">{formatCost(r.unitCost)}</td>}
                   <td
                     className={`py-2.5 px-3 text-right font-medium ${
                       r.quantity > 0 ? 'text-emerald-600' : r.quantity < 0 ? 'text-rose-600' : 'text-slate-800'
