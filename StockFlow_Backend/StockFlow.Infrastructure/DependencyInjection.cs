@@ -43,6 +43,10 @@ public static class DependencyInjection
         // Lưu ảnh hàng hóa thành file trên máy chủ (singleton: dùng chung một HttpClient để tải ảnh từ link)
         services.AddSingleton<StockFlow.Application.Common.Interfaces.IImageStorage, Services.LocalImageStorage>();
 
+        // Thanh toán QR qua payOS: khóa đọc từ cấu hình "PayOS" (biến môi trường PayOS__ClientId / ApiKey / ChecksumKey)
+        services.Configure<Services.PayosOptions>(configuration.GetSection("PayOS"));
+        services.AddHttpClient<StockFlow.Application.Common.Interfaces.IPayosGateway, Services.PayosGateway>();
+
         return services;
     }
 }

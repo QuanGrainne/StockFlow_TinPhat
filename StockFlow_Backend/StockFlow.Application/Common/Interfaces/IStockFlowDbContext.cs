@@ -27,6 +27,7 @@ public interface IStockFlowDbContext
     DbSet<DtlStocktakeItem> DtlStocktakeItems { get; }
     // Xuất hủy hàng hóa (bảng có từ InitialDatabase)
     DbSet<TrxInventoryDisposal> TrxInventoryDisposals { get; }
+    DbSet<TrxPayosPayment> TrxPayosPayments { get; }
     DbSet<DtlInventoryDisposalItem> DtlInventoryDisposalItems { get; }
     DbSet<DtlPurchaseReturnItem> DtlPurchaseReturnItems { get; }
     DbSet<TrxFinancialTransaction> TrxFinancialTransactions { get; }
