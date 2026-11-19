@@ -30,7 +30,5 @@ public partial class DtlReturnRequestItem
     public virtual MstProduct Product { get; set; } = null!;
 
     public virtual TrxReturnRequest ReturnRequest { get; set; } = null!;
-
-    public virtual ICollection<TrxReturnProcessing> TrxReturnProcessings { get; set; } = new List<TrxReturnProcessing>();
 }
 

@@ -37,8 +37,6 @@ public partial class TrxGoodsReceipt
 
     public virtual SecUser ReceivedByNavigation { get; set; } = null!;
 
-    public virtual ICollection<TrxInboundCost> TrxInboundCosts { get; set; } = new List<TrxInboundCost>();
-
     public virtual MstWarehouse Warehouse { get; set; } = null!;
 }
 
