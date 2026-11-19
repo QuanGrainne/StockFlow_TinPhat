@@ -64,7 +64,12 @@ public class GetPurchaseByIdQueryHandler : IRequestHandler<GetPurchaseByIdQuery,
             decimal paidAmount = activePayments.Sum(t => t.Amount ?? 0);
             string? paymentMethod = activePayments.FirstOrDefault()?.PaymentMethod;
 
-            var items = receipt.DtlGoodsReceiptItems.Select(PurchaseItemMapper.ToDto).ToList();
+            // SL lỗi đã trả NCC (phiếu trả hàng lỗi đã hoàn thành) theo từng dòng → ẩn nút "Trả hàng lỗi" khi đã trả hết
+            var defectReturned = await PurchaseReturnLogic.ReturnedQtyByGrItemAsync(
+                _context, receipt.GrId, null, cancellationToken, PurchaseReturnLogic.TypeDefect);
+            var items = receipt.DtlGoodsReceiptItems
+                .Select(i => PurchaseItemMapper.ToDto(i) with { DefectReturnedQty = defectReturned.GetValueOrDefault(i.GrItemId) })
+                .ToList();
 
             // Tổng tiền hàng (trước giảm giá phiếu), giảm giá phiếu, tổng cộng = số cần trả NCC
             decimal totalGoods = items.Sum(i => i.TotalPrice);
@@ -107,7 +112,8 @@ public class GetPurchaseByIdQueryHandler : IRequestHandler<GetPurchaseByIdQuery,
                     r.ReturnDate,
                     r.CreatedByNavigation.FullName ?? r.CreatedByNavigation.Username ?? "",
                     r.TotalAmount ?? 0,
-                    r.Status ?? "DRAFT"))
+                    r.Status ?? "DRAFT",
+                    r.ReturnType))
                 .ToListAsync(cancellationToken);
 
             string receivedByName = receipt.ReceivedByNavigation?.FullName ??

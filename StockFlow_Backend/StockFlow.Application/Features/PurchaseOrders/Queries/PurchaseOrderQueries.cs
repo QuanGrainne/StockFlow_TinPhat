@@ -124,6 +124,8 @@ public class PurchaseOrderQueryHandler :
         var completedLines = receipts.Where(r => r.Status == "COMPLETED").SelectMany(r => r.DtlGoodsReceiptItems).ToList();
         var received = completedLines.GroupBy(i => i.ProductId)
             .ToDictionary(g => g.Key, g => g.Sum(PurchaseStockOps.Quantity));
+        var defective = completedLines.GroupBy(i => i.ProductId)
+            .ToDictionary(g => g.Key, g => g.Sum(i => i.DefectiveQty ?? 0));
 
         var items = po.DtlPurchaseOrderItems.OrderBy(i => i.PoItemId).Select(i => new PurchaseOrderItemDto(
             i.ProductId,
@@ -134,7 +136,8 @@ public class PurchaseOrderQueryHandler :
             received.GetValueOrDefault(i.ProductId),
             i.UnitPrice,
             i.DiscountPercent,
-            PurchaseOrderHelper.LineTotal(i.OrderedQty, i.UnitPrice, i.DiscountPercent))).ToList();
+            PurchaseOrderHelper.LineTotal(i.OrderedQty, i.UnitPrice, i.DiscountPercent),
+            defective.GetValueOrDefault(i.ProductId))).ToList();
 
         // Hàng thực nhập nhưng không có trong phiếu đặt
         var orderedIds = po.DtlPurchaseOrderItems.Select(i => i.ProductId).ToHashSet();
@@ -142,7 +145,7 @@ public class PurchaseOrderQueryHandler :
         {
             var p = g.First().Product;
             return new PurchaseOrderItemDto(g.Key, p?.ProductCode ?? $"SP{g.Key}", p?.ProductName ?? "Sản phẩm",
-                p?.BaseUnit?.UnitName ?? "Cái", 0, received[g.Key], 0, 0, 0);
+                p?.BaseUnit?.UnitName ?? "Cái", 0, received[g.Key], 0, 0, 0, defective.GetValueOrDefault(g.Key));
         }));
 
         // Tiền đã trả NCC của phiếu đặt = tổng đã trả cho các phiếu nhập theo phiếu đặt (khớp Lịch sử thanh toán

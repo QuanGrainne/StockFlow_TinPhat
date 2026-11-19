@@ -78,7 +78,9 @@ public record PurchaseOrderItemDto(
     decimal ReceivedQty,
     decimal UnitPrice,
     decimal DiscountPercent,
-    decimal LineTotal
+    decimal LineTotal,
+    // Tổng SL lỗi ở các phiếu nhập đã hoàn thành: không tính là đã nhập, chờ NCC giao bù (BR-24)
+    decimal DefectiveQty = 0
 );
 
 public record PurchaseOrderReceiptDto(

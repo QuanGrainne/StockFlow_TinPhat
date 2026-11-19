@@ -2275,6 +2275,7 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
             entity.Property(e => e.PartnerId).HasColumnName("partner_id");
             entity.Property(e => e.ReturnDate).HasColumnType("timestamp without time zone").HasColumnName("return_date");
             entity.Property(e => e.Status).HasMaxLength(20).HasColumnName("status");
+            entity.Property(e => e.ReturnType).HasMaxLength(20).HasDefaultValue("STOCK").HasColumnName("return_type");
             entity.Property(e => e.DiscountAmount).HasPrecision(18, 2).HasColumnName("discount_amount");
             entity.Property(e => e.TotalAmount).HasPrecision(18, 2).HasColumnName("total_amount");
             entity.Property(e => e.RefundAmount).HasPrecision(18, 2).HasColumnName("refund_amount");

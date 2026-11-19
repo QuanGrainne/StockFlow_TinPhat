@@ -31,6 +31,8 @@ export interface PurchaseOrderItem {
   unitPrice: number;
   discountPercent: number;
   lineTotal: number;
+  /** Tổng SL lỗi ở các phiếu nhập hoàn thành: không tính là đã nhập, chờ NCC giao bù */
+  defectiveQty?: number;
 }
 
 export interface PurchaseOrderReceipt {

@@ -42,12 +42,8 @@ public class CreatePurchaseCommandHandler : IRequestHandler<CreatePurchaseComman
 
         foreach (var item in req.Items)
         {
-            var defectError = PurchaseItemMapper.ValidateDefect(item);
-            if (defectError != null) return Result.Failure<PurchaseDetailDto>(defectError);
-            if (item.Quantity <= 0)
-            {
-                return Result.Failure<PurchaseDetailDto>($"Số lượng nhập của sản phẩm ID #{item.ProductId} phải lớn hơn 0.");
-            }
+            var qtyError = PurchaseItemMapper.ValidateQuantities(item);
+            if (qtyError != null) return Result.Failure<PurchaseDetailDto>(qtyError);
             if (item.UnitPrice < 0)
             {
                 return Result.Failure<PurchaseDetailDto>($"Đơn giá nhập của sản phẩm ID #{item.ProductId} không được âm.");
@@ -180,10 +176,14 @@ public class CreatePurchaseCommandHandler : IRequestHandler<CreatePurchaseComman
             // Số tiền cần trả NCC = tổng tiền hàng − giảm giá phiếu (làm tròn đến đồng)
             decimal totalAmount = Math.Round(pricing.NetTotal, 0, MidpointRounding.AwayFromZero);
 
+            // SL đặt từng mặt hàng (nhập theo phiếu đặt) → ghi vào ordered_qty của dòng phiếu nhập
+            var orderedByProduct = await PurchaseOrderHelper.OrderedQtyByProductAsync(_context, purchaseOrder?.PoId, cancellationToken);
+
             foreach (var line in pricing.Lines)
             {
                 // SL đạt vào kho + tính tiền; SL lỗi chỉ ghi nhận trên phiếu
-                var dtl = PurchaseItemMapper.NewItem(line.Request, line.LandedCost);
+                var dtl = PurchaseItemMapper.NewItem(line.Request, line.LandedCost,
+                    purchaseOrder != null ? orderedByProduct.GetValueOrDefault(line.Request.ProductId) : null);
                 dtl.Gr = goodsReceipt;
 
                 receiptItems.Add(dtl);
@@ -203,6 +203,8 @@ public class CreatePurchaseCommandHandler : IRequestHandler<CreatePurchaseComman
                 {
                     decimal incomingQty = item.AcceptedQty ?? item.ReceivedQty ?? item.OrderedQty ?? 0;
                     decimal unitPrice = item.UnitLandedCost ?? 0;
+                    // Dòng toàn hàng lỗi (SL đạt = 0): không vào kho, không ghi thẻ kho
+                    if (incomingQty <= 0) continue;
 
                     // A–C. Cộng tồn tại kho nhận, tính giá vốn BQ gia quyền (cập nhật MstProduct.MovingAverageCost)
                     //      và ghi thẻ kho (ReferenceId = GrId thật vừa sinh) qua sổ tồn kho dùng chung

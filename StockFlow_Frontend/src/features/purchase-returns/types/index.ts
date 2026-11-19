@@ -3,6 +3,9 @@
 
 export type PurchaseReturnStatus = 'DRAFT' | 'COMPLETED' | 'CANCELLED';
 
+/** STOCK: trả hàng đã nhập kho; DEFECT: trả hàng lỗi ghi nhận lúc nhận hàng (không trừ kho, không tính tiền) */
+export type PurchaseReturnType = 'STOCK' | 'DEFECT';
+
 export interface PurchaseReturnItem {
   prItemId: number;
   productId: number;
@@ -39,6 +42,7 @@ export interface PurchaseReturnListRecord {
   notes?: string | null;
   /** Phần "tính vào công nợ" đã trừ vào số còn nợ của phiếu nhập gốc */
   offsetAmount?: number;
+  returnType?: PurchaseReturnType;
 }
 
 export interface PurchaseReturnDetail extends PurchaseReturnListRecord {
@@ -79,6 +83,7 @@ export interface SavePurchaseReturnPayload {
   refundAmount: number;
   paymentMethod?: string;
   notes?: string | null;
+  returnType?: PurchaseReturnType;
   items: {
     productId: number;
     quantity: number;
@@ -114,4 +119,6 @@ export interface ReturnSource {
   partnerName: string;
   partnerCurrentPayable: number;
   items: ReturnSourceItem[];
+  /** DEFECT: receivedQty / returnedQty / remainingQty tính theo SL lỗi */
+  returnType?: PurchaseReturnType;
 }
