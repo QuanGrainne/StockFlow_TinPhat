@@ -31,8 +31,6 @@ public partial class MstWarehouse
 
     public virtual ICollection<TrxInventoryTransaction> TrxInventoryTransactions { get; set; } = new List<TrxInventoryTransaction>();
 
-    public virtual ICollection<TrxReturnProcessing> TrxReturnProcessings { get; set; } = new List<TrxReturnProcessing>();
-
     public virtual ICollection<TrxStockIssue> TrxStockIssues { get; set; } = new List<TrxStockIssue>();
 
     public virtual ICollection<TrxStockTransfer> TrxStockTransferDestWarehouses { get; set; } = new List<TrxStockTransfer>();
