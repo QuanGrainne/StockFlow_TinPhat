@@ -75,6 +75,8 @@ export interface PosTab {
   excessToDebt?: boolean;
   /** Trả nhanh: khách quên hóa đơn — tự tìm hàng, tự chọn khách, không giới hạn theo hóa đơn */
   returnQuick?: boolean;
+  /** Chuyển khoản đã được payOS xác nhận (QR) cho tab này */
+  payosPaid?: { orderCode: number; amount: number } | null;
 }
 
 export const POS_TABS_KEY = 'stockflow_pos_tabs_v2';
