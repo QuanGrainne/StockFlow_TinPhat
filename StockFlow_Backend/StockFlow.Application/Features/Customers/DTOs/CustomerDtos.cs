@@ -81,6 +81,20 @@ public record CustomerPaymentResultDto(
     decimal RemainingDebt
 );
 
+/// <summary>Phiếu chi trả tiền cho khách khi cửa hàng đang nợ khách (Nợ cần thu &lt; 0).</summary>
+public record CreateCustomerDebtRefundRequest(
+    decimal Amount,
+    DateTime? RefundDate,
+    string? PaymentMethod,
+    string? Notes
+);
+
+public record CustomerDebtRefundResultDto(
+    string VoucherCode,
+    decimal Amount,
+    decimal RemainingDebt // Nợ cần thu sau phiếu chi (âm = cửa hàng vẫn còn nợ khách)
+);
+
 /// <summary>
 /// Một dòng sổ "Nợ cần thu từ khách": bán hàng (+), thanh toán (−), số dư lũy kế sau giao dịch.
 /// Type: SALE | PAYMENT.

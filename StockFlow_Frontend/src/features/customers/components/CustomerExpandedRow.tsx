@@ -4,11 +4,13 @@
 //   [Thông tin] [Lịch sử bán/trả hàng] [Nợ cần thu từ khách] [Lịch sử hạn mức]
 
 import React, { useMemo, useState } from 'react';
-import { ChevronDown, ChevronLeft, ChevronRight, CircleDollarSign, FileUp, Loader2, Lock, Pencil, SlidersHorizontal, Trash2, Unlock, UserRound } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, CircleDollarSign, FileUp, HandCoins, Loader2, Lock, Pencil, SlidersHorizontal, Trash2, Unlock, UserRound } from 'lucide-react';
 import CustomerPaymentModal from './CustomerPaymentModal';
 import CustomerReceiptModal from './CustomerReceiptModal';
 import CreditLimitHistoryTab from './CreditLimitHistoryTab';
 import DebtAdjustModal from '@/components/debt/DebtAdjustModal';
+import DebtRefundModal from '@/components/debt/DebtRefundModal';
+import DebtVoucherModal from '@/components/debt/DebtVoucherModal';
 import { customerService } from '../services/customerService';
 import { InvoicePreviewModal } from '@/features/orders';
 import { Customer, CustomerDebtLedgerEntry, CustomerDetail } from '../types';
@@ -104,6 +106,10 @@ export default function CustomerExpandedRow({
   const [activeTab, setActiveTab] = useState<TabKey>('info');
   const [ledgerFilter, setLedgerFilter] = useState<LedgerFilter>('ALL');
   const [showPayment, setShowPayment] = useState(false);
+  /** Phiếu chi trả tiền khách khi cửa hàng đang nợ khách (nợ cần thu âm) */
+  const [showRefund, setShowRefund] = useState(false);
+  /** Mã phiếu chi PC... đang mở xem (null = đóng) */
+  const [voucherCode, setVoucherCode] = useState<string | null>(null);
   /** Popup xem nhanh hóa đơn / phiếu thu khi bấm mã */
   const [previewOrderId, setPreviewOrderId] = useState<number | null>(null);
   const [receiptCode, setReceiptCode] = useState<string | null>(null);
@@ -437,6 +443,17 @@ export default function CustomerExpandedRow({
                             pagedLedger.map((l, i) => (
                               <tr key={`${l.type}-${l.code}-${i}`} className="hover:bg-[#f7f8f9]">
                                 <td className="py-2.5 px-3 font-medium">
+                                  {l.type === 'DEBT_REFUND' ? (
+                                    // Phiếu chi trả khách độc lập (PC...): mở phiếu chi (xem / hủy)
+                                    <button
+                                      type="button"
+                                      onClick={() => setVoucherCode(l.code)}
+                                      className="text-[#0070f4] hover:underline cursor-pointer"
+                                      title={`Xem phiếu chi ${l.code}`}
+                                    >
+                                      {l.code}
+                                    </button>
+                                  ) : (
                                   <button
                                     type="button"
                                     onClick={() =>
@@ -469,6 +486,7 @@ export default function CustomerExpandedRow({
                                   >
                                     {l.code}
                                   </button>
+                                  )}
                                 </td>
                                 <td className="py-2.5 px-3 whitespace-nowrap">{fmtDateTime(l.date)}</td>
                                 <td className="py-2.5 px-3">{l.typeLabel}</td>
@@ -523,16 +541,29 @@ export default function CustomerExpandedRow({
                       <span>Xuất file công nợ</span>
                     </button>
                     <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setShowPayment(true)}
-                        disabled={currentDebt <= 0}
-                        title={currentDebt <= 0 ? 'Khách hàng không còn nợ cần thu' : 'Tạo phiếu thu nợ của khách'}
-                        className={`${primaryBtnCls} disabled:opacity-50 disabled:cursor-not-allowed`}
-                      >
-                        <CircleDollarSign size={15} />
-                        <span>Thanh toán</span>
-                      </button>
+                      {currentDebt < 0 ? (
+                        // Cửa hàng đang nợ khách → trả tiền khách (phiếu chi PC...) thay cho Thanh toán
+                        <button
+                          type="button"
+                          onClick={() => setShowRefund(true)}
+                          title="Lập phiếu chi: cửa hàng trả lại tiền đang nợ khách"
+                          className={primaryBtnCls}
+                        >
+                          <HandCoins size={15} />
+                          <span>Trả tiền khách</span>
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setShowPayment(true)}
+                          disabled={currentDebt <= 0}
+                          title={currentDebt <= 0 ? 'Khách hàng không còn nợ cần thu' : 'Tạo phiếu thu nợ của khách'}
+                          className={`${primaryBtnCls} disabled:opacity-50 disabled:cursor-not-allowed`}
+                        >
+                          <CircleDollarSign size={15} />
+                          <span>Thanh toán</span>
+                        </button>
+                      )}
                       {/* Luôn bấm được, kể cả khi nợ = 0: tạo khách nợ mình (dương) hoặc mình nợ khách (âm) */}
                       <button
                         type="button"
@@ -550,6 +581,28 @@ export default function CustomerExpandedRow({
             </>
           )}
         </div>
+        {voucherCode !== null && (
+          <DebtVoucherModal
+            code={voucherCode}
+            load={() => customerService.getDebtRefund(customer.id, voucherCode)}
+            cancel={() => customerService.cancelDebtRefund(customer.id, voucherCode)}
+            onClose={() => setVoucherCode(null)}
+            onChanged={() => onDataChanged?.(customer.id)}
+          />
+        )}
+        {showRefund && (
+          <DebtRefundModal
+            kind="customer"
+            partnerName={`${customer.name} (${customer.code})`}
+            owedAmount={-currentDebt}
+            create={(payload) => customerService.createDebtRefund(customer.id, payload)}
+            onClose={() => setShowRefund(false)}
+            onSuccess={() => {
+              setShowRefund(false);
+              onDataChanged?.(customer.id);
+            }}
+          />
+        )}
         {showPayment && (
           <CustomerPaymentModal
             customer={customer}

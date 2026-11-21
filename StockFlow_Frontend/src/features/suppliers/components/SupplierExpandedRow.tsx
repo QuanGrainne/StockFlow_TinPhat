@@ -5,9 +5,11 @@
 // Giữ các thông tin cũ (phân bổ công nợ theo kho, tổng kết tài chính, lọc phiếu theo kho).
 
 import React, { useMemo, useState } from 'react';
-import { Pencil, Lock, Unlock, Trash2, Loader2, FileUp, ChevronDown, ChevronLeft, ChevronRight, CircleDollarSign, SlidersHorizontal } from 'lucide-react';
+import { Pencil, Lock, Unlock, Trash2, Loader2, FileUp, ChevronDown, ChevronLeft, ChevronRight, CircleDollarSign, SlidersHorizontal, HandCoins } from 'lucide-react';
 import SupplierPaymentModal from './SupplierPaymentModal';
 import DebtAdjustModal from '@/components/debt/DebtAdjustModal';
+import DebtRefundModal from '@/components/debt/DebtRefundModal';
+import DebtVoucherModal from '@/components/debt/DebtVoucherModal';
 import { supplierService } from '../services/supplierService';
 import { Supplier, SupplierDetail, SupplierRecentReceipt, SupplierDebtLedgerEntry } from '../types';
 import { getSupplierStatusBadge } from '../utils/status';
@@ -160,6 +162,10 @@ export default function SupplierExpandedRow({
   const [receiptWarehouseFilter, setReceiptWarehouseFilter] = useState<number | 'ALL'>('ALL');
   const [ledgerFilter, setLedgerFilter] = useState<LedgerFilter>('ALL');
   const [showPayment, setShowPayment] = useState(false);
+  /** Phiếu thu tiền từ NCC khi NCC đang nợ cửa hàng (nợ cần trả âm) */
+  const [showRefund, setShowRefund] = useState(false);
+  /** Mã phiếu PC... / PT... đang mở xem (null = đóng) */
+  const [voucherCode, setVoucherCode] = useState<string | null>(null);
   /** Điều chỉnh công nợ: '' = tạo phiếu mới, mã DC... = mở phiếu đã có, null = đóng */
   const [adjustCode, setAdjustCode] = useState<string | null>(null);
   const [ledgerPage, setLedgerPage] = useState(1);
@@ -409,6 +415,17 @@ export default function SupplierExpandedRow({
                                     >
                                       {l.code}
                                     </button>
+                                  ) : (l.type === 'PAYMENT' && /^PC/i.test(l.code)) ||
+                                    (l.type === 'SUPPLIER_REFUND' && /^PT/i.test(l.code)) ? (
+                                    // Phiếu chi thanh toán NCC (PC...) / phiếu thu NCC trả tiền (PT...)
+                                    <button
+                                      type="button"
+                                      onClick={() => setVoucherCode(l.code)}
+                                      className="text-[#0070f4] hover:underline cursor-pointer"
+                                      title={`Xem phiếu ${l.code}`}
+                                    >
+                                      {l.code}
+                                    </button>
                                   ) : (
                                     l.code
                                   )}
@@ -472,16 +489,29 @@ export default function SupplierExpandedRow({
                       <span>Xuất file</span>
                     </button>
                     <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setShowPayment(true)}
-                        disabled={currentPayable <= 0}
-                        title={currentPayable <= 0 ? 'Nhà cung cấp không còn nợ cần trả' : 'Tạo phiếu chi thanh toán nợ'}
-                        className={`${primaryBtnCls} disabled:opacity-50 disabled:cursor-not-allowed`}
-                      >
-                        <CircleDollarSign size={15} />
-                        <span>Thanh toán</span>
-                      </button>
+                      {currentPayable < 0 ? (
+                        // NCC đang nợ cửa hàng → thu tiền NCC (phiếu thu PT...) thay cho Thanh toán
+                        <button
+                          type="button"
+                          onClick={() => setShowRefund(true)}
+                          title="Lập phiếu thu: nhà cung cấp trả lại tiền đang nợ cửa hàng"
+                          className={primaryBtnCls}
+                        >
+                          <HandCoins size={15} />
+                          <span>Thu tiền NCC</span>
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setShowPayment(true)}
+                          disabled={currentPayable <= 0}
+                          title={currentPayable <= 0 ? 'Nhà cung cấp không còn nợ cần trả' : 'Tạo phiếu chi thanh toán nợ'}
+                          className={`${primaryBtnCls} disabled:opacity-50 disabled:cursor-not-allowed`}
+                        >
+                          <CircleDollarSign size={15} />
+                          <span>Thanh toán</span>
+                        </button>
+                      )}
                       {/* Luôn bấm được, kể cả khi nợ = 0: cửa hàng nợ NCC (dương) hoặc NCC nợ cửa hàng (âm) */}
                       <button
                         type="button"
@@ -514,6 +544,28 @@ export default function SupplierExpandedRow({
             onClose={() => setAdjustCode(null)}
             onSuccess={() => {
               setAdjustCode(null);
+              onDataChanged?.(supplier.partnerId);
+            }}
+          />
+        )}
+        {voucherCode !== null && (
+          <DebtVoucherModal
+            code={voucherCode}
+            load={() => supplierService.getVoucher(supplier.partnerId, voucherCode)}
+            cancel={() => supplierService.cancelRefundReceipt(supplier.partnerId, voucherCode)}
+            onClose={() => setVoucherCode(null)}
+            onChanged={() => onDataChanged?.(supplier.partnerId)}
+          />
+        )}
+        {showRefund && (
+          <DebtRefundModal
+            kind="supplier"
+            partnerName={`${supplier.name} (${supplier.code})`}
+            owedAmount={-currentPayable}
+            create={(payload) => supplierService.createRefundReceipt(supplier.partnerId, payload)}
+            onClose={() => setShowRefund(false)}
+            onSuccess={() => {
+              setShowRefund(false);
               onDataChanged?.(supplier.partnerId);
             }}
           />

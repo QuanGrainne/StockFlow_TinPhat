@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using StockFlow.Application.Features.Suppliers.Commands;
 using StockFlow.Application.Features.Suppliers.DTOs;
+using StockFlow.Application.Common;
 using StockFlow.Application.Features.Suppliers.Queries;
 using StockFlow.API.Authorization;
 
@@ -155,6 +156,41 @@ public class SuppliersController : ControllerBase
             return BadRequest(new { message = result.Error });
         }
         return Ok(result.Value);
+    }
+
+    /// <summary>
+    /// Phiếu thu tiền từ nhà cung cấp (PT000001...) khi NCC đang nợ cửa hàng (Nợ cần trả &lt; 0), không qua phiếu trả hàng.
+    /// </summary>
+    [HttpPost("{id}/refunds")]
+    [ProducesResponseType(typeof(SupplierRefundReceiptResultDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [RequirePermission("FIN_CREATE")]
+    [RequireFeature("feat-suppliers")]
+    public async Task<IActionResult> CreateSupplierRefundReceipt(int id, [FromBody] CreateSupplierRefundReceiptRequest request)
+    {
+        var result = await _mediator.Send(new CreateSupplierRefundReceiptCommand(id, request));
+        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { message = result.Error });
+    }
+
+    /// <summary>Hủy phiếu thu tiền NCC độc lập PT... (Nợ cần trả NCC trừ lại số tiền của phiếu)</summary>
+    [HttpPost("{id}/refunds/{code}/cancel")]
+    [RequirePermission("FIN_UPDATE")]
+    [RequireFeature("feat-suppliers")]
+    public async Task<IActionResult> CancelSupplierRefundReceipt(int id, string code)
+    {
+        var result = await _mediator.Send(new CancelSupplierRefundReceiptCommand(id, code));
+        return result.IsSuccess ? Ok(new { success = true }) : BadRequest(new { message = result.Error });
+    }
+
+    /// <summary>Xem phiếu công nợ NCC theo mã: PC... (thanh toán NCC) hoặc PT... (NCC trả tiền)</summary>
+    [HttpGet("{id}/vouchers/{code}")]
+    [ProducesResponseType(typeof(DebtVoucherDetailDto), StatusCodes.Status200OK)]
+    [RequirePermission("PARTNER_READ")]
+    [RequireFeature("feat-suppliers")]
+    public async Task<IActionResult> GetSupplierVoucher(int id, string code)
+    {
+        var result = await _mediator.Send(new GetSupplierVoucherQuery(id, code));
+        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { message = result.Error });
     }
 
     /// <summary>
