@@ -5,6 +5,7 @@ using StockFlow.Application.Common.Interfaces;
 using StockFlow.Application.Features.Customers.Commands;
 using StockFlow.Application.Features.Customers.DTOs;
 using StockFlow.Application.Features.Customers.Helpers;
+using StockFlow.Application.Features.SalesReturns.Queries;
 
 namespace StockFlow.Application.Features.Customers.Queries;
 
@@ -85,7 +86,7 @@ public class GetCustomerByIdQueryHandler : IRequestHandler<GetCustomerByIdQuery,
             .ToListAsync(cancellationToken);
         var refundRows = await _context.TrxFinancialTransactions.AsNoTracking()
             .Where(t => t.PartnerId == partner.PartnerId && t.TxType == "CUSTOMER_REFUND" && t.Status != "CANCELLED")
-            .Select(t => new { t.TxId, t.TxCode, t.ReferenceId, t.TransactionDate, Amount = t.Amount ?? 0 })
+            .Select(t => new { t.TxId, t.TxCode, t.ReferenceType, t.ReferenceId, t.TransactionDate, Amount = t.Amount ?? 0 })
             .ToListAsync(cancellationToken);
 
         // Phiếu điều chỉnh công nợ (DC...): amount = chênh lệch nợ mới − nợ cũ
@@ -111,7 +112,9 @@ public class GetCustomerByIdQueryHandler : IRequestHandler<GetCustomerByIdQuery,
                                             Label: "Điều chỉnh", Ref: (int?)null, Amount: t.Amount, Order: 1, Seq: t.TxId)))
             .Concat(returnRows.Select(r => (Code: r.ReturnCode ?? $"TH{r.ReturnRequestId:D6}", Date: r.RequestDate, Type: "RETURN",
                                             Label: "Trả hàng", Ref: (int?)r.ReturnRequestId, Amount: -r.TotalAmount, Order: 2, Seq: r.ReturnRequestId)))
-            .Concat(refundRows.Select(t => (Code: t.TxCode ?? $"PC{t.TxId:D6}", Date: t.TransactionDate, Type: "REFUND",
+            // Trả tiền khách theo phiếu trả hàng (REFUND, mở phiếu trả) / phiếu chi trả khách độc lập PC... (DEBT_REFUND)
+            .Concat(refundRows.Select(t => (Code: t.TxCode ?? $"PC{t.TxId:D6}", Date: t.TransactionDate,
+                                            Type: t.ReferenceType == SalesReturnOps.ReferenceType ? "REFUND" : "DEBT_REFUND",
                                             Label: "Trả tiền khách", Ref: t.ReferenceId, Amount: t.Amount, Order: 3, Seq: t.TxId)))
             .OrderBy(m => m.Date ?? DateTime.MinValue)
             .ThenBy(m => m.Order)

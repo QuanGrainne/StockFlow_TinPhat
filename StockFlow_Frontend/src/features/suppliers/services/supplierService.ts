@@ -10,7 +10,14 @@ import {
   CreateSupplierPaymentPayload,
   SupplierPaymentResult,
 } from '../types';
-import type { DebtAdjustmentDetail, DebtAdjustPayload, DebtAdjustResult } from '@/components/debt/types';
+import type {
+  DebtAdjustmentDetail,
+  DebtAdjustPayload,
+  DebtAdjustResult,
+  DebtRefundPayload,
+  DebtRefundResult,
+  DebtVoucherDetail,
+} from '@/components/debt/types';
 
 export const supplierService = {
   /**
@@ -139,5 +146,24 @@ export const supplierService = {
   /** Tạo phiếu chi thanh toán nợ NCC (PC000001...), có phân bổ vào phiếu nhập */
   async createSupplierPayment(id: number, payload: CreateSupplierPaymentPayload): Promise<SupplierPaymentResult> {
     return apiClient.post<SupplierPaymentResult>(`/api/Suppliers/${id}/payments`, payload);
+  },
+
+  /** Phiếu thu tiền từ NCC (PT000001...) khi NCC đang nợ cửa hàng (nợ cần trả âm) */
+  async createRefundReceipt(id: number, payload: DebtRefundPayload): Promise<DebtRefundResult> {
+    const res = await apiClient.post<{ voucherCode: string; amount: number; remainingPayable: number }>(
+      `/api/Suppliers/${id}/refunds`,
+      { amount: payload.amount, receiptDate: payload.date, paymentMethod: payload.paymentMethod, notes: payload.notes }
+    );
+    return { voucherCode: res.voucherCode, amount: res.amount, remainingDebt: res.remainingPayable };
+  },
+
+  /** Xem phiếu công nợ NCC theo mã: PC... (thanh toán NCC) / PT... (NCC trả tiền) */
+  async getVoucher(id: number, code: string): Promise<DebtVoucherDetail> {
+    return apiClient.get<DebtVoucherDetail>(`/api/Suppliers/${id}/vouchers/${encodeURIComponent(code)}`);
+  },
+
+  /** Hủy phiếu thu tiền NCC độc lập PT... */
+  async cancelRefundReceipt(id: number, code: string): Promise<void> {
+    await apiClient.post(`/api/Suppliers/${id}/refunds/${encodeURIComponent(code)}/cancel`, {});
   },
 };

@@ -112,6 +112,20 @@ public record SupplierPaymentResultDto(
     decimal RemainingPayable
 );
 
+/// <summary>Phiếu thu tiền từ nhà cung cấp khi NCC đang nợ cửa hàng (Nợ cần trả &lt; 0).</summary>
+public record CreateSupplierRefundReceiptRequest(
+    decimal Amount,
+    DateTime? ReceiptDate,
+    string? PaymentMethod,
+    string? Notes
+);
+
+public record SupplierRefundReceiptResultDto(
+    string VoucherCode,
+    decimal Amount,
+    decimal RemainingPayable // Nợ cần trả NCC sau phiếu thu (âm = NCC vẫn còn nợ cửa hàng)
+);
+
 /// <summary>
 /// Request payload khi tạo mới Nhà cung cấp.
 /// </summary>
