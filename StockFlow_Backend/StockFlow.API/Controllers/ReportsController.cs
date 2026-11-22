@@ -62,4 +62,18 @@ public class ReportsController : ControllerBase
         var result = await _mediator.Send(new GetStockMovementReportQuery(from, to, warehouseId, categoryId, onlyMismatch, page, pageSize));
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { message = result.Error });
     }
+
+    /// <summary>UC-86 – Báo cáo công nợ; type = RECEIVABLE (phải thu khách) | PAYABLE (phải trả NCC). Không lọc theo kho.</summary>
+    [HttpGet("debts")]
+    [ProducesResponseType(typeof(DebtReportDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [RequirePermission("FIN_READ")]
+    [RequireFeature(FeatureConstants.Reports)]
+    public async Task<IActionResult> GetDebts(
+        [FromQuery] DateOnly from, [FromQuery] DateOnly to, [FromQuery] string type = DebtReportType.Receivable,
+        [FromQuery] string? search = null, [FromQuery] int page = 1, [FromQuery] int pageSize = 50)
+    {
+        var result = await _mediator.Send(new GetDebtReportQuery(from, to, type, search, page, pageSize));
+        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { message = result.Error });
+    }
 }

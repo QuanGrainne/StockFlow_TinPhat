@@ -13,9 +13,10 @@ import { ReportFilterSidebar, isFilterReady } from '../components/ReportFilterSi
 import { OverviewTab } from '../components/OverviewTab';
 import { RevenueProfitTab } from '../components/RevenueProfitTab';
 import { StockMovementTab } from '../components/StockMovementTab';
+import { DebtTab } from '../components/DebtTab';
 import { excelDate } from '../utils/exportExcel';
 
-type ReportTab = 'overview' | 'revenue-profit' | 'stock-movement';
+type ReportTab = 'overview' | 'revenue-profit' | 'stock-movement' | 'debts';
 
 function initialFilter(): ReportFilter {
   return { preset: 'this_month', ...rangeOfPreset('this_month'), warehouseId: null };
@@ -91,6 +92,11 @@ export default function ReportsScreen() {
                 key: 'stock-movement',
                 label: 'Nhập – xuất – tồn',
                 children: <StockMovementTab filter={filter} ready={ready} scopeLabel={scopeLabel} />,
+              },
+              {
+                key: 'debts',
+                label: 'Công nợ',
+                children: <DebtTab filter={filter} ready={ready} />,
               },
             ]}
           />

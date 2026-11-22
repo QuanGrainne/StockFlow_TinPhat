@@ -146,3 +146,38 @@ export interface StockMovementReport extends PagedReport<StockMovementRow> {
   ledgerMismatchCount: number;
   currentMismatchCount: number;
 }
+
+// ─── UC-86 – Công nợ ───
+
+export type DebtReportType = 'RECEIVABLE' | 'PAYABLE';
+
+export type DebtAgingBucket = '0-30' | '31-60' | '61-90' | '90+';
+
+export interface DebtReportRow {
+  partnerId: number;
+  code: string;
+  name: string;
+  phone: string | null;
+  opening: number;
+  increase: number;
+  decrease: number;
+  closing: number;
+  /** Hạn mức (chỉ khách hàng) */
+  creditLimit: number | null;
+  /** Số ngày nợ tính đến hôm nay (chỉ khách đang còn nợ) */
+  debtDays: number | null;
+  agingBucket: DebtAgingBucket | null;
+}
+
+export interface DebtAgingSummary {
+  bucket: DebtAgingBucket;
+  count: number;
+  amount: number;
+}
+
+export interface DebtReport extends PagedReport<DebtReportRow> {
+  type: DebtReportType;
+  /** FIRST_DEBT / LAST_TRANSACTION; null với phải trả */
+  debtDaysFrom: string | null;
+  aging: DebtAgingSummary[];
+}

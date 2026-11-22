@@ -4,6 +4,8 @@
 import { apiClient } from '@/lib/api/client';
 import type {
   DashboardSummary,
+  DebtReport,
+  DebtReportType,
   PagedReport,
   RevenueProfitGroupBy,
   RevenueProfitReport,
@@ -67,5 +69,12 @@ export const reportService = {
     params: ReportPeriodParams & PagingParams & { categoryId?: number | null; onlyMismatch?: boolean }
   ): Promise<StockMovementReport> {
     return apiClient.get<StockMovementReport>(`/api/reports/stock-movement${buildReportQuery(params)}`);
+  },
+
+  /** UC-86 – Công nợ phải thu / phải trả (không lọc theo kho) */
+  getDebts(
+    params: { from: string; to: string; type: DebtReportType; search?: string } & PagingParams
+  ): Promise<DebtReport> {
+    return apiClient.get<DebtReport>(`/api/reports/debts${buildReportQuery(params)}`);
   },
 };

@@ -23,10 +23,11 @@ public static class SupplierDebtCalculator
 
     /// <summary>Tiền hàng của một phiếu nhập (yêu cầu đã Include DtlGoodsReceiptItems).</summary>
     public static decimal ReceiptTotal(TrxGoodsReceipt r) =>
-        Math.Round(
-            r.DtlGoodsReceiptItems.Sum(i => (i.AcceptedQty ?? i.ReceivedQty ?? i.OrderedQty ?? 0) * (i.UnitLandedCost ?? 0)),
-            0,
-            MidpointRounding.AwayFromZero);
+        RoundReceiptTotal(r.DtlGoodsReceiptItems.Sum(i => (i.AcceptedQty ?? i.ReceivedQty ?? i.OrderedQty ?? 0) * (i.UnitLandedCost ?? 0)));
+
+    /// <summary>Làm tròn tiền hàng phiếu nhập đến đồng (dùng khi tổng dòng đã cộng sẵn ở DB).</summary>
+    public static decimal RoundReceiptTotal(decimal rawTotal) =>
+        Math.Round(rawTotal, 0, MidpointRounding.AwayFromZero);
 
     /// <summary>Tổng đã thanh toán theo từng phiếu nhập (key = GrId).</summary>
     public static Dictionary<int, decimal> PaidByReceipt(IEnumerable<TrxFinancialTransaction> payments) =>
