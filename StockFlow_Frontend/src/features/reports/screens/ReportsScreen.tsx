@@ -12,9 +12,10 @@ import { rangeOfPreset } from '../utils/reportFormat';
 import { ReportFilterSidebar, isFilterReady } from '../components/ReportFilterSidebar';
 import { OverviewTab } from '../components/OverviewTab';
 import { RevenueProfitTab } from '../components/RevenueProfitTab';
+import { StockMovementTab } from '../components/StockMovementTab';
 import { excelDate } from '../utils/exportExcel';
 
-type ReportTab = 'overview' | 'revenue-profit';
+type ReportTab = 'overview' | 'revenue-profit' | 'stock-movement';
 
 function initialFilter(): ReportFilter {
   return { preset: 'this_month', ...rangeOfPreset('this_month'), warehouseId: null };
@@ -85,6 +86,11 @@ export default function ReportsScreen() {
                 key: 'revenue-profit',
                 label: 'Doanh thu & lợi nhuận',
                 children: <RevenueProfitTab filter={filter} ready={ready} scopeLabel={scopeLabel} />,
+              },
+              {
+                key: 'stock-movement',
+                label: 'Nhập – xuất – tồn',
+                children: <StockMovementTab filter={filter} ready={ready} scopeLabel={scopeLabel} />,
               },
             ]}
           />

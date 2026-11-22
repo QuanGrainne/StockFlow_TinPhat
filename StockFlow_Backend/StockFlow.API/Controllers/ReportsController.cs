@@ -48,4 +48,18 @@ public class ReportsController : ControllerBase
         var result = await _mediator.Send(new GetRevenueProfitReportQuery(from, to, warehouseId, categoryId, groupBy, page, pageSize));
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { message = result.Error });
     }
+
+    /// <summary>UC-87 – Báo cáo nhập – xuất – tồn theo kho và kỳ (từ thẻ kho); onlyMismatch = chỉ dòng lệch.</summary>
+    [HttpGet("stock-movement")]
+    [ProducesResponseType(typeof(StockMovementReportDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [RequirePermission("FIN_READ")]
+    [RequireFeature(FeatureConstants.Reports)]
+    public async Task<IActionResult> GetStockMovement(
+        [FromQuery] DateOnly from, [FromQuery] DateOnly to, [FromQuery] int? warehouseId, [FromQuery] int? categoryId,
+        [FromQuery] bool onlyMismatch = false, [FromQuery] int page = 1, [FromQuery] int pageSize = 50)
+    {
+        var result = await _mediator.Send(new GetStockMovementReportQuery(from, to, warehouseId, categoryId, onlyMismatch, page, pageSize));
+        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { message = result.Error });
+    }
 }

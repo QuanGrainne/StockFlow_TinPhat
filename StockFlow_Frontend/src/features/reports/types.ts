@@ -101,3 +101,48 @@ export interface PagedReport<TRow, TTotals = TRow> {
 }
 
 export type RevenueProfitReport = PagedReport<RevenueProfitRow>;
+
+// ─── UC-87 – Nhập – xuất – tồn ───
+
+/** Số lượng tách theo nhóm loại giao dịch thẻ kho */
+export interface MovementByGroup {
+  purchase: number;
+  sale: number;
+  transfer: number;
+  stocktake: number;
+  production: number;
+  disposal: number;
+  other: number;
+}
+
+export interface StockMovementRow {
+  key: string;
+  warehouseId: number;
+  warehouseCode: string;
+  warehouseName: string;
+  productId: number;
+  productCode: string;
+  productName: string;
+  unitName: string;
+  openingQuantity: number;
+  openingValue: number;
+  inQuantity: number;
+  inValue: number;
+  outQuantity: number;
+  outValue: number;
+  inByGroup: MovementByGroup;
+  outByGroup: MovementByGroup;
+  closingQuantity: number;
+  closingValue: number;
+  /** balance_after của dòng thẻ kho cuối kỳ */
+  ledgerBalanceAfter: number | null;
+  isLedgerMismatch: boolean;
+  /** Tồn hiện tại – chỉ có khi kỳ kéo tới hôm nay */
+  currentQuantity: number | null;
+  isCurrentMismatch: boolean;
+}
+
+export interface StockMovementReport extends PagedReport<StockMovementRow> {
+  ledgerMismatchCount: number;
+  currentMismatchCount: number;
+}

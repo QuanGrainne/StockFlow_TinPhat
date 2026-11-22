@@ -2,7 +2,13 @@
 // Kết nối API Báo cáo (/api/reports) – chỉ đọc dữ liệu
 
 import { apiClient } from '@/lib/api/client';
-import type { DashboardSummary, PagedReport, RevenueProfitGroupBy, RevenueProfitReport } from '../types';
+import type {
+  DashboardSummary,
+  PagedReport,
+  RevenueProfitGroupBy,
+  RevenueProfitReport,
+  StockMovementReport,
+} from '../types';
 
 /** Tham số kỳ + kho dùng chung cho các báo cáo */
 export interface ReportPeriodParams {
@@ -54,5 +60,12 @@ export const reportService = {
     params: ReportPeriodParams & PagingParams & { groupBy: RevenueProfitGroupBy; categoryId?: number | null }
   ): Promise<RevenueProfitReport> {
     return apiClient.get<RevenueProfitReport>(`/api/reports/revenue-profit${buildReportQuery(params)}`);
+  },
+
+  /** UC-87 – Nhập – xuất – tồn theo kho và kỳ (từ thẻ kho) */
+  getStockMovement(
+    params: ReportPeriodParams & PagingParams & { categoryId?: number | null; onlyMismatch?: boolean }
+  ): Promise<StockMovementReport> {
+    return apiClient.get<StockMovementReport>(`/api/reports/stock-movement${buildReportQuery(params)}`);
   },
 };

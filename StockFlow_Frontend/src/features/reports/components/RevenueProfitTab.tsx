@@ -3,11 +3,11 @@
 // Tab "Doanh thu & lợi nhuận" (UC-88): nhóm theo Ngày / Hàng hóa / Khách hàng, lọc nhóm hàng,
 // phân trang phía server, dòng tổng toàn kỳ, xuất Excel (mọi trang).
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Alert, Button, Pagination, Segmented, Table, message } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { FileSpreadsheet } from 'lucide-react';
-import { productService, type BackendProductCategory } from '@/features/products/services/productService';
+import { useProductCategories } from '../hooks/useProductCategories';
 import type { ReportFilter, RevenueProfitGroupBy, RevenueProfitRow } from '../types';
 import { fetchAllPages, reportService } from '../services/reportService';
 import { useReportQuery } from '../hooks/useReportQuery';
@@ -37,23 +37,8 @@ interface RevenueProfitTabProps {
 export function RevenueProfitTab({ filter, ready, scopeLabel }: RevenueProfitTabProps) {
   const [groupBy, setGroupBy] = useState<RevenueProfitGroupBy>('DAY');
   const [categoryId, setCategoryId] = useState<number | null>(null);
-  const [categories, setCategories] = useState<BackendProductCategory[]>([]);
+  const categories = useProductCategories();
   const [exporting, setExporting] = useState(false);
-
-  useEffect(() => {
-    let stale = false;
-    productService
-      .getCategories()
-      .then((list) => {
-        if (!stale) setCategories(list);
-      })
-      .catch(() => {
-        // Không tải được nhóm hàng: vẫn xem báo cáo, chỉ không lọc được theo nhóm
-      });
-    return () => {
-      stale = true;
-    };
-  }, []);
 
   const { from, to, warehouseId } = filter;
   const filterKey = `${from}|${to}|${warehouseId ?? ''}|${categoryId ?? ''}|${groupBy}`;
