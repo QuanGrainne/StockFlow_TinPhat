@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using StockFlow.API.Authorization;
 using StockFlow.Application.Features.Reports.DTOs;
 using StockFlow.Application.Features.Reports.Queries;
+using StockFlow.Application.Features.Roles.Common;
 
 namespace StockFlow.API.Controllers;
 
@@ -27,7 +28,7 @@ public class ReportsController : ControllerBase
     [ProducesResponseType(typeof(DashboardSummaryDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [RequirePermission("FIN_READ")]
-    [RequireFeature("feat-reports")]
+    [RequireFeature(FeatureConstants.Reports)]
     public async Task<IActionResult> GetDashboard([FromQuery] DateOnly from, [FromQuery] DateOnly to, [FromQuery] int? warehouseId)
     {
         var result = await _mediator.Send(new GetDashboardSummaryQuery(from, to, warehouseId));

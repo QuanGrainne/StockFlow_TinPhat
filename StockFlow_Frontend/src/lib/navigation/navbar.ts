@@ -5,6 +5,7 @@
 import type { LucideIcon } from 'lucide-react';
 import {
   ArrowDownToLine,
+  BarChart3,
   Building2,
   Calculator,
   CalendarRange,
@@ -38,7 +39,7 @@ export interface NavItem {
   title: string;
   desc: string;
   icon: LucideIcon;
-  /** Phân hệ quyền backend (PermissionConstants): AUTH, GOODS, PARTNER, SALES, PURCHASE, STOCK, PROD, BOM */
+  /** Phân hệ quyền backend (PermissionConstants): AUTH, GOODS, PARTNER, SALES, PURCHASE, STOCK, PROD, BOM, FIN */
   backendModule: string;
   /** Mã màn hình cũ / bí danh cùng mở chức năng này */
   aliases?: string[];
@@ -384,6 +385,25 @@ export const NAV_GROUPS: NavGroup[] = [
         desc: 'Định mức nguyên vật liệu và công thức phối liệu',
         icon: Sliders,
         backendModule: 'BOM',
+      },
+    ],
+  },
+  {
+    id: 'reports-group',
+    label: 'Báo cáo',
+    icon: BarChart3,
+    single: true,
+    items: [
+      {
+        // UC-86, 87, 88, 90: báo cáo tổng quan, doanh thu – lợi nhuận, nhập – xuất – tồn, công nợ (chỉ đọc)
+        screen: 'reports',
+        path: '/reports',
+        featureId: 'feat-reports',
+        title: 'Báo cáo',
+        desc: 'Tổng quan kinh doanh, doanh thu – lợi nhuận, nhập – xuất – tồn, công nợ',
+        icon: BarChart3,
+        // API /api/reports dùng quyền FIN_READ
+        backendModule: 'FIN',
       },
     ],
   },
