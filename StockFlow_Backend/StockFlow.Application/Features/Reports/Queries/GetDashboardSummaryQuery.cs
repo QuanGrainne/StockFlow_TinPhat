@@ -14,17 +14,14 @@ namespace StockFlow.Application.Features.Reports.Queries;
 /// top 10 hàng bán, việc chờ xử lý, hàng dưới định mức. Chỉ đọc dữ liệu.
 /// Số liệu theo kho chỉ tính các kho được phân quyền (BR-04); công nợ không lọc theo kho.
 /// </summary>
-public record GetDashboardSummaryQuery(DateOnly From, DateOnly To, int? WarehouseId) : IRequest<Result<DashboardSummaryDto>>;
+public record GetDashboardSummaryQuery(DateOnly From, DateOnly To, int? WarehouseId)
+    : IRequest<Result<DashboardSummaryDto>>, IReportPeriodQuery;
 
 public class GetDashboardSummaryQueryValidator : AbstractValidator<GetDashboardSummaryQuery>
 {
     public GetDashboardSummaryQueryValidator()
     {
-        RuleFor(x => x.From).LessThanOrEqualTo(x => x.To).WithMessage("Từ ngày phải trước hoặc bằng đến ngày.");
-        RuleFor(x => x.To)
-            .Must((x, to) => x.From > to || ReportScope.IsValidPeriod(x.From, to))
-            .WithMessage($"Kỳ báo cáo tối đa {ReportScope.MaxPeriodDays} ngày.");
-        RuleFor(x => x.WarehouseId).GreaterThan(0).When(x => x.WarehouseId.HasValue).WithMessage("Kho không hợp lệ.");
+        ReportValidation.AddPeriodRules(this);
     }
 }
 

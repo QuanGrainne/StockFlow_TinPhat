@@ -34,4 +34,18 @@ public class ReportsController : ControllerBase
         var result = await _mediator.Send(new GetDashboardSummaryQuery(from, to, warehouseId));
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { message = result.Error });
     }
+
+    /// <summary>UC-88 – Báo cáo doanh thu và lợi nhuận; groupBy = DAY | PRODUCT | CUSTOMER, phân trang phía server.</summary>
+    [HttpGet("revenue-profit")]
+    [ProducesResponseType(typeof(RevenueProfitReportDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [RequirePermission("FIN_READ")]
+    [RequireFeature(FeatureConstants.Reports)]
+    public async Task<IActionResult> GetRevenueProfit(
+        [FromQuery] DateOnly from, [FromQuery] DateOnly to, [FromQuery] int? warehouseId, [FromQuery] int? categoryId,
+        [FromQuery] string groupBy = RevenueProfitGroupBy.Day, [FromQuery] int page = 1, [FromQuery] int pageSize = 50)
+    {
+        var result = await _mediator.Send(new GetRevenueProfitReportQuery(from, to, warehouseId, categoryId, groupBy, page, pageSize));
+        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { message = result.Error });
+    }
 }

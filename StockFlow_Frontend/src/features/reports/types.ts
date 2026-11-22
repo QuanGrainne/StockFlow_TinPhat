@@ -70,3 +70,34 @@ export interface DashboardSummary {
   lowStock: LowStockItem[];
   lowStockTotal: number;
 }
+
+// ─── UC-88 – Doanh thu & lợi nhuận ───
+
+export type RevenueProfitGroupBy = 'DAY' | 'PRODUCT' | 'CUSTOMER';
+
+export interface RevenueProfitRow {
+  /** yyyy-MM-dd (theo ngày) hoặc id hàng / khách */
+  key: string;
+  /** Ngày / mã hàng / mã khách */
+  code: string;
+  name: string;
+  quantitySold: number;
+  revenue: number;
+  discount: number;
+  returnValue: number;
+  netRevenue: number;
+  costOfGoodsSold: number;
+  grossProfit: number;
+  marginPercent: number;
+}
+
+/** Trang kết quả báo cáo phân trang phía server, kèm dòng tổng của mọi trang */
+export interface PagedReport<TRow, TTotals = TRow> {
+  items: TRow[];
+  totalCount: number;
+  page: number;
+  pageSize: number;
+  totals: TTotals;
+}
+
+export type RevenueProfitReport = PagedReport<RevenueProfitRow>;

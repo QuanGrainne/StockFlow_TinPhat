@@ -11,8 +11,10 @@ import type { ReportFilter } from '../types';
 import { rangeOfPreset } from '../utils/reportFormat';
 import { ReportFilterSidebar, isFilterReady } from '../components/ReportFilterSidebar';
 import { OverviewTab } from '../components/OverviewTab';
+import { RevenueProfitTab } from '../components/RevenueProfitTab';
+import { excelDate } from '../utils/exportExcel';
 
-type ReportTab = 'overview';
+type ReportTab = 'overview' | 'revenue-profit';
 
 function initialFilter(): ReportFilter {
   return { preset: 'this_month', ...rangeOfPreset('this_month'), warehouseId: null };
@@ -25,6 +27,10 @@ export default function ReportsScreen() {
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
 
   const ready = isFilterReady(filter);
+  const warehouse = warehouses.find((w) => w.warehouseId === filter.warehouseId);
+  const scopeLabel =
+    `Từ ${excelDate(filter.from)} đến ${excelDate(filter.to)} – ` +
+    (warehouse ? `Kho: ${warehouse.code} – ${warehouse.name}` : 'Tất cả kho được phân quyền');
   const sidebar = <ReportFilterSidebar filter={filter} warehouses={warehouses} onChange={setFilter} />;
 
   return (
@@ -53,7 +59,7 @@ export default function ReportsScreen() {
           <div className="flex items-center gap-2">
             <span className="text-sm font-semibold text-slate-800">Báo cáo</span>
             <span className="text-xs text-slate-400">
-              ({filter.from.split('-').reverse().join('/')} – {filter.to.split('-').reverse().join('/')})
+              ({excelDate(filter.from)} – {excelDate(filter.to)})
             </span>
           </div>
           <button
@@ -74,6 +80,11 @@ export default function ReportsScreen() {
                 key: 'overview',
                 label: 'Tổng quan',
                 children: <OverviewTab filter={filter} ready={ready} />,
+              },
+              {
+                key: 'revenue-profit',
+                label: 'Doanh thu & lợi nhuận',
+                children: <RevenueProfitTab filter={filter} ready={ready} scopeLabel={scopeLabel} />,
               },
             ]}
           />

@@ -80,6 +80,19 @@ internal static class ReportData
         return ret.ReturnRequestId;
     }
 
+    /// <summary>Phiếu xuất bán (không dòng) của hóa đơn – để dòng thẻ kho trỏ tới (reference STOCK_ISSUE).</summary>
+    public static int AddStockIssue(TestStockFlowDbContext db, string code, int orderId, int warehouseId, DateTime date)
+    {
+        var issue = new TrxStockIssue
+        {
+            IssueCode = code, IssueType = "SALES", SalesOrderId = orderId, WarehouseId = warehouseId,
+            RequestedBy = TestData.UserId, Status = "COMPLETED", RequestedDate = date, ProcessedDate = date,
+        };
+        db.TrxStockIssues.Add(issue);
+        TestData.SaveAndDetach(db);
+        return issue.StockIssueId;
+    }
+
     /// <summary>Một dòng thẻ kho (quantity có dấu: nhập dương, xuất âm).</summary>
     public static void AddCard(
         TestStockFlowDbContext db, int warehouseId, int productId, string type, decimal quantity, decimal unitCost,
