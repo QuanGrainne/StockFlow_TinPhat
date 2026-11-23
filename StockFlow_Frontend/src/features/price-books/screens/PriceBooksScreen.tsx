@@ -107,7 +107,7 @@ export default function PriceBooksClient() {
       }
     } catch {
       api.error({
-        message: 'Lỗi nạp dữ liệu',
+        title: 'Lỗi nạp dữ liệu',
         description: 'Không thể tải danh sách bảng giá từ máy chủ.',
       });
     }
@@ -138,7 +138,7 @@ export default function PriceBooksClient() {
       setTotalCount(res.totalCount);
     } catch {
       api.error({
-        message: 'Lỗi tải bảng giá',
+        title: 'Lỗi tải bảng giá',
         description: 'Không thể nạp dữ liệu ma trận giá sản phẩm.',
       });
     } finally {
@@ -213,7 +213,7 @@ export default function PriceBooksClient() {
       }
 
       api.success({
-        message: 'Lưu thành công',
+        title: 'Lưu thành công',
         description: `Đã cập nhật đơn giá và tự động tính toán lại các bảng giá liên kết theo công thức.`,
       });
 
@@ -221,7 +221,7 @@ export default function PriceBooksClient() {
       loadMatrix();
     } catch {
       api.error({
-        message: 'Lỗi lưu giá',
+        title: 'Lỗi lưu giá',
         description: 'Không thể lưu các thay đổi giá. Vui lòng thử lại.',
       });
     } finally {
@@ -236,14 +236,14 @@ export default function PriceBooksClient() {
     try {
       await priceBookService.applyFormula(activeCustomBook.priceBookId, { allProducts: true });
       api.success({
-        message: 'Cập nhật thành công',
+        title: 'Cập nhật thành công',
         description: `Đã thêm tất cả hàng hóa vào bảng giá "${activeCustomBook.priceBookName}".`,
       });
       await loadPriceBooks();
       await loadMatrix();
     } catch {
       api.error({
-        message: 'Lỗi',
+        title: 'Lỗi',
         description: 'Không thể thêm hàng hóa vào bảng giá.',
       });
     } finally {
@@ -258,14 +258,14 @@ export default function PriceBooksClient() {
     try {
       await priceBookService.applyFormula(activeCustomBook.priceBookId, { categoryIds: catIds });
       api.success({
-        message: 'Cập nhật dữ liệu thành công',
+        title: 'Cập nhật dữ liệu thành công',
         description: `Đã thêm các nhóm hàng vào bảng giá "${activeCustomBook.priceBookName}".`,
       });
       await loadPriceBooks();
       await loadMatrix();
     } catch {
       api.error({
-        message: 'Lỗi',
+        title: 'Lỗi',
         description: 'Không thể thêm nhóm hàng vào bảng giá.',
       });
     } finally {
@@ -278,7 +278,7 @@ export default function PriceBooksClient() {
     const targetBook = priceBooks.find(b => b.priceBookId === bookId);
     if (!targetBook?.formulaBaseType) {
       api.warning({
-        message: 'Chưa cấu hình công thức',
+        title: 'Chưa cấu hình công thức',
         description: `Bảng giá "${targetBook?.priceBookName}" chưa có công thức giá tự động. Vui lòng chỉnh sửa bảng giá để thiết lập.`,
       });
       return;
@@ -287,13 +287,13 @@ export default function PriceBooksClient() {
     try {
       await priceBookService.applyFormula(bookId);
       api.success({
-        message: 'Áp dụng công thức thành công',
+        title: 'Áp dụng công thức thành công',
         description: `Đã tính toán và cập nhật lại toàn bộ giá cho bảng giá "${targetBook.priceBookName}".`,
       });
       loadMatrix();
     } catch {
       api.error({
-        message: 'Lỗi tính giá',
+        title: 'Lỗi tính giá',
         description: 'Có lỗi xảy ra khi áp dụng công thức giá.',
       });
     }
@@ -305,7 +305,7 @@ export default function PriceBooksClient() {
     if (!target) return;
     if (target.isDefault) {
       api.error({
-        message: 'Không thể xóa',
+        title: 'Không thể xóa',
         description: 'Không thể xóa Bảng giá chung mặc định của hệ thống.',
       });
       return;
@@ -318,7 +318,7 @@ export default function PriceBooksClient() {
     try {
       await priceBookService.deletePriceBook(id);
       api.success({
-        message: 'Đã xóa bảng giá',
+        title: 'Đã xóa bảng giá',
         description: `Bảng giá "${target.priceBookName}" đã được xóa thành công.`,
       });
 
@@ -330,7 +330,7 @@ export default function PriceBooksClient() {
       await loadMatrix();
     } catch {
       api.error({
-        message: 'Lỗi xóa bảng giá',
+        title: 'Lỗi xóa bảng giá',
         description: 'Không thể xóa bảng giá này. Vui lòng thử lại.',
       });
     }
@@ -528,7 +528,7 @@ export default function PriceBooksClient() {
                         recalculateFormula: true,
                       });
                       api.success({
-                        message: 'Áp dụng công thức thành công',
+                        title: 'Áp dụng công thức thành công',
                         description: `Đã cập nhật công thức và tính lại giá cho các hàng hóa trong "${book.priceBookName}".`,
                       });
                       await loadPriceBooks();
@@ -611,7 +611,7 @@ export default function PriceBooksClient() {
   // Xuất file Excel toàn bộ hàng hóa theo bộ lọc đang chọn (mọi trang), mỗi bảng giá 1 cột
   const handleExportExcel = async () => {
     if (displayedBookIds.length === 0) {
-      api.warning({ message: 'Chưa chọn bảng giá', description: 'Vui lòng chọn ít nhất một bảng giá để xuất file.' });
+      api.warning({ title: 'Chưa chọn bảng giá', description: 'Vui lòng chọn ít nhất một bảng giá để xuất file.' });
       return;
     }
     setExporting(true);
@@ -649,7 +649,7 @@ export default function PriceBooksClient() {
       XLSX.utils.book_append_sheet(wb, ws, 'ThietLapGia');
       XLSX.writeFile(wb, `ThietLapGia_${new Date().toISOString().slice(0, 10)}.xlsx`);
     } catch {
-      api.error({ message: 'Lỗi xuất file', description: 'Không thể tải dữ liệu bảng giá để xuất file.' });
+      api.error({ title: 'Lỗi xuất file', description: 'Không thể tải dữ liệu bảng giá để xuất file.' });
     } finally {
       setExporting(false);
     }
@@ -846,7 +846,7 @@ export default function PriceBooksClient() {
         }}
         onSuccess={saved => {
           api.success({
-            message: 'Thành công',
+            title: 'Thành công',
             description: `Bảng giá "${saved.priceBookName}" đã được lưu.`,
           });
           // Tự động chọn bảng giá mới này trên sidebar theo đúng KiotViet!
