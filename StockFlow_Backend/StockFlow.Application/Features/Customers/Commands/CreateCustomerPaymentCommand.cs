@@ -178,6 +178,8 @@ public class CreateCustomerPaymentCommandHandler
                     .ToList();
 
             var createdCodes = new List<string>();
+            // Phân bổ thực tế (trả về để in phiếu thu đúng số đã lưu)
+            var createdParts = new List<CustomerPaymentAllocationResultDto>();
             foreach (var alloc in allocations)
             {
                 var order = orders.First(o => o.OrderId == alloc.OrderId);
@@ -191,6 +193,7 @@ public class CreateCustomerPaymentCommandHandler
 
                 _context.TrxFinancialTransactions.Add(NewTx(code, alloc.Amount, SalesOrderRef, order.OrderId));
                 createdCodes.Add(code);
+                createdParts.Add(new CustomerPaymentAllocationResultDto(code, order.OrderId, order.OrderCode, alloc.Amount));
 
                 order.PaidAmount = (order.PaidAmount ?? 0) + alloc.Amount;
                 order.OutstandingAmount = Math.Max(0, (order.OutstandingAmount ?? 0) - alloc.Amount);
@@ -207,6 +210,7 @@ public class CreateCustomerPaymentCommandHandler
                 var ptCode = $"{VoucherPrefix}{seq:D6}";
                 _context.TrxFinancialTransactions.Add(NewTx(ptCode, unallocated, null, null));
                 createdCodes.Add(ptCode);
+                createdParts.Add(new CustomerPaymentAllocationResultDto(ptCode, null, null, unallocated));
             }
 
             partner.CurrentDebt = currentDebt - amount;
@@ -218,7 +222,8 @@ public class CreateCustomerPaymentCommandHandler
                 VoucherCode: string.Join(", ", createdCodes),
                 Amount: amount,
                 AllocatedAmount: allocatedTotal,
-                RemainingDebt: partner.CurrentDebt ?? 0m));
+                RemainingDebt: partner.CurrentDebt ?? 0m,
+                Allocations: createdParts));
         }
         catch (Exception ex)
         {

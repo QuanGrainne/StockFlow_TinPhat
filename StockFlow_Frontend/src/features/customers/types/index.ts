@@ -194,6 +194,8 @@ export interface CustomerPaymentResult {
   amount: number;
   allocatedAmount: number;
   remainingDebt: number;
+  /** Phân bổ thực tế đã lưu (gồm phần chưa phân bổ đã tự trừ vào hóa đơn cũ nhất); orderCode null = không gắn hóa đơn */
+  allocations?: { voucherCode: string; orderId: number | null; orderCode: string | null; amount: number }[];
 }
 
 export interface CreateCustomerPaymentPayload {
