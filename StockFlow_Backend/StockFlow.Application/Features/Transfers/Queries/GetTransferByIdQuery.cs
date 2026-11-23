@@ -71,8 +71,10 @@ public class GetTransferByIdQueryHandler : IRequestHandler<GetTransferByIdQuery,
             var p = item.Product;
             var qty = item.Quantity ?? 0;
             var rec = item.ReceivedQuantity;
-            // Giá chuyển = giá vốn kho xuất lúc xuất (đã lưu); phiếu tạm thì lấy giá vốn hiện tại của kho xuất
-            var price = item.UnitCost
+            // Giá chuyển = giá người dùng nhập trên phiếu; chưa nhập thì lấy giá vốn kho xuất lúc xuất (đã lưu),
+            // phiếu tạm thì lấy giá vốn hiện tại của kho xuất. Chỉ để hiển thị, không ảnh hưởng giá vốn.
+            var price = item.TransferPrice
+                ?? item.UnitCost
                 ?? (p != null
                     ? TransferStockOps.CostOf(stockBalances.Where(b => b.WarehouseId == t.SourceWarehouseId && b.ProductId == item.ProductId), p)
                     : 0);

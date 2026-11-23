@@ -192,13 +192,8 @@ export const SkuAnalyticsModal: React.FC<SkuAnalyticsModalProps> = ({
   const warehouseBreakdown = useMemo(() => {
     if (!item) return [];
 
-    const warehouses = item.stockByWarehouse && item.stockByWarehouse.length > 0
-      ? item.stockByWarehouse
-      : [
-          { warehouseName: 'Kho Hoàn Kiếm', actualStock: Math.round(itemStockQty * 0.45) },
-          { warehouseName: 'Kho Tổng Gia Lâm', actualStock: Math.round(itemStockQty * 0.35) },
-          { warehouseName: 'Kho Đông Anh', actualStock: Math.max(0, itemStockQty - Math.round(itemStockQty * 0.8)) },
-        ];
+    // Tồn theo kho thật của hàng hóa (từ DB); không có thì không bịa số theo kho cố định
+    const warehouses = item.stockByWarehouse ?? [];
 
     const totalStock = warehouses.reduce((sum, w) => sum + (Number(w.actualStock) || 0), 0) || 1;
     
@@ -215,7 +210,7 @@ export const SkuAnalyticsModal: React.FC<SkuAnalyticsModalProps> = ({
         soldQty: Math.round((summaryKpis.totalSold * consumptionWeight) / 100),
       };
     });
-  }, [item, itemStockQty, summaryKpis.totalSold]);
+  }, [item, summaryKpis.totalSold]);
 
   // Danh sách đơn hàng tiêu thụ gần nhất cho SKU này
   const recentOrders = useMemo(() => {

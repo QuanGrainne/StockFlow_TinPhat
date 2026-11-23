@@ -61,6 +61,8 @@ export interface GoodsItem {
   attributes?: GoodsAttributeDef[];
   variants?: GoodsVariantItem[];
   stockByWarehouse: {
+    /** Id kho trong DB (ProductWarehouseStockDto.warehouseId) — dùng để ghép đúng kho, không dò theo tên */
+    warehouseId?: number;
     warehouseName: string;
     warehouseCode?: string;
     actualStock: number;

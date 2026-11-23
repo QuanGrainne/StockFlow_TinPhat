@@ -6,6 +6,7 @@ import { X, Info, Lightbulb, ChevronDown, Check, Loader2 } from 'lucide-react';
 import { productService, ImportProductItemPayload } from '../services/goodsCatalogService';
 import * as XLSX from 'xlsx';
 import { GoodsItem } from '../screens/GoodsCatalogScreen';
+import type { WarehouseFacility } from '@/features/admin/types';
 
 interface GoodsImportModalProps {
   isOpen: boolean;
@@ -13,6 +14,10 @@ interface GoodsImportModalProps {
   existingGoods: GoodsItem[];
   /** serverMessage: thông báo từ API (gồm số ảnh không tải được về máy chủ, nếu có) */
   onImportSuccess: (importedCount: number, fileName: string, newGoods: GoodsItem[], serverMessage?: string) => void;
+  /** Danh sách kho thật (lấy từ DB, theo phân quyền) để chọn chi nhánh áp dụng */
+  warehouses: WarehouseFacility[];
+  /** Kho làm việc hiện tại: kho nhận tồn / giá vốn khi chọn "Toàn hệ thống" */
+  defaultWarehouse: string;
 }
 
 /**
@@ -356,6 +361,8 @@ export default function GoodsImportModal({
   onClose,
   existingGoods,
   onImportSuccess,
+  warehouses,
+  defaultWarehouse,
 }: GoodsImportModalProps) {
   // ─── Tùy chọn Import theo thiết kế chuyên nghiệp ───
   const [duplicateCodeAction, setDuplicateCodeAction] = useState<'ERROR' | 'REPLACE_NAME'>('ERROR');
@@ -363,9 +370,13 @@ export default function GoodsImportModal({
   const [updateStock, setUpdateStock] = useState<boolean>(false);
   const [updateCostPrice, setUpdateCostPrice] = useState<boolean>(false);
   const [costPriceScope, setCostPriceScope] = useState<'ALL' | 'BRANCH'>('ALL');
-  const [selectedCostBranch, setSelectedCostBranch] = useState<string>('Kho Tổng Gia Lâm');
+  const [selectedCostBranch, setSelectedCostBranch] = useState<string>('');
   const [businessStatusScope, setBusinessStatusScope] = useState<'ALL' | 'BRANCH'>('ALL');
-  const [selectedStatusBranch, setSelectedStatusBranch] = useState<string>('Kho Tổng Gia Lâm');
+  const [selectedStatusBranch, setSelectedStatusBranch] = useState<string>('');
+  // Chưa chọn thì mặc định kho làm việc, không có thì kho đầu tiên trong danh sách kho thật
+  const fallbackWarehouse = defaultWarehouse || warehouses[0]?.name || '';
+  const costBranch = selectedCostBranch || fallbackWarehouse;
+  const statusBranch = selectedStatusBranch || fallbackWarehouse;
   const [updateDescription, setUpdateDescription] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isImporting, setIsImporting] = useState<boolean>(false);
@@ -432,6 +443,8 @@ export default function GoodsImportModal({
         return;
       }
 
+      // Kho áp dụng: "Chi nhánh" = kho đã chọn; "Toàn hệ thống" = kho làm việc (không gán cứng tên kho)
+      const targetWarehouse = costPriceScope === 'BRANCH' ? costBranch : fallbackWarehouse;
       const currentGoods = [...existingGoods];
       const goodsByCode = new Map<string, GoodsItem>();
       currentGoods.forEach((g) => goodsByCode.set(g.code.toUpperCase(), g));
@@ -512,7 +525,7 @@ export default function GoodsImportModal({
             brand: newBrand,
             uom: newUom,
             specification: rawAttr,
-            warehouse: 'Kho Tổng Gia Lâm',
+            warehouse: targetWarehouse,
             stockQuantity: newStock,
             reservedQuantity: 0,
             availableQuantity: newStock,
@@ -530,7 +543,7 @@ export default function GoodsImportModal({
             createdAt: new Date().toLocaleDateString('vi-VN') + ' ' + new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
             stockByWarehouse: [
               {
-                warehouseName: 'Kho Tổng Gia Lâm',
+                warehouseName: targetWarehouse,
                 actualStock: newStock,
                 availableStock: newStock,
                 standardPrice: newSalePrice,
@@ -590,7 +603,7 @@ export default function GoodsImportModal({
           imageUrl: newImage,
           isActive: newIsActive,
           isDirectSale: newIsDirectSale,
-          warehouseName: costPriceScope === 'BRANCH' ? selectedCostBranch : 'Kho Tổng Gia Lâm',
+          warehouseName: targetWarehouse,
         });
       }
 
@@ -602,7 +615,7 @@ export default function GoodsImportModal({
           updateStock,
           updateCostPrice,
           updateDescription,
-          targetWarehouse: costPriceScope === 'BRANCH' ? selectedCostBranch : 'Kho Tổng Gia Lâm',
+          targetWarehouse,
         });
         onImportSuccess(importRes.totalCount || importRes.importedCount || importedCount, file.name, updatedGoodsList, importRes.message);
         onClose();
@@ -810,14 +823,14 @@ export default function GoodsImportModal({
                       <span>Chi nhánh</span>
                     </label>
                     <select
-                      value={selectedCostBranch}
+                      value={costBranch}
                       onChange={(e) => setSelectedCostBranch(e.target.value)}
                       disabled={costPriceScope !== 'BRANCH'}
                       className="flex-1 h-8 px-2.5 rounded-lg border border-slate-300 text-xs text-slate-700 bg-white disabled:bg-slate-50 disabled:text-slate-400 outline-none focus:border-blue-500"
                     >
-                      <option value="Kho Tổng Gia Lâm">Kho Tổng Gia Lâm</option>
-                      <option value="Kho Đông Anh">Kho Đông Anh</option>
-                      <option value="Kho Sài Gòn">Kho Sài Gòn</option>
+                      {warehouses.map((w) => (
+                        <option key={w.warehouseId ?? w.code} value={w.name}>{w.name}</option>
+                      ))}
                     </select>
                   </div>
                 </div>
@@ -852,14 +865,14 @@ export default function GoodsImportModal({
                       <span>Chi nhánh</span>
                     </label>
                     <select
-                      value={selectedStatusBranch}
+                      value={statusBranch}
                       onChange={(e) => setSelectedStatusBranch(e.target.value)}
                       disabled={businessStatusScope !== 'BRANCH'}
                       className="flex-1 h-8 px-2.5 rounded-lg border border-slate-300 text-xs text-slate-700 bg-white disabled:bg-slate-50 disabled:text-slate-400 outline-none focus:border-blue-500"
                     >
-                      <option value="Kho Tổng Gia Lâm">Kho Tổng Gia Lâm</option>
-                      <option value="Kho Đông Anh">Kho Đông Anh</option>
-                      <option value="Kho Sài Gòn">Kho Sài Gòn</option>
+                      {warehouses.map((w) => (
+                        <option key={w.warehouseId ?? w.code} value={w.name}>{w.name}</option>
+                      ))}
                     </select>
                   </div>
                 </div>

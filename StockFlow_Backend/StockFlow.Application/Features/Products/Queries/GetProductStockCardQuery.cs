@@ -109,7 +109,7 @@ public class GetProductStockCardQueryHandler : IRequestHandler<GetProductStockCa
             .ToDictionaryAsync(t => t.StockTransferId, ct);
         var transferPrices = await _context.DtlStockTransferItems.AsNoTracking()
             .Where(i => trIds.Contains(i.StockTransferId) && i.ProductId == request.ProductId)
-            .Select(i => new { i.StockTransferId, i.UnitCost })
+            .Select(i => new { i.StockTransferId, i.UnitCost, i.TransferPrice })
             .ToListAsync(ct);
 
         var stIds = IdsOf("STOCKTAKE");
@@ -206,7 +206,9 @@ public class GetProductStockCardQueryHandler : IRequestHandler<GetProductStockCa
                         code = tr.TransferCode ?? $"CK{refId:D6}";
                         partner = t.WarehouseId == tr.SourceWarehouseId ? tr.DestName : tr.SourceName;
                     }
-                    price ??= transferPrices.FirstOrDefault(p => p.StockTransferId == refId)?.UnitCost;
+                    // Giá GD = giá chuyển trên phiếu (chưa nhập thì theo giá vốn lúc xuất)
+                    var trPrice = transferPrices.FirstOrDefault(p => p.StockTransferId == refId);
+                    price = trPrice?.TransferPrice ?? price ?? trPrice?.UnitCost;
                     break;
                 case "STOCKTAKE" when refId.HasValue:
                     code = stocktakes.TryGetValue(refId.Value, out var st) && st.StocktakeCode != null

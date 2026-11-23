@@ -143,6 +143,10 @@ public class CreatePosOrderCommandHandler : IRequestHandler<CreatePosOrderComman
         }
 
         // 2. Kiểm tra kho xuất hàng (INV-001 -> INV-004)
+        if (req.WarehouseId <= 0)
+        {
+            return Result<PosOrderResultDto>.Failure("Vui lòng chọn kho xuất hàng (chi nhánh làm việc).");
+        }
         var warehouse = await _context.MstWarehouses
             .FirstOrDefaultAsync(w => w.WarehouseId == req.WarehouseId, cancellationToken);
 

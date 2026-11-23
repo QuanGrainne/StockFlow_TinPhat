@@ -28,7 +28,7 @@ import { adminService } from '@/features/admin/services/adminService';
 import { usePathname, useRouter } from 'next/navigation';
 import { permissionService } from '@/features/admin/services/permissionService';
 import { SCREEN_PATH_MAP, canOpenScreen } from '@/lib/navigation/navbar';
-import { setActiveWarehouseGlobal, useAuthorizedWarehouses } from '@/lib/warehouse/useActiveWarehouse';
+import { getActiveWarehouse, setActiveWarehouseGlobal, useAuthorizedWarehouses } from '@/lib/warehouse/useActiveWarehouse';
 import { ROLE_SWITCHER_ENABLED } from '@/lib/auth/flags';
 import { BrandLogo } from '@/components/brand/BrandLogo';
 import { ChangePasswordModal } from '@/components/layout/ChangePasswordModal';
@@ -81,8 +81,10 @@ export const Header: React.FC<HeaderProps> = ({
     if (typeof window !== 'undefined') {
       const stored = tabSession.get('stockflow_selected_branch');
       if (stored && stored !== 'ALL') return stored;
+      // Chưa lưu: lấy tên kho làm việc (rỗng nếu chưa tải) → effect bên dưới tự chọn kho được phân quyền đầu tiên
+      return getActiveWarehouse().name;
     }
-    return 'Kho Tổng Gia Lâm';
+    return '';
   });
   const [branchDropdownOpen, setBranchDropdownOpen] = useState(false);
   const [branchSearch, setBranchSearch] = useState('');

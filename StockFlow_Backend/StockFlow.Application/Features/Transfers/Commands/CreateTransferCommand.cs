@@ -67,6 +67,10 @@ public class CreateTransferCommandHandler : IRequestHandler<CreateTransferComman
             {
                 return Result.Failure<TransferDetailDto>("Số lượng chuyển của các mặt hàng phải lớn hơn 0.");
             }
+            if (it.TransferPrice < 0)
+            {
+                return Result.Failure<TransferDetailDto>("Giá chuyển không được âm.");
+            }
         }
 
         // 2. Sinh mã phiếu chuyển
@@ -121,6 +125,8 @@ public class CreateTransferCommandHandler : IRequestHandler<CreateTransferComman
                 Quantity = it.Quantity,
                 IssuedQuantity = 0,
                 ReceivedQuantity = null,
+                // Giá chuyển chỉ để theo dõi giá trị luân chuyển, không ảnh hưởng giá vốn
+                TransferPrice = it.TransferPrice,
                 Notes = string.IsNullOrWhiteSpace(it.Notes) ? null : it.Notes.Trim(),
             }, cancellationToken);
         }

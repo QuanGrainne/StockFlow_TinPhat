@@ -299,7 +299,7 @@ export function OrderSettingsScreen({ onNavigate }: OrderSettingsScreenProps) {
                   </span>
                 </div>
                 <p className="text-xs text-slate-500 leading-relaxed">
-                  Cho phép phân công điều chuyển đơn hàng giữa các kho (ví dụ: chuyển giao hàng từ Kho Tổng Gia Lâm sang chi nhánh Hải Châu hoặc Cẩm Lệ).
+                  Cho phép phân công điều chuyển đơn hàng giữa các kho (ví dụ: giao hàng từ kho trung tâm sang một chi nhánh khác).
                 </p>
               </div>
               <label className="relative inline-flex items-center cursor-pointer shrink-0 mt-1">

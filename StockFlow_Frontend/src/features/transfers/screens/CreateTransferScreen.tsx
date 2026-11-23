@@ -120,7 +120,8 @@ export default function CreateTransferScreen() {
   // Form Header State
   const [transferCode, setTransferCode] = useState('');
   const [transferDateTime, setTransferDateTime] = useState(() => toLocalDatetimeInputString(new Date()));
-  const [sourceWarehouseId, setSourceWarehouseId] = useState<number>(3); // Default Gia Lâm
+  // Kho chuyển đi = kho làm việc (đồng bộ ở effect bên dưới); 0 = chưa tải xong danh sách kho, không gán cứng kho mặc định
+  const [sourceWarehouseId, setSourceWarehouseId] = useState<number>(0);
   const [destWarehouseId, setDestWarehouseId] = useState<number | ''>('');
   const [notes, setNotes] = useState('');
   const [status, setStatus] = useState<'DRAFT' | 'IN_TRANSIT'>('DRAFT');
@@ -607,6 +608,10 @@ export default function CreateTransferScreen() {
 
   // Execute Save Action
   const executeSave = async (submitStatus: 'DRAFT' | 'IN_TRANSIT') => {
+    if (!sourceWarehouseId) {
+      showToast('Chưa xác định chi nhánh chuyển đi. Vui lòng chọn chi nhánh làm việc.', 'error');
+      return;
+    }
     setIsSubmitting(true);
     try {
       const payload = {
@@ -887,7 +892,7 @@ export default function CreateTransferScreen() {
                   KHO LÀM VIỆC
                 </div>
                 <div className="font-bold text-[#15171a] truncate leading-tight">
-                  {activeWarehouse?.name || 'Kho Tổng Gia Lâm'}
+                  {activeWarehouse?.name || 'Chưa chọn kho'}
                 </div>
               </div>
               <ChevronDown

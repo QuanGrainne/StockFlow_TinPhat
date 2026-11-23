@@ -70,15 +70,6 @@ export interface PosPriceBook {
   scopeCustomerIds: number[];
 }
 
-export interface PosWarehouse {
-  warehouseId: number;
-  code: string;
-  name: string;
-  branchName?: string;
-  address?: string;
-  status: string;
-}
-
 export type PaymentMethod = 'CASH' | 'VIETQR' | 'DEBT';
 
 export interface PosOrderTab {

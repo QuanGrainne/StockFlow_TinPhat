@@ -820,6 +820,11 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("stock_transfer_id");
 
+                    b.Property<decimal?>("TransferPrice")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("transfer_price");
+
                     b.Property<decimal?>("UnitCost")
                         .HasPrecision(18, 4)
                         .HasColumnType("numeric(18,4)")

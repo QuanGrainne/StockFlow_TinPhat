@@ -122,7 +122,8 @@ public class GetTransfersQueryHandler : IRequestHandler<GetTransfersQuery, Resul
             {
                 var qty = item.Quantity ?? 0;
                 var rec = item.ReceivedQuantity ?? 0;
-                var price = item.UnitCost ?? item.Product?.MovingAverageCost ?? 0;
+                // Giá trị chuyển theo giá chuyển trên phiếu (chưa nhập thì theo giá vốn)
+                var price = item.TransferPrice ?? item.UnitCost ?? item.Product?.MovingAverageCost ?? 0;
 
                 totalQty += qty;
                 totalReceived += rec;
