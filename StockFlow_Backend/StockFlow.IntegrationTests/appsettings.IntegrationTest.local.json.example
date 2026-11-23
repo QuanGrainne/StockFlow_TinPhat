@@ -1,0 +1,8 @@
+{
+  "IntegrationTest": {
+    "_comment": "Sao chép thành appsettings.IntegrationTest.local.json (đã có trong .gitignore). Tài khoản cần quyền CREATEDB. Không ghi Database: test tự dùng database riêng bên dưới.",
+    "PostgresConnection": "Host=localhost;Port=5432;Username=postgres;Password=<mật khẩu PostgreSQL của máy bạn>",
+    "DatabaseName": "stockflow_integration_test",
+    "KeepDatabaseAfterRun": false
+  }
+}
