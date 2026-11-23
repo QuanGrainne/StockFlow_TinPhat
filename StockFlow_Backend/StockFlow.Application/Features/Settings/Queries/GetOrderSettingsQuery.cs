@@ -28,54 +28,26 @@ public class GetOrderSettingsQueryHandler : IRequestHandler<GetOrderSettingsQuer
 
         if (setting == null)
         {
-            setting = new MstOrderSetting
-            {
-                SettingId = 1,
-                EnableOrderPlacement = true,
-                AllowOrderWhenOutOfStock = true,
-                AllowSellingReservedStock = false,
-                AllowTransferringOrderBranch = true,
-                AllowNegativeStockSale = false,
-                EnablePrintQuotation = true,
-                ConfirmBeforeCompleteOrder = false,
-                EnableReturnTimeLimit = true,
-                ReturnTimeLimitDays = 30,
-                LockTransactionTime = true,
-                OrderCodeRule = "SEQUENTIAL",
-                OrderCodePrefix = "HD",
-                BookingCodePrefix = "DH",
-                ReturnCodePrefix = "TH",
-                TransferCodePrefix = "CK",
-                UpdatedAt = System.DateTime.UtcNow
-            };
+            // Chưa có dòng cài đặt: tạo với mặc định (cả 2 tuỳ chọn đều cho phép)
+            setting = new MstOrderSetting { SettingId = 1, UpdatedAt = System.DateTime.UtcNow };
             _context.MstOrderSettings.Add(setting);
             await _context.SaveChangesAsync(cancellationToken);
         }
 
-        var dto = new OrderSettingDto
-        {
-            SettingId = setting.SettingId,
-            EnableOrderPlacement = setting.EnableOrderPlacement,
-            AllowOrderWhenOutOfStock = setting.AllowOrderWhenOutOfStock,
-            AllowSellingReservedStock = setting.AllowSellingReservedStock,
-            AllowTransferringOrderBranch = setting.AllowTransferringOrderBranch,
-            AllowNegativeStockSale = setting.AllowNegativeStockSale,
-            EnablePrintQuotation = setting.EnablePrintQuotation,
-            ConfirmBeforeCompleteOrder = setting.ConfirmBeforeCompleteOrder,
-            EnableReturnTimeLimit = setting.EnableReturnTimeLimit,
-            ReturnTimeLimitDays = setting.ReturnTimeLimitDays,
-            LockTransactionTime = setting.LockTransactionTime,
-            OrderCodeRule = setting.OrderCodeRule ?? "SEQUENTIAL",
-            OrderCodePrefix = setting.OrderCodePrefix ?? "HD",
-            BookingCodePrefix = setting.BookingCodePrefix ?? "DH",
-            ReturnCodePrefix = setting.ReturnCodePrefix ?? "TH",
-            TransferCodePrefix = setting.TransferCodePrefix ?? "CK",
-            UpdatedAt = setting.UpdatedAt,
-            UpdatedBy = setting.UpdatedBy,
-            UpdatedByName = setting.UpdatedByUser?.FullName ?? setting.UpdatedByUser?.Username
-        };
-
-        return Result.Success(dto);
+        return Result.Success(OrderSettingMapper.ToDto(setting, setting.UpdatedByUser?.FullName ?? setting.UpdatedByUser?.Username));
     }
 }
 
+/// <summary>Chuyển entity cài đặt sang DTO (dùng chung cho xem và lưu).</summary>
+public static class OrderSettingMapper
+{
+    public static OrderSettingDto ToDto(MstOrderSetting setting, string? updatedByName) => new()
+    {
+        SettingId = setting.SettingId,
+        AllowNegativeStockSale = setting.AllowNegativeStockSale,
+        AllowNegativeStockTransfer = setting.AllowNegativeStockTransfer,
+        UpdatedAt = setting.UpdatedAt,
+        UpdatedBy = setting.UpdatedBy,
+        UpdatedByName = updatedByName,
+    };
+}

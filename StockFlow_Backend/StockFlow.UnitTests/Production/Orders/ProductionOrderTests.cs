@@ -222,8 +222,10 @@ public class ApproveProductionOrderTests
         return (db, h, orderId, itemId);
     }
 
-    private static ApproveProductionOrderRequest Req(int itemId, decimal accepted, decimal defect = 0, string? reason = null, int warehouseId = TestData.K001) =>
-        new(warehouseId, null, null, null, null, null, new List<ApproveProductionOrderLine> { new(itemId, accepted, defect, reason) });
+    private static ApproveProductionOrderRequest Req(int itemId, decimal accepted, decimal defect = 0, string? reason = null, int warehouseId = TestData.K001,
+        bool finishOrder = false, string? finishReason = null) =>
+        new(warehouseId, null, null, null, null, null, new List<ApproveProductionOrderLine> { new(itemId, accepted, defect, reason) },
+            FinishOrder: finishOrder, FinishReason: finishReason);
 
     [Fact(DisplayName = "ApproveProductionOrder/UTCID01 – K001, FG-01 đạt 10, lỗi 0: lệnh COMPLETED, FG-01 +10, PRODUCTION_RECEIPT")]
     [Trait("Function", Function)][Trait("UTCID", "ApproveProductionOrder/UTCID01")][Trait("Type", "N")]
@@ -237,17 +239,18 @@ public class ApproveProductionOrderTests
         Assert.Equal(10, Assert.Single(OrderSetup.Cards(db, "PRODUCTION_RECEIPT")).Quantity);
     }
 
-    [Fact(DisplayName = "ApproveProductionOrder/UTCID02 – đạt 9, lỗi 1, lý do \"Lỗi sơn\": COMPLETED, FG-01 +9, ghi nhận 1 lỗi")]
+    [Fact(DisplayName = "ApproveProductionOrder/UTCID02 – đạt 9, lỗi 1, lý do \"Lỗi sơn\": FG-01 +9, ghi nhận 1 lỗi, lệnh vẫn IN_PROGRESS")]
     [Trait("Function", Function)][Trait("UTCID", "ApproveProductionOrder/UTCID02")][Trait("Type", "N")]
-    public async Task UTCID02_ApproveWithDefect_CompletesOrder()
+    public async Task UTCID02_ApproveWithDefect_StaysInProgress()
     {
         var (db, h, orderId, itemId) = Arrange();
         var r = await h.Handle(new ApproveProductionOrderCommand(orderId, Req(itemId, 9, 1, "Lỗi sơn")), CancellationToken.None);
         Assert.True(r.IsSuccess, r.Error);
         Assert.Equal(9, TestData.StockOf(db, TestData.K001, ProductionData.Fg01));
         Assert.Equal(1, (await db.TrxProductionReports.AsNoTracking().SingleAsync()).DefectQty);
-        // Expected workbook: lệnh COMPLETED. Code chỉ hoàn thành khi SL ĐẠT đủ kế hoạch (9 < 10) → lệnh còn IN_PROGRESS (xem báo cáo)
-        Assert.Equal(ProductionOrderStatus.Completed, (await db.TrxProductionOrders.AsNoTracking().SingleAsync()).Status);
+        // Nhóm chốt 24/11/2026: lệnh chỉ Hoàn thành khi SL ĐẠT đủ kế hoạch (9 < 10) → vẫn IN_PROGRESS để nhập bù;
+        // không sản xuất bù thì tick "Kết thúc lệnh" (UTCID08).
+        Assert.Equal(ProductionOrderStatus.InProgress, (await db.TrxProductionOrders.AsNoTracking().SingleAsync()).Status);
     }
 
     [Fact(DisplayName = "ApproveProductionOrder/UTCID03 – đạt 11 (> kế hoạch 10), chưa xác nhận")]
@@ -292,6 +295,29 @@ public class ApproveProductionOrderTests
     {
         var r = new ApproveProductionOrderCommandValidator().Validate(new ApproveProductionOrderCommand(1, Req(1, 10, warehouseId: 0)));
         Assert.Contains("Vui lòng chọn kho nhận thành phẩm.", r.Errors.Select(e => e.ErrorMessage));
+    }
+
+    [Fact(DisplayName = "ApproveProductionOrder/UTCID08 – đạt 9, lỗi 1, tick Kết thúc lệnh, có lý do: lệnh COMPLETED, ghi lý do vào ghi chú")]
+    [Trait("Function", Function)][Trait("UTCID", "ApproveProductionOrder/UTCID08")][Trait("Type", "N")]
+    public async Task UTCID08_FinishOrderWithReason_CompletesOrder()
+    {
+        var (db, h, orderId, itemId) = Arrange();
+        var r = await h.Handle(new ApproveProductionOrderCommand(orderId,
+            Req(itemId, 9, 1, "Lỗi sơn", finishOrder: true, finishReason: "1 sản phẩm lỗi, không sản xuất bù")), CancellationToken.None);
+        Assert.True(r.IsSuccess, r.Error);
+        Assert.Equal(9, TestData.StockOf(db, TestData.K001, ProductionData.Fg01));
+        var order = await db.TrxProductionOrders.AsNoTracking().SingleAsync();
+        Assert.Equal(ProductionOrderStatus.Completed, order.Status);
+        Assert.Contains("[Kết thúc lệnh", order.Notes);
+        Assert.Contains("1 sản phẩm lỗi, không sản xuất bù", order.Notes);
+    }
+
+    [Fact(DisplayName = "ApproveProductionOrder/UTCID09 – tick Kết thúc lệnh nhưng không nhập lý do (validator)")]
+    [Trait("Function", Function)][Trait("UTCID", "ApproveProductionOrder/UTCID09")][Trait("Type", "A")]
+    public void UTCID09_FinishOrderWithoutReason_ValidatorRejects()
+    {
+        var r = new ApproveProductionOrderCommandValidator().Validate(new ApproveProductionOrderCommand(1, Req(1, 9, 1, "Lỗi sơn", finishOrder: true)));
+        Assert.Contains("Vui lòng nhập lý do kết thúc lệnh.", r.Errors.Select(e => e.ErrorMessage));
     }
 }
 

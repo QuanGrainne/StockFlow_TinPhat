@@ -1,6 +1,5 @@
 using System;
 using System.Linq;
-using System.Security.Cryptography;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
@@ -22,39 +21,18 @@ public static class TransferHelper
     {
         var settings = await context.MstOrderSettings.FirstOrDefaultAsync(s => s.SettingId == 1, cancellationToken);
         string prefix = string.IsNullOrWhiteSpace(settings?.TransferCodePrefix) ? "CK" : settings.TransferCodePrefix.Trim();
-        string rule = settings?.OrderCodeRule?.ToUpperInvariant() ?? "SEQUENTIAL";
-
-        if (rule == "DATETIME")
+        // Mã phiếu chuyển luôn theo số thứ tự (bỏ quy tắc theo ngày giờ / ngẫu nhiên 24/11/2026)
+        // Bỏ qua các mã đã có (phiếu nhập mã tay / dữ liệu cũ không làm tăng sequence) để không trùng mã
+        for (var attempt = 0; attempt < 10000; attempt++)
         {
             long seq = await context.GetNextSequenceValueAsync("stockflow.seq_transfer_code", cancellationToken);
-            return $"{prefix}{DateTime.UtcNow:yyMMddHHmm}{(seq % 1000):D2}";
-        }
-        else if (rule == "RANDOM")
-        {
-            const string chars = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
-            byte[] randomBytes = new byte[7];
-            RandomNumberGenerator.Fill(randomBytes);
-            char[] charsArr = new char[7];
-            for (int i = 0; i < 7; i++)
+            var code = $"{prefix}{seq:D6}";
+            if (!await context.TrxStockTransfers.AnyAsync(t => t.TransferCode == code, cancellationToken))
             {
-                charsArr[i] = chars[randomBytes[i] % chars.Length];
+                return code;
             }
-            return $"{prefix}-{new string(charsArr)}";
         }
-        else
-        {
-            // Bỏ qua các mã đã có (phiếu nhập mã tay / dữ liệu cũ không làm tăng sequence) để không trùng mã
-            for (var attempt = 0; attempt < 10000; attempt++)
-            {
-                long seq = await context.GetNextSequenceValueAsync("stockflow.seq_transfer_code", cancellationToken);
-                var code = $"{prefix}{seq:D6}";
-                if (!await context.TrxStockTransfers.AnyAsync(t => t.TransferCode == code, cancellationToken))
-                {
-                    return code;
-                }
-            }
-            throw new InvalidOperationException("Không sinh được mã phiếu chuyển hàng mới.");
-        }
+        throw new InvalidOperationException("Không sinh được mã phiếu chuyển hàng mới.");
     }
 
     /// <summary>

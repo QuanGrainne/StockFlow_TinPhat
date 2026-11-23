@@ -143,6 +143,8 @@ export default function PurchaseOrderExpandedRow({ poId, colSpan, onClose, onCha
   const isCancelled = po.status === 'CANCELLED';
   const totalOrdered = po.items.reduce((s, i) => s + i.orderedQty, 0);
   const totalReceived = po.items.reduce((s, i) => s + i.receivedQty, 0);
+  // Đã có phiếu nhập hoàn thành → thành tiền / tổng tiền tính theo SL đã nhập (backend tính sẵn), chưa nhập thì theo SL đặt
+  const amountByReceived = po.receipts.some((r) => r.status === 'COMPLETED');
   const tabs = [
     { key: 'info' as const, label: 'Thông tin' },
     { key: 'receipts' as const, label: `Lịch sử nhập hàng (${po.receipts.length})` },
@@ -273,7 +275,9 @@ export default function PurchaseOrderExpandedRow({ poId, colSpan, onClose, onCha
                         <DiffCell item={it} />
                       </td>
                       <td className="py-2.5 px-3 text-right font-mono">{it.orderedQty > 0 ? fmt(it.unitPrice) : ''}</td>
-                      <td className="py-2.5 px-3 text-right font-mono font-semibold">{it.orderedQty > 0 ? fmt(it.lineTotal) : ''}</td>
+                      <td className="py-2.5 px-3 text-right font-mono font-semibold">
+                        {it.orderedQty > 0 || it.lineTotal > 0 ? fmt(it.lineTotal) : ''}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -292,7 +296,7 @@ export default function PurchaseOrderExpandedRow({ poId, colSpan, onClose, onCha
               />
               <dl className="space-y-2 md:col-span-5">
                 <div className="flex justify-between">
-                  <dt className="text-[#677484]">Tổng tiền hàng</dt>
+                  <dt className="text-[#677484]">Tổng tiền hàng{amountByReceived ? ' (theo SL đã nhập)' : ''}</dt>
                   <dd className="font-mono">{fmt(po.totalGoodsAmount)}</dd>
                 </div>
                 <div className="flex justify-between">

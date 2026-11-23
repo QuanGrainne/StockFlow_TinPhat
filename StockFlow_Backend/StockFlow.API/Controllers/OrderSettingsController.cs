@@ -39,13 +39,14 @@ public class OrderSettingsController : ControllerBase
     }
 
     /// <summary>
-    /// Cập nhật cấu hình thiết lập đơn hàng và quy tắc giao dịch (Dành cho Quản trị viên).
+    /// Lưu cài đặt giao dịch (bán hàng vượt tồn kho, chuyển hàng khi âm kho).
+    /// Quyền theo chức năng "Cài đặt" (feat-settings) trong ma trận phân quyền, không gán cứng Admin.
     /// </summary>
     [HttpPut]
     [ProducesResponseType(typeof(OrderSettingDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    [RequirePermission("SALES_APPROVE")]
-    [RequireFeature("feat-invoices", "feat-pos")]
+    [RequirePermission("AUTH_UPDATE")]
+    [RequireFeature("feat-settings")]
     public async Task<IActionResult> UpdateSettings([FromBody] UpdateOrderSettingDto request)
     {
         var result = await _mediator.Send(new UpdateOrderSettingsCommand(request));

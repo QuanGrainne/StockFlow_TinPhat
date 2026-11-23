@@ -9,13 +9,17 @@ using Xunit;
 
 namespace StockFlow.UnitTests.Authorization;
 
-/// <summary>Report 5.1 – sheet UpdateSettings (TamDM): Admin sửa thiết lập đơn hàng (giới hạn đổi trả, quy tắc sinh mã, tiền tố). UTCID09 (403) – ApiPermissionTests.</summary>
+/// <summary>
+/// Report 5.1 – sheet UpdateSettings: lưu cài đặt giao dịch (cho phép bán hàng vượt tồn kho, cho phép chuyển hàng khi âm kho).
+/// Từ 24/11/2026 chỉ còn 2 tuỳ chọn; quyền lưu theo chức năng "Cài đặt" (feat-settings) kiểm ở controller, handler không gán cứng Admin.
+/// UTCID05 (403 thiếu quyền) – ApiPermissionTests.
+/// </summary>
 public class UpdateSettingsTests
 {
     private const string Function = "UpdateSettings";
 
-    private static UpdateOrderSettingDto Dto(string? rule = "datetime", int days = 30, string prefix = "HD") =>
-        new() { OrderCodeRule = rule!, ReturnTimeLimitDays = days, OrderCodePrefix = prefix };
+    private static UpdateOrderSettingDto Dto(bool sale, bool transfer) =>
+        new() { AllowNegativeStockSale = sale, AllowNegativeStockTransfer = transfer };
 
     private static async Task<(TestStockFlowDbContext Db, Result<OrderSettingDto> R)> Update(UpdateOrderSettingDto dto, bool withRecord = true,
         Mock<ICurrentUserService>? user = null)
@@ -27,73 +31,49 @@ public class UpdateSettingsTests
         return (db, r);
     }
 
-    private static async Task AssertRejected(UpdateOrderSettingDto dto, string message, Mock<ICurrentUserService>? user = null)
-    {
-        var (db, r) = await Update(dto, user: user);
-        Assert.False(r.IsSuccess);
-        Assert.Equal(message, r.Error);
-        Assert.Null((await db.MstOrderSettings.AsNoTracking().SingleAsync()).UpdatedBy);
-    }
-
-    [Fact(DisplayName = "UpdateSettings/UTCID01 – orderCodeRule \"datetime\", 30 ngày, tiền tố HD: DATETIME, updatedBy 1")]
+    [Fact(DisplayName = "UpdateSettings/UTCID01 – tắt bán vượt tồn kho và chuyển hàng âm kho: lưu false / false, updatedBy 1")]
     [Trait("Function", Function)][Trait("UTCID", "UpdateSettings/UTCID01")][Trait("Type", "N")]
-    public async Task UTCID01_Valid_Saved()
+    public async Task UTCID01_TurnOffBoth_Saved()
     {
-        var (db, r) = await Update(Dto());
+        var (db, r) = await Update(Dto(false, false));
         Assert.True(r.IsSuccess, r.Error);
-        Assert.Equal("DATETIME", r.Value!.OrderCodeRule);
+        Assert.False(r.Value!.AllowNegativeStockSale);
+        Assert.False(r.Value.AllowNegativeStockTransfer);
         Assert.Equal(AuthData.Admin, r.Value.UpdatedBy);
-        Assert.Equal("DATETIME", (await db.MstOrderSettings.AsNoTracking().SingleAsync()).OrderCodeRule);
+        var saved = await db.MstOrderSettings.AsNoTracking().SingleAsync();
+        Assert.False(saved.AllowNegativeStockSale);
+        Assert.False(saved.AllowNegativeStockTransfer);
     }
 
-    [Fact(DisplayName = "UpdateSettings/UTCID02 – chưa có dòng thiết lập: tạo mới")]
+    [Fact(DisplayName = "UpdateSettings/UTCID02 – chưa có dòng cài đặt: tạo mới")]
     [Trait("Function", Function)][Trait("UTCID", "UpdateSettings/UTCID02")][Trait("Type", "N")]
     public async Task UTCID02_NoRecord_Created()
     {
-        var (db, r) = await Update(Dto(), withRecord: false);
+        var (db, r) = await Update(Dto(true, false), withRecord: false);
         Assert.True(r.IsSuccess, r.Error);
         var saved = await db.MstOrderSettings.AsNoTracking().SingleAsync();
         Assert.Equal(1, saved.SettingId);
-        Assert.Equal("DATETIME", saved.OrderCodeRule);
+        Assert.True(saved.AllowNegativeStockSale);
+        Assert.False(saved.AllowNegativeStockTransfer);
     }
 
-    [Fact(DisplayName = "UpdateSettings/UTCID03 – orderCodeRule null, tiền tố \"   \": SEQUENTIAL, HD")]
-    [Trait("Function", Function)][Trait("UTCID", "UpdateSettings/UTCID03")][Trait("Type", "B")]
-    public async Task UTCID03_Defaults_Applied()
+    [Fact(DisplayName = "UpdateSettings/UTCID03 – bật lại cả hai (mặc định cho phép)")]
+    [Trait("Function", Function)][Trait("UTCID", "UpdateSettings/UTCID03")][Trait("Type", "N")]
+    public async Task UTCID03_TurnOnBoth_Saved()
     {
-        var (_, r) = await Update(Dto(rule: null, prefix: "   "));
+        var (_, r) = await Update(Dto(true, true));
         Assert.True(r.IsSuccess, r.Error);
-        Assert.Equal("SEQUENTIAL", r.Value!.OrderCodeRule);
-        Assert.Equal("HD", r.Value.OrderCodePrefix);
+        Assert.True(r.Value!.AllowNegativeStockSale);
+        Assert.True(r.Value.AllowNegativeStockTransfer);
     }
 
-    [Fact(DisplayName = "UpdateSettings/UTCID04 – returnTimeLimitDays = 0")]
-    [Trait("Function", Function)][Trait("UTCID", "UpdateSettings/UTCID04")][Trait("Type", "B")]
-    public async Task UTCID04_ZeroDays_Saved()
+    [Fact(DisplayName = "UpdateSettings/UTCID04 – Manager (không phải Admin) lưu được: quyền theo chức năng Cài đặt, không gán cứng Admin")]
+    [Trait("Function", Function)][Trait("UTCID", "UpdateSettings/UTCID04")][Trait("Type", "N")]
+    public async Task UTCID04_Manager_Saved()
     {
-        var (_, r) = await Update(Dto(days: 0));
+        var (_, r) = await Update(Dto(false, true), user: CurrentUser.WithWarehouses(AuthData.Manager, TestData.K001));
         Assert.True(r.IsSuccess, r.Error);
-        Assert.Equal(0, r.Value!.ReturnTimeLimitDays);
+        Assert.False(r.Value!.AllowNegativeStockSale);
+        Assert.Equal(AuthData.Manager, r.Value.UpdatedBy);
     }
-
-    [Fact(DisplayName = "UpdateSettings/UTCID05 – returnTimeLimitDays = −1")]
-    [Trait("Function", Function)][Trait("UTCID", "UpdateSettings/UTCID05")][Trait("Type", "A")]
-    public Task UTCID05_NegativeDays_ReturnsError() =>
-        AssertRejected(Dto(days: -1), "Số ngày giới hạn đổi trả phải lớn hơn hoặc bằng 0.");
-
-    [Fact(DisplayName = "UpdateSettings/UTCID06 – orderCodeRule \"INVALID\"")]
-    [Trait("Function", Function)][Trait("UTCID", "UpdateSettings/UTCID06")][Trait("Type", "A")]
-    public Task UTCID06_InvalidRule_ReturnsError() =>
-        AssertRejected(Dto(rule: "INVALID"), "Quy tắc sinh mã không hợp lệ: INVALID. Chấp nhận: SEQUENTIAL, DATETIME, RANDOM.");
-
-    [Fact(DisplayName = "UpdateSettings/UTCID07 – tiền tố 11 ký tự")]
-    [Trait("Function", Function)][Trait("UTCID", "UpdateSettings/UTCID07")][Trait("Type", "A")]
-    public Task UTCID07_LongPrefix_ReturnsError() =>
-        AssertRejected(Dto(prefix: new string('H', 11)), "Tiền tố mã chứng từ không được vượt quá 10 ký tự.");
-
-    [Fact(DisplayName = "UpdateSettings/UTCID08 – Manager (có SALES_APPROVE, không phải Admin)")]
-    [Trait("Function", Function)][Trait("UTCID", "UpdateSettings/UTCID08")][Trait("Type", "A")]
-    public Task UTCID08_Manager_ReturnsError() =>
-        AssertRejected(Dto(), "Chỉ Quản trị viên (Admin) mới có quyền thay đổi thiết lập đơn hàng và quy tắc giao dịch.",
-            CurrentUser.WithWarehouses(AuthData.Manager, TestData.K001));
 }

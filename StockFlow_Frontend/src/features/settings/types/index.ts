@@ -1,40 +1,14 @@
-export type OrderCodeRule = 'SEQUENTIAL' | 'DATETIME' | 'RANDOM';
-
+/** Cài đặt giao dịch (GET/PUT /api/settings/orders): chỉ 2 tuỳ chọn, mặc định đều cho phép */
 export interface OrderSettings {
   settingId: number;
-
-  // Group A: Đặt hàng
-  enableOrderPlacement: boolean;
-  allowOrderWhenOutOfStock: boolean;
-  allowSellingReservedStock: boolean;
-  allowTransferringOrderBranch: boolean;
-
-  // Group B: Bán hàng & POS
+  /** Cho phép bán hàng vượt tồn kho (bán âm kho) */
   allowNegativeStockSale: boolean;
-  enablePrintQuotation: boolean;
-  confirmBeforeCompleteOrder: boolean;
-
-  // Group C: Trả hàng
-  enableReturnTimeLimit: boolean;
-  returnTimeLimitDays: number;
-
-  // Group D: Thời gian giao dịch
-  lockTransactionTime: boolean;
-
-  // Group E: Quy tắc sinh mã
-  orderCodeRule: OrderCodeRule;
-  orderCodePrefix: string;
-  bookingCodePrefix: string;
-  returnCodePrefix: string;
-  transferCodePrefix: string;
+  /** Cho phép xuất chuyển hàng khi tồn kho xuất không đủ (kho xuất âm) */
+  allowNegativeStockTransfer: boolean;
 
   updatedAt?: string;
   updatedBy?: number | null;
   updatedByName?: string | null;
 }
 
-export type UpdateOrderSettingsPayload = Omit<
-  OrderSettings,
-  'settingId' | 'updatedAt' | 'updatedBy' | 'updatedByName'
->;
-
+export type UpdateOrderSettingsPayload = Pick<OrderSettings, 'allowNegativeStockSale' | 'allowNegativeStockTransfer'>;

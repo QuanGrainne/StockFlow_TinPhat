@@ -83,14 +83,9 @@ public class CreatePosOrderCommandHandler : IRequestHandler<CreatePosOrderComman
             .FirstOrDefaultAsync(s => s.SettingId == 1, cancellationToken)
             ?? new MstOrderSetting();
 
-        // Kiểm tra Group A1: Bật/tắt tiếp nhận đơn đặt hàng mới (áp dụng cho đơn PENDING/đặt trước)
-        if (string.Equals(req.Status, "PENDING", StringComparison.OrdinalIgnoreCase) && !settings.EnableOrderPlacement)
-        {
-            return Result<PosOrderResultDto>.Failure("Hệ thống hiện đang tạm ngừng tiếp nhận đơn đặt hàng mới theo chính sách cài đặt (A1).");
-        }
-
+        // Luôn nhận đơn đặt hàng (bỏ tuỳ chọn "nhận đơn đặt hàng" 24/11/2026).
         // Thời gian bán người dùng chọn không được ở tương lai (kiểm tra trước khi sinh mã để không bỏ số hóa đơn)
-        if (!settings.LockTransactionTime && req.OrderDate.HasValue)
+        if (req.OrderDate.HasValue)
         {
             // DB lưu giờ Việt Nam (timestamp without time zone) — so sánh theo giờ Việt Nam
             var requested = VietnamTime.From(req.OrderDate);
@@ -315,26 +310,11 @@ public class CreatePosOrderCommandHandler : IRequestHandler<CreatePosOrderComman
             .GroupBy(i => i.ProductId)
             .ToDictionary(g => g.Key, g => g.Sum(x => x.Quantity));
 
-        // Group A2: Nếu là đơn đặt hàng (PENDING) mà không cho phép đặt khi hết hàng
-        if (isPendingBooking && !settings.AllowOrderWhenOutOfStock)
-        {
-            foreach (var (pId, requestedQty) in productQuantitySummary)
-            {
-                var prod = products[pId];
-                balanceMap.TryGetValue(pId, out var currentBalance);
-                decimal currentStock = currentBalance?.Quantity ?? 0;
-                if (currentStock <= 0)
-                {
-                    return Result<PosOrderResultDto>.Failure(
-                        $"Sản phẩm '{prod.ProductName}' (Mã: {prod.ProductCode}) hiện đã hết hàng tồn kho. Chính sách hệ thống không cho phép nhận đặt hàng khi hết tồn kho (A2).");
-                }
-            }
-        }
-
-        // Group A3: Tính toán lượng hàng đang tạm giữ cho các đơn đặt hàng khác
-        // (hàng khách đặt ở các đơn đặt hàng còn mở của chi nhánh, trừ chính đơn đang giao)
+        // Đơn đặt hàng luôn nhận kể cả khi hết hàng (bỏ tuỳ chọn A2).
+        // Hàng đang tạm giữ cho các đơn đặt hàng khác (hàng khách đặt ở các đơn còn mở của chi nhánh, trừ chính đơn đang giao):
+        // chỉ cần khi KHÔNG cho bán vượt tồn kho — lúc đó không được bán phần hàng khách đã đặt.
         Dictionary<int, decimal> reservedMap = new();
-        if (!settings.AllowSellingReservedStock && req.IssueStockNow && isCompleted)
+        if (!settings.AllowNegativeStockSale && req.IssueStockNow && isCompleted)
         {
             reservedMap = await SalesBookingOps.ReservedQtyAsync(_context, req.WarehouseId, productIds, booking?.OrderId, cancellationToken);
         }
@@ -359,11 +339,11 @@ public class CreatePosOrderCommandHandler : IRequestHandler<CreatePosOrderComman
                             $"Sản phẩm '{prod.ProductName}' (Mã: {prod.ProductCode}) không đủ tồn kho tại {warehouse.WarehouseName}. Tồn hiện tại: {currentStock:N0} {prod.BaseUnit?.UnitName ?? "Cái"}, Số lượng yêu cầu xuất: {requestedQty:N0}. Không thể xuất âm kho (B1, POS-014, INV-006).");
                     }
 
-                    // Không cho phép bán hàng đang tạm giữ cho đơn khác (A3 = false)
-                    if (!settings.AllowSellingReservedStock && availableStock < requestedQty)
+                    // Không bán phần hàng đang tạm giữ cho đơn đặt khác
+                    if (availableStock < requestedQty)
                     {
                         return Result<PosOrderResultDto>.Failure(
-                            $"Sản phẩm '{prod.ProductName}' (Mã: {prod.ProductCode}) có tồn kho {currentStock:N0} nhưng đang tạm giữ {reservedStock:N0} cho các đơn đặt hàng khác. Tồn khả dụng: {availableStock:N0}, Yêu cầu xuất: {requestedQty:N0}. Chính sách hệ thống không cho phép bán hàng đang tạm giữ (A3).");
+                            $"Sản phẩm '{prod.ProductName}' (Mã: {prod.ProductCode}) có tồn kho {currentStock:N0} nhưng đang tạm giữ {reservedStock:N0} cho các đơn đặt hàng khác. Tồn khả dụng: {availableStock:N0}, Yêu cầu xuất: {requestedQty:N0}. Cài đặt hiện không cho bán hàng vượt tồn kho.");
                     }
                 }
             }
@@ -460,9 +440,9 @@ public class CreatePosOrderCommandHandler : IRequestHandler<CreatePosOrderComman
         string docType = isPendingBooking ? "BOOKING" : "ORDER";
         string orderCode = await _codeGenerator.GenerateCodeAsync(docType, settings, cancellationToken);
 
-        // Group D1: Khóa ngày giao dịch theo cấu hình hệ thống
+        // Thời gian giao dịch: luôn cho chọn (bỏ tuỳ chọn khoá thời gian), không chọn thì lấy giờ hiện tại
         DateTime finalOrderDate;
-        if (settings.LockTransactionTime || !req.OrderDate.HasValue)
+        if (!req.OrderDate.HasValue)
         {
             finalOrderDate = VietnamTime.Now;
         }

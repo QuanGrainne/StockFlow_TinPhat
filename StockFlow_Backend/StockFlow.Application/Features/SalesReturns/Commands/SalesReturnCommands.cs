@@ -163,7 +163,8 @@ public class SalesReturnCommandHandler :
         var settings = await _context.MstOrderSettings.AsNoTracking().FirstOrDefaultAsync(s => s.SettingId == 1, ct) ?? new MstOrderSetting();
         var now = VietnamTime.Now;
         var returnDate = now;
-        if (!settings.LockTransactionTime && req.ReturnDate.HasValue)
+        // Thời gian trả hàng: luôn cho chọn (bỏ tuỳ chọn khoá thời gian), không ở tương lai, không trước lúc bán
+        if (req.ReturnDate.HasValue)
         {
             returnDate = VietnamTime.From(req.ReturnDate);
             if (returnDate > now.AddMinutes(1)) return Fail("Thời gian trả hàng không được ở tương lai.");

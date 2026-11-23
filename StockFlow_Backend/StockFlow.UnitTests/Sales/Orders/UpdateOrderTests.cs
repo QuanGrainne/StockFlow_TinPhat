@@ -103,9 +103,9 @@ public class UpdateOrderTests
         // Act
         var result = await handler.Handle(new UpdateOrderCommand("HD0001", new UpdateOrderDto { Notes = "x" }), CancellationToken.None);
 
-        // Assert – giữ nguyên Expected của workbook ("đơn đặt hàng"); code hiện trả "đơn hàng" (xem báo cáo)
+        // Assert – nhóm chốt 24/11/2026 giữ câu của code ("đơn hàng"): HD0001 là hóa đơn, không phải đơn đặt hàng
         Assert.False(result.IsSuccess);
-        Assert.Equal("Bạn không có quyền sửa đơn đặt hàng của chi nhánh này.", result.Error);
+        Assert.Equal("Bạn không có quyền sửa đơn hàng của chi nhánh này.", result.Error);
         Assert.Null((await db.TrxOrders.AsNoTracking().SingleAsync()).Notes);
     }
 

@@ -45,7 +45,7 @@ public class CloseProductionOrderCommandHandler : IRequestHandler<CloseProductio
         if (!order.CanClose()) return Result.Failure<ProductionOrderDetailDto>(ProductionMessages.StatusNotAllowed);
 
         var reason = command.Request.Reason!.Trim();
-        var closeNote = $"[Đóng lệnh {VietnamTime.Now:dd/MM/yyyy HH:mm}] {reason}";
+        var closeNote = $"[Kết thúc lệnh {VietnamTime.Now:dd/MM/yyyy HH:mm}] {reason}";
         var notes = string.IsNullOrWhiteSpace(order.Notes) ? closeNote : $"{order.Notes}\n{closeNote}";
         order.Notes = notes.Length > NotesMaxLength ? notes[^NotesMaxLength..] : notes;
         order.MarkCompleted();
