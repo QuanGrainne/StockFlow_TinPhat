@@ -38,15 +38,10 @@ export function CostScopeConfirmModal({
   permittedFacilities,
   executeSaveItem,
 }: CostScopeConfirmModalProps) {
-        const allFacilitiesList = permittedFacilities.length > 0
-          ? permittedFacilities
-          : (facilities.length > 0
-            ? facilities
-            : [
-                { code: 'K001', name: 'Kho Tổng Gia Lâm', address: 'Số 18 Đường Dệt May, Gia Lâm' },
-                { code: 'K002', name: 'Kho Đông Anh', address: 'CCN Nguyên Khê, Đông Anh' },
-                { code: 'K003', name: 'Kho Ninh Bình', address: 'KCN Gián Khẩu, Ninh Bình' },
-              ]);
+        // Danh sách kho thật từ DB: ưu tiên kho được phân quyền, không có thì toàn bộ kho đang hoạt động
+        const allFacilitiesList = permittedFacilities.length > 0 ? permittedFacilities : facilities;
+        // Kho mặc định khi chọn "Theo chi nhánh kho": kho trên form → kho làm việc → kho đầu tiên trong danh sách
+        const defaultBranch = formWarehouse || warehouseFilter || allFacilitiesList[0]?.name || '';
 
         const filteredFacilities = allFacilitiesList.filter(
           (fac) =>
@@ -121,7 +116,7 @@ export function CostScopeConfirmModal({
                     onClick={() => {
                       setCostScope('BRANCH');
                       if (costSelectedBranches.length === 0) {
-                        setCostSelectedBranches([formWarehouse || warehouseFilter || 'Kho Tổng Gia Lâm']);
+                        if (defaultBranch) setCostSelectedBranches([defaultBranch]);
                       }
                     }}
                     className={`p-4.5 rounded-2xl border-2 cursor-pointer transition flex flex-col justify-between gap-3 select-none ${
@@ -143,7 +138,7 @@ export function CostScopeConfirmModal({
                         onChange={() => {
                           setCostScope('BRANCH');
                           if (costSelectedBranches.length === 0) {
-                            setCostSelectedBranches([formWarehouse || warehouseFilter || 'Kho Tổng Gia Lâm']);
+                            if (defaultBranch) setCostSelectedBranches([defaultBranch]);
                           }
                         }}
                         className="w-4 h-4 text-blue-600 border-slate-300 focus:ring-blue-500 cursor-pointer mt-1"

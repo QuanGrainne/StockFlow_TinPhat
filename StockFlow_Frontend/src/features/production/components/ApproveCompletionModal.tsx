@@ -2,7 +2,8 @@
 
 // Duyệt hoàn thành lệnh sản xuất (Manager): nhập SL thực tế đạt / lỗi của từng thành phẩm,
 // hệ thống TỰ SINH phiếu nhập thành phẩm vào kho đã chọn. Nhập đủ kế hoạch thì lệnh chuyển Hoàn thành;
-// chưa đủ thì lệnh vẫn Đang sản xuất để duyệt nhập tiếp đợt sau (BR-38).
+// chưa đủ thì lệnh vẫn Đang sản xuất để duyệt nhập tiếp đợt sau (BR-38); tick "Kết thúc lệnh" (bắt buộc lý do)
+// để chuyển Hoàn thành luôn khi không sản xuất bù (vd có thành phẩm lỗi).
 // Vị trí lưu kho: chọn từ trường "Vị trí" của danh mục Hàng hóa, không bắt buộc.
 // Giữ luật của nhập thành phẩm: BR-35 vượt kế hoạch hỏi [Có]/[Không], BR-36 chỉ SL đạt vào tồn,
 // BR-37 cần nhiều NVL hơn số đã xuất → bắt buộc ghi chú (phiếu gắn cờ xem xét).
@@ -57,6 +58,9 @@ export function ApproveCompletionModal({ detail, onClose, onDone }: ApproveCompl
   const [exceedMsg, setExceedMsg] = useState<string | null>(null);
   const [needReviewNote, setNeedReviewNote] = useState(false);
   const [reviewNote, setReviewNote] = useState('');
+  /** Kết thúc lệnh dù chưa đủ kế hoạch: mặc định không tick (lệnh vẫn Đang sản xuất để nhập bù) */
+  const [finishOrder, setFinishOrder] = useState(false);
+  const [finishReason, setFinishReason] = useState('');
 
   // Mỗi thành phẩm của lệnh 1 dòng, mặc định SL đạt = phần còn lại theo kế hoạch, không vượt số làm được từ NVL đã xuất
   const [lines, setLines] = useState<LineDraft[]>(() => {
@@ -122,6 +126,9 @@ export function ApproveCompletionModal({ detail, onClose, onDone }: ApproveCompl
   );
 
   const totalProduced = parsed.reduce((sum, p) => sum + (p.acceptedBad ? 0 : p.accepted) + (p.defectBad ? 0 : p.defect), 0);
+  // Sau đợt duyệt này vẫn chưa đủ kế hoạch (tính theo SL đạt) → cho chọn "Kết thúc lệnh"
+  const stillShort = lines.some((l, i) => l.received + (parsed[i].acceptedBad ? 0 : parsed[i].accepted) < l.planned - 1e-9);
+  const finishing = stillShort && finishOrder;
 
   function updateLine(idx: number, patch: Partial<LineDraft>) {
     setLines((prev) => prev.map((l, i) => (i === idx ? { ...l, ...patch } : l)));
@@ -146,8 +153,12 @@ export function ApproveCompletionModal({ detail, onClose, onDone }: ApproveCompl
       message.error(`Vui lòng nhập lý do lỗi của thành phẩm ${lines[reasonIdx].productCode}.`);
       return false;
     }
-    if (totalProduced <= 0) {
-      message.error('Tổng số lượng thành phẩm (đạt + lỗi) phải lớn hơn 0.');
+    if (totalProduced <= 0 && !finishing) {
+      message.error('Tổng số lượng thành phẩm (đạt + lỗi) phải lớn hơn 0. Không sản xuất bù / tiếp thì tick "Kết thúc lệnh".');
+      return false;
+    }
+    if (finishing && !finishReason.trim()) {
+      message.error('Vui lòng nhập lý do kết thúc lệnh.');
       return false;
     }
     return true;
@@ -157,6 +168,13 @@ export function ApproveCompletionModal({ detail, onClose, onDone }: ApproveCompl
     if (!validate()) return;
     setBusy(true);
     try {
+      // Không nhập thêm thành phẩm, chỉ kết thúc lệnh (vd đã dùng hết NVL, không sản xuất bù hàng lỗi)
+      if (finishing && totalProduced <= 0) {
+        const closed = await productionService.closeOrder(s.productionOrderId, finishReason.trim());
+        message.success(`Đã kết thúc lệnh ${s.code} (không sản xuất bù / tiếp).`);
+        onDone(closed);
+        return;
+      }
       const result = await productionService.approveOrder(s.productionOrderId, {
         warehouseId,
         locationId: null,
@@ -166,6 +184,8 @@ export function ApproveCompletionModal({ detail, onClose, onDone }: ApproveCompl
         notes: notes.trim() || null,
         reviewNote: note,
         confirmExceedPlan: confirmExceed,
+        finishOrder: finishing,
+        finishReason: finishing ? finishReason.trim() : null,
         lines: lines.map((l, i) => ({
           productionOrderItemId: l.productionOrderItemId,
           acceptedQuantity: parsed[i].accepted,
@@ -175,7 +195,9 @@ export function ApproveCompletionModal({ detail, onClose, onDone }: ApproveCompl
       });
       message.success(
         result.summary.status === 'COMPLETED'
-          ? `Đã duyệt hoàn thành lệnh ${s.code} và tự sinh phiếu nhập thành phẩm.`
+          ? finishing
+            ? `Đã nhập thành phẩm và kết thúc lệnh ${s.code} (chưa đủ kế hoạch, không sản xuất bù).`
+            : `Đã duyệt hoàn thành lệnh ${s.code} và tự sinh phiếu nhập thành phẩm.`
           : `Đã nhập thành phẩm cho lệnh ${s.code}. Chưa đủ kế hoạch nên lệnh vẫn Đang sản xuất, có thể duyệt nhập tiếp.`
       );
       onDone(result);
@@ -216,7 +238,7 @@ export function ApproveCompletionModal({ detail, onClose, onDone }: ApproveCompl
           <p className="text-xs text-[#677484] leading-relaxed">
             Nhập số lượng <b>thực tế</b> sản xuất được. Hệ thống tự sinh phiếu nhập thành phẩm (chỉ SL đạt vào tồn kho, giữ nguyên giá vốn
             hiện có của thành phẩm). Nhập <b>đủ kế hoạch</b> thì lệnh chuyển sang <b>Hoàn thành</b>; chưa đủ thì lệnh vẫn <b>Đang sản xuất</b> để duyệt nhập tiếp
-            (muốn kết thúc sớm dùng &quot;Đóng lệnh&quot;). Chỉ duyệt được tối đa số thành phẩm làm được từ <b>NVL đã xuất</b> (cột
+            (không sản xuất bù thì tick &quot;Kết thúc lệnh&quot; bên dưới). Chỉ duyệt được tối đa số thành phẩm làm được từ <b>NVL đã xuất</b> (cột
             &quot;Tối đa duyệt&quot;, tính cả SL lỗi); muốn duyệt thêm thì Xuất bổ sung NVL trước.
           </p>
 
@@ -311,6 +333,39 @@ export function ApproveCompletionModal({ detail, onClose, onDone }: ApproveCompl
           )}
           {parsed.some((p) => p.exceeds) && (
             <p className="text-xs text-amber-700">Có thành phẩm nhập vượt số lượng kế hoạch — hệ thống sẽ hỏi xác nhận khi duyệt.</p>
+          )}
+
+          {/* Chưa đủ kế hoạch: mặc định lệnh vẫn Đang sản xuất để nhập bù; tick để kết thúc luôn (bắt buộc lý do) */}
+          {stillShort && (
+            <div className="rounded-[8px] border border-slate-200 bg-[#f7f8f9] p-3 space-y-2">
+              <label className="flex items-start gap-2 text-xs text-slate-700 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={finishOrder}
+                  onChange={(e) => setFinishOrder(e.target.checked)}
+                  className="w-4 h-4 mt-0.5 rounded border-slate-300 cursor-pointer"
+                />
+                <span>
+                  <b>Kết thúc lệnh</b> — không sản xuất bù / không sản xuất tiếp phần còn thiếu, lệnh chuyển <b>Hoàn thành</b>
+                  (SL bằng 0 thì chỉ kết thúc lệnh, không lập phiếu nhập). Không tick thì lệnh vẫn <b>Đang sản xuất</b> để duyệt nhập tiếp.
+                </span>
+              </label>
+              {finishOrder && (
+                <div>
+                  <label className={labelCls}>Lý do kết thúc lệnh *</label>
+                  <textarea
+                    value={finishReason}
+                    onChange={(e) => setFinishReason(e.target.value)}
+                    maxLength={300}
+                    rows={2}
+                    placeholder="Ví dụ: 1 sản phẩm lỗi, không sản xuất bù"
+                    className={`w-full px-2.5 py-1.5 text-[13px] border rounded-[6px] focus:outline-none ${
+                      finishReason.trim() ? 'border-slate-300 focus:border-[#0070f4]' : 'border-[#fb2c36]'
+                    }`}
+                  />
+                </div>
+              )}
+            </div>
           )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">

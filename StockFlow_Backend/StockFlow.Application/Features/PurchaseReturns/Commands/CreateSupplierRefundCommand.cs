@@ -57,7 +57,9 @@ public class CreateSupplierRefundHandler : IRequestHandler<CreateSupplierRefundC
         await using var transaction = await _context.BeginTransactionAsync(ct);
         try
         {
-            var code = $"PT{await _context.GetNextSequenceValueAsync("stockflow.seq_supplier_refund", ct):D6}";
+            // Dùng chung dãy số với phiếu thu khách để mã PT... không trùng (trước đây seq_supplier_refund → trùng mã)
+            var code = $"PT{await _context.GetNextSequenceValueAsync(
+                Suppliers.Commands.CreateSupplierRefundReceiptCommandHandler.VoucherSequence, ct):D6}";
             var method = string.IsNullOrWhiteSpace(command.Request.PaymentMethod)
                 ? "CASH"
                 : command.Request.PaymentMethod.Trim().ToUpperInvariant();

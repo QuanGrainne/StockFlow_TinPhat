@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using StockFlow.Application.Features.Customers.Commands;
 using StockFlow.Application.Features.Customers.DTOs;
+using StockFlow.Application.Common;
 using StockFlow.Application.Features.Customers.Queries;
 using StockFlow.API.Authorization;
 
@@ -192,6 +193,41 @@ public class CustomersController : ControllerBase
             return BadRequest(new { message = result.Error });
         }
         return Ok(result.Value);
+    }
+
+    /// <summary>
+    /// Phiếu chi trả tiền cho khách (PC000001...) khi cửa hàng đang nợ khách (Nợ cần thu &lt; 0), không qua phiếu trả hàng.
+    /// </summary>
+    [HttpPost("{id}/refunds")]
+    [ProducesResponseType(typeof(CustomerDebtRefundResultDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [RequirePermission("FIN_CREATE")]
+    [RequireFeature("feat-customers")]
+    public async Task<IActionResult> CreateCustomerDebtRefund(int id, [FromBody] CreateCustomerDebtRefundRequest request)
+    {
+        var result = await _mediator.Send(new CreateCustomerDebtRefundCommand(id, request));
+        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { message = result.Error });
+    }
+
+    /// <summary>Xem phiếu chi trả tiền khách theo mã (PC... độc lập hoặc TTTH... theo phiếu trả hàng)</summary>
+    [HttpGet("{id}/refunds/{code}")]
+    [ProducesResponseType(typeof(DebtVoucherDetailDto), StatusCodes.Status200OK)]
+    [RequirePermission("PARTNER_READ")]
+    [RequireFeature("feat-customers")]
+    public async Task<IActionResult> GetCustomerDebtRefund(int id, string code)
+    {
+        var result = await _mediator.Send(new GetCustomerDebtRefundQuery(id, code));
+        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { message = result.Error });
+    }
+
+    /// <summary>Hủy phiếu chi trả tiền khách độc lập PC... (Nợ cần thu trừ lại số tiền của phiếu)</summary>
+    [HttpPost("{id}/refunds/{code}/cancel")]
+    [RequirePermission("FIN_UPDATE")]
+    [RequireFeature("feat-customers")]
+    public async Task<IActionResult> CancelCustomerDebtRefund(int id, string code)
+    {
+        var result = await _mediator.Send(new CancelCustomerDebtRefundCommand(id, code));
+        return result.IsSuccess ? Ok(new { success = true }) : BadRequest(new { message = result.Error });
     }
 
     /// <summary>

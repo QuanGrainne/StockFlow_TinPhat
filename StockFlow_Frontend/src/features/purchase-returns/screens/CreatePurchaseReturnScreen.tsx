@@ -935,11 +935,19 @@ export default function CreatePurchaseReturnScreen() {
                 <span className="font-bold text-[#0070f4]">{formatVnd(supplierMustPay)}</span>
               </div>
 
-              {/* Tiền nhà cung cấp trả + hình thức */}
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <span>Tiền nhà cung cấp trả</span>
-                  <div className="mt-1.5 inline-flex rounded-[6px] border border-slate-300 overflow-hidden text-[12px]">
+              {/* Tiền nhà cung cấp trả + hình thức — hai hàng: [nhãn | ô tiền] rồi [Tiền mặt | Chuyển khoản]
+                  (để chung một hàng thì nút bị ô nhập đè khi khung hẹp, giống màn Nhập hàng) */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="shrink-0">Tiền nhà cung cấp trả</span>
+                  <NumberInput
+                    value={refundAmount}
+                    onChange={(v) => setRefundAmount(Math.min(Math.max(0, v), supplierMustPay))}
+                    className="w-44"
+                  />
+                </div>
+                <div className="flex justify-end">
+                  <div className="inline-flex rounded-[6px] border border-slate-300 overflow-hidden text-[12px]">
                     {([
                       ['CASH', 'Tiền mặt'],
                       ['BANK_TRANSFER', 'Chuyển khoản'],
@@ -957,11 +965,6 @@ export default function CreatePurchaseReturnScreen() {
                     ))}
                   </div>
                 </div>
-                <NumberInput
-                  value={refundAmount}
-                  onChange={(v) => setRefundAmount(Math.min(Math.max(0, v), supplierMustPay))}
-                  className="w-44"
-                />
               </div>
 
               {/* Tính vào công nợ: phần NCC chưa trả lại → trừ vào nợ phải trả NCC */}

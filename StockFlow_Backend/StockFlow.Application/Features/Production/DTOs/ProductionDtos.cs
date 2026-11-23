@@ -244,7 +244,14 @@ public record ApproveProductionOrderRequest(
     /// <summary>Đã xác nhận nhập vượt SL kế hoạch</summary>
     bool ConfirmExceedPlan = false,
     /// <summary>Vị trí lưu kho chọn từ trường "Vị trí" của danh mục Hàng hóa (không bắt buộc)</summary>
-    string? LocationName = null);
+    string? LocationName = null,
+    /// <summary>
+    /// Kết thúc lệnh sau khi duyệt dù chưa nhập đủ kế hoạch (không sản xuất bù, vd có thành phẩm lỗi).
+    /// Mặc định false: nhập chưa đủ thì lệnh vẫn Đang sản xuất. Bật thì bắt buộc FinishReason.
+    /// </summary>
+    bool FinishOrder = false,
+    /// <summary>Lý do kết thúc lệnh khi chưa đủ kế hoạch (bắt buộc khi FinishOrder = true)</summary>
+    string? FinishReason = null);
 
 public record AdjustMaterialNormLine(
     /// <summary>Dòng nhu cầu đang có; null = thêm NVL mới vào lệnh</summary>

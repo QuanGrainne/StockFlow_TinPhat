@@ -19,7 +19,14 @@ import {
   CreditLimitChange,
   CreditLimitHistoryItem,
 } from '../types';
-import type { DebtAdjustmentDetail, DebtAdjustPayload, DebtAdjustResult } from '@/components/debt/types';
+import type {
+  DebtAdjustmentDetail,
+  DebtAdjustPayload,
+  DebtAdjustResult,
+  DebtRefundPayload,
+  DebtRefundResult,
+  DebtVoucherDetail,
+} from '@/components/debt/types';
 
 interface BackendCustomerDto {
   id: string;
@@ -251,6 +258,25 @@ export const customerService = {
 
   async createCustomerPayment(partnerId: number, payload: CreateCustomerPaymentPayload): Promise<CustomerPaymentResult> {
     return apiClient.post<CustomerPaymentResult>(`/api/customers/${partnerId}/payments`, payload);
+  },
+
+  /** Phiếu chi trả tiền khách (PC000001...) khi cửa hàng đang nợ khách (nợ cần thu âm) */
+  async createDebtRefund(partnerId: number, payload: DebtRefundPayload): Promise<DebtRefundResult> {
+    const res = await apiClient.post<{ voucherCode: string; amount: number; remainingDebt: number }>(
+      `/api/customers/${partnerId}/refunds`,
+      { amount: payload.amount, refundDate: payload.date, paymentMethod: payload.paymentMethod, notes: payload.notes }
+    );
+    return { voucherCode: res.voucherCode, amount: res.amount, remainingDebt: res.remainingDebt };
+  },
+
+  /** Xem phiếu chi trả tiền khách theo mã (PC... / TTTH...) */
+  async getDebtRefund(partnerId: number, code: string): Promise<DebtVoucherDetail> {
+    return apiClient.get<DebtVoucherDetail>(`/api/customers/${partnerId}/refunds/${encodeURIComponent(code)}`);
+  },
+
+  /** Hủy phiếu chi trả tiền khách độc lập PC... */
+  async cancelDebtRefund(partnerId: number, code: string): Promise<void> {
+    await apiClient.post(`/api/customers/${partnerId}/refunds/${encodeURIComponent(code)}/cancel`, {});
   },
 
   async getCustomerById(id: number | string): Promise<CustomerDetail> {

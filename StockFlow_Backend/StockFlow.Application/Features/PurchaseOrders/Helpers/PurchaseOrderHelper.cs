@@ -48,6 +48,34 @@ public static class PurchaseOrderHelper
     public static decimal LineTotal(decimal qty, decimal unitPrice, decimal discountPercent) =>
         Math.Round(qty * unitPrice * (1 - Math.Clamp(discountPercent, 0, 100) / 100m), 0, MidpointRounding.AwayFromZero);
 
+    /// <summary>
+    /// Thành tiền 1 dòng phiếu đặt để hiển thị: đã có phiếu nhập hoàn thành → theo SL đã nhập (SL đạt) × đơn giá đặt
+    /// (nhập lệch so với SL đặt được chấp nhận, tiền theo thực nhập); chưa nhập gì → theo SL đặt.
+    /// </summary>
+    public static decimal ItemAmount(DtlPurchaseOrderItem item, decimal receivedQty, bool hasReceipts) =>
+        LineTotal(hasReceipts ? receivedQty : item.OrderedQty, item.UnitPrice, item.DiscountPercent);
+
+    /// <summary>Thành tiền hàng nhập ngoài phiếu đặt = SL đạt × đơn giá trên phiếu nhập (trừ chiết khấu dòng).</summary>
+    public static decimal ReceiptLineAmount(DtlGoodsReceiptItem line) =>
+        LineTotal(PurchaseStockOps.Quantity(line), line.UnitPrice ?? 0, line.DiscountPercent ?? 0);
+
+    /// <summary>
+    /// Tiền hàng / giảm giá / tổng cộng của phiếu đặt theo SL đã nhập (các dòng của phiếu nhập đã hoàn thành).
+    /// Chưa có phiếu nhập hoàn thành → bằng giá trị đặt như lúc lập phiếu. Giá trị lưu trong DB (total_amount) không đổi.
+    /// </summary>
+    public static (decimal Goods, decimal Discount, decimal Total) AmountsByReceived(
+        TrxPurchaseOrder po, IReadOnlyCollection<DtlGoodsReceiptItem> completedLines)
+    {
+        var hasReceipts = completedLines.Count > 0;
+        var received = completedLines.GroupBy(l => l.ProductId)
+            .ToDictionary(g => g.Key, g => g.Sum(PurchaseStockOps.Quantity));
+        var orderedIds = po.DtlPurchaseOrderItems.Select(i => i.ProductId).ToHashSet();
+        var goods = po.DtlPurchaseOrderItems.Sum(i => ItemAmount(i, received.GetValueOrDefault(i.ProductId), hasReceipts))
+            + completedLines.Where(l => !orderedIds.Contains(l.ProductId)).Sum(ReceiptLineAmount);
+        var discount = Math.Clamp(po.DiscountAmount, 0, goods);
+        return (goods, discount, goods - discount);
+    }
+
     /// <summary>Tổng phải trả NCC theo phiếu đặt = Σ thành tiền − giảm giá phiếu.</summary>
     public static (decimal Discount, decimal Total) ComputeTotal(List<PurchaseOrderItemRequest> items, decimal discount)
     {

@@ -86,6 +86,11 @@ public class CreatePurchaseCommandHandler : IRequestHandler<CreatePurchaseComman
         {
             return Result.Failure<PurchaseDetailDto>($"Không tìm thấy nhà cung cấp ID #{req.PartnerId}.");
         }
+        // Chỉ nhập hàng từ nhà cung cấp (SUPPLIER / BOTH), không nhận khách hàng (ISS-01)
+        if (!partner.IsSupplier())
+        {
+            return Result.Failure<PurchaseDetailDto>("Đối tác được chọn không phải nhà cung cấp.");
+        }
 
         // Nhập hàng theo phiếu đặt hàng nhập: phải đúng NCC, đúng kho và phiếu còn đang chờ nhập
         TrxPurchaseOrder? purchaseOrder = null;

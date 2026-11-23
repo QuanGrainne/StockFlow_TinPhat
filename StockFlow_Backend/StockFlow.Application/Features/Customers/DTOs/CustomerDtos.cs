@@ -78,7 +78,31 @@ public record CustomerPaymentResultDto(
     string VoucherCode,
     decimal Amount,
     decimal AllocatedAmount,
-    decimal RemainingDebt
+    decimal RemainingDebt,
+    // Phân bổ thực tế đã lưu (gồm phần chưa phân bổ đã tự trừ vào hóa đơn cũ nhất) — để in phiếu thu đúng số liệu
+    List<CustomerPaymentAllocationResultDto>? Allocations = null
+);
+
+/// <summary>Một phần của phiếu thu vừa tạo: mã phiếu, hóa đơn (null = phần không gắn hóa đơn), số tiền.</summary>
+public record CustomerPaymentAllocationResultDto(
+    string VoucherCode,
+    int? OrderId,
+    string? OrderCode,
+    decimal Amount
+);
+
+/// <summary>Phiếu chi trả tiền cho khách khi cửa hàng đang nợ khách (Nợ cần thu &lt; 0).</summary>
+public record CreateCustomerDebtRefundRequest(
+    decimal Amount,
+    DateTime? RefundDate,
+    string? PaymentMethod,
+    string? Notes
+);
+
+public record CustomerDebtRefundResultDto(
+    string VoucherCode,
+    decimal Amount,
+    decimal RemainingDebt // Nợ cần thu sau phiếu chi (âm = cửa hàng vẫn còn nợ khách)
 );
 
 /// <summary>

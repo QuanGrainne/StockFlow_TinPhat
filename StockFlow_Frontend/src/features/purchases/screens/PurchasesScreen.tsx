@@ -1366,15 +1366,22 @@ export default function PurchasesScreen({ onNavigate }: { onNavigate?: (screen: 
                                             <span>Trả hàng nhập</span>
                                           </button>
                                         )}
-                                        {/* Chỉ hiện khi còn hàng lỗi chưa trả NCC */}
+                                        {/* Hiện khi phiếu có hàng lỗi; đã trả hết hàng lỗi cho NCC thì bấm chỉ báo, không mở màn trả */}
                                         {!isDraft &&
                                           !isCanceled &&
-                                          (detail?.items ?? []).some(
-                                            (it) => (it.defectQuantity ?? 0) - (it.defectReturnedQty ?? 0) > 0
-                                          ) && (
+                                          (detail?.items ?? []).some((it) => (it.defectQuantity ?? 0) > 0) && (
                                           <button
                                             type="button"
-                                            onClick={() => router.push(`/purchase-returns/create?grId=${record.grId}&type=defect`)}
+                                            onClick={() => {
+                                              const remaining = (detail?.items ?? []).some(
+                                                (it) => (it.defectQuantity ?? 0) - (it.defectReturnedQty ?? 0) > 0
+                                              );
+                                              if (!remaining) {
+                                                message.info(`Phiếu nhập ${record.grCode} đã trả hết hàng lỗi cho nhà cung cấp.`);
+                                                return;
+                                              }
+                                              router.push(`/purchase-returns/create?grId=${record.grId}&type=defect`);
+                                            }}
                                             className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-[#fb2c36] hover:bg-[#fef2f2] rounded-[8px] transition cursor-pointer border border-[#fecaca] bg-white font-medium"
                                             title="Lập phiếu trả hàng lỗi cho NCC (không trừ tồn kho, không tính tiền)"
                                           >

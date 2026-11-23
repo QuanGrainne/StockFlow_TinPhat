@@ -26,6 +26,12 @@ public partial class DtlStockTransferItem
     /// <summary>Giá vốn kho xuất tại thời điểm xuất chuyển (giá trị chuyển / giá nhập vào kho nhận)</summary>
     public decimal? UnitCost { get; set; }
 
+    /// <summary>
+    /// Giá chuyển người dùng nhập trên phiếu: chỉ để theo dõi giá trị luân chuyển nội bộ / đối chiếu chứng từ,
+    /// KHÔNG dùng để tính tồn kho hay giá vốn (giá vốn kho nhận vẫn theo UnitCost). Null = chưa nhập → hiển thị theo UnitCost.
+    /// </summary>
+    public decimal? TransferPrice { get; set; }
+
     /// <summary>Ghi chú dòng hàng của chi nhánh chuyển</summary>
     public string? Notes { get; set; }
 

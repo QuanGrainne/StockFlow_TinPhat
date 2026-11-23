@@ -172,11 +172,11 @@ export default function ProductionOrdersScreen() {
     setBusy(true);
     try {
       await productionService.closeOrder(d.summary.productionOrderId, reason);
-      message.success(`Lệnh sản xuất ${d.summary.code} đã hoàn thành.`);
+      message.success(`Đã kết thúc lệnh sản xuất ${d.summary.code} (chuyển Hoàn thành).`);
       setDialog(null);
       reload();
     } catch (err) {
-      message.error(errorText(err, 'Không đóng được lệnh sản xuất'));
+      message.error(errorText(err, 'Không kết thúc được lệnh sản xuất'));
     } finally {
       setBusy(false);
     }
@@ -399,14 +399,16 @@ export default function ProductionOrdersScreen() {
       )}
       {dialog?.kind === 'close' && (
         <ReasonDialog
-          title="Đóng lệnh sản xuất"
-          confirmText="Đóng lệnh"
+          title="Kết thúc lệnh sản xuất"
+          confirmText="Kết thúc lệnh"
           busy={busy}
+          placeholder="Ví dụ: 1 sản phẩm lỗi, không sản xuất bù / khách hủy phần còn lại"
           description={
             <span>
               Lệnh <b>{dialog.detail.summary.code}</b> đã nhập {fmtQty(dialog.detail.summary.receivedQuantity)}/
-              {fmtQty(dialog.detail.summary.plannedQuantity)} {dialog.detail.summary.unitName}. Đóng lệnh sẽ chuyển lệnh sang Hoàn
-              thành, không xuất NVL / nhập thành phẩm thêm được nữa.
+              {fmtQty(dialog.detail.summary.plannedQuantity)} {dialog.detail.summary.unitName}. Dùng khi{' '}
+              <b>không sản xuất bù</b> hàng lỗi hoặc <b>không sản xuất tiếp</b>: lệnh chuyển sang Hoàn thành, không xuất NVL / nhập
+              thành phẩm thêm được nữa. Lý do được ghi vào ghi chú lệnh.
             </span>
           }
           onCancel={() => setDialog(null)}

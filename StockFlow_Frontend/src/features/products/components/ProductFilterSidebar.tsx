@@ -2006,13 +2006,13 @@ export default function ProductFilterSidebar({
               </div>
             )}
 
-            {/* Toggle button: Thu gọn^ or Mở rộngv */}
+            {/* Nút thu gọn / mở rộng danh sách thuộc tính */}
             <button
               type="button"
               onClick={() => setExpandAttributes(!expandAttributes)}
               className="text-[13px] font-semibold text-slate-800 hover:text-blue-600 inline-block cursor-pointer pt-1 transition"
             >
-              {expandAttributes ? 'Thu gọn^' : 'Mở rộngv'}
+              {expandAttributes ? 'Thu gọn' : 'Mở rộng'}
             </button>
           </div>
         </div>

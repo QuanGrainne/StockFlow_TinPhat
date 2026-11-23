@@ -1,0 +1,581 @@
+﻿"Test Case ID","Test Name","Module","Requirement ID","Use Case ID","Test Type","Priority","Technique","API","Preconditions","Test Data","Test Steps","Expected Result","Actual Result","Status","Evidence","Note"
+"UT-COST-001","MAC khi kho chưa có hàng bằng đơn giá nhập (làm tròn 2 số)","Nhập hàng","BR-29","","Unit","Critical","Phân lớp tương đương, Giá trị biên","","","Tồn 0, MAC 0, nhập 10 × 123,456","1. Gọi CalculateMovingAverageCost(0, 0, 10, 123.456)","Trả 123,46","","Not Run","",""
+"UT-COST-002","MAC bình quân gia quyền khi đã có tồn","Nhập hàng","BR-29","","Unit","Critical","Phân lớp tương đương","","","Tồn 10 × 100, nhập 10 × 200","1. Gọi CalculateMovingAverageCost(10, 100, 10, 200)","Trả 150,00 = (10×100 + 10×200) / 20","","Not Run","",""
+"UT-COST-003","Nhập số lượng 0 không đổi MAC","Nhập hàng","BR-29","","Unit","High","Giá trị biên","","","Tồn 10 × 100, nhập 0 × 200","1. Gọi CalculateMovingAverageCost(10, 100, 0, 200)","Trả 100 (giữ nguyên)","","Not Run","",""
+"UT-COST-004","Tồn âm trước khi nhập: MAC lấy đơn giá nhập","Nhập hàng","BR-29","","Unit","High","Giá trị biên, Đoán lỗi","","","Tồn −5 × 100, nhập 10 × 200","1. Gọi CalculateMovingAverageCost(-5, 100, 10, 200)","Trả 200","","Not Run","","Tài liệu không quy định trường hợp tồn âm; mong đợi theo code (CostingPolicy). Cần nhóm xác nhận."
+"UT-COST-005","Làm tròn half-up 2 chữ số","Nhập hàng","BR-29","","Unit","Medium","Giá trị biên","","","Tồn 1 × 0,005, nhập 1 × 0,005","1. Gọi CalculateMovingAverageCost(1, 0.005, 1, 0.005)","Trả 0,01 (MidpointRounding.AwayFromZero)","","Not Run","",""
+"UT-PRD-001","Nhu cầu NVL = SL × định mức × (1 + hao hụt%)","Sản xuất","BR-31","","Unit","Critical","Phân lớp tương đương","","","SL 100, định mức 2,5, hao hụt 3,5%","1. Gọi CalculateRequirement(100, 2.5, 3.5)","Trả 258,75","","Not Run","",""
+"UT-PRD-002","Nhu cầu NVL với hao hụt 0%","Sản xuất","BR-31","","Unit","High","Giá trị biên","","","SL 100, định mức 2,5, hao hụt 0","1. Gọi CalculateRequirement(100, 2.5, 0)","Trả 250,00","","Not Run","",""
+"UT-PRD-003","Làm tròn nhu cầu half-up 2 chữ số ở bước cuối","Sản xuất","BR-31","","Unit","Medium","Giá trị biên","","","SL 3, định mức 0,3333, hao hụt 0","1. Gọi CalculateRequirement(3, 0.3333, 0)","Trả 1,00 (0,9999 làm tròn)","","Not Run","",""
+"UT-PRD-004","Nhu cầu vượt giới hạn lưu trữ bị từ chối","Sản xuất","BR-31","","Unit","High","Giá trị biên, Đoán lỗi","","","SL 10^16, định mức 10","1. Gọi TryCalculateRequirement(1e16, 10, 0, out r)","Trả false (vượt MaxStoredQuantity 9.999.999.999.999.999,99)","","Not Run","",""
+"UT-PRD-005","Số còn thiếu = nhu cầu − đã xuất, tối thiểu 0","Sản xuất","BR-32","","Unit","High","Phân lớp tương đương, Giá trị biên","","","(10, 4) và (10, 12)","1. Gọi CalculateShortage(10, 4)
+2. Gọi CalculateShortage(10, 12)","Trả 6
+Trả 0","","Not Run","",""
+"UT-PRD-006","NVL cần cho số thành phẩm đã nhận","Sản xuất","BR-37","","Unit","High","Phân lớp tương đương","","","Nhu cầu 25 kg cho 50 lốc, đã nhận 30 lốc","1. Gọi MaterialNeededFor(25, 50, 30)","Trả 15","","Not Run","",""
+"UT-PRD-007","Số thành phẩm sản xuất được từ NVL đã xuất, làm tròn xuống","Sản xuất","BR-37","","Unit","High","Phân lớp tương đương, Giá trị biên","","","SL kế hoạch 50, nhu cầu 25, đã xuất 15; và nhu cầu 30, đã xuất 10","1. Gọi ProducibleFromIssued cho hai bộ dữ liệu","Trả 30
+Trả 16,66 (không làm tròn lên 16,67)","","Not Run","",""
+"UT-PRD-008","Định mức tính ngược từ tổng nhu cầu (4 chữ số)","Sản xuất","BR-31, BR-51","","Unit","Medium","Phân lớp tương đương","","","SL 100, nhu cầu 258,75, hao hụt 3,5%","1. Gọi CalculateNormFromRequirement(100, 258.75, 3.5)","Trả 2,5000","","Not Run","",""
+"UT-MRP-001","Bộ unit MrpPolicy có sẵn: MU-01..38 (công thức theo thời gian, phân bổ, gom kỳ, làm tròn mua)","MRP","BR-MRP-01..09, BR-MRP-10..17, BR-MRP-18..22, BR-MRP-23..29","UC-100, UC-101, UC-104","Unit","Critical","Phân lớp tương đương, Giá trị biên, Bảng quyết định","","","","1. dotnet run --project specs/mrp/unit-tests -c Release","38/38 đạt","","Not Run","","Có sẵn trong specs/mrp/unit-tests; lần chạy gần nhất 18/11/2026: 38/38. Phase 3 chuyển sang xUnit nếu Q1 được duyệt."
+"UT-PLN-001","Bộ unit kế hoạch sản xuất có sẵn (79 ca)","Kế hoạch sản xuất","BR-PP-01..08, BR-PP-09..15, BR-PP-16..21, BR-PP-22..24","UC-92, UC-93, UC-94, UC-95, UC-96","Unit","High","Phân lớp tương đương, Giá trị biên, Chuyển trạng thái","","","","1. dotnet run --project specs/production-planning-implementation/unit-tests -c Release","79/79 đạt","","Not Run","","Có sẵn; theo 04-testing-report.md lần chạy 15/11/2026: 79/79."
+"UT-STS-001","Phiếu chuyển kho DRAFT: được sửa, xuất, huỷ; chưa được nhận","Chuyển kho","BR-40","UC-37","Unit","Critical","Chuyển trạng thái","","TrxStockTransfer.Status = DRAFT","","1. Kiểm CanEdit, CanIssue, CanReceive, CanCancel
+2. Gọi MarkInTransit","CanEdit = CanIssue = CanCancel = true; CanReceive = false
+Status = IN_TRANSIT","","Not Run","",""
+"UT-STS-002","Phiếu chuyển kho IN_TRANSIT: được nhận, huỷ; không sửa, không xuất lại","Chuyển kho","BR-40","UC-37","Unit","Critical","Chuyển trạng thái","","Status = IN_TRANSIT","","1. Kiểm CanEdit, CanIssue, CanReceive, CanCancel
+2. Gọi MarkReceived","CanReceive = CanCancel = true; CanEdit = CanIssue = false
+Status = RECEIVED","","Not Run","",""
+"UT-STS-003","Phiếu chuyển kho RECEIVED không được huỷ","Chuyển kho","BR-40","UC-37","Unit","High","Chuyển trạng thái, Kiểm thử âm","","Status = RECEIVED","","1. Kiểm CanCancel","CanCancel = false (A37.2: chỉ huỷ phiếu Draft hoặc In Transit)","","Not Run","","Dự đoán Failed: code cho CanCancel = true khi RECEIVED (TrxStockTransfer.Status.cs). Nghi vấn N-08."
+"UT-STS-004","Phiếu huỷ hàng: DRAFT sửa được; COMPLETED chỉ sửa thông tin, huỷ được; CANCELLED không thao tác","Huỷ hàng","BR-44","UC-43","Unit","High","Chuyển trạng thái, Bảng quyết định","","","","1. Lần lượt đặt Status = DRAFT, COMPLETED, CANCELLED và kiểm CanEdit, CanEditInfo, CanCancel","DRAFT: cả ba true
+COMPLETED: CanEdit false, CanEditInfo true, CanCancel true
+CANCELLED: cả ba false","","Not Run","",""
+"UT-STS-005","Lệnh sản xuất: bảng trạng thái cho phép thao tác","Sản xuất","BR-38","UC-58","Unit","Critical","Chuyển trạng thái, Bảng quyết định","","","","1. Với NOT_STARTED, IN_PROGRESS, COMPLETED, CANCELLED kiểm CanCancel, CanClose, CanIssueMaterial, CanReceiveFinishedGoods, CanApproveCompletion, CanAdjustNorm","NOT_STARTED: huỷ, xuất NVL, điều chỉnh định mức
+IN_PROGRESS: đóng, xuất NVL, nhập TP, duyệt hoàn thành, điều chỉnh định mức
+COMPLETED / CANCELLED: không thao tác nào","","Not Run","",""
+"UT-STS-006","Kế hoạch sản xuất: bảng trạng thái cho phép thao tác","Kế hoạch sản xuất","BR-PP-09..15, BR-PP-22..24","UC-92","Unit","Critical","Chuyển trạng thái, Bảng quyết định","","","","1. Với DRAFT, PENDING_APPROVAL, APPROVED, REJECTED, CLOSED, CANCELLED kiểm CanEditAll, CanSubmit, CanApprove, CanReject, CanClose, CanCancel, CanCreateOrder","DRAFT / REJECTED: sửa toàn bộ, gửi duyệt, huỷ
+PENDING_APPROVAL: duyệt, từ chối, huỷ
+APPROVED: sửa giới hạn, đóng, huỷ, lập lệnh
+CLOSED / CANCELLED: không thao tác nào","","Not Run","",""
+"UT-STS-007","Yêu cầu tín dụng chỉ duyệt / từ chối khi PENDING","Tín dụng & công nợ KH","BR-13, BR-50","UC-64","Unit","High","Chuyển trạng thái","","","","1. Với PENDING, APPROVED, REJECTED kiểm CanApprove, CanReject
+2. Gọi MarkApproved(""ONE_TIME"", 0) và MarkApproved(""NEW_LIMIT"", 50.000.000)","Chỉ PENDING trả true
+Status = APPROVED, lưu loại duyệt và hạn mức được duyệt","","Not Run","",""
+"UT-VAL-001","RunMrpCommandValidator: biên ngày cuối kỳ","MRP","BR-MRP-30..33","UC-101","Unit","High","Giá trị biên","","","Hôm nay T: T−1, T, T+366, T+367","1. Validate từng giá trị PeriodEnd với 1 kho","T−1 lỗi MSG76
+T đạt
+T+366 đạt
+T+367 lỗi MSG76","","Not Run","",""
+"UT-VAL-002","RunMrpCommandValidator: số kho 0, 1, 20, 21","MRP","BR-MRP-30..33","UC-101","Unit","High","Giá trị biên","","","","1. Validate WarehouseIds với 0, 1, 20, 21 phần tử","0 và 21 lỗi MSG77
+1 và 20 đạt","","Not Run","",""
+"UT-VAL-003","Thời gian giao hàng của hàng hoá: biên 0 – 365","Danh mục","BR-MRP-30..33","UC-52","Unit","High","Giá trị biên","","","−1, 0, 365, 366, rỗng","1. Gọi kiểm tra ProductLeadTime với từng giá trị","−1 và 366 lỗi MSG80
+0, 365, rỗng đạt","","Not Run","",""
+"UT-VAL-004","Ngày giao dự kiến không trước ngày đặt","Đặt hàng nhập","BR-MRP-30..33","UC-30","Unit","High","Giá trị biên","","","Ngày đặt D: D−1, D, D+30, rỗng","1. Gọi PurchaseOrderHelper.ValidateExpectedDate","D−1 lỗi MSG81
+D, D+30, rỗng đạt","","Not Run","",""
+"UT-VAL-005","CreatePosOrderCommandValidator: dòng hàng, số lượng, tiền khách trả","Bán hàng POS","BR-14, BR-16","UC-23","Unit","High","Phân lớp tương đương, Kiểm thử âm","","","Không dòng hàng; SL 0; SL −1; tiền trả âm","1. Validate từng request","Mỗi request trả lỗi VALIDATION_FAILED (MSG01)","","Not Run","",""
+"UT-VAL-006","SaveSalesBookingCommandValidator: khách hàng, kho, dòng hàng","Đặt hàng (booking)","BR-08","UC-19","Unit","High","Phân lớp tương đương, Kiểm thử âm","","","Thiếu khách; thiếu kho; SL 0","1. Validate từng request","Lỗi MSG01 cho từng trường hợp (E18.2)","","Not Run","",""
+"UT-VAL-007","CreateStaffCommandValidator: chính sách mật khẩu","Tài khoản","BR-05","UC-07","Unit","High","Giá trị biên, Phân lớp tương đương","","","7 ký tự đủ loại; 8 ký tự thiếu ký tự đặc biệt; 8 ký tự đủ loại (Aa1@aaaa)","1. Validate từng mật khẩu","Hai mật khẩu đầu lỗi
+Mật khẩu thứ ba đạt","","Not Run","","Cần đọc validator để xác nhận chính sách BR-05 đã được kiểm ở backend."
+"UT-VAL-008","ChangePasswordCommandValidator: mật khẩu mới trùng mật khẩu cũ, không khớp xác nhận","Xác thực","BR-05","UC-03","Unit","High","Kiểm thử âm","","","","1. Validate mật khẩu mới = mật khẩu cũ
+2. Validate xác nhận khác mật khẩu mới","Lỗi MSG07 cho cả hai","","Not Run","",""
+"UT-VAL-009","RejectCreditRequestCommandValidator: từ chối phải có lý do","Tín dụng & công nợ KH","BR-50","UC-64","Unit","High","Phân lớp tương đương, Kiểm thử âm","","","Lý do rỗng, khoảng trắng, có nội dung","1. Validate","Rỗng và khoảng trắng lỗi MSG40
+Có nội dung đạt","","Not Run","",""
+"UT-VAL-010","CreateDisposalCommandValidator: số lượng, lý do khi hoàn thành","Huỷ hàng","BR-44","UC-43","Unit","High","Phân lớp tương đương, Bảng quyết định","","","SL 0; hoàn thành không lý do; lưu tạm không lý do","1. Validate từng request","SL 0 lỗi
+Hoàn thành không lý do lỗi MSG40
+Lưu tạm không lý do đạt","","Not Run","",""
+"UT-VAL-011","AdjustMaterialNormCommandValidator: lý do bắt buộc, nhu cầu mới không thấp hơn đã xuất","Sản xuất","BR-51, BR-52","UC-59","Unit","High","Kiểm thử âm, Giá trị biên","","","","1. Validate điều chỉnh không lý do
+2. Validate nhu cầu mới < đã xuất","Cả hai bị từ chối","","Not Run","",""
+"UT-VAL-012","Validator điều chỉnh công nợ: giá trị mới bằng hiện tại, thời gian tương lai, mô tả > 500 ký tự","Tài chính & báo cáo","","UC-98","Unit","High","Giá trị biên, Kiểm thử âm","","","","1. Validate AdjustCustomerDebtCommand và AdjustSupplierDebtCommand với từng trường hợp","Mỗi trường hợp lỗi MSG71 (E98.1)","","Not Run","",""
+"UT-VAL-013","CreatePriceBookCommandValidator: ngày hiệu lực bắt đầu sau ngày kết thúc","Bảng giá","","UC-91","Unit","Medium","Giá trị biên","","","","1. Validate bảng giá có From > To","Lỗi MSG68 (E91.1)","","Not Run","",""
+"UT-CODE-001","Định dạng mã chứng từ theo quy tắc SEQUENTIAL / DATETIME / RANDOM","Cài đặt","BR-06","UC-97","Unit","High","Phân lớp tương đương","","","Tiền tố HD, số thứ tự 7","1. Định dạng mã với từng quy tắc","SEQUENTIAL: HD + số có đệm 0
+DATETIME: HD + thời điểm
+RANDOM: HD + chuỗi ngẫu nhiên; độ dài đúng cấu hình","","Not Run","","Phần định dạng thuần nằm trong TransactionCodeGenerator (Infrastructure); sequence kiểm ở IT-SET-001."
+"IT-INV-001","Nhập kho hoàn thành: phiếu, dòng, tồn, thẻ kho, MAC, công nợ NCC","Nhập hàng","BR-23, BR-24, BR-25, BR-29, NFR-REL-02, FLOW-01","UC-31","Integration","Critical","Phân lớp tương đương","POST /api/purchases","Kho K001, NCC N1 (công nợ 0), hàng H1 tồn 10 × MAC 100.000, người dùng whstaff01 có quyền K001","Phiếu nhập Hoàn thành: H1 SL đạt 10, đơn giá 200.000, trả NCC 500.000","1. Gửi lệnh tạo phiếu nhập trạng thái Hoàn thành
+2. Đọc lại các bảng liên quan","trx_goods_receipts COMPLETED, created_by = whstaff01
+Tồn H1 tại K001 = 20; MAC = 150.000
+Thẻ kho thêm 1 dòng INBOUND_RECEIPT, reference GOODS_RECEIPT = id phiếu
+Công nợ N1 tăng 1.500.000 (2.000.000 − 500.000, BR-25)
+Σ quantity của trx_inventory_transactions (hàng, kho) = quantity trong trx_inventory_balances","","Not Run","",""
+"IT-INV-002","Hàng lỗi khi nhận không vào kho, không tính tiền","Nhập hàng","BR-24","UC-32","Integration","Critical","Phân lớp tương đương","POST /api/purchases","","H1 SL đạt 8, SL lỗi 2, đơn giá 200","1. Tạo phiếu nhập Hoàn thành","Tồn tăng 8
+Giá trị phiếu = 8 × 200
+Dòng phiếu ghi DefectiveQty = 2","","Not Run","",""
+"IT-INV-003","Lỗi giữa chừng không để lại dữ liệu dở dang (rollback)","Nhập hàng","NFR-REL-02, NFR-REL-03","UC-31","Integration","Critical","Đoán lỗi","POST /api/purchases","","Phiếu 2 dòng: dòng 1 hợp lệ, dòng 2 product_id không tồn tại","1. Gửi lệnh
+2. Đếm bản ghi phiếu, tồn, thẻ kho trước / sau","Lệnh thất bại với thông báo lỗi
+Không có phiếu nhập mới, tồn và thẻ kho không đổi, công nợ không đổi","","Not Run","",""
+"IT-INV-004","Hoàn thành phiếu nhập tạm","Nhập hàng","BR-23","UC-31","Integration","High","Chuyển trạng thái","POST /api/purchases; PATCH /api/purchases/{id}/complete","","","1. Tạo phiếu DRAFT
+2. Kiểm tồn không đổi
+3. Hoàn thành phiếu","DRAFT không đổi tồn
+Sau hoàn thành: như IT-INV-001","","Not Run","",""
+"IT-INV-005","Huỷ phiếu nhập đã hoàn thành đảo tồn và công nợ","Nhập hàng","BR-15, BR-25","UC-31","Integration","High","Chuyển trạng thái","PATCH /api/purchases/{id}/cancel","","","1. Huỷ phiếu đã hoàn thành","Tồn giảm lại đúng SL đạt
+Công nợ NCC giảm lại
+Thẻ kho có dòng đảo","","Not Run","","BR-15 ghi ""huỷ chứng từ thì đảo tác dụng""; nếu tồn hiện tại < SL cần trừ, hệ thống phải báo lỗi rõ."
+"IT-PO-001","Nhận hàng trên đơn đặt: đơn chuyển Nhập một phần rồi Hoàn thành","Đặt hàng nhập","BR-23","UC-30, UC-31","Integration","Critical","Chuyển trạng thái","POST /api/purchase-orders; POST /api/purchase-orders/{id:int}/receive","","Đơn đặt H1 × 100","1. Nhận 40
+2. Nhận 60","Sau lần 1: PARTIAL, đã nhận 40
+Sau lần 2: COMPLETED
+Mỗi lần tạo 1 phiếu nhập COMPLETED liên kết đơn","","Not Run","",""
+"IT-PO-002","Gộp đơn đặt cùng NCC giữ ngày giao dự kiến sớm nhất","Đặt hàng nhập","BR-22, BR-MRP-30..33","UC-30","Integration","High","Phân lớp tương đương","POST /api/purchase-orders/merge","","Đơn A giao D+10, đơn B giao D+5, cùng NCC","1. Gộp A và B","Đơn gộp có ngày giao D+5
+Đơn nguồn liên kết đơn gộp","","Not Run","",""
+"IT-PO-003","Không sửa / huỷ đơn đặt đã có phiếu nhập","Đặt hàng nhập","BR-22","UC-30","Integration","High","Chuyển trạng thái, Kiểm thử âm","PUT /api/purchase-orders/{id:int}; POST /api/purchase-orders/{id:int}/cancel","Đơn đã nhận 1 phần","","1. Sửa SL
+2. Huỷ đơn","Cả hai bị từ chối MSG17; dữ liệu không đổi","","Not Run","",""
+"IT-PR-001","Trả hàng NCC: tồn giảm, công nợ NCC giảm, không vượt SL đã nhận","Trả hàng NCC","BR-24, BR-25, FLOW-06","UC-33","Integration","Critical","Giá trị biên","POST /api/purchasereturns; POST /api/purchasereturns/{id:int}/refunds","","Phiếu nhập H1 × 10; trả 3, rồi trả 8","1. Trả 3
+2. Trả tiếp 8
+3. Ghi nhận NCC hoàn tiền","Lần 1: tồn −3, công nợ giảm 3 × giá vốn phiếu
+Lần 2 bị từ chối (vượt 7 còn lại)
+Hoàn tiền ghi phiếu tài chính","","Not Run","",""
+"IT-SAL-001","Hoàn tất hoá đơn POS: phiếu xuất, tồn, thẻ kho, thanh toán, công nợ","Bán hàng POS","BR-14, BR-15, BR-16, BR-45, FLOW-02","UC-23, UC-25, UC-35","Integration","Critical","Phân lớp tương đương","POST /api/orders/pos","K001: H1 tồn 10; khách KH1 nợ 0, hạn mức 10.000.000","H1 × 3, giá 100.000, trả 200.000 tiền mặt","1. Gửi hoá đơn
+2. Đọc lại đơn, phiếu xuất, tồn, thẻ kho, công nợ","trx_orders INVOICE COMPLETED, đã trả 200.000
+trx_stock_issues + dòng SL 3
+Tồn H1 = 7; thẻ kho ISSUE_SALE −3 tham chiếu STOCK_ISSUE
+Công nợ KH1 = 100.000
+Tổng tiền không cộng VAT (BR-45)
+Σ quantity của trx_inventory_transactions (hàng, kho) = quantity trong trx_inventory_balances","","Not Run","",""
+"IT-SAL-002","Không đủ tồn và không cho bán âm thì từ chối, không tạo dữ liệu","Bán hàng POS","BR-16","UC-35","Integration","Critical","Giá trị biên, Kiểm thử âm","POST /api/orders/pos","Cài đặt không cho bán âm; H1 tồn 2","H1 × 3","1. Gửi hoá đơn","Bị từ chối MSG28
+Không có đơn, phiếu xuất; tồn vẫn 2","","Not Run","",""
+"IT-SAL-003","Biên tồn: bán đúng bằng tồn khả dụng","Bán hàng POS","BR-16","UC-35","Integration","High","Giá trị biên","POST /api/orders/pos","","H1 tồn 3, bán 3","1. Gửi hoá đơn","Hoàn tất; tồn = 0","","Not Run","",""
+"IT-SAL-004","Cho bán âm trong cài đặt thì hoàn tất, tồn âm","Bán hàng POS","BR-16","UC-35, UC-97","Integration","High","Bảng quyết định","PUT /api/order-settings; POST /api/orders/pos","Bật cho bán âm; H1 tồn 2","H1 × 5","1. Gửi hoá đơn","Hoàn tất; tồn = −3; thẻ kho −5","","Not Run","",""
+"IT-SAL-005","Tồn khả dụng trừ số đã giữ cho đơn đặt khác","Bán hàng POS","BR-08, BR-16","UC-35","Integration","High","Bảng quyết định","POST /api/sales-bookings; POST /api/orders/pos","H1 tồn 10; đơn đặt của KH2 giữ 8; không cho bán âm","Hoá đơn lẻ H1 × 3","1. Gửi hoá đơn","Bị từ chối MSG28 (khả dụng 2)","","Not Run","",""
+"IT-SAL-006","Kiểm hạn mức tín dụng khi thanh toán (bảng quyết định)","Tín dụng & công nợ KH","BR-12","UC-23, UC-27","Integration","Critical","Bảng quyết định, Giá trị biên","POST /api/orders/pos","KH1 hạn mức 1.000.000, nợ 600.000","Bảng: (a) còn nợ mới 400.000 → nợ = hạn mức; (b) 400.001; (c) 500.000 có yêu cầu tín dụng được duyệt ONE_TIME; (d) 500.000 và cài đặt cho nợ vượt hạn mức","1. Gửi hoá đơn với từng tổ hợp","(a) hoàn tất
+(b) bị chặn, gợi ý gửi yêu cầu tín dụng
+(c) hoàn tất 1 lần, yêu cầu được dùng
+(d) hoàn tất","","Not Run","",""
+"IT-SAL-007","Giao một phần đơn đặt: DELIVERING giữ số còn lại; giao nốt: FINISHED","Đặt hàng (booking)","BR-17","UC-23, UC-36","Integration","Critical","Chuyển trạng thái","POST /api/sales-bookings; POST /api/orders/pos","","Đơn đặt H1 × 10; hoá đơn 1 giao 4; hoá đơn 2 giao 6","1. Xử lý đơn đặt thành hoá đơn 1
+2. Xử lý tiếp hoá đơn 2","Sau 1: đơn đặt DELIVERING, còn 6, giữ chỗ 6
+Sau 2: FINISHED, giữ chỗ 0","","Not Run","",""
+"IT-SAL-008","Không giao vượt số còn lại của đơn đặt","Đặt hàng (booking)","BR-17","UC-23","Integration","Critical","Giá trị biên, Kiểm thử âm","POST /api/orders/pos","","Đơn đặt còn 6; hoá đơn giao 7","1. Gửi hoá đơn từ đơn đặt","Bị từ chối, hoặc phần vượt không trừ vào đơn đặt theo quy định; đơn đặt không âm số còn lại","","Not Run","","Audit 13/11 ghi code chưa chặn; cần chạy để xác nhận."
+"IT-SAL-009","Huỷ hoá đơn đảo tồn, công nợ, thanh toán","Bán hàng POS","BR-15","UC-35","Integration","High","Chuyển trạng thái","POST /api/orders/{id:int}/cancel","","","1. Huỷ hoá đơn của IT-SAL-001","Tồn H1 về 10; công nợ KH1 về 0; thẻ kho có dòng đảo; đơn CANCELLED","","Not Run","",""
+"IT-SAL-010","Gửi lại cùng ClientRequestId không tạo hoá đơn thứ hai","Bán hàng POS","NFR-REL-03","UC-23","Integration","High","Đoán lỗi","POST /api/orders/pos","","Cùng request, ClientRequestId = R1, gửi tuần tự 2 lần","1. Gửi 2 lần","Chỉ 1 hoá đơn; lần 2 trả hoá đơn đã có hoặc MSG67","","Not Run","",""
+"IT-SAL-011","Bán thành phẩm có tồn ở nhiều lô","Bán hàng POS","BR-16, NFR-REL-01","UC-35","Integration","High","Đoán lỗi, Theo rủi ro","POST /api/orders/pos","Thành phẩm TP1 tại K001: lô L1 = 5, lô L2 = 5 (nhập từ 2 lệnh sản xuất)","Bán TP1 × 8","1. Gửi hoá đơn
+2. Đối chiếu tồn từng lô và thẻ kho","Hoàn tất (tổng tồn 10 ≥ 8)
+Tổng tồn TP1 = 2; tồn từng lô không âm
+Σ quantity của trx_inventory_transactions (hàng, kho) = quantity trong trx_inventory_balances","","Not Run","","Nghi vấn N-04: POS chỉ kiểm / trừ một dòng tồn mỗi hàng."
+"IT-TRF-001","Chuyển kho: xuất trừ kho nguồn, nhận cộng kho đích","Chuyển kho","BR-40, FLOW-04","UC-37","Integration","Critical","Chuyển trạng thái","POST /api/transfers; POST /api/transfers/{id}/complete; POST /api/transfers/{id}/receive","K001: H1 = 10; K002: H1 = 0","Chuyển H1 × 6 từ K001 sang K002","1. Tạo phiếu DRAFT
+2. Hoàn thành (xuất)
+3. Nhận đủ 6","DRAFT: không đổi tồn
+Xuất: K001 = 4, IN_TRANSIT
+Nhận: K002 = 6, RECEIVED
+Thẻ kho hai kho đều có dòng tham chiếu phiếu
+Σ quantity của trx_inventory_transactions (hàng, kho) = quantity trong trx_inventory_balances","","Not Run","",""
+"IT-TRF-002","Nhận thiếu phải có ghi chú","Chuyển kho","BR-41","UC-38","Integration","High","Giá trị biên, Bảng quyết định","POST /api/transfers/{id}/receive","","Xuất 6, nhận 5 không ghi chú; rồi nhận 5 có ghi chú","1. Nhận không ghi chú
+2. Nhận có ghi chú","Lần 1 bị từ chối MSG49
+Lần 2: K002 + 5, ghi nhận chênh lệch 1","","Not Run","",""
+"IT-TRF-003","Nhận nhiều hơn số đã xuất bị chặn","Chuyển kho","BR-40","UC-38","Integration","High","Giá trị biên, Kiểm thử âm","POST /api/transfers/{id}/receive","","Xuất 6, nhận 7","1. Nhận 7","Bị từ chối; tồn K002 không đổi","","Not Run","","Nghi vấn N-02 (ReceiveTransferCommand.cs:63, 99 không chặn)."
+"IT-TRF-004","Huỷ phiếu đang chuyển hoàn tồn kho nguồn","Chuyển kho","BR-40","UC-37","Integration","High","Chuyển trạng thái","POST /api/transfers/{id}/cancel","","","1. Huỷ phiếu IN_TRANSIT","K001 tăng lại 6; CANCELLED; thẻ kho có dòng đảo","","Not Run","",""
+"IT-TRF-005","Quyền kho: xuất cần kho nguồn, nhận cần kho đích","Chuyển kho","BR-04, FLOW-07","UC-37","Integration","High","Bảng quyết định","POST /api/transfers/{id}/complete; POST /api/transfers/{id}/receive","U1 chỉ có K001; U2 chỉ có K002","","1. U2 xuất phiếu K001 → K002
+2. U1 xuất
+3. U1 nhận
+4. U2 nhận","U2 xuất: MSG04
+U1 xuất: thành công
+U1 nhận: MSG04
+U2 nhận: thành công","","Not Run","",""
+"IT-STK-001","Hoàn thành kiểm kê điều chỉnh tồn bằng SL đếm","Kiểm kê","BR-43","UC-39, UC-40","Integration","Critical","Phân lớp tương đương","POST /api/stocktakes","","H1 hệ thống 10 đếm 8; H2 hệ thống 5 đếm 7","1. Tạo và hoàn thành phiếu kiểm kê","Tồn H1 = 8, H2 = 7
+Thẻ kho STOCKTAKE_OUT −2, STOCKTAKE_IN +2
+Phiếu BALANCED, lưu chênh lệch SL và giá trị từng dòng
+Σ quantity của trx_inventory_transactions (hàng, kho) = quantity trong trx_inventory_balances","","Not Run","",""
+"IT-STK-002","Kiểm kê đang Draft chặn xuất NVL, nhập TP, duyệt hoàn thành, huỷ hàng cùng hàng, cùng kho","Kiểm kê","BR-42","UC-39, UC-43, UC-46, UC-49","Integration","Critical","Bảng quyết định","POST /api/stocktakes; POST /api/production/material-issues; POST /api/production/finished-goods-receipts; POST /api/production/orders/{id:int}/approve; POST /api/disposals","Phiếu kiểm kê DRAFT tại K001 có H1, TP1","","1. Xuất NVL H1 tại K001
+2. Nhập TP1 tại K001
+3. Duyệt hoàn thành lệnh nhận TP1 tại K001
+4. Huỷ hàng H1 tại K001
+5. Xuất NVL H1 tại K002","Bốn thao tác đầu bị chặn MSG50
+Thao tác ở K002 thành công","","Not Run","",""
+"IT-STK-003","Huỷ phiếu kiểm kê đã cân bằng đảo điều chỉnh","Kiểm kê","BR-43","UC-39","Integration","High","Chuyển trạng thái","POST /api/stocktakes/{id:int}/cancel","","","1. Huỷ phiếu của IT-STK-001","Tồn H1 = 10, H2 = 5; thẻ kho có dòng đảo","","Not Run","",""
+"IT-STK-004","Gộp các phiếu kiểm kê nháp cùng kho","Kiểm kê","","UC-39","Integration","Medium","Phân lớp tương đương, Kiểm thử âm","POST /api/stocktakes/merge","","","1. Gộp 2 phiếu DRAFT cùng K001
+2. Gộp phiếu K001 với K002","Lần 1: 1 phiếu chứa dòng của cả hai
+Lần 2 bị từ chối","","Not Run","",""
+"IT-DSP-001","Hoàn thành huỷ hàng trừ tồn theo giá vốn","Huỷ hàng","BR-44","UC-43","Integration","Critical","Phân lớp tương đương","POST /api/disposals","","H1 tồn 10, MAC 100; huỷ 3, lý do ""hỏng""","1. Tạo và hoàn thành phiếu","Tồn = 7; giá trị phiếu 300; thẻ kho −3; COMPLETED","","Not Run","",""
+"IT-DSP-002","SL huỷ vượt tồn bị chặn","Huỷ hàng","BR-44","UC-43","Integration","High","Giá trị biên","POST /api/disposals","","Tồn 3, huỷ 4","1. Hoàn thành phiếu","Bị từ chối MSG54; tồn không đổi","","Not Run","",""
+"IT-DSP-003","Huỷ phiếu huỷ hàng đã hoàn thành hoàn lại tồn đúng lô","Huỷ hàng","BR-44","UC-43","Integration","High","Chuyển trạng thái","DELETE /api/disposals/{id:int}","","","1. Huỷ phiếu của IT-DSP-001","Tồn = 10 (đúng kho, vị trí, lô cũ); CANCELLED","","Not Run","",""
+"IT-RET-001","Trả hàng theo hoá đơn: tồn tăng, công nợ giảm theo giá trị trả − phí","Trả hàng bán","BR-19, BR-21, FLOW-05","UC-28, UC-41","Integration","Critical","Phân lớp tương đương","POST /api/sales-returns","Hoá đơn HĐ1: H1 × 5 × 100.000, khách còn nợ 500.000","Trả 2, phí trả 20.000","1. Tạo phiếu trả
+2. Đọc tồn, công nợ","Phiếu COMPLETED
+Tồn kho nhận +2
+Công nợ khách = 500.000 − (200.000 − 20.000)","","Not Run","",""
+"IT-RET-002","Trả nhiều lần không vượt SL đã bán − đã trả","Trả hàng bán","BR-19","UC-28","Integration","Critical","Giá trị biên","POST /api/sales-returns","","HĐ1 bán 5: trả 2, trả 3, trả 1","1. Gửi 3 phiếu trả","Hai lần đầu thành công
+Lần 3 bị từ chối MSG31","","Not Run","",""
+"IT-RET-003","Trả hàng nhanh không hoá đơn","Trả hàng bán","BR-19","UC-28","Integration","High","Phân lớp tương đương","POST /api/sales-returns","","","1. Tạo phiếu trả nhanh","Phiếu COMPLETED, tồn tăng, không giảm công nợ hoá đơn nào","","Not Run","",""
+"IT-RET-004","Hoàn tiền sau cho phiếu trả","Trả hàng bán","BR-21","UC-41, UC-82","Integration","High","Phân lớp tương đương","POST /api/sales-returns/{id:int}/refunds","","","1. Ghi hoàn tiền 180.000","Phiếu tài chính hoàn tiền; số đã hoàn của phiếu trả tăng","","Not Run","",""
+"IT-RET-005","Trả hàng sau thời hạn trả hàng trong cài đặt","Trả hàng bán","","UC-28, UC-97","Integration","Medium","Giá trị biên","POST /api/sales-returns","Cài đặt thời hạn trả 7 ngày; hoá đơn lập 8 ngày trước","","1. Tạo phiếu trả","Bị từ chối hoặc cảnh báo theo cài đặt","","Not Run","","Tài liệu có cài đặt ""return time limit"" (OrderSetting) nhưng chưa ghi rõ hành vi; cần xác nhận trước khi chạy."
+"IT-FIN-001","Phiếu thu phân bổ vào hoá đơn còn nợ cũ nhất trước","Tài chính & báo cáo","BR-15, BR-46","UC-84","Integration","Critical","Phân lớp tương đương","POST /api/customers/{id}/payments","KH1 nợ HĐ1 300.000 (cũ), HĐ2 500.000","Thu 400.000","1. Ghi phiếu thu","HĐ1 hết nợ, HĐ2 còn 400.000
+Công nợ KH1 = 400.000","","Not Run","",""
+"IT-FIN-002","Số tiền phiếu thu: 0, bằng dư nợ, vượt dư nợ","Tài chính & báo cáo","BR-46","UC-84","Integration","High","Giá trị biên","POST /api/customers/{id}/payments","","Dư nợ 800.000: thu 0; 800.000; 800.001","1. Ghi từng phiếu","0 bị từ chối MSG59
+800.000 thành công
+800.001 bị từ chối","","Not Run","",""
+"IT-FIN-003","Huỷ phiếu thu hoàn lại công nợ; sửa phiếu chỉ đổi thời gian, phương thức, ghi chú","Tài chính & báo cáo","BR-46","UC-84","Integration","High","Chuyển trạng thái, Kiểm thử âm","PUT /api/customers/{id}/receipts/{code}; POST /api/customers/{id}/receipts/{code}/cancel","","","1. Sửa ghi chú phiếu
+2. Thử sửa số tiền
+3. Huỷ phiếu","Sửa ghi chú thành công
+Số tiền không đổi được
+Huỷ: công nợ tăng lại đúng số tiền phiếu","","Not Run","",""
+"IT-FIN-004","Phiếu chi NCC giảm công nợ NCC","Tài chính & báo cáo","BR-25, BR-46","UC-85","Integration","High","Phân lớp tương đương","POST /api/suppliers/{id}/payments","","Công nợ N1 1.000.000, chi 600.000","1. Ghi phiếu chi","Công nợ N1 = 400.000; phiếu phân bổ vào phiếu nhập còn nợ","","Not Run","",""
+"IT-FIN-005","Điều chỉnh công nợ khách / NCC và huỷ điều chỉnh","Tài chính & báo cáo","BR-15, BR-25","UC-98","Integration","High","Phân lớp tương đương","POST /api/customers/{id}/debt-adjustments; POST /api/customers/{id}/debt-adjustments/{code}/cancel; POST /api/suppliers/{id}/debt-adjustments","","","1. Điều chỉnh nợ KH1 từ 400.000 thành 350.000
+2. Huỷ điều chỉnh
+3. Điều chỉnh công nợ N1","Nợ KH1 = 350.000
+Huỷ: về 400.000
+Công nợ N1 đổi đúng giá trị mới","","Not Run","",""
+"IT-CRD-001","Duyệt yêu cầu tín dụng: ngoại lệ một lần, hạn mức mới (có lịch sử)","Tín dụng & công nợ KH","BR-13, BR-50, NFR-SEC-07","UC-27, UC-64","Integration","Critical","Bảng quyết định","POST /api/credit-requests; POST /api/credit-requests/{id:int}/approve","","","1. Duyệt yêu cầu A loại ONE_TIME
+2. Duyệt yêu cầu B loại NEW_LIMIT 5.000.000","A: hoá đơn vượt hạn mức hoàn tất được 1 lần, lần sau bị chặn lại
+B: hạn mức khách = 5.000.000; trx_credit_limit_histories có dòng cũ / mới / lý do
+Cả hai ghi người duyệt, thời gian, ghi chú","","Not Run","",""
+"IT-CRD-002","Hai Manager duyệt cùng một yêu cầu đồng thời","Tín dụng & công nợ KH","BR-13","UC-64","Integration","High","Đồng thời","POST /api/credit-requests/{id:int}/approve","","","1. Gửi song song 2 lệnh duyệt / từ chối cùng yêu cầu","Chỉ 1 thành công; lệnh còn lại MSG57","","Not Run","",""
+"IT-PRO-001","Luồng sản xuất: kế hoạch → duyệt → lệnh → xuất NVL → nhập thành phẩm","Sản xuất","BR-30, BR-31, BR-32, BR-33, BR-36, BR-38, FLOW-03","UC-92, UC-95, UC-46, UC-49","Integration","Critical","Chuyển trạng thái","POST /api/production/plans; POST /api/production/plans/{id:int}/submit; POST /api/production/plans/{id:int}/approve; POST /api/production/plans/{id:int}/orders; POST /api/production/material-issues; POST /api/production/finished-goods-receipts","TP1 có BOM active: NVL1 2 kg/sp, hao hụt 5%; NVL1 tồn 300","Kế hoạch TP1 × 100; lập lệnh 100; xuất 210; nhận 98 đạt + 2 lỗi","1. Lập, gửi, duyệt kế hoạch
+2. Lập lệnh
+3. Xuất NVL
+4. Nhập thành phẩm","Nhu cầu NVL1 = 210
+Lệnh IN_PROGRESS sau xuất lần đầu; tồn NVL1 = 90; thẻ kho xuất NVL
+Tồn TP1 + 98 (lô mới); 2 lỗi không vào tồn bán được
+Lệnh lưu luỹ kế nhận","","Not Run","",""
+"IT-PRO-002","Xuất NVL vượt tồn bị chặn","Sản xuất","BR-33","UC-46","Integration","Critical","Giá trị biên","POST /api/production/material-issues","","NVL1 tồn 50, xuất 51","1. Xuất","Bị từ chối MSG28; tồn không đổi","","Not Run","",""
+"IT-PRO-003","Cấp bổ sung vượt nhu cầu phải có lý do","Sản xuất","BR-34","UC-47","Integration","High","Bảng quyết định","POST /api/production/material-issues","","Nhu cầu 210, đã xuất 210, cấp thêm 10 không lý do / có lý do","1. Cấp thêm không lý do
+2. Cấp thêm có lý do","Lần 1 bị từ chối
+Lần 2 thành công; luỹ kế 220; thiếu = 0","","Not Run","",""
+"IT-PRO-004","Nhập thành phẩm vượt SL kế hoạch cần xác nhận; NVL đã xuất không đủ thì cảnh báo, không chặn","Sản xuất","BR-35, BR-37","UC-49","Integration","High","Giá trị biên, Bảng quyết định","GET /api/production/finished-goods-receipts/check; POST /api/production/finished-goods-receipts","","","1. Kiểm nhập 105 khi kế hoạch 100
+2. Nhập khi NVL đã xuất chỉ đủ 90 sp","Hệ thống yêu cầu xác nhận trước khi lưu
+Hiện cảnh báo, bắt ghi chú, đánh dấu cho Manager; phiếu vẫn lưu","","Not Run","",""
+"IT-PRO-005","Không lập lệnh cho thành phẩm không có BOM active","Sản xuất","BR-30","UC-59","Integration","High","Kiểm thử âm","POST /api/production/plans/{id:int}/orders","","","1. Ngừng BOM của TP1 rồi lập lệnh","Bị từ chối MSG58","","Not Run","",""
+"IT-PRO-006","Điều chỉnh định mức không làm nhu cầu thấp hơn đã xuất; không bỏ NVL đã xuất","Sản xuất","BR-51, BR-52","UC-59","Integration","High","Giá trị biên, Kiểm thử âm","POST /api/production/orders/{id:int}/adjust-norms","","","1. Đặt nhu cầu mới < đã xuất
+2. Bỏ NVL đã xuất
+3. Điều chỉnh hợp lệ có lý do","Hai lệnh đầu bị từ chối
+Lệnh 3 thành công; BOM không đổi","","Not Run","",""
+"IT-PRO-007","Xuất NVL theo số thực tế khác nhu cầu","Sản xuất","BR-32, BR-33","UC-46, UC-48","Integration","High","Giá trị biên","POST /api/production/material-issues; GET /api/production/orders/{id:int}","","Nhu cầu NVL1 210; xuất thực tế 150, rồi 60","1. Xuất 150
+2. Xem chi tiết lệnh
+3. Xuất 60","Tồn trừ 150; đã xuất 150; thiếu 60
+Sau lần 2: đã xuất 210; thiếu 0
+Mỗi lần xuất tham chiếu mã lệnh","","Not Run","",""
+"IT-MRP-001","Lần chạy MRP ghi run, lines, demands trong một transaction","MRP","BR-MRP-30..33, NFR-REL-02","UC-101","Integration","High","Đoán lỗi","POST /api/production/mrp/runs","","","1. Chạy MRP hợp lệ
+2. Chạy MRP với SL làm tràn giới hạn lưu","Lần 1: 1 trx_mrp_runs + dòng lines + demands khớp material_count
+Lần 2 bị từ chối; không có bản ghi run mới","","Not Run","",""
+"IT-SEC-001","Cô lập kho trong handler cho mọi nghiệp vụ kho","Bảo mật & phân quyền","BR-04, NFR-SEC-01, FLOW-07","","Integration","Critical","Bảng quyết định","POST /api/purchases; POST /api/orders/pos; POST /api/transfers; POST /api/stocktakes; POST /api/disposals; POST /api/sales-returns; POST /api/production/material-issues; POST /api/production/finished-goods-receipts; POST /api/production/mrp/runs","U1 chỉ có quyền K001 (đủ quyền chức năng)","","1. Gửi từng nghiệp vụ với kho K002","Mỗi lệnh bị từ chối MSG04; không bản ghi nào được tạo","","Not Run","",""
+"IT-SEC-002","Đổi ma trận quyền có hiệu lực ngay ở request kế tiếp","Bảo mật & phân quyền","BR-02, NFR-SEC-02","UC-13","Integration","High","Chuyển trạng thái","PUT /api/roles/{roleCode}/permissions","","","1. Bỏ SALES_CREATE của vai trò SalesStaff
+2. sales01 gọi tạo hoá đơn bằng token cũ","403, không cần đăng nhập lại","","Not Run","",""
+"IT-SEC-003","Khoá tài khoản thì mất quyền ở request kế tiếp","Bảo mật & phân quyền","BR-05, NFR-SEC-04","UC-09","Integration","Critical","Chuyển trạng thái","PUT /api/staff/{id}/toggle-status","","","1. Admin khoá sales01
+2. sales01 gọi API bằng token còn hạn","401 / 403; frontend về trang đăng nhập","","Not Run","",""
+"IT-SEC-004","Mật khẩu lưu dạng băm có salt","Bảo mật & phân quyền","BR-05, NFR-SEC-03","","Integration","High","Đoán lỗi","POST /api/staff","","","1. Tạo nhân viên
+2. Đọc sec_users.password_hash","Chuỗi BCrypt ($2a$/$2b$), khác nhau cho hai tài khoản cùng mật khẩu","","Not Run","",""
+"IT-SET-001","Sinh mã chứng từ từ sequence không trùng khi chạy song song","Cài đặt","BR-06","UC-97","Integration","High","Đồng thời","POST /api/orders/pos","","","1. Gửi song song 20 hoá đơn hợp lệ","20 mã khác nhau, đúng tiền tố và quy tắc trong cài đặt","","Not Run","",""
+"IT-CONC-001","Hai người cùng bán sản phẩm cuối cùng","Bán hàng POS","BR-16, NFR-REL-01","UC-35","Integration","Critical","Đồng thời, Theo rủi ro","POST /api/orders/pos","Không cho bán âm; H1 tồn 1","","1. sales01 và manager01 gửi song song hoá đơn H1 × 1","Đúng 1 hoá đơn hoàn tất, request kia MSG28
+Tồn H1 = 0, không âm
+Σ quantity của trx_inventory_transactions (hàng, kho) = quantity trong trx_inventory_balances","","Not Run","","Nghi vấn N-03: không có khoá tồn kho."
+"IT-CONC-002","Bấm thanh toán hai lần đồng thời (cùng ClientRequestId)","Bán hàng POS","NFR-REL-03","UC-23","Integration","Critical","Đồng thời","POST /api/orders/pos","","","1. Gửi song song 2 request giống hệt, cùng ClientRequestId","Chỉ 1 hoá đơn, 1 phiếu xuất, 1 lần trừ tồn và cộng nợ","","Not Run","","Nghi vấn N-05: chống trùng bằng kiểm tra ghi chú rồi mới ghi, không có ràng buộc unique."
+"IT-CONC-003","Nhiều request nhập / xuất cùng hàng song song giữ tồn đúng","Tồn kho","NFR-REL-01, NFR-REL-02","","Integration","Critical","Đồng thời","POST /api/purchases; POST /api/orders/pos; POST /api/disposals","","H1 tồn 100; song song: 10 phiếu nhập × 5, 10 hoá đơn × 3, 5 phiếu huỷ × 1","1. Gửi đồng thời 25 request
+2. Đối chiếu tồn và thẻ kho","Tồn = 100 + 50 − 30 − 5 = 115
+Σ quantity của trx_inventory_transactions (hàng, kho) = quantity trong trx_inventory_balances","","Not Run","",""
+"IT-CONC-004","Hai request xuất (hoặc nhận) cùng một phiếu chuyển kho","Chuyển kho","BR-40","UC-37","Integration","High","Đồng thời","POST /api/transfers/{id}/complete; POST /api/transfers/{id}/receive","","","1. Gửi song song 2 lệnh xuất
+2. Gửi song song 2 lệnh nhận","Mỗi cặp chỉ 1 thành công; tồn chỉ trừ / cộng một lần","","Not Run","",""
+"IT-CONC-005","Hai phiếu thu đồng thời vượt dư nợ","Tài chính & báo cáo","BR-46","UC-84","Integration","High","Đồng thời","POST /api/customers/{id}/payments","","Dư nợ 500.000; hai phiếu 300.000 song song","1. Gửi song song","Không để công nợ âm; tổng thu không vượt 500.000","","Not Run","",""
+"IT-CONC-006","Hai người cùng sửa một đơn đặt","Đặt hàng (booking)","","UC-21","Integration","Medium","Đồng thời","PUT /api/sales-bookings/{id:int}","","","1. Gửi song song 2 bản sửa khác nhau","Đơn sau cùng nhất quán (đúng một bản), không trùng hoặc mất dòng hàng","","Not Run","","Tài liệu chưa quy định khoá lạc quan; ghi nhận hành vi thực tế."
+"API-SEC-001","Mọi endpoint (trừ login, health) trả 401 khi không có token","Bảo mật & phân quyền","BR-02, NFR-SEC-01","","API","Critical","Bảo mật, Bảng quyết định","*","","198 endpoint đọc từ 01b_API_INVENTORY.md","1. Gọi từng endpoint không kèm Authorization","401 kèm { message }; không lộ dữ liệu","","Not Run","",""
+"API-SEC-002","Token sai chữ ký, hết hạn, sai issuer bị từ chối","Bảo mật & phân quyền","BR-05, NFR-SEC-04","","API","Critical","Bảo mật, Kiểm thử âm","GET /api/auth/me; GET /api/orders","","Token sửa 1 ký tự; token hết hạn; token ký bằng khoá khác","1. Gọi API với từng token","401","","Not Run","",""
+"API-SEC-003","Ma trận quyền: vai trò thiếu quyền của endpoint nhận 403","Bảo mật & phân quyền","BR-02, BR-03, NFR-SEC-01","","API","Critical","Bảo mật, Bảng quyết định","*","","Mỗi endpoint có [RequirePermission] / [RequireAdmin] × 5 tài khoản seed (admin, manager01, sales01, whstaff01, prodstaff01) theo quyền mặc định","1. Sinh bảng mong đợi từ PermissionConstants.GetDefaultPermissionCodes
+2. Gọi từng cặp (endpoint, vai trò)","Vai trò có quyền: không 401 / 403
+Vai trò không có quyền: 403","","Not Run","",""
+"API-SEC-004","Tắt chức năng menu (feature) của vai trò thì API tương ứng trả 403","Bảo mật & phân quyền","BR-02, NFR-SEC-02","UC-13","API","High","Bảo mật","PUT /api/roles/feature-matrix; POST /api/orders/pos; POST /api/production/mrp/runs","","","1. Bỏ feat-pos của SalesStaff
+2. sales01 tạo hoá đơn POS
+3. Bỏ feat-production-mrp của Manager, manager01 chạy MRP","Cả hai 403","","Not Run","",""
+"API-SEC-005","Endpoint chỉ cần đăng nhập không lộ cấu hình và kho cho vai trò không liên quan","Bảo mật & phân quyền","NFR-SEC-01, NFR-SEC-05","UC-97","API","High","Bảo mật","GET /api/order-settings; GET /api/warehouses; GET /api/warehouses/{id}; GET /api/suppliers/warehouses; GET /api/warehousepermissions/facilities","","","1. prodstaff01 gọi từng endpoint","Chỉ nhận dữ liệu thuộc kho được gán; cấu hình chỉ Admin / Manager xem (UC-97)","","Not Run","","Nghi vấn N-09: 10 endpoint không khai [RequirePermission]."
+"API-SEC-006","IDOR: xem chứng từ của kho không được gán","Bảo mật & phân quyền","BR-04, NFR-SEC-01, FLOW-07","","API","Critical","Bảo mật","GET /api/purchases/{id}; GET /api/transfers/{id}; GET /api/stocktakes/{id:int}; GET /api/disposals/{id:int}; GET /api/orders/{id}; GET /api/sales-returns/{id:int}; GET /api/production/orders/{id:int}; GET /api/production/mrp/runs/{id:int}","U1 chỉ có K001; chứng từ X thuộc K002","","1. U1 gọi chi tiết X theo id","403 hoặc 404; không trả dữ liệu X","","Not Run","",""
+"API-SEC-007","Production Accountant không thấy giá mua, giá vốn, MAC, giá bán","Bảo mật & phân quyền","BR-39, NFR-SEC-05","","API","High","Bảo mật","GET /api/products; GET /api/products/{id}; GET /api/production/orders/{id:int}; GET /api/production/lookups/products","","","1. prodstaff01 gọi từng endpoint
+2. Tìm các trường giá trong JSON","Không có hoặc rỗng các trường giá, giá vốn, MAC","","Not Run","",""
+"API-SEC-008","Chuỗi SQL injection / XSS trong tìm kiếm và tên","Bảo mật & phân quyền","NFR-SEC-01","","API","High","Bảo mật, Đoán lỗi","GET /api/products; GET /api/customers; POST /api/customers","","' OR 1=1 --; <script>alert(1)</script>; 5.000 ký tự","1. Tìm kiếm với từng chuỗi
+2. Tạo khách hàng tên chứa <script>","Không 500; tìm kiếm trả kết quả đúng nghĩa chữ
+Tên lưu nguyên văn, giao diện hiển thị dạng chữ","","Not Run","",""
+"API-SEC-009","Dùng lại token sau khi đăng xuất","Xác thực","NFR-SEC-04","UC-02","API","Medium","Bảo mật","GET /api/auth/me","","","1. Đăng xuất trên giao diện
+2. Gọi API bằng token cũ","Theo UC-02 phiên phải kết thúc: 401","","Not Run","","Nghi vấn N-16: đăng xuất chỉ xoá token ở trình duyệt; JWT còn hạn vẫn dùng được."
+"API-SEC-010","Tải ảnh hàng hoá sai định dạng hoặc lớn hơn 2 MB","Danh mục","NFR-SEC-01","UC-52","API","Medium","Giá trị biên, Bảo mật","POST /api/products; PUT /api/products/{id}","","File .exe đổi đuôi .jpg; ảnh 2,1 MB; ảnh 2 MB","1. Lưu hàng hoá với từng ảnh","Hai file đầu bị từ chối
+Ảnh 2 MB được lưu","","Not Run","",""
+"API-AUTH-001","Đăng nhập bằng username, email, mã nhân viên","Xác thực","BR-01","UC-01","API","Critical","Phân lớp tương đương","POST /api/auth/login","","","1. Đăng nhập lần lượt bằng 3 định danh của cùng tài khoản","200 kèm token; /api/auth/me trả đúng vai trò và kho","","Not Run","",""
+"API-AUTH-002","Sai mật khẩu, tài khoản không tồn tại, tài khoản khoá","Xác thực","BR-01","UC-01","API","Critical","Kiểm thử âm, Bảo mật","POST /api/auth/login","","","1. Sai mật khẩu
+2. Username không tồn tại
+3. Tài khoản bị khoá","Hai ca đầu cùng một thông báo MSG02 (không nói trường nào sai)
+Tài khoản khoá: MSG03","","Not Run","",""
+"API-AUTH-003","Đổi mật khẩu: sai mật khẩu hiện tại, mật khẩu mới không hợp lệ, thành công","Xác thực","BR-05","UC-03","API","High","Giá trị biên, Kiểm thử âm","POST /api/auth/change-password","","","1. Sai mật khẩu hiện tại
+2. Mật khẩu mới 7 ký tự
+3. Hợp lệ
+4. Đăng nhập bằng mật khẩu mới","MSG06
+MSG07
+200
+Đăng nhập được; mật khẩu cũ không còn dùng được","","Not Run","",""
+"API-AUTH-004","Khách hàng và nhà cung cấp không có tài khoản trong StockFlow","Xác thực","BR-07","UC-01","API","Medium","Kiểm thử âm","POST /api/auth/login; POST /api/customers","","","1. Tạo khách hàng có email
+2. Đăng nhập bằng email / mã khách hàng đó","MSG02; không có cách tạo tài khoản đăng nhập cho đối tác","","Not Run","",""
+"API-ACC-005","Xem và tìm tài khoản theo tên, mã nhân viên, email, vai trò, trạng thái","Tài khoản","","UC-04, UC-05, UC-06","API","Medium","Phân lớp tương đương","GET /api/staff","","12 tài khoản, 5 vai trò, 2 bị khoá","1. Lấy danh sách
+2. Tìm theo một phần tên
+3. Lọc theo vai trò, trạng thái","Đủ 12 tài khoản kèm vai trò, kho
+Kết quả tìm / lọc đúng","","Not Run","","Audit 13/11 ghi chưa lọc theo vai trò; cần xác nhận."
+"API-ROLE-003","Xem vai trò, quyền của vai trò và gán vai trò cho tài khoản","Vai trò & quyền","BR-03","UC-11, UC-13, UC-14","API","High","Phân lớp tương đương, Chuyển trạng thái","GET /api/roles; GET /api/roles/{roleCode}/permissions; GET /api/roles/feature-matrix; PUT /api/staff/{id}","","","1. Lấy danh sách vai trò và số tài khoản
+2. Xem quyền vai trò WarehouseStaff
+3. Đổi vai trò của whstaff01 sang SalesStaff
+4. whstaff01 gọi API mua hàng và bán hàng","Mỗi tài khoản đúng một vai trò
+Sau khi đổi: mất quyền mua hàng, có quyền bán hàng ở request kế tiếp","","Not Run","",""
+"API-WHA-002","Xem quyền kho theo kho và theo nhân viên","Quyền kho","","UC-16","API","Medium","Phân lớp tương đương","GET /api/warehousepermissions; GET /api/warehousepermissions/facilities","","","1. Admin lọc theo K001
+2. Tìm nhân viên","Danh sách nhân viên có quyền K001 đúng dữ liệu jnc_user_warehouse_access","","Not Run","",""
+"API-ACC-001","Tạo nhân viên trùng username, email, mã nhân viên","Tài khoản","BR-06","UC-07","API","High","Kiểm thử âm","POST /api/staff","","","1. Tạo với từng trường trùng","MSG09 cho từng trường hợp","","Not Run","",""
+"API-ACC-002","Không tạo được tài khoản vai trò Admin; thiếu trường bắt buộc","Tài khoản","BR-03","UC-07","API","High","Kiểm thử âm","POST /api/staff","","","1. Tạo với vai trò Admin
+2. Thiếu email / email sai định dạng","MSG01 (E4.2)","","Not Run","",""
+"API-ACC-003","Sửa nhân viên không gửi danh sách kho thì giữ nguyên quyền kho","Tài khoản","BR-04","UC-08","API","Critical","Đoán lỗi","PUT /api/staff/{id}","sales01 có K001, K002","","1. Sửa số điện thoại, request không có AssignedWarehouses
+2. Đọc quyền kho","Vẫn K001, K002","","Not Run","","Nghi vấn N-01: UpdateStaffCommand.cs:163 xoá hết quyền kho."
+"API-ACC-004","Khoá / mở khoá và đặt lại mật khẩu nhân viên","Tài khoản","BR-01, BR-05","UC-09","API","High","Chuyển trạng thái","PUT /api/staff/{id}/toggle-status; POST /api/staff/{id}/reset-password","","","1. Khoá
+2. Đăng nhập
+3. Mở khoá, đặt lại mật khẩu
+4. Đăng nhập bằng mật khẩu mới","Khi khoá: MSG03
+Sau mở khoá: đăng nhập được","","Not Run","",""
+"API-ROLE-001","Tạo vai trò trùng tên / mã; sửa hoặc xoá vai trò mặc định, vai trò đang được dùng","Vai trò & quyền","BR-03","UC-12","API","High","Kiểm thử âm","POST /api/roles; PUT /api/roles/{roleIdOrCode}; DELETE /api/roles/{roleIdOrCode}","","","1. Tạo trùng
+2. Xoá vai trò Manager
+3. Xoá vai trò tuỳ chỉnh đang gán cho nhân viên","MSG09
+MSG14
+MSG14","","Not Run","",""
+"API-ROLE-002","Chỉ Admin cấu hình vai trò, quyền, quyền kho, kho","Vai trò & quyền","BR-03","","API","High","Bảo mật","PUT /api/roles/{roleCode}/permissions; PUT /api/warehousepermissions/{userId}; POST /api/warehouses; PUT /api/warehouses/{id}","","","1. manager01 gọi từng endpoint","403","","Not Run","",""
+"API-WHA-001","Gán quyền kho cho nhân viên; mã kho trùng","Quyền kho","BR-03, BR-06","UC-15, UC-17","API","High","Phân lớp tương đương, Kiểm thử âm","PUT /api/warehousepermissions/{userId}; POST /api/warehouses","","","1. Gán K001, K003 cho whstaff01
+2. Tạo kho trùng mã K001","GET /api/warehouses/my-warehouses của whstaff01 trả đúng K001, K003
+MSG09","","Not Run","",""
+"API-BKG-001","Tạo đơn đặt không đổi tồn, tăng số giữ chỗ","Đặt hàng (booking)","BR-08, BR-11","UC-18, UC-19","API","Critical","Phân lớp tương đương","POST /api/sales-bookings; GET /api/sales-bookings/reserved","","","1. Tạo đơn đặt H1 × 5
+2. Đọc tồn và số giữ chỗ","Tồn không đổi; giữ chỗ H1 + 5; đơn giá lấy từ bảng giá áp dụng","","Not Run","",""
+"API-BKG-002","Tắt nhận đơn đặt mới trong cài đặt","Đặt hàng (booking)","","UC-19, UC-97","API","High","Bảng quyết định","PUT /api/order-settings; POST /api/sales-bookings","","","1. Tắt nhận đơn mới
+2. Tạo đơn đặt","MSG66","","Not Run","",""
+"API-BKG-003","Sửa / huỷ đơn đặt đã giao bị chặn","Đặt hàng (booking)","BR-09","UC-21, UC-22","API","High","Chuyển trạng thái, Kiểm thử âm","PUT /api/sales-bookings/{id:int}; POST /api/sales-bookings/{id:int}/cancel","Đơn đặt DELIVERING","","1. Sửa dòng hàng
+2. Huỷ","MSG17","","Not Run","",""
+"API-BKG-004","Gộp đơn đặt khác khách hoặc khác kho bị chặn","Đặt hàng (booking)","BR-10","UC-24","API","High","Bảng quyết định","POST /api/sales-bookings/merge","","","1. Gộp 2 đơn khác khách
+2. Gộp 2 đơn khác kho
+3. Gộp 2 đơn cùng khách cùng kho","MSG20
+MSG20
+Đơn mới; hai đơn nguồn CANCELLED, liên kết đơn mới","","Not Run","",""
+"API-BKG-005","Sales Accountant huỷ đơn đặt của mình","Đặt hàng (booking)","BR-09, BR-02","UC-22","API","High","Bảo mật","POST /api/sales-bookings/{id:int}/cancel","Đơn đặt DRAFT do sales01 tạo","","1. sales01 huỷ đơn","200; đơn CANCELLED; giữ chỗ giảm","","Not Run","","Nghi vấn N-07: endpoint cần SALES_DELETE, quyền mặc định SalesStaff không có."
+"API-POS-001","Số tiền khách trả ngoài khoảng [0, tổng]; chuyển khoản thiếu mã tham chiếu","Bán hàng POS","BR-14","UC-25","API","High","Giá trị biên, Kiểm thử âm","POST /api/orders/pos","","Trả −1; trả tổng + 1 (không phải tiền thừa); chuyển khoản không có mã tham chiếu","1. Gửi từng hoá đơn","Hai ca đầu bị từ chối
+Ca 3 bị từ chối (BR-14 bắt buộc mã tham chiếu)","","Not Run","","Audit 13/11 ghi chưa có mã tham chiếu chuyển khoản."
+"API-POS-002","Huỷ hoá đơn đã huỷ","Bán hàng POS","","UC-35","API","High","Chuyển trạng thái, Kiểm thử âm","POST /api/orders/{id:int}/cancel","","","1. Huỷ lần 1
+2. Huỷ lần 2","Lần 2: MSG17; tồn chỉ hoàn một lần","","Not Run","",""
+"API-POS-003","Danh sách và chi tiết hoá đơn chỉ thuộc kho được gán","Bán hàng POS","BR-04","UC-63","API","Medium","Bảo mật","GET /api/orders; GET /api/orders/{id}","","","1. sales01 (chỉ K001) lấy danh sách hoá đơn không lọc kho","Chỉ có hoá đơn K001","","Not Run","",""
+"API-CRD-001","Gửi, duyệt, từ chối yêu cầu tín dụng: các lỗi nghiệp vụ","Tín dụng & công nợ KH","BR-13, BR-50","UC-27, UC-64","API","High","Giá trị biên, Chuyển trạng thái","POST /api/credit-requests; POST /api/credit-requests/{id:int}/approve; POST /api/credit-requests/{id:int}/reject; GET /api/credit-requests/{id:int}/customer-history","","","1. Từ chối không lý do
+2. Duyệt hạn mức mới = 0
+3. Duyệt hợp lệ
+4. Duyệt lại yêu cầu đã duyệt","MSG40
+MSG40
+200, ghi người duyệt
+MSG57","","Not Run","",""
+"API-CRD-002","Đặt hạn mức một / nhiều khách có lý do, lưu lịch sử","Tín dụng & công nợ KH","BR-13, BR-49","UC-55","API","High","Phân lớp tương đương, Giá trị biên","PATCH /api/customers/{id:int}/credit-limit; PATCH /api/customers/credit-limit/batch; GET /api/customers/{id:int}/credit-limit-history","","","1. Đặt hạn mức 1 khách
+2. Tăng 10% cho 3 khách
+3. Đặt hạn mức âm","Lịch sử có giá trị cũ / mới / lý do / người sửa
+Hạn mức âm bị từ chối","","Not Run","",""
+"API-PB-001","Bảng giá: ngày hiệu lực, công thức tham chiếu chính nó, áp giá","Bảng giá","BR-11","UC-91","API","Medium","Giá trị biên, Phân lớp tương đương","POST /api/price-books; PUT /api/price-books/{id:int}; POST /api/price-books/{id:int}/apply-formula; PUT /api/price-books/{id:int}/prices; GET /api/price-books/matrix","","","1. Tạo bảng giá From > To
+2. Tạo công thức dựa trên chính nó
+3. Tạo hợp lệ và áp công thức
+4. Bán hàng cho khách thuộc phạm vi bảng giá","MSG68
+MSG68
+Giá đúng công thức
+Đơn giá dòng hoá đơn lấy từ bảng giá đó","","Not Run","",""
+"API-PO-001","Đơn đặt thiếu NCC / dòng hàng / SL ≤ 0; ngày giao trước ngày đặt","Đặt hàng nhập","BR-22, BR-MRP-30..33","UC-30","API","High","Giá trị biên, Kiểm thử âm","POST /api/purchase-orders","","","1. Gửi từng request lỗi","MSG01 cho 3 ca đầu
+MSG81 cho ngày giao","","Not Run","",""
+"API-PO-002","Warehouse Accountant sửa, huỷ, kết thúc, gộp đơn đặt","Đặt hàng nhập","BR-02, BR-22","UC-30","API","High","Bảo mật","PUT /api/purchase-orders/{id:int}; POST /api/purchase-orders/{id:int}/cancel; POST /api/purchase-orders/{id:int}/finish; POST /api/purchase-orders/merge","","","1. whstaff01 gọi từng thao tác trên đơn chưa nhận","200 (Report 3 mục 2.1: Warehouse Accountant ghi đơn đặt hàng nhập)","","Not Run","","Nghi vấn N-07: các endpoint cần PURCHASE_UPDATE, quyền mặc định WarehouseStaff không có."
+"API-GR-001","Nhập hàng kho không có quyền, SL âm, thiếu NCC","Nhập hàng","BR-04","UC-31","API","High","Kiểm thử âm","POST /api/purchases","","","1. Nhập vào K002 (không có quyền)
+2. SL −1
+3. Không có NCC","MSG04
+MSG01
+MSG01","","Not Run","",""
+"API-GR-002","Hàng theo dõi lô bắt buộc số lô và hạn dùng khi nhập","Nhập hàng","BR-27","UC-31","API","Medium","Kiểm thử âm","POST /api/purchases","","","1. Nhập hàng có cờ theo dõi lô mà không có số lô","Bị từ chối; khi có số lô thì lưu vào mst_inventory_lots","","Blocked","","Chưa có cờ ""theo dõi lô"" trên hàng hoá và nhập hàng không ghi lô (nghi vấn N-10)."
+"API-SUP-001","Warehouse Accountant ghi phiếu chi NCC và nhận tiền NCC hoàn","Nhà cung cấp","BR-02, BR-25","UC-85","API","High","Bảo mật","POST /api/suppliers/{id}/payments; POST /api/purchasereturns/{id:int}/refunds","","","1. whstaff01 ghi phiếu chi
+2. whstaff01 ghi tiền hoàn của phiếu trả NCC","200 (Report 3 mục 2.1: Warehouse Accountant ghi phiếu chi NCC)","","Not Run","","Nghi vấn N-07: cần FIN_CREATE, quyền mặc định WarehouseStaff không có."
+"API-SUP-002","Phiếu chi NCC: số tiền 0, vượt công nợ; xoá NCC đã có giao dịch","Nhà cung cấp","BR-46, BR-06","UC-85","API","High","Giá trị biên, Kiểm thử âm","POST /api/suppliers/{id}/payments; DELETE /api/suppliers/{id}","","","1. Chi 0
+2. Chi vượt công nợ
+3. Xoá NCC có phiếu nhập","MSG59
+Bị từ chối
+MSG17; chỉ được ngừng hoạt động","","Not Run","",""
+"API-MST-001","Hàng hoá: mã trùng, xoá hàng đã có giao dịch, ngừng kinh doanh","Danh mục","BR-06","UC-52","API","High","Kiểm thử âm","POST /api/products; DELETE /api/products/{id}; PATCH /api/products/{id}/toggle-status","","","1. Tạo mã trùng
+2. Xoá hàng đã bán
+3. Ngừng kinh doanh hàng đó","MSG09
+MSG17
+200","","Not Run","",""
+"API-MST-002","Nhập hàng hoá từ Excel và điều chỉnh tồn","Danh mục","BR-06, BR-29","UC-99","API","High","Giá trị biên, Kiểm thử âm","POST /api/products/import; POST /api/products/{id}/stock-adjustments","","","1. Nhập file có dòng trùng mã khác tên
+2. Nhập file hợp lệ
+3. Điều chỉnh tồn thêm 0
+4. Điều chỉnh tồn thực tế −1
+5. Điều chỉnh tồn thực tế 15","MSG01, dừng nhập
+MSG72 (số mới / cập nhật)
+MSG01
+MSG01
+Tồn = 15; tạo phiếu kiểm kê BALANCED","","Not Run","",""
+"API-MST-003","BOM: chỉ một bản active; không xoá BOM đã dùng cho lệnh","Danh mục","BR-30","UC-57","API","High","Chuyển trạng thái","POST /api/production/boms; POST /api/production/boms/{id:int}/activate; DELETE /api/production/boms/{id:int}","","","1. Kích hoạt bản v2 khi v1 đang active
+2. Xoá v1 đã dùng","v2 active, v1 ngừng
+MSG17","","Not Run","",""
+"API-MST-004","Khách hàng / NCC: mã trùng, ngừng hoạt động hàng loạt","Danh mục","BR-06","UC-54","API","Medium","Kiểm thử âm","POST /api/customers; PATCH /api/customers/batch-status; POST /api/suppliers; PUT /api/customers/{id}","","","1. Tạo trùng mã
+2. Ngừng 3 khách
+3. Sửa khách và gửi kèm dư nợ khác","MSG09
+3 khách ngừng
+Dư nợ không đổi qua API sửa thông tin","","Not Run","",""
+"API-INV-001","Thẻ kho đúng thứ tự thời gian, số dư chạy khớp tồn","Tồn kho","NFR-REL-01","UC-73","API","High","Phân lớp tương đương","GET /api/products/{id}/stock-card","","","1. Sau IT-CONC-003, đọc thẻ kho H1 tại K001","Số dư dòng cuối = tồn hiện tại; mỗi dòng có loại, chứng từ, người","","Not Run","",""
+"API-INV-002","Lọc hàng dưới định mức tồn","Tồn kho","BR-48","UC-77","API","Medium","Giá trị biên","GET /api/products","","H1 tồn 5 điểm đặt 5; H2 tồn 6 điểm đặt 5","1. Lọc ""Dưới định mức tồn""","Có H1, không có H2","","Not Run","",""
+"API-INV-003","Cảnh báo lô sắp hết hạn","Tồn kho","BR-48","UC-78","API","Medium","Phân lớp tương đương","","","","1. Mở cảnh báo hạn dùng","Liệt kê lô hết hạn trong số ngày cấu hình","","Blocked","","Chưa có chức năng và không thu hạn dùng (UC-78 ""Chưa có code"")."
+"API-STK-001","Kiểm kê: SL đếm âm, không có hàng, sửa phiếu đã cân bằng","Kiểm kê","BR-43","UC-39","API","High","Giá trị biên, Kiểm thử âm","POST /api/stocktakes; PUT /api/stocktakes/{id:int}","","","1. SL đếm −1
+2. Không có dòng
+3. Sửa phiếu BALANCED","MSG01
+MSG01
+MSG17","","Not Run","",""
+"API-DSP-001","Huỷ hàng: hoàn thành thiếu lý do; sửa phiếu đã hoàn thành","Huỷ hàng","BR-44","UC-43","API","High","Chuyển trạng thái, Kiểm thử âm","POST /api/disposals; PUT /api/disposals/{id:int}; PUT /api/disposals/{id:int}/info","","","1. Hoàn thành không lý do
+2. Sửa dòng phiếu COMPLETED
+3. Sửa ghi chú phiếu COMPLETED","MSG40
+Bị từ chối
+200","","Not Run","",""
+"API-TRF-001","Chuyển kho: cùng kho, không có dòng, nhận phiếu chưa xuất, huỷ phiếu đã nhận","Chuyển kho","BR-40","UC-37","API","High","Chuyển trạng thái, Kiểm thử âm","POST /api/transfers; POST /api/transfers/{id}/receive; POST /api/transfers/{id}/cancel","","","1. Nguồn = đích
+2. Không dòng hàng
+3. Nhận phiếu DRAFT
+4. Huỷ phiếu RECEIVED","MSG46
+MSG46
+MSG17
+MSG17 (A37.2)","","Not Run","","Ca 4 – nghi vấn N-08."
+"API-RET-001","Trả hàng từ hoá đơn chưa hoàn tất / đã huỷ; không dòng nào có SL > 0","Trả hàng bán","BR-19","UC-28","API","High","Kiểm thử âm","POST /api/sales-returns; GET /api/sales-returns/source/{invoiceId:int}","","","1. Trả từ hoá đơn đã huỷ
+2. Mọi dòng SL 0","MSG17
+MSG31","","Not Run","",""
+"API-PRD-001","Thao tác lệnh sản xuất sai trạng thái","Sản xuất","BR-38","UC-58","API","High","Chuyển trạng thái, Kiểm thử âm","POST /api/production/material-issues; POST /api/production/orders/{id:int}/approve; POST /api/production/orders/{id:int}/cancel; POST /api/production/orders/{id:int}/close","","","1. Xuất NVL cho lệnh COMPLETED
+2. Duyệt hoàn thành lệnh NOT_STARTED
+3. Huỷ lệnh IN_PROGRESS
+4. Đóng lệnh không lý do","MSG17 cho 3 ca đầu
+Đóng sớm phải có lý do (BR-38)","","Not Run","",""
+"API-PRD-002","Nhập thành phẩm vào kho không được gán","Sản xuất","BR-04","UC-49","API","High","Bảo mật","POST /api/production/finished-goods-receipts","","","1. prodstaff01 nhập TP vào kho không có quyền","MSG04","","Not Run","",""
+"API-PLN-001","Bộ API kế hoạch sản xuất có sẵn (pptest.ps1, pptest2–5.ps1)","Kế hoạch sản xuất","BR-PP-01..08, BR-PP-09..15, BR-PP-16..21, BR-PP-22..24","UC-92, UC-93, UC-94, UC-95, UC-96","API","High","Phân lớp tương đương, Giá trị biên, Chuyển trạng thái","POST /api/production/plans; PUT /api/production/plans/{id:int}; POST /api/production/plans/{id:int}/submit; POST /api/production/plans/{id:int}/approve; POST /api/production/plans/{id:int}/reject; POST /api/production/plans/{id:int}/close; POST /api/production/plans/{id:int}/cancel; POST /api/production/plans/{id:int}/orders; POST /api/production/plans/material-requirements/preview","","","1. Chạy các script trên database tạm (env.ps1)","Mọi ca đạt (lần gần nhất: 101 ca ghi trong results*.json)","","Not Run","","Có sẵn trong specs/production-planning-implementation/api-tests."
+"API-PLN-002","Lập lệnh vượt số còn lại; huỷ kế hoạch có lệnh chưa huỷ","Kế hoạch sản xuất","BR-PP-16..21, BR-PP-22..24","UC-95, UC-96","API","High","Giá trị biên, Kiểm thử âm","POST /api/production/plans/{id:int}/orders; POST /api/production/plans/{id:int}/cancel","","","1. Lập lệnh 101 khi còn 100
+2. Huỷ kế hoạch có lệnh đang mở","MSG69
+MSG70","","Not Run","",""
+"API-PLN-003","Production Accountant không được huỷ / đóng kế hoạch","Kế hoạch sản xuất","BR-02","UC-96","API","High","Bảo mật","POST /api/production/plans/{id:int}/cancel; POST /api/production/plans/{id:int}/close","","","1. prodstaff01 huỷ kế hoạch APPROVED
+2. prodstaff01 đóng kế hoạch","403 (UC-96 thuộc Manager)","","Not Run","","Nghi vấn N-07: huỷ chỉ cần PROD_UPDATE (Production Accountant có)."
+"API-PLN-004","Kế hoạch đã đóng không lập thêm lệnh, không đổi lệnh đã lập","Kế hoạch sản xuất","BR-PP-16..21, BR-PP-22..24","UC-96","API","High","Chuyển trạng thái","POST /api/production/plans/{id:int}/close; POST /api/production/plans/{id:int}/orders; POST /api/production/orders/{id:int}/adjust-norms","","","1. Đóng kế hoạch còn 40 chưa lập lệnh
+2. Lập lệnh từ kế hoạch đã đóng
+3. Điều chỉnh định mức lệnh đã lập của kế hoạch","Lập lệnh bị từ chối (MSG17)
+Điều chỉnh định mức chỉ đổi nhu cầu NVL, không đổi SL thành phẩm của lệnh","","Not Run","","Nghi vấn N-06 (S-01): UpdateProductionOrderCommand đã không còn trong code (kiểm 19/11/2026), ca này xác nhận lại."
+"API-MRP-001","Bộ API MRP có sẵn (mrptest.ps1, MT-01..37)","MRP","BR-MRP-01..09, BR-MRP-10..17, BR-MRP-18..22, BR-MRP-23..29, BR-MRP-30..33","UC-100, UC-101, UC-102, UC-103, UC-104, UC-105","API","Critical","Phân lớp tương đương, Giá trị biên, Bảng quyết định, Chuyển trạng thái","POST /api/production/mrp/runs; GET /api/production/mrp/runs; GET /api/production/mrp/runs/{id:int}; GET /api/production/mrp/runs/{id:int}/daily-requirements; GET /api/production/mrp/runs/{id:int}/monthly-demand; GET /api/production/mrp/runs/{id:int}/shortages; GET /api/production/mrp/runs/{id:int}/materials/{materialId:int}/projection; GET /api/production/mrp/runs/{id:int}/purchase-suggestions","","","1. Chạy specs/mrp/api-tests/mrptest.ps1 trên database tạm","37/37 đạt (lần gần nhất 18/11/2026)","","Not Run","","Có sẵn; phủ cả phân quyền kho và cảnh báo lỗi thời."
+"API-MRP-002","MRP: lần chạy không tồn tại, vai trò bán hàng gọi MRP","MRP","BR-02, BR-MRP-30..33","UC-100","API","High","Kiểm thử âm, Bảo mật","GET /api/production/mrp/runs/{id:int}; POST /api/production/mrp/runs","","","1. Đọc lần chạy id 999999
+2. sales01 chạy MRP","MSG79
+403","","Not Run","",""
+"API-FIN-001","Báo cáo công nợ, nhập – xuất – tồn, doanh thu – lợi nhuận, chi phí","Tài chính & báo cáo","BR-47","UC-86, UC-87, UC-88, UC-89","API","Medium","Phân lớp tương đương","","","","1. Gọi API báo cáo theo kỳ","Số liệu chỉ từ giao dịch đã xác nhận; khớp chứng từ nguồn","","Blocked","","Chưa có API báo cáo (UC-86 – UC-89 ""Chưa có code"")."
+"API-FIN-002","Dashboard quản lý: KPI và việc chờ duyệt","Tài chính & báo cáo","","UC-90","API","Medium","Phân lớp tương đương","","","","1. Mở dashboard Manager","Hiện KPI, việc chờ duyệt; xuất .xlsx / .pdf","","Blocked","","/dashboard hiện là bảng quản trị của Admin."
+"API-SET-001","Cài đặt đơn hàng: biên giá trị, quyền Admin đổi quy tắc giao dịch","Cài đặt","BR-06","UC-97","API","High","Giá trị biên, Bảo mật","GET /api/order-settings; PUT /api/order-settings; GET /api/settings/debt-warning; PUT /api/settings/debt-warning","","Số ngày nợ 0, 3650, 3651; tiền tố 10 và 11 ký tự","1. Lưu từng giá trị
+2. manager01 đổi quy tắc mã chứng từ","0, 3650 và tiền tố 10 ký tự đạt
+3651 và 11 ký tự: MSG01
+manager01 đổi quy tắc: MSG73","","Not Run","",""
+"API-OOS-001","Các UC và BR đã loại khỏi phạm vi","Ngoài phạm vi","BR-20, BR-28","UC-34, UC-42, UC-75, UC-76, UC-81","API","Low","","","","","1. Không thực hiện","—","","Skipped","","D1, D2, O3 ngày 19/11/2026; Report 3 ghi ""Removed""."
+"ST-AUTH-001","Đăng nhập, sai mật khẩu, tài khoản khoá, đăng xuất, token hết hạn","Xác thực","BR-01, BR-05, NFR-SEC-04","UC-01, UC-02","System","Critical","Phân lớp tương đương, Kiểm thử âm","","Frontend chạy với NEXT_PUBLIC_DEV_AUTO_LOGIN=false","","1. Đăng nhập đúng
+2. Đăng xuất
+3. Đăng nhập sai mật khẩu
+4. Đăng nhập tài khoản bị khoá
+5. Sửa token trong localStorage thành token hết hạn rồi tải lại trang","Vào màn hình đầu tiên của vai trò
+Về /login
+MSG02
+MSG03
+Về /login, phiên cũ bị xoá","","Not Run","",""
+"ST-AUTH-002","Đổi mật khẩu trên giao diện","Xác thực","BR-05","UC-03","System","High","Phân lớp tương đương","","","","1. Mở Đổi mật khẩu
+2. Nhập sai mật khẩu hiện tại
+3. Nhập đúng, mật khẩu mới hợp lệ
+4. Đăng xuất, đăng nhập lại","MSG06
+Thông báo thành công
+Đăng nhập bằng mật khẩu mới","","Not Run","",""
+"ST-RBAC-001","Admin: menu và màn hình theo bảng 3.1.6","Bảo mật & phân quyền","BR-02, BR-03, FLOW-07","UC-04, UC-05, UC-06, UC-10, UC-11, UC-14, UC-15, UC-16","System","Critical","Bảo mật","","","","1. Đăng nhập admin
+2. Đối chiếu menu với cột Administrator của bảng 3.1.6
+3. Tạo nhân viên, vai trò, gán quyền kho","Menu khớp bảng; mọi thao tác quản trị thành công","","Not Run","",""
+"ST-RBAC-002","Manager: menu theo bảng 3.1.6, không có màn quản trị","Bảo mật & phân quyền","BR-02, BR-03, FLOW-07","","System","Critical","Bảo mật","","","","1. Đăng nhập manager01
+2. Đối chiếu menu
+3. Gõ thẳng URL /staff, /roles","Menu khớp bảng; URL quản trị bị chặn","","Not Run","",""
+"ST-RBAC-003","Sales Accountant: chỉ bán hàng, đặt hàng, khách hàng, trả hàng","Bảo mật & phân quyền","BR-02, FLOW-07","","System","Critical","Bảo mật","","","","1. Đăng nhập sales01
+2. Đối chiếu menu
+3. Gõ thẳng URL /purchases, /production, /stocktakes","Menu khớp cột Sales; URL khác bị chặn","","Not Run","",""
+"ST-RBAC-004","Warehouse Accountant: mua hàng, nhập hàng, chuyển kho, kiểm kê, huỷ hàng, phiếu chi NCC","Bảo mật & phân quyền","BR-02, FLOW-07","","System","Critical","Bảo mật","","","","1. Đăng nhập whstaff01
+2. Đối chiếu menu
+3. Thực hiện: sửa đơn đặt, ghi phiếu chi NCC","Menu khớp cột Warehouse Accountant
+Thao tác thành công (xem API-PO-002, API-SUP-001)","","Not Run","",""
+"ST-RBAC-005","Production Accountant: lệnh, xuất NVL, nhập TP, kế hoạch, MRP; không thấy giá","Bảo mật & phân quyền","BR-02, BR-39, FLOW-07","","System","Critical","Bảo mật","","","","1. Đăng nhập prodstaff01
+2. Đối chiếu menu
+3. Mở chi tiết lệnh, danh mục hàng","Menu khớp cột Production Accountant
+Không có cột giá / giá vốn trên mọi màn","","Not Run","",""
+"ST-RBAC-006","Cô lập kho trên giao diện: người dùng chỉ có K001","Bảo mật & phân quyền","BR-04, NFR-SEC-01, FLOW-07","","System","Critical","Bảo mật","","whstaff01 chỉ có K001; dữ liệu ở cả K001 và K002","","1. Mở bộ chọn kho làm việc
+2. Mở danh sách phiếu nhập, chuyển kho, kiểm kê, huỷ hàng, tồn kho","Bộ chọn chỉ có K001
+Không thấy chứng từ, tồn của K002 (trừ phiếu chuyển đến K001)","","Not Run","",""
+"ST-MST-001","Danh mục: nhóm hàng, hàng hoá (đơn vị quy đổi, thời gian giao, ảnh), khách hàng, NCC, kho, BOM","Danh mục","BR-06, BR-26, BR-30","UC-51, UC-52, UC-53, UC-54, UC-56, UC-57","System","High","Phân lớp tương đương","","","","1. Tạo nhóm hàng
+2. Tạo NVL có đơn vị quy đổi, thời gian giao 7 ngày, ảnh
+3. Tạo thành phẩm và BOM, kích hoạt
+4. Tạo khách hàng, NCC
+5. Admin tạo kho
+6. Sửa hàng hoá, ngừng kinh doanh","Dữ liệu lưu đúng; mã trùng bị chặn
+Trạng thái cuối khớp giữa giao diện, API và database","","Not Run","",""
+"ST-MST-002","Nhập hàng hoá từ Excel và điều chỉnh tồn một hàng","Danh mục","","UC-99","System","Medium","Phân lớp tương đương","","","","1. Nhập file mẫu 20 dòng
+2. Điều chỉnh tồn H1 tại K001","MSG72 với số mới / cập nhật đúng
+Tồn đổi; có phiếu kiểm kê BALANCED","","Not Run","",""
+"ST-PUR-001","Mua hàng → nhập kho → tồn → giá vốn → công nợ NCC","Đặt hàng nhập","BR-22, BR-23, BR-24, BR-25, BR-29, FLOW-01","UC-30, UC-31, UC-32, UC-67, UC-68, UC-70, UC-71","System","Critical","Chuyển trạng thái","","","","1. Tạo NCC
+2. Tạo đơn đặt H1 × 100, ngày giao dự kiến
+3. Nhận 60 (2 lỗi), trả NCC một phần tiền
+4. Nhận nốt 40
+5. Xem tồn, MAC, công nợ NCC, thẻ kho","Đơn PARTIAL rồi COMPLETED
+Tồn tăng 98; hàng lỗi không vào kho
+MAC đúng BR-29
+Công nợ NCC = giá trị đạt − đã trả
+Trạng thái cuối khớp giữa giao diện, API và database","","Not Run","",""
+"ST-PUR-002","Đặt hàng nhập → nhập → trả NCC → tồn → công nợ NCC","Trả hàng NCC","BR-24, BR-25, FLOW-06","UC-33, UC-69","System","High","Giá trị biên","","","","1. Từ phiếu nhập ở ST-PUR-001 tạo phiếu trả NCC 10
+2. Ghi NCC hoàn tiền
+3. Thử trả vượt SL đã nhận","Tồn −10; công nợ NCC giảm
+Hoàn tiền ghi nhận
+Trả vượt bị chặn
+Trạng thái cuối khớp giữa giao diện, API và database","","Not Run","",""
+"ST-SAL-001","Bán hàng hoàn chỉnh tại POS","Bán hàng POS","BR-11, BR-12, BR-14, BR-15, BR-16, FLOW-02","UC-23, UC-25, UC-35, UC-63","System","Critical","Phân lớp tương đương","","","","1. Đăng nhập sales01
+2. Mở POS, tìm hàng (F3), chọn khách (F4)
+3. Thêm 2 hàng, đổi số lượng
+4. Kiểm giá theo bảng giá, chiết khấu, tổng
+5. Thanh toán một phần tiền mặt
+6. Hoàn tất
+7. Mở hoá đơn, tồn, công nợ, thẻ kho","Giá, chiết khấu, tổng đúng
+Hoá đơn COMPLETED; tồn trừ đúng; công nợ = phần chưa trả
+Trạng thái cuối khớp giữa giao diện, API và database","","Not Run","",""
+"ST-SAL-002","Đặt hàng → gộp → xử lý hoá đơn giao một phần → giao nốt","Đặt hàng (booking)","BR-08, BR-09, BR-10, BR-17","UC-18, UC-19, UC-20, UC-23, UC-24, UC-36, UC-65","System","Critical","Chuyển trạng thái","","","","1. Tạo 2 đơn đặt cùng khách cùng kho, trả trước một phần
+2. Gộp
+3. Xử lý thành hoá đơn giao 60%
+4. Giao nốt","Đơn gộp; đơn nguồn huỷ
+DELIVERING giữ phần còn lại; tiền trả trước trừ đúng
+FINISHED
+Trạng thái cuối khớp giữa giao diện, API và database","","Not Run","",""
+"ST-SAL-003","Bán chịu vượt hạn mức → yêu cầu tín dụng → Manager duyệt → hoàn tất","Tín dụng & công nợ KH","BR-12, BR-13, BR-50, NFR-SEC-07","UC-27, UC-62, UC-64","System","Critical","Bảng quyết định","","","","1. sales01 bán chịu vượt hạn mức
+2. Gửi yêu cầu tín dụng
+3. manager01 duyệt ngoại lệ một lần
+4. sales01 hoàn tất
+5. Thử bán chịu vượt hạn mức lần nữa","Bị chặn, gợi ý gửi yêu cầu
+Sau duyệt hoàn tất được
+Lần sau bị chặn lại","","Not Run","",""
+"ST-SAL-004","Thanh toán chuyển khoản hiển thị mã QR đúng số tiền và mã giao dịch","Bán hàng POS","BR-14","UC-26","System","Medium","Phân lớp tương đương","","","","1. Chọn chuyển khoản tại POS","Hiện QR chứa đúng số tiền và mã giao dịch","","Blocked","","Chưa có chức năng (POS hiện ""Chưa cấu hình tài khoản ngân hàng…"")."
+"ST-RET-001","Hoá đơn → trả hàng một phần, trả lần hai, trả vượt → tồn, công nợ, hoàn tiền","Trả hàng bán","BR-19, BR-21, FLOW-05","UC-28, UC-41, UC-79, UC-80, UC-82","System","Critical","Giá trị biên","","","","1. Trả 2 / 5 từ hoá đơn
+2. Trả 3
+3. Trả thêm 1
+4. Hoàn tiền","Hai lần đầu thành công, tồn và công nợ đổi đúng
+Lần 3: MSG31
+Hoàn tiền ghi nhận; Manager xem được trên danh sách trả hàng
+Trạng thái cuối khớp giữa giao diện, API và database","","Not Run","",""
+"ST-TRF-001","Chuyển kho hai tài khoản: xuất ở kho nguồn, nhận thiếu có ghi chú ở kho đích","Chuyển kho","BR-40, BR-41, BR-04, FLOW-04","UC-37, UC-38, UC-74","System","Critical","Chuyển trạng thái","","U1 có K001, U2 có K002","","1. U1 tạo, xuất phiếu 10
+2. U2 thấy phiếu đến, nhận 9 không ghi chú
+3. U2 nhận 9 có ghi chú
+4. Manager xem theo dõi chuyển kho","K001 −10 khi xuất
+MSG49
+K002 +9; chênh lệch 1 hiện trên phiếu
+Trạng thái cuối khớp giữa giao diện, API và database","","Not Run","",""
+"ST-INV-001","Kiểm kê lưu tạm chặn nghiệp vụ, hoàn thành; huỷ hàng; đối chiếu tồn và thẻ kho","Kiểm kê","BR-42, BR-43, BR-44","UC-39, UC-40, UC-43, UC-72, UC-73","System","High","Chuyển trạng thái","","","","1. Tạo kiểm kê nháp có NVL1
+2. Thử xuất NVL1
+3. Hoàn thành kiểm kê
+4. Tạo phiếu huỷ hàng, hoàn thành
+5. Đối chiếu tồn và thẻ kho","Xuất bị chặn MSG50
+Tồn = SL đếm
+Tồn trừ SL huỷ
+Trạng thái cuối khớp giữa giao diện, API và database","","Not Run","",""
+"ST-PRO-001","Kế hoạch → duyệt → lệnh → xuất NVL (có cấp bổ sung) → nhập thành phẩm (có lỗi)","Sản xuất","BR-30, BR-31, BR-32, BR-34, BR-35, BR-36, BR-38, FLOW-03","UC-44, UC-45, UC-46, UC-47, UC-49, UC-50, UC-58, UC-60, UC-61, UC-93, UC-94, UC-95","System","Critical","Chuyển trạng thái","","","","1. prodstaff01 lập kế hoạch, gửi duyệt
+2. manager01 duyệt, lập lệnh
+3. prodstaff01 xuất NVL, cấp bổ sung có lý do
+4. Nhập thành phẩm: đạt + lỗi
+5. Manager duyệt hoàn thành","Trạng thái kế hoạch và lệnh đúng BR-38
+Nhu cầu, đã xuất, thiếu đúng
+Thành phẩm đạt vào kho có lô; lỗi không vào tồn bán được
+Trạng thái cuối khớp giữa giao diện, API và database","","Not Run","",""
+"ST-MRP-001","Kế hoạch → MRP → NVL thiếu → lập đơn đặt từ đề xuất → nhập → chạy lại MRP → xuất NVL → nhập TP","MRP","BR-MRP-01..09, BR-MRP-10..17, BR-MRP-18..22, BR-MRP-23..29, BR-MRP-30..33, FLOW-03","UC-100, UC-101, UC-102, UC-103, UC-104, UC-105","System","Critical","Chuyển trạng thái","","NVL1 thời gian giao 7 ngày, NVL2 chưa khai báo; kế hoạch duyệt bắt đầu T+10","","1. Chạy MRP kỳ 30 ngày
+2. Xem NVL thiếu, theo ngày / tuần, tồn dự phóng
+3. Lập đơn đặt từ đề xuất, chọn NCC, lưu
+4. Mở lại lần chạy
+5. Nhập hàng, chạy lại MRP
+6. Lập lệnh, xuất NVL, nhập TP","NVL1 Kịp đặt, NVL2 Chưa có thời gian giao
+Đơn đặt điền sẵn mỗi NVL một dòng, SL làm tròn lên
+Lần chạy cũ hiện cảnh báo lỗi thời (MSG78)
+Lần chạy mới không còn thiếu
+Trạng thái cuối khớp giữa giao diện, API và database","","Not Run","",""
+"ST-FIN-001","Phiếu thu, phiếu chi, điều chỉnh nợ, huỷ phiếu; số dư và lịch sử","Tài chính & báo cáo","BR-15, BR-25, BR-46","UC-29, UC-66, UC-83, UC-84, UC-85, UC-98","System","High","Chuyển trạng thái","","","","1. Thu nợ khách phân bổ hoá đơn
+2. Sửa ghi chú, huỷ phiếu thu
+3. Chi NCC
+4. Điều chỉnh nợ khách, huỷ điều chỉnh","Số dư khách / NCC khớp tổng chứng từ
+Lịch sử công nợ đủ dòng
+Trạng thái cuối khớp giữa giao diện, API và database","","Not Run","",""
+"ST-SET-001","Cài đặt đơn hàng và cảnh báo công nợ có hiệu lực ngay","Cài đặt","BR-12, BR-16","UC-97","System","High","Bảng quyết định","","","","1. Tắt bán âm, bán vượt tồn ở POS
+2. Bật bán âm, bán lại
+3. Đổi tiền tố mã hoá đơn, tạo hoá đơn
+4. Bật cho nợ vượt hạn mức","MSG28
+Hoàn tất
+Mã mới đúng tiền tố
+Bán chịu vượt hạn mức hoàn tất","","Not Run","",""
+"ST-NFR-001","Yêu cầu thường: 95% ≤ 2 giây","Hiệu năng","NFR-PERF-01","","System","Medium","Hiệu năng","","","Bộ dữ liệu chuẩn (chốt ở Phase 8)","1. Đo 200 lần các GET danh sách chính","p95 ≤ 2 giây (không tính độ trễ mạng của máy khách)","","Not Run","",""
+"ST-NFR-002","Giao dịch thường ≤ 3 giây","Hiệu năng","NFR-PERF-02","","System","Medium","Hiệu năng","","","","1. Đo lưu đơn đặt, hoàn tất POS, hoàn thành phiếu nhập, xuất NVL, nhập TP, hoàn thành kiểm kê","Mỗi giao dịch ≤ 3 giây","","Not Run","",""
+"ST-NFR-003","Tìm kiếm ≤ 2 giây","Hiệu năng","NFR-PERF-03","","System","Medium","Hiệu năng","","","","1. Tìm hàng hoá, đơn, khách hàng, tồn kho trên bộ dữ liệu chuẩn","≤ 2 giây","","Not Run","",""
+"ST-NFR-004","Báo cáo ≤ 5 giây","Hiệu năng","NFR-PERF-04","","System","Low","Hiệu năng","","","","1. Mở báo cáo chuẩn","≤ 5 giây","","Blocked","","Chưa có báo cáo (UC-86 – UC-90)."
+"ST-NFR-005","100 người dùng đăng nhập đồng thời","Hiệu năng","NFR-PERF-05","","System","Medium","Hiệu năng, Đồng thời","","","","1. Mô phỏng 100 phiên làm các thao tác đọc và giao dịch","Không lỗi chức năng; đạt NFR-PERF-01, 02","","Blocked","","Cần công cụ tải (chờ duyệt cùng Q1)."
+"ST-NFR-006","Chạy trên Chrome, Edge, Firefox bản ổn định","Bảo mật & phân quyền","NFR-COMP-01","","System","Medium","Phân lớp tương đương","","","","1. Chạy lại ST-SAL-001 và ST-PUR-001 trên từng trình duyệt","Không lỗi hiển thị / chức năng","","Not Run","",""
+"ST-NFR-007","Sao lưu và khôi phục database","Bảo mật & phân quyền","NFR-REL-04","","System","Medium","Phân lớp tương đương","","","","1. Sao lưu database thử
+2. Khôi phục vào database mới
+3. Đối chiếu số dòng các bảng chính","Khôi phục đầy đủ","","Not Run","","Cần quy trình sao lưu của bản triển khai (deploy/compose.yml chưa có)."
+"ST-NFR-008","Nhật ký kiểm toán cho thao tác nhạy cảm","Bảo mật & phân quyền","BR-49, NFR-SEC-06","","System","Medium","Phân lớp tương đương","","","","1. Đổi quyền, quyền kho, hạn mức, điều chỉnh tồn; xem nhật ký","Có người, thời gian, thao tác, giá trị trước / sau","","Blocked","","Chưa có bảng / chức năng audit (nghi vấn N-11)."
+"RT-N01","Tái hiện N-01: sửa nhân viên giữ nguyên quyền kho","Tài khoản","BR-04","UC-08","Regression","High","Theo rủi ro","","","","1. Chạy API-ACC-003 trước và sau khi sửa","Sau sửa: đạt; chạy lại API-ACC-*, IT-SEC-001","","Not Run","",""
+"RT-N02","Tái hiện N-02: nhận vượt số xuất bị chặn","Chuyển kho","BR-40","UC-38","Regression","High","Theo rủi ro","","","","1. Chạy IT-TRF-003","Sau sửa: đạt; chạy lại IT-TRF-*, API-TRF-001, ST-TRF-001","","Not Run","",""
+"RT-N03","Tái hiện N-03: bán đồng thời không vượt tồn","Bán hàng POS","BR-16, NFR-REL-01","UC-35","Regression","Critical","Theo rủi ro, Đồng thời","","","","1. Chạy IT-CONC-001 20 lần","Không lần nào tồn âm khi không cho bán âm; chạy lại IT-SAL-*, IT-CONC-003, ST-SAL-001","","Not Run","",""
+"RT-N04","Tái hiện N-04: bán hàng nhiều lô","Bán hàng POS","BR-16","UC-35","Regression","High","Theo rủi ro","","","","1. Chạy IT-SAL-011","Sau sửa: đạt; chạy lại IT-SAL-*, IT-PRO-001","","Not Run","",""
+"RT-N05","Tái hiện N-05: thanh toán trùng đồng thời","Bán hàng POS","NFR-REL-03","UC-23","Regression","High","Theo rủi ro, Đồng thời","","","","1. Chạy IT-CONC-002 20 lần","Luôn chỉ 1 hoá đơn","","Not Run","",""
+"RT-N07","Tái hiện N-07: quyền mặc định theo vai trò của Report 3","Bảo mật & phân quyền","BR-02","UC-22, UC-30, UC-85, UC-96","Regression","High","Theo rủi ro, Bảo mật","","","","1. Chạy API-BKG-005, API-PO-002, API-SUP-001, API-PLN-003","Sau khi nhóm chốt ma trận quyền: đạt; chạy lại API-SEC-003","","Not Run","",""
+"RT-N08","Tái hiện N-08: không huỷ phiếu chuyển đã nhận","Chuyển kho","BR-40","UC-37","Regression","Medium","Theo rủi ro","","","","1. Chạy UT-STS-003, API-TRF-001 ca 4","Sau sửa: đạt","","Not Run","",""
+"RT-N14","Xác minh N-14: kỳ hạn nợ và nợ quá hạn","Tín dụng & công nợ KH","BR-18","UC-29, UC-66","Regression","Medium","Phân lớp tương đương","","Khách có kỳ hạn 30 ngày; hoá đơn xuất 31 ngày trước còn nợ","","1. Mở công nợ khách","Hiện ngày đến hạn = ngày xuất + 30, đánh dấu quá hạn","","Not Run","",""
+"RT-N15","Xác minh N-15: lô sau khi chuyển kho","Chuyển kho","BR-40","UC-37","Regression","Low","Đoán lỗi","","TP1 lô L1 tại K001","","1. Chuyển TP1 sang K002
+2. Xem tồn theo lô tại K002","Ghi nhận lô có được giữ hay không (tài liệu chưa quy định); báo nhóm","","Not Run","",""
+"RT-SUITE-01","Bộ hồi quy theo module (chạy khi sửa module tương ứng)","Bảo mật & phân quyền","NFR-REL-01","","Regression","High","Theo rủi ro","","","","1. Chọn bộ theo bảng ""Bộ hồi quy"" trong 03_TEST_STRATEGY.md","Mọi ca trong bộ đạt hoặc có lý do","","Not Run","",""

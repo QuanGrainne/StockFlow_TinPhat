@@ -1187,7 +1187,7 @@ export default function CreatePurchaseScreen({ mode = 'receipt' }: CreatePurchas
                   KHO LÀM VIỆC
                 </div>
                 <div className="font-bold text-[#15171a] truncate leading-tight">
-                  {activeWarehouse?.name || 'Kho Tổng Gia Lâm'}
+                  {activeWarehouse?.name || 'Chưa chọn kho'}
                 </div>
               </div>
               <ChevronDown
@@ -1676,7 +1676,7 @@ export default function CreatePurchaseScreen({ mode = 'receipt' }: CreatePurchas
               {/* Kho nhận hàng (giữ từ form cũ) */}
               <div className="flex items-center justify-between gap-3">
                 <span>Kho nhận hàng</span>
-                <span className="text-right truncate">{fixedWarehouse?.name || activeWarehouse?.name || 'Kho Tổng Gia Lâm'}</span>
+                <span className="text-right truncate">{fixedWarehouse?.name || activeWarehouse?.name || 'Chưa chọn kho'}</span>
               </div>
 
               {/* Mã đặt hàng nhập */}

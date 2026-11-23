@@ -264,7 +264,8 @@ function DiscountPopover({
 // ─── Màn hình chính ───────────────────────────────────────────────────────────
 export default function PosScreen() {
   const { activeWarehouse, setActiveWarehouse } = useActiveWarehouse();
-  const warehouseId = activeWarehouse?.warehouseId ?? 3;
+  // 0 = chưa tải xong danh sách kho được phân quyền (không gán cứng kho mặc định)
+  const warehouseId = activeWarehouse.warehouseId;
   /** Hàng khách đặt chưa giao tại chi nhánh (productId → SL) */
   const [reserved, setReserved] = useState<Record<number, number>>({});
   /** Quyền theo ma trận chức năng: Bán hàng (hóa đơn) / Đặt hàng */
@@ -284,8 +285,6 @@ export default function PosScreen() {
   const [priceBooks, setPriceBooks] = useState<PosPriceBook[]>([]);
   const [priceMatrix, setPriceMatrix] = useState<Record<number, Record<number, number>>>({});
   const [allowNegativeStock, setAllowNegativeStock] = useState(false);
-  // Thiết lập "Khóa thời gian giao dịch": bật thì không cho chọn ngày giờ bán (luôn lấy giờ hiện tại)
-  const [lockSaleTime, setLockSaleTime] = useState(false);
   /** Ngày giờ bán do người dùng chọn (YYYY-MM-DDTHH:mm); null = bán theo giờ hiện tại */
   const [saleTime, setSaleTime] = useState<string | null>(null);
   const [reloadTick, setReloadTick] = useState(0);
@@ -395,7 +394,6 @@ export default function PosScreen() {
       setPriceBooks(pbs.filter((p) => p.isActive !== false));
       setPriceMatrix(matrix);
       setAllowNegativeStock(Boolean(settings?.allowNegativeStockSale));
-      setLockSaleTime(Boolean(settings?.lockTransactionTime));
       // Đổi kho làm việc → tồn kho của các dòng đang có trong giỏ lấy theo kho mới
       // (dòng nạp từ đơn đặt hàng chưa có ảnh → lấy ảnh theo danh mục hàng)
       const prodOf = new Map(prods.map((p) => [p.productId, p]));
@@ -920,18 +918,19 @@ export default function PosScreen() {
       customerSearchRef.current?.focus();
       return message.warning('Vui lòng chọn khách hàng đặt hàng.');
     }
+    if (!warehouseId) return message.error('Chưa xác định chi nhánh làm việc. Vui lòng chọn chi nhánh ở góc trên.');
     if (tab.lines.length === 0) return message.warning('Đơn đặt hàng chưa có hàng hóa.');
     if (tab.lines.some((l) => l.quantity <= 0)) return message.warning('Số lượng hàng hóa phải lớn hơn 0.');
     if (tab.warehouseId && tab.warehouseId !== warehouseId)
       return message.error('Đơn thuộc chi nhánh khác — hãy đổi chi nhánh làm việc về chi nhánh xử lý của đơn.');
     if (bookingPaidTotal > due) return message.error(`Tiền khách trả trước (${fmt(bookingPaidTotal)}) vượt quá giá trị đơn (${fmt(due)}).`);
-    if (!tab.bookingId && !lockSaleTime && saleTime && new Date(saleTime).getTime() > Date.now())
+    if (!tab.bookingId && saleTime && new Date(saleTime).getTime() > Date.now())
       return message.error('Không được đặt hàng với thời gian trong tương lai.');
 
     const payload: SaveSalesBookingPayload = {
       partnerId: tab.customer.id,
       warehouseId,
-      orderDate: !tab.bookingId && !lockSaleTime && saleTime ? new Date(saleTime).toISOString() : undefined,
+      orderDate: !tab.bookingId && saleTime ? new Date(saleTime).toISOString() : undefined,
       deliveryDate: tab.deliveryDate ? new Date(tab.deliveryDate).toISOString() : null,
       discountType: tab.discountMode === 'PERCENT' ? 'PERCENT' : 'AMOUNT',
       discountValue: tab.discountMode === 'PERCENT' ? tab.discountValue : orderDiscount,
@@ -975,13 +974,14 @@ export default function PosScreen() {
     if (isBooking) return handleSaveBooking();
     if (submitting) return;
     if (!canInvoice) return message.error('Vai trò của bạn chưa được phân quyền chức năng Bán hàng.');
+    if (!warehouseId) return message.error('Chưa xác định chi nhánh làm việc. Vui lòng chọn chi nhánh ở góc trên.');
     if (tab.lines.length === 0) return message.warning('Hóa đơn chưa có hàng hóa.');
     if (tab.lines.some((l) => l.quantity <= 0)) return message.warning('Số lượng hàng hóa phải lớn hơn 0.');
     if (!allowNegativeStock) {
       const over = tab.lines.find((l) => (qtyByProduct.get(l.productId) ?? 0) > l.stock);
       if (over) return message.error(`"${over.name}" không đủ tồn kho (tồn ${fmt(over.stock)}). Thiết lập hiện không cho bán âm kho.`);
     }
-    if (!lockSaleTime && saleTime && new Date(saleTime).getTime() > Date.now())
+    if (saleTime && new Date(saleTime).getTime() > Date.now())
       return message.error('Không được bán với thời gian trong tương lai.');
     if (tab.warehouseId && tab.warehouseId !== warehouseId)
       return message.error('Hóa đơn của đơn đặt hàng phải xuất từ chi nhánh xử lý của đơn — hãy đổi chi nhánh làm việc.');
@@ -1021,7 +1021,7 @@ export default function PosScreen() {
       paidAmount: paid,
       notes,
       clientRequestId: `${tab.id}-${tab.lines.length}-${subTotal}`,
-      orderDate: !lockSaleTime && saleTime ? new Date(saleTime).toISOString() : undefined,
+      orderDate: saleTime ? new Date(saleTime).toISOString() : undefined,
       bookingOrderId: tab.bookingId ?? undefined,
       createRemainderBooking,
       excessAction: excessToDebt ? 'RECORD_DEBT' : 'RETURN_CASH',
@@ -1561,19 +1561,15 @@ export default function PosScreen() {
             {/* Sửa đơn đặt hàng: hiện thời gian đặt của đơn (không đổi được); còn lại: thời gian bán / đặt */}
             <input
               type="datetime-local"
-              value={isBooking && tab.bookingId && tab.orderDate ? tab.orderDate : lockSaleTime ? nowLocal : saleTime ?? nowLocal}
+              value={isBooking && tab.bookingId && tab.orderDate ? tab.orderDate : saleTime ?? nowLocal}
               max={nowLocal}
-              disabled={lockSaleTime || (isBooking && !!tab.bookingId)}
+              disabled={isBooking && !!tab.bookingId}
               onChange={(e) => {
                 const v = e.target.value;
                 // Không cho bán trong tương lai: chọn quá giờ hiện tại thì lấy giờ hiện tại
                 setSaleTime(!v || v >= nowLocal ? null : v);
               }}
-              title={
-                lockSaleTime
-                  ? "Đang bật Khóa thời gian giao dịch (Thiết lập đơn hàng) — hóa đơn lấy giờ hiện tại"
-                  : "Thời gian bán (không được chọn thời gian trong tương lai)"
-              }
+              title="Thời gian bán (không được chọn thời gian trong tương lai)"
               className="h-8 px-2 rounded-lg border border-slate-300 text-[14px] text-[#15171a] outline-none focus:border-[#0070f4] disabled:bg-[#f7f8f9] disabled:text-[#677484] disabled:cursor-not-allowed cursor-pointer"
             />
           </div>

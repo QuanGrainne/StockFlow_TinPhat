@@ -26,29 +26,6 @@ import { StaffAccount, UserRole, RoleDefinition, WarehouseFacility } from '../ty
 import { adminService } from '../services/adminService';
 import { PASSWORD_RULES, firstPasswordViolation } from '@/lib/auth/passwordPolicy';
 
-const WAREHOUSE_OPTIONS = [
-  {
-    code: 'K001',
-    name: 'Kho Tổng Gia Lâm',
-    address: 'Số 18 Đường Dệt May, Gia Lâm, Hà Nội',
-  },
-  {
-    code: 'K002',
-    name: 'Kho Đông Anh',
-    address: 'CCN Nguyên Khê, Đông Anh, Hà Nội',
-  },
-  {
-    code: 'K003',
-    name: 'Kho Hà Đông',
-    address: 'Km14 Quốc lộ 6, Yên Nghĩa, Hà Đông, Hà Nội',
-  },
-  {
-    code: 'K004',
-    name: 'Kho Hoàn Kiếm',
-    address: '42 Phố Trần Hưng Đạo, Hoàn Kiếm, Hà Nội',
-  },
-];
-
 const getNextStaffCode = (list: StaffAccount[]): string => {
   let maxId = 0;
   for (const s of list) {
@@ -105,26 +82,22 @@ export const StaffAccountsScreen: React.FC<StaffAccountsScreenProps> = ({
   const [formTitle, setFormTitle] = useState('');
   const [formRole, setFormRole] = useState<UserRole>('ROLE_WAREHOUSE');
   const [formPassword, setFormPassword] = useState('TinPhat@2026');
-  const [formWarehouses, setFormWarehouses] = useState<string[]>(['K001']);
+  const [formWarehouses, setFormWarehouses] = useState<string[]>([]);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  const warehouseList = availableWarehouses.length > 0
-    ? availableWarehouses.map((w) => ({
-        code: w.code,
-        name: w.name,
-        address: w.address,
-      }))
-    : WAREHOUSE_OPTIONS;
+  // Danh sách kho thật từ DB (không còn danh sách kho dự phòng gán cứng)
+  const warehouseList = availableWarehouses.map((w) => ({
+    code: w.code,
+    name: w.name,
+    address: w.address,
+  }));
 
   const normalizeWarehouseCode = (code: string): string => {
     if (!code) return '';
     const upper = code.trim().toUpperCase();
-    if (upper === 'K001' || upper === 'K01' || upper === 'WH-HN-01' || upper === 'KTP-01' || upper.includes('GIA LÂM')) return 'K001';
-    if (upper === 'K002' || upper === 'K02' || upper === 'WH-HN-02' || upper === 'KNVL-01' || upper.includes('ĐÔNG ANH')) return 'K002';
-    if (upper === 'K003' || upper === 'K03' || upper === 'WH-HN-03' || upper.includes('HÀ ĐÔNG')) return 'K003';
-    if (upper === 'K004' || upper === 'K04' || upper === 'WH-HN-04' || upper.includes('HOÀN KIẾM')) return 'K004';
-
-    const exact = warehouseList.find((w) => w.code.toUpperCase() === upper);
+    // Khớp theo mã kho, rồi theo tên kho (chính xác) trong danh sách kho thật; không dò tên địa danh cố định
+    const exact = warehouseList.find((w) => w.code.toUpperCase() === upper)
+      ?? warehouseList.find((w) => w.name.trim().toUpperCase() === upper);
     if (exact) return exact.code;
 
     return code;
@@ -255,7 +228,7 @@ export const StaffAccountsScreen: React.FC<StaffAccountsScreenProps> = ({
     const defaultRole = selectableRoles.find((r) => !r.isSystem)?.code || selectableRoles[0]?.code || 'ROLE_WAREHOUSE';
     setFormRole(defaultRole);
     setFormPassword('TinPhat@2026');
-    setFormWarehouses([warehouseList[0]?.code || 'K001']);
+    setFormWarehouses(warehouseList[0] ? [warehouseList[0].code] : []);
     setEditModalOpen(true);
   };
 
@@ -283,7 +256,7 @@ export const StaffAccountsScreen: React.FC<StaffAccountsScreenProps> = ({
 
     setFormPassword('');
     const normalizedWarehouses = (staff.assignedWarehouses || []).map((code) => normalizeWarehouseCode(code));
-    setFormWarehouses(normalizedWarehouses.length > 0 ? normalizedWarehouses : [warehouseList[0]?.code || 'K001']);
+    setFormWarehouses(normalizedWarehouses.length > 0 ? normalizedWarehouses : (warehouseList[0] ? [warehouseList[0].code] : []));
     setEditModalOpen(true);
   };
 

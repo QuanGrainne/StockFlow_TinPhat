@@ -5,6 +5,7 @@ using StockFlow.Application.Common.Interfaces;
 using StockFlow.Application.Features.PurchaseOrders.DTOs;
 using StockFlow.Application.Features.PurchaseOrders.Helpers;
 using StockFlow.Application.Features.Purchases.Helpers;
+using StockFlow.Domain.Entities;
 
 namespace StockFlow.Application.Features.PurchaseOrders.Queries;
 
@@ -77,8 +78,10 @@ public class PurchaseOrderQueryHandler :
             .Include(r => r.DtlGoodsReceiptItems)
             .Where(r => r.PurchaseOrderId != null && poIds.Contains(r.PurchaseOrderId.Value) && r.Status == "COMPLETED")
             .ToListAsync(ct);
-        var receivedByPo = receipts.GroupBy(r => r.PurchaseOrderId!.Value)
-            .ToDictionary(g => g.Key, g => g.SelectMany(r => r.DtlGoodsReceiptItems).Sum(PurchaseStockOps.Quantity));
+        var linesByPo = receipts.GroupBy(r => r.PurchaseOrderId!.Value)
+            .ToDictionary(g => g.Key, g => (IReadOnlyCollection<DtlGoodsReceiptItem>)g.SelectMany(r => r.DtlGoodsReceiptItems).ToList());
+        var receivedByPo = linesByPo.ToDictionary(kv => kv.Key, kv => kv.Value.Sum(PurchaseStockOps.Quantity));
+        IReadOnlyCollection<DtlGoodsReceiptItem> noLines = Array.Empty<DtlGoodsReceiptItem>();
 
         var result = orders.Select(p => new PurchaseOrderListDto(
             p.PoId,
@@ -93,7 +96,8 @@ public class PurchaseOrderQueryHandler :
             p.CreatedByNavigation?.FullName ?? p.CreatedByNavigation?.Username ?? "",
             p.DtlPurchaseOrderItems.Sum(i => i.OrderedQty),
             receivedByPo.GetValueOrDefault(p.PoId),
-            p.TotalAmount,
+            // Tổng tiền theo SL đã nhập (chưa nhập thì theo SL đặt)
+            PurchaseOrderHelper.AmountsByReceived(p, linesByPo.GetValueOrDefault(p.PoId) ?? noLines).Total,
             p.Notes,
             p.ExpectedDate)).ToList();
 
@@ -136,7 +140,8 @@ public class PurchaseOrderQueryHandler :
             received.GetValueOrDefault(i.ProductId),
             i.UnitPrice,
             i.DiscountPercent,
-            PurchaseOrderHelper.LineTotal(i.OrderedQty, i.UnitPrice, i.DiscountPercent),
+            // Thành tiền theo SL đã nhập khi đã có phiếu nhập hoàn thành (nhập lệch được chấp nhận), chưa nhập thì theo SL đặt
+            PurchaseOrderHelper.ItemAmount(i, received.GetValueOrDefault(i.ProductId), completedLines.Count > 0),
             defective.GetValueOrDefault(i.ProductId))).ToList();
 
         // Hàng thực nhập nhưng không có trong phiếu đặt
@@ -145,7 +150,8 @@ public class PurchaseOrderQueryHandler :
         {
             var p = g.First().Product;
             return new PurchaseOrderItemDto(g.Key, p?.ProductCode ?? $"SP{g.Key}", p?.ProductName ?? "Sản phẩm",
-                p?.BaseUnit?.UnitName ?? "Cái", 0, received[g.Key], 0, 0, 0, defective.GetValueOrDefault(g.Key));
+                p?.BaseUnit?.UnitName ?? "Cái", 0, received[g.Key], 0, 0,
+                g.Sum(PurchaseOrderHelper.ReceiptLineAmount), defective.GetValueOrDefault(g.Key));
         }));
 
         // Tiền đã trả NCC của phiếu đặt = tổng đã trả cho các phiếu nhập theo phiếu đặt (khớp Lịch sử thanh toán
@@ -155,6 +161,9 @@ public class PurchaseOrderQueryHandler :
             .Where(t => t.TxType == "SUPPLIER_PAYMENT" && t.Status != "CANCELLED" &&
                         t.ReferenceType == "GOODS_RECEIPT" && t.ReferenceId != null && completedIds.Contains(t.ReferenceId.Value))
             .SumAsync(t => t.Amount ?? 0, ct);
+
+        // Tiền hàng / giảm giá / tổng cộng theo SL đã nhập (chưa nhập thì bằng giá trị đặt)
+        var amounts = PurchaseOrderHelper.AmountsByReceived(po, completedLines);
 
         var receiptDtos = receipts.Select(r => new PurchaseOrderReceiptDto(
             r.GrId,
@@ -176,9 +185,9 @@ public class PurchaseOrderQueryHandler :
             po.OrderDate,
             po.Status ?? PurchaseOrderHelper.Draft,
             po.CreatedByNavigation?.FullName ?? po.CreatedByNavigation?.Username ?? "",
-            po.TotalAmount + po.DiscountAmount,
-            po.DiscountAmount,
-            po.TotalAmount,
+            amounts.Goods,
+            amounts.Discount,
+            amounts.Total,
             po.Notes,
             items,
             receiptDtos,
