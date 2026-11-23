@@ -52,7 +52,12 @@ public class ReceiveTransferCommandHandler : IRequestHandler<ReceiveTransferComm
             return Result.Failure<TransferDetailDto>($"Chỉ phiếu ở trạng thái 'Đang chuyển' mới có thể nhận hàng. Trạng thái hiện tại: {transfer.Status}.");
         }
 
-        // 1. Kiểm tra chênh lệch số lượng (nhận thiếu)
+        var productIds = transfer.DtlStockTransferItems.Select(i => i.ProductId).Distinct().ToList();
+        var products = await _context.MstProducts
+            .Where(p => productIds.Contains(p.ProductId))
+            .ToDictionaryAsync(p => p.ProductId, cancellationToken);
+
+        // 1. Kiểm tra số lượng nhận: không âm, không lớn hơn số lượng chuyển (24/11/2026), và đánh dấu nhận thiếu
         bool hasDiscrepancy = false;
         foreach (var item in transfer.DtlStockTransferItems)
         {
@@ -60,8 +65,25 @@ public class ReceiveTransferCommandHandler : IRequestHandler<ReceiveTransferComm
                 (ri.TransferItemId.HasValue && ri.TransferItemId.Value == item.TransferItemId) ||
                 ri.ProductId == item.ProductId);
 
-            decimal actualReceived = reqItem != null ? Math.Max(0, reqItem.ReceivedQuantity) : (item.Quantity ?? 0);
-            if (actualReceived < (item.Quantity ?? 0))
+            var sent = item.Quantity ?? 0;
+            if (reqItem != null)
+            {
+                var label = products.TryGetValue(item.ProductId, out var p)
+                    ? $"{p.ProductCode} - {p.ProductName}"
+                    : $"#{item.ProductId}";
+                if (reqItem.ReceivedQuantity < 0)
+                {
+                    return Result.Failure<TransferDetailDto>($"Hàng {label}: số lượng nhận không được âm.");
+                }
+                if (reqItem.ReceivedQuantity > sent)
+                {
+                    return Result.Failure<TransferDetailDto>(
+                        $"Hàng {label}: số lượng nhận ({reqItem.ReceivedQuantity:0.###}) không được lớn hơn số lượng chuyển ({sent:0.###}).");
+                }
+            }
+
+            decimal actualReceived = reqItem?.ReceivedQuantity ?? sent;
+            if (actualReceived < sent)
             {
                 hasDiscrepancy = true;
             }
@@ -73,11 +95,6 @@ public class ReceiveTransferCommandHandler : IRequestHandler<ReceiveTransferComm
         {
             return Result.Failure<TransferDetailDto>("Phát hiện nhận thiếu hàng! Bắt buộc phải nhập ghi chú lý do thiếu hàng trước khi xác nhận Nhận hàng.");
         }
-
-        var productIds = transfer.DtlStockTransferItems.Select(i => i.ProductId).Distinct().ToList();
-        var products = await _context.MstProducts
-            .Where(p => productIds.Contains(p.ProductId))
-            .ToDictionaryAsync(p => p.ProductId, cancellationToken);
 
         var receivedDate = TransferHelper.GetVietnamTime(command.Request.ReceivedDate);
 
@@ -96,7 +113,7 @@ public class ReceiveTransferCommandHandler : IRequestHandler<ReceiveTransferComm
                 (ri.TransferItemId.HasValue && ri.TransferItemId.Value == item.TransferItemId) ||
                 ri.ProductId == item.ProductId);
 
-            decimal actualReceived = reqItem != null ? Math.Max(0, reqItem.ReceivedQuantity) : (item.Quantity ?? 0);
+            decimal actualReceived = reqItem?.ReceivedQuantity ?? (item.Quantity ?? 0);
             item.ReceivedQuantity = actualReceived;
             if (reqItem != null)
             {

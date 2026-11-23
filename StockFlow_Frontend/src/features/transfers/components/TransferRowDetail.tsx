@@ -233,7 +233,7 @@ export const TransferRowDetail: React.FC<Props> = ({ transferId, onRefresh, onOp
             <div>
               <span className="text-slate-400">Tình trạng nhận: </span>
               <span className={`font-semibold ${totalReceived === totalQty ? 'text-[#16a34a]' : 'text-[#fb2c36]'}`}>
-                {totalReceived === totalQty ? 'Khớp' : 'Không khớp'}
+                {totalReceived === totalQty ? 'Khớp' : `Không khớp (lệch ${qtyFmt(totalReceived - totalQty)})`}
               </span>
             </div>
           )}
@@ -253,7 +253,8 @@ export const TransferRowDetail: React.FC<Props> = ({ transferId, onRefresh, onOp
               {isReceiveTab && <th className="py-2 px-3 w-24 text-right">SL nhận</th>}
               {isReceiveTab && <th className="py-2 px-3 w-24 text-right">Chênh lệch</th>}
               <th className="py-2 px-3 w-28 text-right">Giá chuyển</th>
-              <th className="py-2 px-3 w-32 text-right">{isReceiveTab ? 'Thành tiền nhận' : 'Thành tiền'}</th>
+              <th className="py-2 px-3 w-32 text-right">Thành tiền chuyển</th>
+              {isReceiveTab && <th className="py-2 px-3 w-32 text-right">Thành tiền nhận</th>}
             </tr>
             <tr className="bg-white border-t border-slate-200">
               <th />
@@ -273,13 +274,13 @@ export const TransferRowDetail: React.FC<Props> = ({ transferId, onRefresh, onOp
                   className="w-full h-7 px-2 text-xs font-normal border border-slate-300 rounded-[6px] focus:outline-none focus:border-[#0070f4]"
                 />
               </th>
-              <th colSpan={isReceiveTab ? 6 : 4} />
+              <th colSpan={isReceiveTab ? 7 : 4} />
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {items.length === 0 ? (
               <tr>
-                <td colSpan={isReceiveTab ? 9 : 7} className="py-6 text-center text-slate-400">
+                <td colSpan={isReceiveTab ? 10 : 7} className="py-6 text-center text-slate-400">
                   Không có mặt hàng nào phù hợp
                 </td>
               </tr>
@@ -313,9 +314,12 @@ export const TransferRowDetail: React.FC<Props> = ({ transferId, onRefresh, onOp
                       </td>
                     )}
                     <td className="py-2 px-3 text-right">{money.format(it.transferPrice)}</td>
-                    <td className="py-2 px-3 text-right font-semibold">
-                      {money.format(isReceiveTab ? (received ?? 0) * it.transferPrice : it.lineTotal)}
-                    </td>
+                    <td className="py-2 px-3 text-right font-semibold">{money.format(it.lineTotal)}</td>
+                    {isReceiveTab && (
+                      <td className="py-2 px-3 text-right font-semibold">
+                        {received !== null && received !== undefined ? money.format(received * it.transferPrice) : '—'}
+                      </td>
+                    )}
                   </tr>
                 );
               })
@@ -370,24 +374,25 @@ export const TransferRowDetail: React.FC<Props> = ({ transferId, onRefresh, onOp
             <span>Tổng SL chuyển:</span>
             <span className="font-semibold text-slate-800">{qtyFmt(totalQty)}</span>
           </div>
+          <div className="flex justify-between text-slate-600">
+            <span>Tổng giá trị chuyển:</span>
+            <span className="font-bold text-slate-800">{money.format(totalAmount)}</span>
+          </div>
+          {/* Phần nhận chỉ có khi kho nhận đã xác nhận nhận hàng */}
           {hasReceived && (
             <>
-              <div className="flex justify-between text-slate-600">
+              <div className="flex justify-between text-slate-600 border-t border-slate-200 pt-1.5">
                 <span>Tổng SL nhận:</span>
-                <span className="font-semibold text-[#16a34a]">{qtyFmt(totalReceived)}</span>
+                <span className={`font-semibold ${totalReceived === totalQty ? 'text-[#16a34a]' : 'text-[#fb2c36]'}`}>
+                  {qtyFmt(totalReceived)}
+                </span>
               </div>
-              {totalReceived !== totalQty && (
-                <div className="flex justify-between text-[#fb2c36]">
-                  <span>Chênh lệch:</span>
-                  <span className="font-semibold">{qtyFmt(totalReceived - totalQty)}</span>
-                </div>
-              )}
+              <div className="flex justify-between text-slate-600">
+                <span>Tổng giá trị nhận:</span>
+                <span className="font-bold text-slate-800">{money.format(receivedAmount)}</span>
+              </div>
             </>
           )}
-          <div className="flex justify-between text-slate-700 border-t border-slate-200 pt-1.5 font-bold">
-            <span>{isReceiveTab && hasReceived ? 'Tổng giá trị nhận:' : 'Tổng giá trị chuyển:'}</span>
-            <span>{money.format(isReceiveTab && hasReceived ? receivedAmount : totalAmount)}</span>
-          </div>
         </div>
       </div>
 
