@@ -1,6 +1,8 @@
-import { redirect } from 'next/navigation';
+// src/app/(dashboard)/reports/page.tsx — Báo cáo (UC-86, 87, 88, 90)
+'use client';
 
-// Trang cũ: chuyển sang chức năng tương ứng trên navbar
-export default function LegacyPage() {
-  redirect('/dashboard');
+import { LazyAppLayout } from '@/components/layout/LazyAppLayout';
+
+export default function ReportsPage() {
+  return <LazyAppLayout initialScreen="reports" />;
 }

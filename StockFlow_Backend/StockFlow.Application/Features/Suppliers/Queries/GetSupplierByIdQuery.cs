@@ -2,7 +2,6 @@ using MediatR;
 using Microsoft.EntityFrameworkCore;
 using StockFlow.Application.Common;
 using StockFlow.Application.Common.Interfaces;
-using StockFlow.Application.Features.Suppliers.Commands;
 using StockFlow.Application.Features.Suppliers.DTOs;
 using StockFlow.Application.Features.PurchaseReturns.Helpers;
 using StockFlow.Application.Features.Suppliers.Helpers;
@@ -113,82 +112,13 @@ public class GetSupplierByIdQueryHandler : IRequestHandler<GetSupplierByIdQuery,
             .OrderByDescending(b => b.TotalPurchasedAmount)
             .ToList();
 
-        // 4. Sổ "Nợ cần trả nhà cung cấp" theo kiểu KiotViet: chỉ hiện dòng phiếu nhập (PN...).
+        // 4. Sổ "Nợ cần trả nhà cung cấp" theo kiểu KiotViet (SupplierDebtLedger, dùng chung với báo cáo công nợ UC-86).
         //    Khoản trả ngay khi nhập hàng được trừ thẳng vào dòng PN đó → Giá trị = tiền hàng − đã trả = nợ phát sinh.
         //    Chỉ thanh toán KHÔNG gắn với phiếu nhập hoàn thành nào (thanh toán công nợ riêng) mới thành dòng riêng.
         //    Nợ đầu kỳ = Nợ hiện tại − Σ giá trị các dòng — gồm nợ khai báo ban đầu / điều chỉnh tay.
         //    Phiếu chi thanh toán nợ (có TxCode, VD PC000001) luôn là 1 dòng "Thanh toán" riêng, gộp các phần phân bổ.
         var currentPayable = partner.CurrentPayable ?? 0m;
-        var completedIds = completed.Select(r => r.GrId).ToHashSet();
-        bool IsPaidWithReceipt(TrxFinancialTransaction t) =>
-            string.IsNullOrEmpty(t.TxCode)
-            && string.Equals(t.ReferenceType, SupplierDebtCalculator.GoodsReceiptRef, StringComparison.OrdinalIgnoreCase)
-            && t.ReferenceId.HasValue && completedIds.Contains(t.ReferenceId.Value);
-
-        // Khoản trả ngay lúc hoàn thành phiếu nhập (không có mã phiếu chi) → trừ thẳng vào dòng PN
-        var paidAtReceipt = SupplierDebtCalculator.PaidByReceipt(activePayments.Where(IsPaidWithReceipt));
-
-        var voucherRows = activePayments
-            .Where(t => !string.IsNullOrEmpty(t.TxCode))
-            .GroupBy(t => t.TxCode!)
-            .Select(g => (Code: g.Key, Date: g.Min(t => t.TransactionDate), Type: "PAYMENT",
-                          Label: "Thanh toán", Ref: (int?)null, Amount: -g.Sum(t => t.Amount ?? 0), Order: 1, Seq: g.Min(t => t.TxId)));
-
-        var otherPayments = activePayments
-            .Where(t => string.IsNullOrEmpty(t.TxCode) && !IsPaidWithReceipt(t))
-            .Select(t => (Code: $"TT{t.TxId:D6}", Date: t.TransactionDate, Type: "PAYMENT",
-                          Label: "Thanh toán", Ref: t.ReferenceId, Amount: -(t.Amount ?? 0), Order: 1, Seq: t.TxId));
-
-        // Phiếu trả hàng nhập đã hoàn thành: giảm nợ = NCC cần trả − tiền NCC trả ngay lúc trả hàng.
-        // Tiền NCC trả sau (phiếu thu PT...) là dòng "Nhà cung cấp trả tiền" riêng, làm tăng lại nợ phải trả.
-        var completedReturns = allReturns.Where(r => r.Status == "COMPLETED").ToList();
-        var refunds = await _context.TrxFinancialTransactions
-            .AsNoTracking()
-            .Where(t => t.PartnerId == request.PartnerId
-                        && t.TxType == PurchaseReturnLogic.RefundTxType
-                        && t.Status != "CANCELLED")
-            .ToListAsync(cancellationToken);
-        var refundAtReturn = refunds
-            .Where(t => string.IsNullOrEmpty(t.TxCode) && t.ReferenceId.HasValue)
-            .GroupBy(t => t.ReferenceId!.Value)
-            .ToDictionary(g => g.Key, g => g.Sum(t => t.Amount ?? 0));
-        var returnRows = completedReturns
-            .Select(r => (Code: r.ReturnCode ?? $"THN{r.PurchaseReturnId:D6}", Date: r.ReturnDate, Type: "SUPPLIER_RETURN",
-                          Label: "Trả hàng nhà cung cấp", Ref: (int?)r.PurchaseReturnId,
-                          Amount: -((r.TotalAmount ?? 0) - refundAtReturn.GetValueOrDefault(r.PurchaseReturnId)),
-                          Order: 0, Seq: r.PurchaseReturnId));
-        var refundRows = refunds
-            .Where(t => !string.IsNullOrEmpty(t.TxCode))
-            .Select(t => (Code: t.TxCode!, Date: t.TransactionDate, Type: "SUPPLIER_REFUND",
-                          Label: "Nhà cung cấp trả tiền", Ref: t.ReferenceId,
-                          Amount: t.Amount ?? 0,
-                          Order: 1, Seq: t.TxId));
-
-        // Phiếu điều chỉnh công nợ NCC (DC...): amount = nợ sau − nợ trước
-        var adjustRows = (await _context.TrxFinancialTransactions
-            .AsNoTracking()
-            .Where(t => t.PartnerId == request.PartnerId
-                        && t.TxType == AdjustSupplierDebtCommandHandler.TxType
-                        && t.Status != "CANCELLED")
-            .ToListAsync(cancellationToken))
-            .Select(t => (Code: t.TxCode ?? $"{DebtAdjustCodes.Prefix}{t.TxId:D6}", Date: t.TransactionDate, Type: "ADJUST",
-                          Label: "Điều chỉnh", Ref: (int?)null, Amount: t.Amount ?? 0, Order: 1, Seq: t.TxId));
-
-        var movements = completed
-            .Select(r => (Code: r.GrCode ?? $"PN{r.GrId:D6}", Date: r.ReceivedDate, Type: "GOODS_RECEIPT",
-                          Label: "Nhập hàng", Ref: (int?)r.GrId,
-                          Amount: SupplierDebtCalculator.ReceiptTotal(r) - paidAtReceipt.GetValueOrDefault(r.GrId),
-                          Order: 0, Seq: r.GrId))
-            .Concat(returnRows)
-            .Concat(refundRows)
-            .Concat(voucherRows)
-            .Concat(otherPayments)
-            .Concat(adjustRows)
-            // Trùng thời gian (form chọn giờ chỉ đến phút): xếp theo thứ tự tạo thực tế
-            .OrderBy(m => m.Date ?? DateTime.MinValue)
-            .ThenBy(m => m.Order)
-            .ThenBy(m => m.Seq)
-            .ToList();
+        var movements = await SupplierDebtLedger.LoadMovementsAsync(_context, new[] { request.PartnerId }, cancellationToken);
 
         // Phiếu nhập còn nợ (cũ nhất trước) — để phân bổ khi tạo phiếu chi
         var openReceipts = completed

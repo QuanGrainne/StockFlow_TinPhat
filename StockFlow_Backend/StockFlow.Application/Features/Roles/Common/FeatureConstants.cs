@@ -41,6 +41,9 @@ public static class FeatureConstants
     /// <summary>Chạy tính toán và xem hoạch định nhu cầu nguyên vật liệu (MRP).</summary>
     public const string ProductionMrp = "feat-production-mrp";
 
+    /// <summary>Báo cáo tổng quan, doanh thu – lợi nhuận, nhập – xuất – tồn, công nợ (UC-86, 87, 88, 90). Chỉ đọc.</summary>
+    public const string Reports = "feat-reports";
+
     public static readonly List<FeatureDefinition> Features = new()
     {
         new("feat-dashboard", "Tổng quan", "AUTH", None),
@@ -81,6 +84,9 @@ public static class FeatureConstants
         new(ProductionMrp, "Hoạch định NVL (MRP)", "PROD", None),
 
         new("feat-bom", "Định mức BOM", "BOM", None),
+
+        // Báo cáo (UC-86, 87, 88, 90): mặc định Manager / Admin; API cần FIN_READ
+        new(Reports, "Báo cáo", "FIN", None),
     };
 
     /// <summary>Admin luôn giữ quyền vào màn phân quyền (không tự khóa mình)</summary>
@@ -122,7 +128,7 @@ public static class FeatureConstants
             "ROLE_ADMIN" => Features.Select(f => f.Id),
             "ROLE_MANAGER" => GoodsFeats.Concat(StockFeats).Append("feat-customers").Concat(SalesFeats)
                 .Append("feat-credit-approvals")
-                .Concat(PurchaseFeats).Concat(ProdFeats).Append("feat-bom"),
+                .Concat(PurchaseFeats).Concat(ProdFeats).Append("feat-bom").Append(Reports),
             "ROLE_SALES" => new[] { "feat-goods", "feat-customers" }.Concat(SalesFeats),
             "ROLE_WAREHOUSE" => new[] { "feat-goods" }.Concat(StockFeats).Concat(PurchaseFeats),
             "ROLE_PRODUCTION" => new[] { "feat-goods" }.Concat(ProdAccountantFeats),
