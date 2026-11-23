@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Bộ chạy test: cùng phiên bản với StockFlow.UnitTests -->
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <!-- Chạy API thật trong tiến trình test (WebApplicationFactory + TestServer); giữ 9.0.10 khớp JwtBearer / EF Core của dự án -->
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="9.0.10" />
+    <!-- Ghim cùng bản Infrastructure biên dịch (9.0.10), tránh MSB3277 như StockFlow.UnitTests -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="9.0.10" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- API kéo theo Application, Domain, Infrastructure (DbContext, Npgsql) -->
+    <ProjectReference Include="..\StockFlow.API\StockFlow.API.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Thông tin kết nối PostgreSQL của máy chạy test: file cục bộ, KHÔNG commit (xem .gitignore). Có thể thay bằng biến môi trường STOCKFLOW_IT_PG -->
+    <None Include="appsettings.IntegrationTest.local.json" Condition="Exists('appsettings.IntegrationTest.local.json')" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="appsettings.IntegrationTest.local.json.example" CopyToOutputDirectory="Never" />
+  </ItemGroup>
+
+</Project>

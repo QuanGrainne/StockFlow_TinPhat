@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Bộ chạy test (xUnit v2) -->
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <!-- Mock dependency (ICurrentUserService, IDbContextTransaction...) -->
+    <PackageReference Include="Moq" Version="4.20.72" />
+    <!-- DbContext thật của dự án chạy trong bộ nhớ, không cần PostgreSQL; giữ 9.x khớp EF Core 9.0.10 -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="9.0.10" />
+    <!-- Ghim cùng bản Infrastructure biên dịch (9.0.10); nếu không, Npgsql kéo bản tối thiểu 9.0.1 và báo MSB3277 -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="9.0.10" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\StockFlow.Domain\StockFlow.Domain.csproj" />
+    <ProjectReference Include="..\StockFlow.Application\StockFlow.Application.csproj" />
+    <ProjectReference Include="..\StockFlow.Infrastructure\StockFlow.Infrastructure.csproj" />
+    <!-- Ca 403 (RequireAdmin / RequirePermission): kiểm handler phân quyền và JsonAuthorizationResultHandler ở mức unit, không chạy web server -->
+    <ProjectReference Include="..\StockFlow.API\StockFlow.API.csproj" />
+  </ItemGroup>
+
+</Project>
