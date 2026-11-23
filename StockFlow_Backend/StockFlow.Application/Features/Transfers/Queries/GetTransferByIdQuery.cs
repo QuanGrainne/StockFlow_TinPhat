@@ -64,6 +64,7 @@ public class GetTransferByIdQueryHandler : IRequestHandler<GetTransferByIdQuery,
         decimal totalQty = 0;
         decimal totalReceived = 0;
         decimal totalAmount = 0;
+        decimal receivedAmount = 0;
         var itemDtos = new List<TransferItemDetailDto>();
 
         foreach (var item in t.DtlStockTransferItems)
@@ -81,7 +82,11 @@ public class GetTransferByIdQueryHandler : IRequestHandler<GetTransferByIdQuery,
             var lineTotal = qty * price;
 
             totalQty += qty;
-            if (rec.HasValue) totalReceived += rec.Value;
+            if (rec.HasValue)
+            {
+                totalReceived += rec.Value;
+                receivedAmount += rec.Value * price;
+            }
             totalAmount += lineTotal;
 
             var sourceStock = stockBalances
@@ -141,7 +146,8 @@ public class GetTransferByIdQueryHandler : IRequestHandler<GetTransferByIdQuery,
             Notes: t.Notes,
             Items: itemDtos,
             ReceivedByName: receivedByName,
-            ReceiveNotes: t.ReceiveNotes
+            ReceiveNotes: t.ReceiveNotes,
+            TotalReceivedAmount: t.IsReceived() ? receivedAmount : null
         );
 
         return Result.Success(detail);

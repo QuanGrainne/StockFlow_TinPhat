@@ -22,6 +22,8 @@ export interface TransferRecord {
   totalQuantity: number;
   totalReceivedQuantity?: number | null;
   totalAmount: number;
+  /** Giá trị nhận = Σ SL nhận × giá chuyển; null khi phiếu chưa nhận */
+  totalReceivedAmount?: number | null;
   notes?: string | null;
   isStarred?: boolean;
   isMatched?: boolean | null;

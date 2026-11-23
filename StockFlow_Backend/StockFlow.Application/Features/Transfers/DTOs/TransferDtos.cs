@@ -21,7 +21,9 @@ public record TransferListDto(
     decimal TotalQuantity,
     decimal? TotalReceivedQuantity,
     decimal TotalAmount,
-    string? Notes
+    string? Notes,
+    /// <summary>Giá trị nhận = Σ SL nhận × giá chuyển; null khi phiếu chưa nhận</summary>
+    decimal? TotalReceivedAmount = null
 );
 
 public record TransferItemDetailDto(
@@ -60,7 +62,9 @@ public record TransferDetailDto(
     string? Notes,
     List<TransferItemDetailDto> Items,
     string? ReceivedByName = null,
-    string? ReceiveNotes = null
+    string? ReceiveNotes = null,
+    /// <summary>Giá trị nhận = Σ SL nhận × giá chuyển; null khi phiếu chưa nhận</summary>
+    decimal? TotalReceivedAmount = null
 );
 
 public record ProductWithStockDto(
