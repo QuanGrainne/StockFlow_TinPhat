@@ -627,7 +627,7 @@ const PROD_ACCOUNTANT_FEATS = ['feat-production-plans', 'feat-prod', 'feat-prod-
 
 export const DEFAULT_ROLE_FEATURE_PERMS: Record<string, string[]> = {
   ROLE_ADMIN: NAVBAR_FEATURES.map((f) => f.id),
-  ROLE_MANAGER: [...GOODS_FEATS, ...STOCK_FEATS, 'feat-customers', ...SALES_FEATS, 'feat-credit-approvals', ...PURCHASE_FEATS, ...PROD_FEATS, 'feat-bom'],
+  ROLE_MANAGER: [...GOODS_FEATS, ...STOCK_FEATS, 'feat-customers', ...SALES_FEATS, 'feat-credit-approvals', ...PURCHASE_FEATS, ...PROD_FEATS, 'feat-bom', 'feat-reports'],
   ROLE_SALES: ['feat-goods', 'feat-customers', ...SALES_FEATS],
   // UC-33: nhân viên kho lập phiếu chuyển và xác nhận nhận hàng
   ROLE_WAREHOUSE: ['feat-goods', ...STOCK_FEATS, ...PURCHASE_FEATS],

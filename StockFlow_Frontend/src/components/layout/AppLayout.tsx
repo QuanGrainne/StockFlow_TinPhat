@@ -32,6 +32,9 @@ import FinishedGoodsReceiptsScreen from '@/features/production/screens/FinishedG
 import ProductionPlansScreen from '@/features/production/screens/ProductionPlansScreen';
 import { MrpScreen } from '@/features/production/screens/MrpScreen';
 
+// Báo cáo (UC-86, 87, 88, 90)
+import ReportsScreen from '@/features/reports/screens/ReportsScreen';
+
 // Admin Screens
 import { AdminDashboard } from '@/features/admin/screens/AdminDashboard';
 import { StaffAccountsScreen } from '@/features/admin/screens/StaffAccountsScreen';
@@ -173,6 +176,10 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ initialScreen, children })
       case 'production-mrp':
         return <MrpScreen />;
 
+      // ─── Báo cáo ───
+      case 'reports':
+        return <ReportsScreen />;
+
       // ─── Admin Screens ───
       case 'admin-dashboard':
         return <AdminDashboard onNavigate={handleNavigate} />;
@@ -297,6 +304,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ initialScreen, children })
         activeScreen === 'price-books' || activeScreen === 'admin-price-books' ||
         activeScreen === 'stocktakes' ||
         activeScreen === 'disposals' ||
+        activeScreen === 'reports' ||
         activeScreen === 'manager-bom' || activeScreen.startsWith('production-') ||
         activeScreen.includes('price-book') ? (
         <main className="flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden bg-transparent">

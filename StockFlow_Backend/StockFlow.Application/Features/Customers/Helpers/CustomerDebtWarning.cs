@@ -20,34 +20,16 @@ public static class CustomerDebtWarning
         var debtors = partners.Where(p => (p.CurrentDebt ?? 0) > 0).ToList();
         if (debtors.Count == 0) return result;
 
-        var setting = await context.MstDebtWarningSettings.AsNoTracking().FirstOrDefaultAsync(s => s.SettingId == 1, ct)
-                      ?? new MstDebtWarningSetting();
+        var setting = await LoadSettingAsync(context, ct);
         bool checkAmount = setting.EnableDebtAmountWarning && setting.DebtAmountThreshold > 0;
         bool checkDays = setting.EnableDebtDaysWarning && setting.DebtDaysThreshold > 0;
         if (!checkAmount && !checkDays) return result;
 
         Dictionary<int, DateTime> since = new();
-        bool fromFirstDebt = setting.DebtDaysFrom != MstDebtWarningSetting.FromLastTransaction;
+        bool fromFirstDebt = IsFromFirstDebt(setting);
         if (checkDays)
-        {
-            var ids = debtors.Select(p => p.PartnerId).ToList();
-            var orders = context.TrxOrders.AsNoTracking()
-                .Where(o => ids.Contains(o.PartnerId) && o.Status == CustomerProfileHelper.CompletedStatus && o.OrderDate != null);
-            if (fromFirstDebt)
-                orders = orders.Where(o => (o.OutstandingAmount ?? 0) > 0);
+            since = await GetDebtSinceAsync(context, debtors.Select(p => p.PartnerId).ToList(), fromFirstDebt, ct);
 
-            var rows = await orders
-                .GroupBy(o => o.PartnerId)
-                .Select(g => new
-                {
-                    PartnerId = g.Key,
-                    Date = fromFirstDebt ? g.Min(o => o.OrderDate) : g.Max(o => o.OrderDate),
-                })
-                .ToListAsync(ct);
-            since = rows.Where(r => r.Date.HasValue).ToDictionary(r => r.PartnerId, r => r.Date!.Value);
-        }
-
-        var today = VietnamTime.Now.Date;
         foreach (var p in debtors)
         {
             var reasons = new List<string>();
@@ -57,7 +39,7 @@ public static class CustomerDebtWarning
 
             if (checkDays && since.TryGetValue(p.PartnerId, out var date))
             {
-                var days = (today - date.Date).Days;
+                var days = DebtDays(date);
                 if (days >= setting.DebtDaysThreshold)
                     reasons.Add(fromFirstDebt
                         ? $"Nợ {days} ngày kể từ giao dịch nợ đầu tiên (mức cảnh báo {setting.DebtDaysThreshold} ngày)"
@@ -68,4 +50,41 @@ public static class CustomerDebtWarning
         }
         return result;
     }
+
+    /// <summary>Thiết lập cảnh báo công nợ (dòng SettingId = 1; chưa có thì dùng mặc định).</summary>
+    public static async Task<MstDebtWarningSetting> LoadSettingAsync(IStockFlowDbContext context, CancellationToken ct) =>
+        await context.MstDebtWarningSettings.AsNoTracking().FirstOrDefaultAsync(s => s.SettingId == 1, ct)
+        ?? new MstDebtWarningSetting();
+
+    /// <summary>Đếm số ngày nợ từ hóa đơn nợ đầu tiên (FIRST_DEBT) hay từ giao dịch cuối (LAST_TRANSACTION).</summary>
+    public static bool IsFromFirstDebt(MstDebtWarningSetting setting) =>
+        setting.DebtDaysFrom != MstDebtWarningSetting.FromLastTransaction;
+
+    /// <summary>
+    /// Mốc bắt đầu tính số ngày nợ của từng khách: ngày đơn hoàn thành còn nợ sớm nhất (fromFirstDebt)
+    /// hoặc ngày đơn hoàn thành gần nhất. Khách không có đơn phù hợp thì không có trong kết quả.
+    /// Số ngày nợ = (hôm nay − mốc).Days – xem DebtDays.
+    /// </summary>
+    public static async Task<Dictionary<int, DateTime>> GetDebtSinceAsync(
+        IStockFlowDbContext context, IReadOnlyCollection<int> partnerIds, bool fromFirstDebt, CancellationToken ct)
+    {
+        var ids = partnerIds.ToList();
+        var orders = context.TrxOrders.AsNoTracking()
+            .Where(o => ids.Contains(o.PartnerId) && o.Status == CustomerProfileHelper.CompletedStatus && o.OrderDate != null);
+        if (fromFirstDebt)
+            orders = orders.Where(o => (o.OutstandingAmount ?? 0) > 0);
+
+        var rows = await orders
+            .GroupBy(o => o.PartnerId)
+            .Select(g => new
+            {
+                PartnerId = g.Key,
+                Date = fromFirstDebt ? g.Min(o => o.OrderDate) : g.Max(o => o.OrderDate),
+            })
+            .ToListAsync(ct);
+        return rows.Where(r => r.Date.HasValue).ToDictionary(r => r.PartnerId, r => r.Date!.Value);
+    }
+
+    /// <summary>Số ngày nợ tính đến hôm nay (giờ Việt Nam) từ mốc.</summary>
+    public static int DebtDays(DateTime since) => (VietnamTime.Now.Date - since.Date).Days;
 }
