@@ -174,8 +174,10 @@ public class GetPosOrdersQueryHandler : IRequestHandler<GetPosOrdersQuery, Resul
                 Status = o.Status ?? "COMPLETED",
                 OrderDate = o.OrderDate,
                 TotalItems = o.DtlOrderItems.Count,
-                WarehouseId = o.TrxStockIssues.Select(si => (int?)si.WarehouseId).FirstOrDefault(),
-                WarehouseName = o.TrxStockIssues.Select(si => si.Warehouse.WarehouseName).FirstOrDefault() ?? "Kho Tổng Gia Lâm - Hà Nội",
+                // Kho của phiếu xuất; chưa xuất thì kho bán của đơn (không gán cứng tên kho)
+                WarehouseId = o.TrxStockIssues.Select(si => (int?)si.WarehouseId).FirstOrDefault() ?? o.WarehouseId,
+                WarehouseName = o.TrxStockIssues.Select(si => si.Warehouse.WarehouseName).FirstOrDefault()
+                    ?? (o.Warehouse != null ? o.Warehouse.WarehouseName : null) ?? string.Empty,
                 PaymentMethod = _context.TrxFinancialTransactions
                     .Where(ft => ft.ReferenceType == "SALES_ORDER" && ft.ReferenceId == o.OrderId)
                     .Select(ft => ft.PaymentMethod)

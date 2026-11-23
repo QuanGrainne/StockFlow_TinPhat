@@ -264,7 +264,8 @@ function DiscountPopover({
 // ─── Màn hình chính ───────────────────────────────────────────────────────────
 export default function PosScreen() {
   const { activeWarehouse, setActiveWarehouse } = useActiveWarehouse();
-  const warehouseId = activeWarehouse?.warehouseId ?? 3;
+  // 0 = chưa tải xong danh sách kho được phân quyền (không gán cứng kho mặc định)
+  const warehouseId = activeWarehouse.warehouseId;
   /** Hàng khách đặt chưa giao tại chi nhánh (productId → SL) */
   const [reserved, setReserved] = useState<Record<number, number>>({});
   /** Quyền theo ma trận chức năng: Bán hàng (hóa đơn) / Đặt hàng */
@@ -920,6 +921,7 @@ export default function PosScreen() {
       customerSearchRef.current?.focus();
       return message.warning('Vui lòng chọn khách hàng đặt hàng.');
     }
+    if (!warehouseId) return message.error('Chưa xác định chi nhánh làm việc. Vui lòng chọn chi nhánh ở góc trên.');
     if (tab.lines.length === 0) return message.warning('Đơn đặt hàng chưa có hàng hóa.');
     if (tab.lines.some((l) => l.quantity <= 0)) return message.warning('Số lượng hàng hóa phải lớn hơn 0.');
     if (tab.warehouseId && tab.warehouseId !== warehouseId)
@@ -975,6 +977,7 @@ export default function PosScreen() {
     if (isBooking) return handleSaveBooking();
     if (submitting) return;
     if (!canInvoice) return message.error('Vai trò của bạn chưa được phân quyền chức năng Bán hàng.');
+    if (!warehouseId) return message.error('Chưa xác định chi nhánh làm việc. Vui lòng chọn chi nhánh ở góc trên.');
     if (tab.lines.length === 0) return message.warning('Hóa đơn chưa có hàng hóa.');
     if (tab.lines.some((l) => l.quantity <= 0)) return message.warning('Số lượng hàng hóa phải lớn hơn 0.');
     if (!allowNegativeStock) {

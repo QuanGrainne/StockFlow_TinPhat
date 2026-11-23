@@ -33,25 +33,29 @@ public class ImportProductsCommandHandler : IRequestHandler<ImportProductsComman
         }
 
         // 1. Resolve target warehouse
-        int defaultWarehouseId = 1;
+        // Kho theo tên / mã gửi lên; không gửi hoặc không khớp thì lấy kho đang hoạt động đầu tiên
+        // (trước đây không khớp thì rơi về id cứng = 1, có thể là kho đã ngừng hoạt động).
+        int? resolvedWarehouseId = null;
         if (!string.IsNullOrWhiteSpace(req.TargetWarehouse))
         {
-            var matchedWh = await _context.MstWarehouses
-                .FirstOrDefaultAsync(w => (w.WarehouseName != null && w.WarehouseName.ToLower() == req.TargetWarehouse.ToLower()) ||
-                                          (w.WarehouseCode != null && w.WarehouseCode.ToLower() == req.TargetWarehouse.ToLower()), cancellationToken);
-            if (matchedWh != null)
-            {
-                defaultWarehouseId = matchedWh.WarehouseId;
-            }
+            var target = req.TargetWarehouse.Trim().ToLower();
+            resolvedWarehouseId = await _context.MstWarehouses
+                .Where(w => (w.WarehouseName != null && w.WarehouseName.ToLower() == target) ||
+                            (w.WarehouseCode != null && w.WarehouseCode.ToLower() == target))
+                .OrderByDescending(w => w.IsActive != false)
+                .Select(w => (int?)w.WarehouseId)
+                .FirstOrDefaultAsync(cancellationToken);
         }
-        else
+        resolvedWarehouseId ??= await _context.MstWarehouses
+            .Where(w => w.IsActive != false)
+            .OrderBy(w => w.WarehouseId)
+            .Select(w => (int?)w.WarehouseId)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (resolvedWarehouseId == null)
         {
-            var firstWh = await _context.MstWarehouses.FirstOrDefaultAsync(w => w.IsActive != false, cancellationToken);
-            if (firstWh != null)
-            {
-                defaultWarehouseId = firstWh.WarehouseId;
-            }
+            return Result.Failure<ImportProductsResultDto>("Chưa có kho nào đang hoạt động để nhập tồn kho.");
         }
+        var defaultWarehouseId = resolvedWarehouseId.Value;
 
         // Tải ảnh (link KiotViet...) về máy chủ TRƯỚC khi ghi DB, để hàng không phụ thuộc ảnh bên ngoài.
         // Link trùng nhau chỉ tải một lần; link lỗi thì giữ nguyên link gốc và báo trong kết quả.
