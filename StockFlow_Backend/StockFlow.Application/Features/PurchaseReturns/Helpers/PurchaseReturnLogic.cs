@@ -147,6 +147,9 @@ public static class PurchaseReturnLogic
         var partner = await context.MstBusinessPartners.FirstOrDefaultAsync(p => p.PartnerId == partnerId, ct);
         if (partner == null)
             return Result.Failure<Prepared>("Vui lòng chọn nhà cung cấp.");
+        // Trả hàng nhập chỉ cho nhà cung cấp (SUPPLIER / BOTH), không nhận khách hàng
+        if (!partner.IsSupplier())
+            return Result.Failure<Prepared>("Đối tác được chọn không phải nhà cung cấp.");
 
         var productIds = req.Items.Select(i => i.ProductId).Distinct().ToList();
         var products = await context.MstProducts
@@ -166,6 +169,10 @@ public static class PurchaseReturnLogic
             {
                 if (group.Key == null || !grItems.TryGetValue(group.Key.Value, out var grItem))
                     return Result.Failure<Prepared>("Mặt hàng trả không thuộc phiếu nhập gốc.");
+                // Trả theo phiếu nhập: mặt hàng phải đúng mặt hàng của dòng phiếu nhập gốc. Kiểm trước khi tra danh mục
+                // (trước đây tra products[grItem.ProductId] trước → lỗi KeyNotFound khi gửi mặt hàng khác).
+                if (group.Any(line => line.ProductId != grItem.ProductId))
+                    return Result.Failure<Prepared>("Mặt hàng trả không khớp với dòng phiếu nhập gốc.");
 
                 var product = products[grItem.ProductId];
                 // Trả hàng lỗi: giới hạn theo SL lỗi; trả hàng thường: giới hạn theo SL đạt (đã vào kho)
@@ -181,8 +188,6 @@ public static class PurchaseReturnLogic
 
                 foreach (var line in group)
                 {
-                    if (line.ProductId != grItem.ProductId)
-                        return Result.Failure<Prepared>("Mặt hàng trả không khớp với dòng phiếu nhập gốc.");
                     items.Add(new DtlPurchaseReturnItem
                     {
                         ProductId = grItem.ProductId,

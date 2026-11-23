@@ -16,10 +16,16 @@ public class CompleteTransferTests
     private const string Function = "SF-FUNC-120";
 
     private static (TestStockFlowDbContext Db, CompleteTransferCommandHandler Handler, int TransferId) Arrange(
-        decimal stock, decimal transferQty, string status = TransferStatus.Draft, params int[] userWarehouses)
+        decimal stock, decimal transferQty, string status = TransferStatus.Draft, params int[] userWarehouses) =>
+        Arrange(stock, transferQty, allowNegativeTransfer: null, status, userWarehouses);
+
+    /// <param name="allowNegativeTransfer">null = chưa có dòng cài đặt (mặc định cho phép); có giá trị = lưu cài đặt "chuyển hàng khi âm kho"</param>
+    private static (TestStockFlowDbContext Db, CompleteTransferCommandHandler Handler, int TransferId) Arrange(
+        decimal stock, decimal transferQty, bool? allowNegativeTransfer, string status = TransferStatus.Draft, params int[] userWarehouses)
     {
         var db = TestStockFlowDbContext.Create();
         TestData.SeedMasterData(db);
+        if (allowNegativeTransfer.HasValue) SalesData.SeedOrderSettings(db, s => s.AllowNegativeStockTransfer = allowNegativeTransfer.Value);
         TestData.SetStock(db, TestData.K001, TestData.PTest, stock, 10_000m);
         var id = TestData.AddTransfer(db, status, transferQty);
         var user = CurrentUser.WithWarehouses(TestData.UserId, userWarehouses.Length == 0 ? new[] { TestData.K001 } : userWarehouses);
@@ -124,5 +130,31 @@ public class CompleteTransferTests
         Assert.Equal("Bạn không có quyền xuất hàng chuyển kho từ kho này.", result.Error);
         Assert.Equal(100, TestData.StockOf(db, TestData.K001));
         Assert.Empty(db.TrxInventoryTransactions.AsNoTracking());
+    }
+
+    [Fact(DisplayName = "CompleteTransfer/UTCID06 – tắt \"chuyển hàng khi âm kho\", tồn K001 10, chuyển 15: bị chặn, tồn không đổi")]
+    [Trait("Function", Function)]
+    [Trait("UTCID", "CompleteTransfer/UTCID06")]
+    [Trait("Type", "A")]
+    public async Task UTCID06_NegativeTransferDisabled_AboveStock_ReturnsError()
+    {
+        var (db, handler, id) = Arrange(stock: 10, transferQty: 15, allowNegativeTransfer: false);
+        var result = await handler.Handle(new CompleteTransferCommand(id, TestData.UserId), CancellationToken.None);
+        Assert.False(result.IsSuccess);
+        Assert.Equal("Hàng P-TEST - Sản phẩm test chỉ còn tồn 10 tại kho xuất, không đủ chuyển 15. Cài đặt hiện không cho chuyển hàng khi âm kho.", result.Error);
+        Assert.Equal(10, TestData.StockOf(db, TestData.K001));
+    }
+
+    [Fact(DisplayName = "CompleteTransfer/UTCID07 – tắt \"chuyển hàng khi âm kho\", tồn K001 10, chuyển 10: vẫn xuất được, tồn 0")]
+    [Trait("Function", Function)]
+    [Trait("UTCID", "CompleteTransfer/UTCID07")]
+    [Trait("Type", "B")]
+    public async Task UTCID07_NegativeTransferDisabled_WithinStock_Succeeds()
+    {
+        var (db, handler, id) = Arrange(stock: 10, transferQty: 10, allowNegativeTransfer: false);
+        var result = await handler.Handle(new CompleteTransferCommand(id, TestData.UserId), CancellationToken.None);
+        Assert.True(result.IsSuccess, result.Error);
+        Assert.Equal(TransferStatus.InTransit, result.Value!.Status);
+        Assert.Equal(0, TestData.StockOf(db, TestData.K001));
     }
 }

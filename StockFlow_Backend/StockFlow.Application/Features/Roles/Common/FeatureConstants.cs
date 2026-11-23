@@ -44,6 +44,9 @@ public static class FeatureConstants
     /// <summary>Báo cáo tổng quan, doanh thu – lợi nhuận, nhập – xuất – tồn, công nợ (UC-86, 87, 88, 90). Chỉ đọc.</summary>
     public const string Reports = "feat-reports";
 
+    /// <summary>Cài đặt giao dịch (nút cài đặt cạnh avatar): bán hàng vượt tồn kho, chuyển hàng khi âm kho</summary>
+    public const string Settings = "feat-settings";
+
     public static readonly List<FeatureDefinition> Features = new()
     {
         new("feat-dashboard", "Tổng quan", "AUTH", None),
@@ -87,6 +90,10 @@ public static class FeatureConstants
 
         // Báo cáo (UC-86, 87, 88, 90): mặc định Manager / Admin; API cần FIN_READ
         new(Reports, "Báo cáo", "FIN", None),
+
+        // Cài đặt giao dịch: mặc định Admin + Manager (trước đây chỉ Admin lưu được, gán cứng trong handler).
+        // Phân hệ AUTH: chỉ có API đọc dùng AUTH_*, thao tác ghi tài khoản / vai trò vẫn dùng [RequireAdmin].
+        new(Settings, "Cài đặt", "AUTH", None),
     };
 
     /// <summary>Admin luôn giữ quyền vào màn phân quyền (không tự khóa mình)</summary>
@@ -128,7 +135,7 @@ public static class FeatureConstants
             "ROLE_ADMIN" => Features.Select(f => f.Id),
             "ROLE_MANAGER" => GoodsFeats.Concat(StockFeats).Append("feat-customers").Concat(SalesFeats)
                 .Append("feat-credit-approvals")
-                .Concat(PurchaseFeats).Concat(ProdFeats).Append("feat-bom").Append(Reports),
+                .Concat(PurchaseFeats).Concat(ProdFeats).Append("feat-bom").Append(Reports).Append(Settings),
             "ROLE_SALES" => new[] { "feat-goods", "feat-customers" }.Concat(SalesFeats),
             "ROLE_WAREHOUSE" => new[] { "feat-goods" }.Concat(StockFeats).Concat(PurchaseFeats),
             "ROLE_PRODUCTION" => new[] { "feat-goods" }.Concat(ProdAccountantFeats),

@@ -97,6 +97,11 @@ public class UpdatePurchaseCommandHandler : IRequestHandler<UpdatePurchaseComman
             {
                 return Result.Failure<PurchaseDetailDto>($"Không tìm thấy nhà cung cấp ID #{req.PartnerId}.");
             }
+            // Chỉ nhập hàng từ nhà cung cấp (SUPPLIER / BOTH), không nhận khách hàng (ISS-01)
+            if (!partner.IsSupplier())
+            {
+                return Result.Failure<PurchaseDetailDto>("Đối tác được chọn không phải nhà cung cấp.");
+            }
 
             // Gồm cả sản phẩm của dòng cũ (để đảo nhập kho khi sửa phiếu đã nhập)
             var productIds = req.Items.Select(i => i.ProductId)

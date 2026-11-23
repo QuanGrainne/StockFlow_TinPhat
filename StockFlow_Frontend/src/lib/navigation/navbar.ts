@@ -423,10 +423,10 @@ export const ADMIN_LOCKED_FEATURES = ['feat-roles', 'feat-role-matrix'];
 
 /**
  * Màn mở được nhưng không nằm trên navbar: đường dẫn + các chức năng (chỉ cần 1) được phép mở.
- * VD Thiết lập giao dịch mở từ màn Hóa đơn / POS.
+ * VD Cài đặt (nút cạnh avatar) mở bằng chức năng "Cài đặt" (feat-settings) trong ma trận phân quyền.
  */
 export const EXTRA_SCREENS: Record<string, { path: string; anyOf: string[] }> = {
-  'admin-order-settings': { path: '/settings/orders', anyOf: ['feat-invoices', 'feat-pos'] },
+  'admin-order-settings': { path: '/settings/orders', anyOf: ['feat-settings'] },
 };
 
 /** Màn hình (kể cả bí danh, màn phụ) → đường dẫn riêng */

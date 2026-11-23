@@ -5,6 +5,7 @@ using StockFlow.Application.Common.Interfaces;
 using StockFlow.Application.Common.Inventory;
 using StockFlow.Application.Features.Purchases.Commands;
 using StockFlow.Application.Features.Purchases.DTOs;
+using StockFlow.Application.Features.PurchaseOrders.Queries;
 using StockFlow.Domain.Entities;
 using StockFlow.UnitTests.Common;
 using Xunit;
@@ -14,7 +15,8 @@ namespace StockFlow.UnitTests.Purchasing.Receipts;
 /// <summary>
 /// Report 5.1 – sheet CreatePurchase (LucDT): lưu phiếu tạm hoặc nhập hàng (UC-31, BR-23, BR-25, BR-29).
 /// Người dùng 1 có quyền K001 (authorized = [3]). Ca "Success" kiểm theo D.2; UTCID15 theo câu chữ mới ở D.1.
-/// UTCID28, UTCID29 đã được workbook dự báo Fail (ISS-01, Q2).
+/// UTCID28: nhóm chốt 24/11/2026 chấp nhận nhập lệch SL đặt (tiền phiếu đặt theo SL đã nhập).
+/// UTCID29: đã sửa ISS-01 (chỉ nhận đối tác là nhà cung cấp).
 /// </summary>
 public class CreatePurchaseTests
 {
@@ -316,17 +318,24 @@ public class CreatePurchaseTests
         Assert.Equal(1000.667m, db.MstProducts.AsNoTracking().Single(p => p.ProductId == TestData.PTest).MovingAverageCost);
     }
 
-    [Fact(DisplayName = "CreatePurchase/UTCID28 – nhập 11 khi phiếu đặt chỉ đặt 10: phải bị từ chối (BR-23)")]
-    [Trait("Function", Function)][Trait("UTCID", "CreatePurchase/UTCID28")][Trait("Type", "A")]
-    public async Task UTCID28_OverOrderedQty_Rejected()
+    [Fact(DisplayName = "CreatePurchase/UTCID28 – nhập 11 khi phiếu đặt chỉ đặt 10: chấp nhận nhập lệch, tiền phiếu đặt theo SL đã nhập")]
+    [Trait("Function", Function)][Trait("UTCID", "CreatePurchase/UTCID28")][Trait("Type", "B")]
+    public async Task UTCID28_OverOrderedQty_AcceptedAndAmountByReceived()
     {
         var db = PurchaseData.Db();
         var poId = PurchaseData.AddPo(db, "PDN000001", "ORDERED", new[] { (TestData.PTest, 10m, 6000m) });
         var u = CurrentUser.WithWarehouses(TestData.UserId, TestData.K001).Object;
         var r = await new CreatePurchaseCommandHandler(db, u, new InventoryLedger(db))
             .Handle(new CreatePurchaseCommand(Req(poId: poId, items: Line(qty: 11))), CancellationToken.None);
-        Assert.False(r.IsSuccess, "Workbook mong bị từ chối: SL nhận vượt SL đặt (BR-23). Code đang chấp nhận (Q2).");
-        Assert.Equal(0, TestData.StockOf(db, TestData.K001));
+        Assert.True(r.IsSuccess, r.Error);
+        Assert.Equal(11, TestData.StockOf(db, TestData.K001));
+
+        // Phiếu đặt hiển thị tiền theo SL đã nhập: 11 × 6.000 = 66.000 (giá trị đặt lưu trong DB vẫn 60.000)
+        var po = await new PurchaseOrderQueryHandler(db, u).Handle(new GetPurchaseOrderByIdQuery(poId), CancellationToken.None);
+        Assert.True(po.IsSuccess, po.Error);
+        Assert.Equal("COMPLETED", po.Value!.Status);
+        Assert.Equal(66_000m, Assert.Single(po.Value.Items).LineTotal);
+        Assert.Equal(66_000m, po.Value.TotalAmount);
     }
 
     [Fact(DisplayName = "CreatePurchase/UTCID29 – đối tác là khách hàng: phải bị từ chối")]

@@ -163,11 +163,11 @@ public class ReceiveTransferTests
         Assert.Equal(20, TestData.StockOf(db, TestData.K002));
     }
 
-    [Fact(DisplayName = "ReceiveTransfer/UTCID07 – nhận 31 > 30 đã xuất: phải bị từ chối (workbook ghi dự kiến Fail)")]
+    [Fact(DisplayName = "ReceiveTransfer/UTCID07 – nhận 31 > 30 đã xuất: chấp nhận, kho nhận +31 (nhân viên báo lại để điều chỉnh)")]
     [Trait("Function", Function)]
     [Trait("UTCID", "ReceiveTransfer/UTCID07")]
     [Trait("Type", "A")]
-    public async Task UTCID07_ReceiveAboveDispatched_IsRejected()
+    public async Task UTCID07_ReceiveAboveDispatched_IsAccepted()
     {
         // Arrange
         var (db, handler, id, _) = Arrange();
@@ -175,9 +175,10 @@ public class ReceiveTransferTests
         // Act
         var result = await handler.Handle(new ReceiveTransferCommand(id, Received(31), TestData.UserId), CancellationToken.None);
 
-        // Assert – Expected theo workbook: yêu cầu bị từ chối, tồn kho nhận không đổi.
-        // Workbook không ghi câu thông báo cụ thể nên chỉ kiểm IsSuccess = false.
-        Assert.False(result.IsSuccess, "Nhận 31 trong khi chỉ xuất 30 nhưng handler vẫn chấp nhận (N-02 / ISS-05).");
-        Assert.Equal(20, TestData.StockOf(db, TestData.K002));
+        // Assert – nhóm chốt 24/11/2026: chấp nhận nhận nhiều hơn số đã xuất (ghi đúng thực nhận);
+        // nhân viên nhận báo lại để điều chỉnh phiếu nhập, hủy phiếu hoặc kiểm kho.
+        Assert.True(result.IsSuccess, result.Error);
+        Assert.Equal(TransferStatus.Received, result.Value!.Status);
+        Assert.Equal(51, TestData.StockOf(db, TestData.K002));
     }
 }

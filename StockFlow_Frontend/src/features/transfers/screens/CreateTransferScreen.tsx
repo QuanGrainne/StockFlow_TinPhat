@@ -27,6 +27,7 @@ import { useActiveWarehouse } from '@/lib/warehouse/useActiveWarehouse';
 import { adminService } from '@/features/admin/services/adminService';
 import { WarehouseFacility } from '@/features/admin/types';
 import { transferService } from '@/features/transfers/services/transferService';
+import { orderSettingsService } from '@/features/settings/services/orderSettingsService';
 import { ProductForTransfer, TransferItem } from '@/features/transfers/types';
 import { toLocalDatetimeInputString } from '@/features/transfers/utils/dateUtils';
 import { productService, BackendProduct } from '@/features/products/services/productService';
@@ -600,6 +601,21 @@ export default function CreateTransferScreen() {
     return true;
   };
 
+  // Cài đặt "Cho phép chuyển hàng khi âm kho" (mặc định bật): tắt thì không cho xuất chuyển vượt tồn kho xuất
+  const [allowNegativeTransfer, setAllowNegativeTransfer] = useState(true);
+  useEffect(() => {
+    let alive = true;
+    orderSettingsService
+      .getSettings()
+      .then((s) => {
+        if (alive) setAllowNegativeTransfer(s.allowNegativeStockTransfer !== false);
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, []);
+
   // Check Over Stock Warning
   const checkOverStock = (): boolean => {
     const overStockItems = items.filter((it) => it.transferQuantity > it.sourceStock);
@@ -686,6 +702,11 @@ export default function CreateTransferScreen() {
         .filter((it) => it.transferQuantity > it.sourceStock)
         .map((it) => `${it.productCode} (SL: ${it.transferQuantity} / Tồn: ${it.sourceStock})`)
         .join(', ');
+
+      if (!allowNegativeTransfer) {
+        showToast(`Số lượng chuyển vượt tồn kho chi nhánh nguồn: ${overStockNames}. Cài đặt hiện không cho chuyển hàng khi âm kho.`, 'error');
+        return;
+      }
 
       setConfirmModal({
         isOpen: true,

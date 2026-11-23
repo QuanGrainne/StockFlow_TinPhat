@@ -467,9 +467,14 @@ export function ProductionOrderDetailPanel({
             </button>
           )}
           {features.canPlan && inProgress && (
-            <button type="button" onClick={() => onAction('close')} className={actionBtn}>
+            <button
+              type="button"
+              onClick={() => onAction('close')}
+              className={actionBtn}
+              title="Kết thúc lệnh khi không sản xuất bù / không sản xuất tiếp (bắt buộc lý do)"
+            >
               <CheckCircle2 size={13} />
-              <span>Đóng lệnh</span>
+              <span>Kết thúc lệnh</span>
             </button>
           )}
           {features.canPlan && (notStarted || inProgress) && (

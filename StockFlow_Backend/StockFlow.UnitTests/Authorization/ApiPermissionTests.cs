@@ -100,11 +100,11 @@ public class ApiPermissionTests
     public Task UpdateWarehouseAccess_UTCID06() =>
         AssertForbidden(typeof(WarehousePermissionsController), nameof(WarehousePermissionsController.UpdateWarehouseAccess), AdminOnly);
 
-    [Fact(DisplayName = "UpdateSettings/UTCID09 – thiếu SALES_APPROVE: 403 \"…(cần quyền SALES_APPROVE).\"")]
-    [Trait("Function", "UpdateSettings")][Trait("UTCID", "UpdateSettings/UTCID09")][Trait("Type", "A")]
-    public Task UpdateSettings_UTCID09() =>
+    [Fact(DisplayName = "UpdateSettings/UTCID05 – thiếu AUTH_UPDATE: 403 \"…(cần quyền AUTH_UPDATE).\"")]
+    [Trait("Function", "UpdateSettings")][Trait("UTCID", "UpdateSettings/UTCID05")][Trait("Type", "A")]
+    public Task UpdateSettings_UTCID05() =>
         AssertForbidden(typeof(OrderSettingsController), nameof(OrderSettingsController.UpdateSettings),
-            "Bạn không có quyền thực hiện thao tác này (cần quyền SALES_APPROVE).");
+            "Bạn không có quyền thực hiện thao tác này (cần quyền AUTH_UPDATE).");
 
     [Fact(DisplayName = "ImportProducts/UTCID05 – thiếu GOODS_CREATE: 403")]
     [Trait("Function", "ImportProducts")][Trait("UTCID", "ImportProducts/UTCID05")][Trait("Type", "A")]

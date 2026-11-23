@@ -22,9 +22,8 @@ public sealed class PosStockPolicyTests : SalesTestBase
         await ArrangeDbAsync(async db =>
         {
             var st = await db.MstOrderSettings.SingleAsync(x => x.SettingId == 1);
-            st.AllowNegativeStockSale = false;    // không cho bán khi hết hàng / âm kho
-            st.AllowSellingReservedStock = false; // không cho bán hàng đang tạm giữ
-            Step("Thiết lập: AllowNegativeStockSale = false, AllowSellingReservedStock = false");
+            st.AllowNegativeStockSale = false;    // không cho bán vượt tồn kho (khi đó cũng không bán phần hàng khách đã đặt)
+            Step("Thiết lập: AllowNegativeStockSale = false");
         });
         var s = await ClientAsync(TestDataSeeder.SalesK001);
         await ArrangeBookingAsync(s, Booking(Ids.KhAbc, K001, new[] { (Ids.PTest, 6m, PTestPrice) }), "Đơn đặt hàng đang mở giữ P-TEST x6");
@@ -55,7 +54,8 @@ public sealed class PosStockPolicyTests : SalesTestBase
         var check = new Checks(Output);
         check.Equal("HTTP status", 400, res.StatusCode);
         check.Message("Thông báo A3", "... Tồn khả dụng: 4, Yêu cầu xuất: 5 ...", res.Message);
-        check.Contains("Mã A3", "(A3)", res.Message);
+        // Tuỳ chọn A3 (bán hàng đang tạm giữ) đã bỏ 24/11/2026: tắt "bán vượt tồn kho" thì luôn giữ hàng khách đã đặt
+        check.Contains("Lý do theo cài đặt", "Cài đặt hiện không cho bán hàng vượt tồn kho.", res.Message);
         check.Equal("Tồn K001 không đổi", 10m, await StockAsync(K001, Ids.PTest));
         check.Assert();
     }

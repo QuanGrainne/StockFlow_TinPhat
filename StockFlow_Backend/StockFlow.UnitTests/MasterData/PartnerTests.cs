@@ -62,7 +62,8 @@ public class CreateCustomerTests
     [Fact(DisplayName = "CreateCustomer/UTCID03 – tên chỉ có khoảng trắng (validator)")]
     [Trait("Function", Function)][Trait("UTCID", "CreateCustomer/UTCID03")][Trait("Type", "A")]
     public void UTCID03_BlankName_ValidatorRejects() =>
-        Assert.Contains("Tên khách hàng không được chỉ chứa khoảng trắng.", Errors(Req(name: "   ")));
+        // Nhóm chốt 24/11/2026 theo thực tế: FluentValidation NotEmpty coi chuỗi toàn khoảng trắng là rỗng và dừng ở luật đầu
+        Assert.Contains("Tên khách hàng không được để trống.", Errors(Req(name: "   ")));
 
     [Fact(DisplayName = "CreateCustomer/UTCID04 – không có số điện thoại và email (validator)")]
     [Trait("Function", Function)][Trait("UTCID", "CreateCustomer/UTCID04")][Trait("Type", "A")]

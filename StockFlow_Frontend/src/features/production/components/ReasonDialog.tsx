@@ -14,9 +14,11 @@ interface ReasonDialogProps {
   onConfirm: (reason: string) => void;
   /** Số ký tự tối đa của lý do (mặc định 300; lý do từ chối / hủy kế hoạch sản xuất là 200) */
   maxLength?: number;
+  /** Gợi ý nội dung lý do */
+  placeholder?: string;
 }
 
-export function ReasonDialog({ title, description, confirmText, busy, onCancel, onConfirm, maxLength = 300 }: ReasonDialogProps) {
+export function ReasonDialog({ title, description, confirmText, busy, onCancel, onConfirm, maxLength = 300, placeholder }: ReasonDialogProps) {
   const [reason, setReason] = useState('');
   const [touched, setTouched] = useState(false);
   const missing = !reason.trim();
@@ -55,6 +57,7 @@ export function ReasonDialog({ title, description, confirmText, busy, onCancel, 
         maxLength={maxLength}
         rows={3}
         autoFocus
+        placeholder={placeholder}
         className={`w-full px-2.5 py-1.5 text-[13px] border rounded-[6px] focus:outline-none ${
           touched && missing ? 'border-[#fb2c36]' : 'border-slate-300 focus:border-[#0070f4]'
         }`}
