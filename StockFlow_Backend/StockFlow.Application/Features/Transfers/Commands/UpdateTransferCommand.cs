@@ -62,6 +62,11 @@ public class UpdateTransferCommandHandler : IRequestHandler<UpdateTransferComman
             return Result.Failure<TransferDetailDto>("Vui lòng chọn ít nhất 1 mặt hàng cần chuyển.");
         }
 
+        if (req.Items.Any(it => it.TransferPrice < 0))
+        {
+            return Result.Failure<TransferDetailDto>("Giá chuyển không được âm.");
+        }
+
         transfer.DestWarehouseId = req.DestWarehouseId;
         if (req.TransferDate.HasValue)
         {
@@ -82,6 +87,8 @@ public class UpdateTransferCommandHandler : IRequestHandler<UpdateTransferComman
                 Quantity = it.Quantity,
                 IssuedQuantity = 0,
                 ReceivedQuantity = null,
+                // Giá chuyển chỉ để theo dõi giá trị luân chuyển, không ảnh hưởng giá vốn
+                TransferPrice = it.TransferPrice,
                 Notes = string.IsNullOrWhiteSpace(it.Notes) ? null : it.Notes.Trim(),
             };
             await _context.DtlStockTransferItems.AddAsync(item, cancellationToken);

@@ -388,6 +388,9 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
             entity.Property(e => e.UnitCost)
                 .HasPrecision(18, 4)
                 .HasColumnName("unit_cost");
+            entity.Property(e => e.TransferPrice)
+                .HasPrecision(18, 4)
+                .HasColumnName("transfer_price");
             entity.Property(e => e.Notes)
                 .HasMaxLength(500)
                 .HasColumnName("notes");
