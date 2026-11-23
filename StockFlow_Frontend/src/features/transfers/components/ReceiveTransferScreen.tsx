@@ -208,8 +208,30 @@ export const ReceiveTransferScreen: React.FC<Props> = ({
     });
   }, [transfer.items, receivedQtys]);
 
+  // Mặt hàng nhập SL nhận lớn hơn SL chuyển (không cho phép, backend cũng chặn)
+  const overReceivedItems = useMemo(
+    () =>
+      (transfer.items || []).filter(
+        (it) => (receivedQtys[it.productId] ?? it.transferQuantity) > it.transferQuantity
+      ),
+    [transfer.items, receivedQtys]
+  );
+
+  // Thông báo cùng câu với backend: "Hàng <mã> - <tên>: số lượng nhận (x) không được lớn hơn số lượng chuyển (y)."
+  const overReceivedMessage = (): string | null => {
+    if (overReceivedItems.length === 0) return null;
+    const first = overReceivedItems[0];
+    const more = overReceivedItems.length > 1 ? ` (và ${overReceivedItems.length - 1} mặt hàng khác)` : '';
+    return `Hàng ${first.productCode} - ${first.productName}: số lượng nhận (${receivedQtys[first.productId]}) không được lớn hơn số lượng chuyển (${first.transferQuantity})${more}.`;
+  };
+
   // Hành động: Lưu tạm phiếu nhận
   const handleSaveDraft = () => {
+    const overMsg = overReceivedMessage();
+    if (overMsg) {
+      showToast(overMsg, 'error');
+      return;
+    }
     try {
       const draft: ReceiveDraft = { receivedQtys, itemNotes, receiveNotes };
       localStorage.setItem(receiveDraftKey(transfer.id), JSON.stringify(draft));
@@ -225,6 +247,13 @@ export const ReceiveTransferScreen: React.FC<Props> = ({
     const dateCheck = validateReceiveAfterTransfer(transfer.transferDate, receiveDate);
     if (!dateCheck.isValid) {
       showToast(dateCheck.message || 'Thời gian nhận hàng phải sau thời gian chuyển hàng!', 'error');
+      return;
+    }
+
+    // Số lượng nhận không được lớn hơn số lượng chuyển
+    const overMsg = overReceivedMessage();
+    if (overMsg) {
+      showToast(overMsg, 'error');
       return;
     }
 
@@ -415,7 +444,7 @@ export const ReceiveTransferScreen: React.FC<Props> = ({
                   <th className="py-2 px-3 w-24 text-right">SL chuyển</th>
                   <th className="py-2 px-3 w-28 text-right">SL nhận</th>
                   <th className="py-2 px-3 w-28 text-right">Giá chuyển</th>
-                  <th className="py-2 px-3 w-32 text-right">Thành tiền</th>
+                  <th className="py-2 px-3 w-32 text-right">Thành tiền nhận</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-xs">
@@ -429,6 +458,7 @@ export const ReceiveTransferScreen: React.FC<Props> = ({
                   displayedItems.map((it, idx) => {
                     const currentRecQty = receivedQtys[it.productId] ?? it.transferQuantity;
                     const isDiff = currentRecQty !== it.transferQuantity;
+                    const isOver = currentRecQty > it.transferQuantity;
                     const currentLineTotal = currentRecQty * (it.transferPrice || 0);
 
                     return (
@@ -490,13 +520,17 @@ export const ReceiveTransferScreen: React.FC<Props> = ({
                           <input
                             type="number"
                             min={0}
+                            max={it.transferQuantity}
                             step={1}
                             value={currentRecQty}
                             onChange={(e) =>
                               handleQtyChange(it.productId, Number(e.target.value))
                             }
+                            title={isOver ? `Số lượng nhận không được lớn hơn số lượng chuyển (${it.transferQuantity})` : undefined}
                             className={`w-20 h-7 px-2 text-right rounded-[6px] border text-xs font-bold transition focus:outline-none ${
-                              isDiff
+                              isOver
+                                ? 'border-[#fb2c36] bg-[#fef2f2] text-[#fb2c36] focus:ring-1 focus:ring-[#fb2c36]'
+                                : isDiff
                                 ? 'border-amber-400 bg-amber-50 text-amber-900 focus:ring-1 focus:ring-amber-500'
                                 : 'border-slate-300 bg-white text-[#15171a] focus:border-[#0070f4]'
                             }`}

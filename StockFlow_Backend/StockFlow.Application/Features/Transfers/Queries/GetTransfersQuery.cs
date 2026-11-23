@@ -117,6 +117,7 @@ public class GetTransfersQueryHandler : IRequestHandler<GetTransfersQuery, Resul
             decimal totalQty = 0;
             decimal totalReceived = 0;
             decimal totalAmount = 0;
+            decimal receivedAmount = 0;
 
             foreach (var item in t.DtlStockTransferItems)
             {
@@ -128,6 +129,7 @@ public class GetTransfersQueryHandler : IRequestHandler<GetTransfersQuery, Resul
                 totalQty += qty;
                 totalReceived += rec;
                 totalAmount += qty * price;
+                receivedAmount += rec * price;
             }
 
             return new TransferListDto(
@@ -147,7 +149,8 @@ public class GetTransfersQueryHandler : IRequestHandler<GetTransfersQuery, Resul
                 TotalQuantity: totalQty,
                 TotalReceivedQuantity: t.IsReceived() ? totalReceived : null,
                 TotalAmount: totalAmount,
-                Notes: t.Notes
+                Notes: t.Notes,
+                TotalReceivedAmount: t.IsReceived() ? receivedAmount : null
             );
         }).ToList();
 
