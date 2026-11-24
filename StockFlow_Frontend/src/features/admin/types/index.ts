@@ -44,6 +44,10 @@ export interface ProductUnitConversion {
   conversionRate: number;
   isBase: boolean;
   isDirectSale: boolean;
+  /** Quy đổi theo đơn vị khác đơn vị cơ bản (VD 1 thùng = 10 túi): tên đơn vị đó, chỉ để hiển thị */
+  refUnitName?: string;
+  /** Số lượng theo refUnitName (VD 10) */
+  refRate?: number;
 }
 
 export interface ProductAttributeDef {
