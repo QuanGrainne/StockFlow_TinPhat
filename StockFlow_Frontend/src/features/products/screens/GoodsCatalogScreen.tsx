@@ -2705,7 +2705,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                     </button>
                   </th>
 
-                  <th className="sticky top-0 z-20 bg-[#f7f8f9] py-2.5 px-2 w-12 text-center border-b border-slate-200" title="Hình ảnh sản phẩm"></th>
+                  <th className="sticky top-0 z-20 bg-[#f7f8f9] py-2.5 px-2 w-12 min-w-[52px] text-center border-b border-slate-200" title="Hình ảnh sản phẩm"></th>
                   <th className="sticky top-0 z-20 bg-[#f7f8f9] py-2.5 px-4 min-w-[200px] border-b border-slate-200">MÃ HÀNG</th>
                   <th className="sticky top-0 z-20 bg-[#f7f8f9] py-2.5 px-4 min-w-[240px] border-b border-slate-200">TÊN HÀNG</th>
                   <th className="sticky top-0 z-20 bg-[#f7f8f9] py-2.5 px-4 text-right min-w-[120px] border-b border-slate-200">GIÁ BÁN</th>
@@ -2772,7 +2772,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
 
                       {/* Ảnh Thumbnail Nhỏ Cạnh Tên / Mã Hàng (Chuẩn 100% Ảnh Chụp StockFlow) */}
                       <td
-                        className="py-2.5 px-2 text-center w-12 relative"
+                        className="py-2.5 px-2 text-center w-12 min-w-[52px] relative"
                         onClick={(e) => e.stopPropagation()}
                       >
                         <div
@@ -2784,7 +2784,9 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                             <img
                               src={item.imageUrl}
                               alt={item.name}
-                              className="w-9 h-9 object-cover rounded-lg border border-slate-200 shadow-2xs group-hover:border-blue-500 group-hover:ring-2 group-hover:ring-blue-100 transition cursor-pointer bg-white"
+                              // max-w-none + shrink-0: ảnh trong ô bảng có max-width % (mặc định của Tailwind) bị trình duyệt
+                              // coi là rộng tối thiểu 0 → bảng thiếu chỗ thì cột ảnh co mất, chỉ còn vạch viền (bản deploy)
+                              className="w-9 h-9 max-w-none shrink-0 object-cover rounded-lg border border-slate-200 shadow-2xs group-hover:border-blue-500 group-hover:ring-2 group-hover:ring-blue-100 transition cursor-pointer bg-white"
                               onClick={() => setExpandedRowId(isExpanded ? null : item.id)}
                             />
                           ) : (
