@@ -108,6 +108,63 @@ interface GoodsCatalogScreenProps {
   currentRole?: string;
 }
 
+/** Dữ liệu để mở modal Thiết lập ĐVT & thuộc tính cho một hàng hóa */
+interface ConfigModalSource {
+  units: GoodsUnitConversion[];
+  attributes: GoodsAttributeDef[];
+  variants: GoodsVariantItem[];
+  cost: number;
+  price: number;
+  stock: number;
+  code: string;
+  uom: string;
+}
+
+/**
+ * Bỏ các đơn vị (khác đơn vị cơ bản) không còn dòng hàng cùng loại nào.
+ * Chỉ áp dụng khi đã có danh sách hàng cùng loại; hàng chưa thiết lập thì giữ nguyên.
+ */
+function pruneUnitsWithoutVariants(units: GoodsUnitConversion[], variants: GoodsVariantItem[]): GoodsUnitConversion[] {
+  if (variants.length === 0) return units;
+  return units.filter((u) => u.isBase || variants.some((v) => v.unitName === u.name));
+}
+
+/**
+ * Vế phải công thức quy đổi để hiển thị: "10 túi" nếu đơn vị được đặt theo đơn vị khác (và đơn vị đó còn),
+ * ngược lại "100 chùm" theo đơn vị cơ bản như bình thường.
+ */
+function unitRateLabel(u: GoodsUnitConversion, units: GoodsUnitConversion[], baseName: string): string {
+  if (u.refUnitName && u.refRate && units.some((x) => x.name === u.refUnitName)) {
+    return `${u.refRate.toLocaleString('vi-VN')} ${u.refUnitName}`;
+  }
+  return `${u.conversionRate.toLocaleString('vi-VN')} ${baseName}`;
+}
+
+/** Đơn vị, thuộc tính, hàng cùng loại gửi lên API (lưu trong variants_json của hàng hóa) */
+function toApiUnitConfig(units: GoodsUnitConversion[], attributes: GoodsAttributeDef[], variants: GoodsVariantItem[]) {
+  return {
+    units: units.map((u) => ({
+      name: u.name,
+      conversionRate: u.conversionRate,
+      isBase: u.isBase,
+      isDirectSale: u.isDirectSale ?? true,
+      refUnitName: u.refUnitName,
+      refRate: u.refRate,
+    })),
+    attributes: attributes.map((a) => ({ name: a.name, values: a.values })),
+    variants: variants.map((v) => ({
+      attributeValue: v.attributeValue,
+      unitName: v.unitName,
+      conversionRate: v.conversionRate,
+      code: v.code,
+      barcode: v.barcode,
+      costPrice: v.costPrice,
+      salePrice: v.salePrice,
+      stock: v.stock,
+    })),
+  };
+}
+
 export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
   onNavigate,
   currentRole = 'warehouse',
@@ -442,7 +499,12 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
   const [tempVariants, setTempVariants] = useState<GoodsVariantItem[]>([]);
   const [showAddUnitInline, setShowAddUnitInline] = useState(false);
   const [newUnitName, setNewUnitName] = useState('');
-  const [newUnitRate, setNewUnitRate] = useState<number>(4);
+  // Ô nhập dạng chuỗi để không hiện số 0 thừa ("010")
+  const [newUnitRate, setNewUnitRate] = useState<string>('');
+  // Đơn vị đích của công thức quy đổi (rỗng = đơn vị cơ bản), VD 1 thùng = 10 túi
+  const [newUnitRefName, setNewUnitRefName] = useState<string>('');
+  const [unitFormError, setUnitFormError] = useState<string | null>(null);
+  const [savingUnitConfig, setSavingUnitConfig] = useState(false);
   const [activeQuickTagAttrIndex, setActiveQuickTagAttrIndex] = useState<number | null>(null);
 
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -510,6 +572,8 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                   conversionRate: u.ConversionRate ?? u.conversionRate ?? 1,
                   isBase: u.IsBase ?? u.isBase ?? false,
                   isDirectSale: u.IsDirectSale ?? u.isDirectSale ?? true,
+                  refUnitName: u.RefUnitName ?? u.refUnitName ?? undefined,
+                  refRate: u.RefRate ?? u.refRate ?? undefined,
                 }));
               }
               if (vObj.attributes) {
@@ -1184,7 +1248,11 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
     setFormImageUrl(item.imageUrl || '');
     setFormImages(item.imageUrl ? [item.imageUrl] : []);
     setFormDescription(item.description || '');
-    const curUnits = item.units && item.units.length > 0 ? item.units : [{ name: item.uom, conversionRate: 1, isBase: true, isDirectSale: true }];
+    // Bỏ đơn vị đã xoá hết dòng hàng cùng loại (dữ liệu cũ còn sót, VD "thùng" đã xoá nhưng vẫn nằm trong danh sách đơn vị)
+    const curUnits = pruneUnitsWithoutVariants(
+      item.units && item.units.length > 0 ? item.units : [{ name: item.uom, conversionRate: 1, isBase: true, isDirectSale: true }],
+      item.variants || []
+    );
     setFormUnits(curUnits);
     setFormAttributes(item.attributes || []);
     setFormVariants(item.variants || []);
@@ -1234,57 +1302,145 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
     });
 
     setEditModalOpen(true);
+
+    // Trả dữ liệu của chính hàng này để mở ngay modal Thiết lập ĐVT (state form chỉ cập nhật ở lần render sau)
+    const source: ConfigModalSource = {
+      units: curUnits,
+      attributes: item.attributes || [],
+      variants: item.variants || [],
+      cost: branchCost,
+      price: item.standardPrice || 0,
+      stock: branchStock,
+      code: item.code,
+      uom: item.uom,
+    };
+    return source;
   };
 
-  // Mở Modal 2 Thiết lập ĐVT & Thuộc tính (Ảnh 2, 3, 4)
-  const handleOpenConfigModal = () => {
-    const curUnits = formUnits.length > 0 ? [...formUnits] : [{ name: formUom || 'Hộp', conversionRate: 1, isBase: true, isDirectSale: true }];
-    const curAttrs = [...formAttributes];
+  // Mở Modal 2 Thiết lập ĐVT & Thuộc tính (Ảnh 2, 3, 4).
+  // Không truyền source = lấy từ form đang mở; nút "Thêm hàng hóa cùng loại" ở danh sách truyền dữ liệu của hàng đó.
+  const handleOpenConfigModal = (source?: ConfigModalSource) => {
+    const src: ConfigModalSource = source ?? {
+      units: formUnits,
+      attributes: formAttributes,
+      variants: formVariants,
+      cost: Number(formCostPrice) || 0,
+      price: Number(formStandardPrice) || 0,
+      stock: Number(formStockQuantity) || 0,
+      code: formCode,
+      uom: formUom,
+    };
+    const allUnits = src.units.length > 0 ? [...src.units] : [{ name: src.uom || 'Cái', conversionRate: 1, isBase: true, isDirectSale: true }];
+    // Đơn vị đã xoá hết dòng hàng cùng loại thì không sinh lại (dữ liệu cũ còn sót đơn vị trong danh sách)
+    const curUnits = pruneUnitsWithoutVariants(allUnits, src.variants);
+    const curAttrs = [...src.attributes];
     setTempUnits(curUnits);
     setTempAttributes(curAttrs);
 
     const generated = generateVariantMatrix(
       curUnits,
       curAttrs,
-      formVariants,
-      Number(formCostPrice) || 0,
-      Number(formStandardPrice) || 0,
-      Number(formStockQuantity) || 0,
-      formCode || 'SP'
+      src.variants,
+      src.cost,
+      src.price,
+      src.stock,
+      src.code || 'SP'
     );
     setTempVariants(generated);
     setShowAddUnitInline(false);
+    setNewUnitName('');
+    setNewUnitRate('');
+    setNewUnitRefName('');
     setActiveQuickTagAttrIndex(null);
     setConfigModalOpen(true);
   };
 
-  // Lưu Modal 2 trở lại Modal 1
-  const handleApplyConfigModal = () => {
-    setFormUnits(tempUnits);
-    setFormAttributes(tempAttributes);
-    setFormVariants(tempVariants);
-    const baseU = tempUnits.find((u) => u.isBase);
-    if (baseU) {
-      setFormUom(baseU.name);
+  // Đưa cấu hình ĐVT / thuộc tính / hàng cùng loại về form chỉnh sửa (và snapshot nếu đã lưu DB)
+  const applyUnitConfigToForm = (
+    units: GoodsUnitConversion[],
+    attrs: GoodsAttributeDef[],
+    variants: GoodsVariantItem[],
+    savedToDb: boolean
+  ) => {
+    setFormUnits(units);
+    setFormAttributes(attrs);
+    setFormVariants(variants);
+    const baseU = units.find((u) => u.isBase);
+    if (baseU) setFormUom(baseU.name);
+    if (savedToDb && editingItem) {
+      // Đã lưu DB: cập nhật mốc so sánh của form và dòng trong danh sách để không phải lưu thêm lượt nữa
+      setEditInitialSnapshot((prev: Record<string, unknown> | null) =>
+        prev ? { ...prev, units, attributes: attrs, variants, uom: baseU?.name ?? prev.uom } : prev
+      );
+      const patch = { units, attributes: attrs, variants, uom: baseU?.name ?? editingItem.uom };
+      setEditingItem({ ...editingItem, ...patch });
+      setGoods((prev) => prev.map((g) => (g.id === editingItem.id ? { ...g, ...patch } : g)));
     }
-    setConfigModalOpen(false);
-    showToast('Đã lưu cấu hình đơn vị tính & thuộc tính!');
   };
 
-  // Thêm đơn vị quy đổi mới trong Modal 2
-  const handleAddUnit = () => {
-    if (!newUnitName.trim()) {
-      alert('Vui lòng nhập tên đơn vị tính!');
+  /**
+   * Lưu ngay cấu hình ĐVT / thuộc tính / hàng cùng loại vào DB khi đang sửa hàng đã có.
+   * Trả false nếu là hàng đang tạo mới (chưa có trong DB: lưu cùng lúc bấm Lưu hàng hóa).
+   */
+  const persistUnitConfig = async (
+    units: GoodsUnitConversion[],
+    attrs: GoodsAttributeDef[],
+    variants: GoodsVariantItem[]
+  ): Promise<boolean> => {
+    if (modalMode !== 'edit' || !editingItem) return false;
+    const id = await resolveNumericProductId(editingItem);
+    if (!id) return false;
+    await productService.updateProduct(id, toApiUnitConfig(units, attrs, variants));
+    return true;
+  };
+
+  // Bấm Xong: lưu cấu hình (đang sửa hàng đã có thì lưu thẳng DB) rồi quay về form
+  const handleApplyConfigModal = async () => {
+    const units = pruneUnitsWithoutVariants(tempUnits, tempVariants);
+    setSavingUnitConfig(true);
+    try {
+      const saved = await persistUnitConfig(units, tempAttributes, tempVariants);
+      applyUnitConfigToForm(units, tempAttributes, tempVariants, saved);
+      setConfigModalOpen(false);
+      showToast(saved ? 'Đã lưu đơn vị tính & thuộc tính.' : 'Đã cập nhật đơn vị tính & thuộc tính, sẽ lưu cùng hàng hóa.');
+    } catch (err) {
+      showToast(`Không lưu được đơn vị tính: ${err instanceof Error ? err.message : 'lỗi không xác định'}`);
+    } finally {
+      setSavingUnitConfig(false);
+    }
+  };
+
+  // Thêm đơn vị quy đổi mới trong Modal 2.
+  // Quy đổi theo đơn vị chọn (VD 1 thùng = 10 túi), lưu ra số đơn vị cơ bản: 10 × (1 túi = 10 chùm) = 100 chùm.
+  const handleAddUnit = async () => {
+    const name = newUnitName.trim();
+    if (!name) {
+      setUnitFormError('Vui lòng nhập tên đơn vị tính.');
       return;
     }
-    const updatedUnits: GoodsUnitConversion[] = [
-      ...tempUnits,
-      { name: newUnitName.trim(), conversionRate: Number(newUnitRate) || 1, isBase: false, isDirectSale: true },
-    ];
-    setTempUnits(updatedUnits);
-    setNewUnitName('');
-    setNewUnitRate(4);
-    setShowAddUnitInline(false);
+    if (tempUnits.some((u) => u.name.trim().toLowerCase() === name.toLowerCase())) {
+      setUnitFormError(`Đơn vị "${name}" đã có trong danh sách.`);
+      return;
+    }
+    const rate = Number(newUnitRate);
+    if (!Number.isFinite(rate) || rate <= 0) {
+      setUnitFormError('Số lượng quy đổi phải lớn hơn 0.');
+      return;
+    }
+    const baseUnit = tempUnits.find((u) => u.isBase);
+    const refUnit = tempUnits.find((u) => u.name === newUnitRefName) ?? baseUnit;
+    const conversionRate = rate * (refUnit?.conversionRate ?? 1);
+    if (conversionRate === 1) {
+      setUnitFormError(`Đơn vị mới phải khác đơn vị cơ bản (1 ${name} đang bằng 1 ${baseUnit?.name ?? 'đơn vị cơ bản'}).`);
+      return;
+    }
+    // Đặt theo đơn vị khác đơn vị cơ bản thì nhớ công thức gốc để hiển thị "1 thùng = 10 túi"
+    const newUnit: GoodsUnitConversion = { name, conversionRate, isBase: false, isDirectSale: true };
+    if (refUnit && !refUnit.isBase) {
+      newUnit.refUnitName = refUnit.name;
+      newUnit.refRate = rate;
+    }
+    const updatedUnits: GoodsUnitConversion[] = [...tempUnits, newUnit];
 
     // Tự sinh lại biến thể
     const gen = generateVariantMatrix(
@@ -1296,7 +1452,25 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
       Number(formStockQuantity) || 0,
       formCode || 'SP'
     );
-    setTempVariants(gen);
+
+    // Bấm "Lưu đơn vị" là lưu luôn (hàng đã có trong DB), không phải bấm Lưu hàng hóa thêm lượt nữa
+    setSavingUnitConfig(true);
+    try {
+      const saved = await persistUnitConfig(updatedUnits, tempAttributes, gen);
+      setTempUnits(updatedUnits);
+      setTempVariants(gen);
+      applyUnitConfigToForm(updatedUnits, tempAttributes, gen, saved);
+      setNewUnitName('');
+      setNewUnitRate('');
+      setNewUnitRefName('');
+      setUnitFormError(null);
+      setShowAddUnitInline(false);
+      showToast(saved ? `Đã lưu đơn vị "${name}".` : `Đã thêm đơn vị "${name}", sẽ lưu cùng hàng hóa.`);
+    } catch (err) {
+      setUnitFormError(`Không lưu được đơn vị: ${err instanceof Error ? err.message : 'lỗi không xác định'}`);
+    } finally {
+      setSavingUnitConfig(false);
+    }
   };
 
   // Thêm thuộc tính mới trong Modal 2
@@ -1374,9 +1548,15 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
     );
   };
 
-  // Xóa một biến thể khỏi bảng ma trận
+  // Xóa một biến thể khỏi bảng ma trận. Đơn vị (khác đơn vị cơ bản) không còn dòng nào thì gỡ luôn khỏi
+  // danh sách đơn vị, nếu không lần mở sau ma trận sẽ tự sinh lại dòng vừa xoá.
   const handleDeleteVariantRow = (varId: string) => {
-    setTempVariants((prev) => prev.filter((v) => v.id !== varId));
+    const removed = tempVariants.find((v) => v.id === varId);
+    const remaining = tempVariants.filter((v) => v.id !== varId);
+    setTempVariants(remaining);
+    if (removed && !remaining.some((v) => v.unitName === removed.unitName)) {
+      setTempUnits((prev) => prev.filter((u) => u.isBase || u.name !== removed.unitName));
+    }
   };
 
   // Lưu hàng hóa: mở modal xác nhận phạm vi áp dụng giá vốn chuẩn StockFlow (Ảnh 2)
@@ -1623,26 +1803,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
       description: savedItem.description,
       // Tồn kho không gửi kèm ở đây: được cân chỉnh riêng từng kho qua /stock-adjustments sau khi lưu
       createdAt: new Date().toISOString(),
-      units: savedItem.units?.map((u) => ({
-        name: u.name,
-        conversionRate: u.conversionRate,
-        isBase: u.isBase,
-        isDirectSale: u.isDirectSale ?? true,
-      })),
-      attributes: savedItem.attributes?.map((a) => ({
-        name: a.name,
-        values: a.values,
-      })),
-      variants: savedItem.variants?.map((v) => ({
-        attributeValue: v.attributeValue,
-        unitName: v.unitName,
-        conversionRate: v.conversionRate,
-        code: v.code,
-        barcode: v.barcode,
-        costPrice: v.costPrice,
-        salePrice: v.salePrice,
-        stock: v.stock,
-      })),
+      ...toApiUnitConfig(savedItem.units ?? [], savedItem.attributes ?? [], savedItem.variants ?? []),
     };
 
     setIsSaving(true);
@@ -3116,10 +3277,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
 
                                     <button
                                       type="button"
-                                      onClick={() => {
-                                        handleOpenEdit(item);
-                                        handleOpenConfigModal();
-                                      }}
+                                      onClick={() => handleOpenConfigModal(handleOpenEdit(item))}
                                       className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg border border-blue-200 hover:bg-blue-50 text-blue-700 text-xs font-semibold transition cursor-pointer"
                                     >
                                       <Plus size={13} />
@@ -3334,10 +3492,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                                   </div>
                                   <button
                                     type="button"
-                                    onClick={() => {
-                                      handleOpenEdit(item);
-                                      handleOpenConfigModal();
-                                    }}
+                                    onClick={() => handleOpenConfigModal(handleOpenEdit(item))}
                                     className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[8px] bg-[#0070f4] hover:bg-[#005ac3] text-xs font-semibold text-white transition cursor-pointer"
                                   >
                                     <Plus size={13} />
@@ -3367,7 +3522,14 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                                               {item.name} - {v.attributeValue ? `${v.attributeValue} - ` : ''}{v.unitName}
                                             </td>
                                             <td className="py-2.5 px-3 text-slate-500">
-                                              1 {v.unitName} = {v.conversionRate} {item.uom}
+                                              {(() => {
+                                                // Đơn vị đặt theo đơn vị khác thì hiện đúng công thức đó (1 thùng = 10 túi)
+                                                const unit = item.units?.find((u) => u.name === v.unitName);
+                                                const rhs = unit
+                                                  ? unitRateLabel(unit, item.units ?? [], item.uom)
+                                                  : `${v.conversionRate.toLocaleString('vi-VN')} ${item.uom}`;
+                                                return `1 ${v.unitName} = ${rhs}`;
+                                              })()}
                                             </td>
                                             <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-900">
                                               {v.salePrice.toLocaleString('vi-VN')} đ
@@ -4079,7 +4241,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
 
                     <button
                       type="button"
-                      onClick={handleOpenConfigModal}
+                      onClick={() => handleOpenConfigModal()}
                       className="shrink-0 px-4 py-2 rounded-lg border border-blue-600 text-blue-600 hover:bg-blue-50 font-bold text-xs transition cursor-pointer shadow-2xs"
                     >
                       Thiết lập
@@ -4283,14 +4445,32 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                       }`}
                     >
                       <span className="font-bold">
-                        {u.name} {u.isBase ? '(Đơn vị cơ bản)' : `(${u.conversionRate} ${tempUnits.find((x) => x.isBase)?.name || 'Cơ bản'})`}
+                        {u.name}{' '}
+                        {u.isBase
+                          ? '(Đơn vị cơ bản)'
+                          : `(${unitRateLabel(u, tempUnits, tempUnits.find((x) => x.isBase)?.name || 'Cơ bản')})`}
                       </span>
                       <button
                         type="button"
                         onClick={() => {
-                          const rate = prompt(`Nhập tỷ lệ quy đổi cho "${u.name}":`, u.conversionRate.toString());
+                          // Sửa theo đúng đơn vị đang quy đổi (VD thùng đặt theo túi thì nhập số túi)
+                          const ref = u.refUnitName ? tempUnits.find((x) => x.name === u.refUnitName) : undefined;
+                          const label = ref ? ref.name : tempUnits.find((x) => x.isBase)?.name || 'đơn vị cơ bản';
+                          const current = ref && u.refRate ? u.refRate : u.conversionRate;
+                          const rate = prompt(`1 ${u.name} = ? ${label}`, current.toString());
                           if (rate && Number(rate) > 0) {
-                            const updated = tempUnits.map((x, i) => (i === uIdx ? { ...x, conversionRate: Number(rate) } : x));
+                            const r = Number(rate);
+                            const edited: GoodsUnitConversion = ref
+                              ? { ...u, refRate: r, conversionRate: r * ref.conversionRate }
+                              : { ...u, conversionRate: r, refUnitName: undefined, refRate: undefined };
+                            // Đơn vị khác đặt theo đơn vị vừa sửa thì tính lại số đơn vị cơ bản
+                            const updated = tempUnits.map((x, i) =>
+                              i === uIdx
+                                ? edited
+                                : x.refUnitName === u.name && x.refRate
+                                  ? { ...x, conversionRate: x.refRate * edited.conversionRate }
+                                  : x
+                            );
                             setTempUnits(updated);
                             const gen = generateVariantMatrix(
                               updated,
@@ -4314,7 +4494,10 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                         <button
                           type="button"
                           onClick={() => {
-                            const updated = tempUnits.filter((_, i) => i !== uIdx);
+                            // Đơn vị khác đặt theo đơn vị bị xoá thì hiển thị lại theo đơn vị cơ bản (số quy đổi giữ nguyên)
+                            const updated = tempUnits
+                              .filter((_, i) => i !== uIdx)
+                              .map((x) => (x.refUnitName === u.name ? { ...x, refUnitName: undefined, refRate: undefined } : x));
                             setTempUnits(updated);
                             const gen = generateVariantMatrix(
                               updated,
@@ -4337,7 +4520,13 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
 
                   <button
                     type="button"
-                    onClick={() => setShowAddUnitInline(true)}
+                    onClick={() => {
+                      setNewUnitName('');
+                      setNewUnitRate('');
+                      setNewUnitRefName('');
+                      setUnitFormError(null);
+                      setShowAddUnitInline(true);
+                    }}
                     className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-dashed border-blue-300 text-blue-600 hover:bg-blue-50 font-bold text-xs transition cursor-pointer"
                   >
                     <Plus size={13} />
@@ -4347,40 +4536,84 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
 
                 {/* Inline Form Thêm Đơn Vị Mới (Hỗ trợ TỰ NHẬP tên đơn vị tự do) */}
                 {showAddUnitInline && (
-                  <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center gap-3 animate-in fade-in flex-wrap">
+                  <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2 animate-in fade-in">
+                  <div className="flex items-center gap-3 flex-wrap">
                     <div className="w-48">
                       <CustomCombobox
                         value={newUnitName}
-                        onChange={setNewUnitName}
+                        onChange={(v) => {
+                          setNewUnitName(v);
+                          setUnitFormError(null);
+                        }}
                         options={['Lốc', 'Thùng', 'Kiện', 'Bao', 'Pallet', 'Bịch', 'Lon', 'Lô', 'Cuộn']}
                         placeholder="Tự nhập ĐVT (Lốc, Thùng...)"
                       />
                     </div>
-                    <div className="flex items-center gap-1 text-slate-600 text-xs">
+                    <div className="flex items-center gap-1.5 text-slate-600 text-xs">
                       <span>1 {newUnitName || 'Đơn vị'} =</span>
                       <input
-                        type="number"
-                        min={1}
+                        type="text"
+                        inputMode="decimal"
                         value={newUnitRate}
-                        onChange={(e) => setNewUnitRate(Number(e.target.value))}
+                        placeholder="SL"
+                        onChange={(e) => {
+                          // Chỉ nhận số, bỏ số 0 thừa ở đầu ("010" → "10")
+                          const v = e.target.value.replace(/[^\d.]/g, '').replace(/^0+(?=\d)/, '');
+                          setNewUnitRate(v);
+                          setUnitFormError(null);
+                        }}
                         className="w-16 h-9 px-2 rounded-lg border border-slate-200 bg-white font-mono text-center text-xs"
                       />
-                      <span className="font-semibold text-slate-800">{tempUnits.find((u) => u.isBase)?.name || 'Cơ bản'}</span>
+                      {/* Đơn vị quy đổi: chọn đơn vị cơ bản hoặc một đơn vị đã có (VD 1 thùng = 10 túi) */}
+                      <select
+                        value={newUnitRefName || tempUnits.find((u) => u.isBase)?.name || ''}
+                        onChange={(e) => {
+                          const base = tempUnits.find((u) => u.isBase)?.name;
+                          setNewUnitRefName(e.target.value === base ? '' : e.target.value);
+                          setUnitFormError(null);
+                        }}
+                        className="h-9 px-2 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-800 cursor-pointer focus:outline-none focus:border-[#0071BA]"
+                        title="Đơn vị quy đổi"
+                      >
+                        {tempUnits.map((u) => (
+                          <option key={u.name} value={u.name}>
+                            {u.name}
+                          </option>
+                        ))}
+                      </select>
+                      {(() => {
+                        // Gợi ý số đơn vị cơ bản khi quy đổi theo đơn vị khác đơn vị cơ bản
+                        const base = tempUnits.find((u) => u.isBase);
+                        const ref = tempUnits.find((u) => u.name === newUnitRefName);
+                        const rate = Number(newUnitRate);
+                        if (!base || !ref || ref.isBase || !(rate > 0)) return null;
+                        return (
+                          <span className="text-[11px] text-slate-500">
+                            (= {(rate * ref.conversionRate).toLocaleString('vi-VN')} {base.name})
+                          </span>
+                        );
+                      })()}
                     </div>
                     <button
                       type="button"
-                      onClick={handleAddUnit}
-                      className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs transition cursor-pointer shadow-xs"
+                      onClick={() => void handleAddUnit()}
+                      disabled={savingUnitConfig}
+                      className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs transition cursor-pointer shadow-xs disabled:opacity-60 disabled:cursor-not-allowed"
                     >
-                      Lưu đơn vị
+                      {savingUnitConfig ? 'Đang lưu...' : 'Lưu đơn vị'}
                     </button>
                     <button
                       type="button"
-                      onClick={() => setShowAddUnitInline(false)}
+                      onClick={() => {
+                        setShowAddUnitInline(false);
+                        setUnitFormError(null);
+                      }}
                       className="px-3 py-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-white text-xs transition cursor-pointer"
                     >
                       Hủy
                     </button>
+                  </div>
+                  {unitFormError && <div className="text-[11px] font-medium text-rose-600">{unitFormError}</div>}
                   </div>
                 )}
               </div>
@@ -4631,10 +4864,11 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
               </button>
               <button
                 type="button"
-                onClick={handleApplyConfigModal}
-                className="px-6 py-2 rounded-[8px] bg-[#0070f4] hover:bg-[#005ac3] text-xs font-bold text-white transition cursor-pointer shadow-xs"
+                onClick={() => void handleApplyConfigModal()}
+                disabled={savingUnitConfig}
+                className="px-6 py-2 rounded-[8px] bg-[#0070f4] hover:bg-[#005ac3] text-xs font-bold text-white transition cursor-pointer shadow-xs disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                Xong
+                {savingUnitConfig ? 'Đang lưu...' : 'Xong'}
               </button>
             </div>
           </div>
