@@ -6,6 +6,11 @@ public class ProductConversionUnitDto
     public decimal ConversionRate { get; set; } = 1;
     public bool IsBase { get; set; }
     public bool IsDirectSale { get; set; } = true;
+    /// <summary>Quy đổi nhập theo đơn vị khác đơn vị cơ bản (VD 1 thùng = 10 túi): tên đơn vị đó. Chỉ để hiển thị;
+    /// ConversionRate vẫn là số đơn vị cơ bản (10 × 10 = 100).</summary>
+    public string? RefUnitName { get; set; }
+    /// <summary>Số lượng theo RefUnitName (VD 10 túi)</summary>
+    public decimal? RefRate { get; set; }
 }
 
 public class ProductAttributeDto
