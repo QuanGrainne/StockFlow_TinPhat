@@ -10,6 +10,25 @@ namespace StockFlow.Application.Features.Transfers.Helpers;
 
 public static class TransferHelper
 {
+    /// <summary>
+    /// Khóa theo phiếu chuyển (pg_advisory_xact_lock): xuất / nhận / hủy / sửa cùng một phiếu chạy tuần tự,
+    /// request đến sau đọc lại trạng thái mới nên không nhận / xuất 2 lần, không vừa nhận vừa hủy (DEF-IT-01).
+    /// </summary>
+    public static string LockKey(int transferId) => $"stock-transfer:{transferId}";
+
+    /// <summary>
+    /// Mở transaction (nếu chưa có) rồi giữ khóa của phiếu chuyển tới khi transaction kết thúc.
+    /// Trả về null khi handler được gọi lồng trong transaction của handler khác (VD Tạo phiếu + Hoàn thành):
+    /// khi đó khóa nằm trong transaction ngoài và handler ngoài commit.
+    /// </summary>
+    public static async Task<Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction?> BeginLockedAsync(
+        IStockFlowDbContext context, int transferId, CancellationToken ct)
+    {
+        var tx = context.HasActiveTransaction ? null : await context.BeginTransactionAsync(ct);
+        await context.AcquireTransactionLockAsync(LockKey(transferId), ct);
+        return tx;
+    }
+
     private static readonly Regex CkRegex = new(@"^CK(\d+)$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     /// <summary>

@@ -7,6 +7,7 @@ using Microsoft.EntityFrameworkCore;
 using StockFlow.Application.Common;
 using StockFlow.Application.Common.Interfaces;
 using StockFlow.Application.Features.Transfers.DTOs;
+using StockFlow.Application.Features.Transfers.Helpers;
 using StockFlow.Application.Features.Transfers.Queries;
 using StockFlow.Domain.Entities;
 
@@ -31,6 +32,8 @@ public class UpdateTransferCommandHandler : IRequestHandler<UpdateTransferComman
 
     public async Task<Result<TransferDetailDto>> Handle(UpdateTransferCommand command, CancellationToken cancellationToken)
     {
+        await using var tx = await TransferHelper.BeginLockedAsync(_context, command.Id, cancellationToken);
+
         var req = command.Request;
         var transfer = await _context.TrxStockTransfers
             .Include(t => t.DtlStockTransferItems)
@@ -95,6 +98,7 @@ public class UpdateTransferCommandHandler : IRequestHandler<UpdateTransferComman
         }
 
         await _context.SaveChangesAsync(cancellationToken);
+        if (tx != null) await tx.CommitAsync(cancellationToken);
 
         return await new GetTransferByIdQueryHandler(_context).Handle(new GetTransferByIdQuery(transfer.StockTransferId), cancellationToken);
     }

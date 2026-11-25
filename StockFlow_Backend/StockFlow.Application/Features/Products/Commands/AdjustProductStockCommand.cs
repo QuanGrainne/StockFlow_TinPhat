@@ -17,7 +17,7 @@ namespace StockFlow.Application.Features.Products.Commands;
 /// Mỗi lần thay đổi sinh 1 phiếu kiểm kho "Đã cân bằng kho" (thẻ kho STOCKTAKE_IN / STOCKTAKE_OUT), giá vốn giữ nguyên.
 /// </summary>
 public record AdjustProductStockCommand(int ProductId, AdjustProductStockRequest Request)
-    : IRequest<Result<ProductStockAdjustmentDto>>;
+    : IRequest<Result<ProductStockAdjustmentDto>>, IRetryOnConcurrencyConflict;
 
 public class AdjustProductStockHandler : IRequestHandler<AdjustProductStockCommand, Result<ProductStockAdjustmentDto>>
 {
