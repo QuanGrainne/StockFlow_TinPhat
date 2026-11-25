@@ -170,7 +170,8 @@ public sealed class ApiSecurityTests : InventoryTestBase
         var res = await GetAsync(u, "/api/stocktakes");
         var check = new Checks(Output);
         check.Equal("HTTP status", 403, res.StatusCode);
-        check.Message("Thông báo", "Vai trò của bạn chưa được phân quyền chức năng feat-stocktake.", res);
+        // v1.1: thông báo dùng tên chức năng hiển thị, không dùng mã feat-stocktake
+        check.Message("Thông báo", "Vai trò của bạn chưa được phân quyền chức năng Kiểm kho.", res);
         check.Assert();
     }
 

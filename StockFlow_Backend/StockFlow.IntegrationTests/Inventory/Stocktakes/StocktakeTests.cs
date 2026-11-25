@@ -159,13 +159,13 @@ public sealed class StocktakeTests : InventoryTestBase
     public async Task INT_STK_46_09_VarianceWithoutReason()
     {
         var a = await ArrangeAsync();
-        // Request không có lý do chênh lệch (SaveStocktakeRequest / StocktakeItemRequest không có trường lý do)
-        var (res, id) = await SaveAsync(a, "BALANCED", (Ids.PTest, 105m));
+        // BR-43 / MSG51: dòng lệch +5 nhưng không có lý do
+        var res = await PostAsync(a, "/api/stocktakes", StocktakeWithReason(K001, "BALANCED", null, (Ids.PTest, 105m)));
 
         var check = new Checks(Output);
-        check.Rejected(res);
+        check.Message("Thông báo", "Vui lòng nhập lý do cho mọi dòng có chênh lệch (P-TEST).", res);
         check.Equal("Tồn K001 giữ 100", 100m, await StockAsync(K001, Ids.PTest));
-        Actual("Phiếu tạo ra (nếu có)", id > 0 ? (await StocktakeAsync(id)).Status : "(không có)");
+        check.Equal("Không tạo phiếu kiểm", 0, await QueryAsync(db => Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.CountAsync(db.TrxStocktakes)));
         check.Assert();
     }
 

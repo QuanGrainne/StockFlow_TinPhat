@@ -136,7 +136,7 @@ public sealed class ProductionTests : InventoryTestBase
 
         var check = new Checks(Output);
         check.Equal("HTTP status", 400, res.StatusCode);
-        check.Message("Thông báo", "BOM phải có ít nhất một nguyên vật liệu.", res);
+        check.Message("Thông báo", "Định mức phải có ít nhất một nguyên vật liệu.", res);
         check.Assert();
     }
 
@@ -150,7 +150,7 @@ public sealed class ProductionTests : InventoryTestBase
 
         var check = new Checks(Output);
         check.Equal("HTTP status", 400, res.StatusCode);
-        check.Message("Thông báo", "Thành phẩm đã có BOM phiên bản 1.0.", res);
+        check.Message("Thông báo", "Thành phẩm đã có định mức phiên bản 1.0.", res);
         check.Assert();
     }
 
@@ -163,7 +163,7 @@ public sealed class ProductionTests : InventoryTestBase
 
         var check = new Checks(Output);
         check.Equal("HTTP status", 400, res.StatusCode);
-        check.Message("Thông báo", "BOM đã được dùng cho lệnh sản xuất nên không sửa được. Vui lòng tạo phiên bản mới.", res);
+        check.Message("Thông báo", "Định mức đã được dùng cho lệnh sản xuất nên không sửa được. Vui lòng tạo phiên bản mới.", res);
         check.Assert();
     }
 
@@ -176,7 +176,7 @@ public sealed class ProductionTests : InventoryTestBase
 
         var check = new Checks(Output);
         check.Equal("HTTP status", 400, res.StatusCode);
-        check.Message("Thông báo", "BOM đã được dùng cho lệnh sản xuất nên không xoá được. Bạn có thể ngừng áp dụng BOM.", res);
+        check.Message("Thông báo", "Định mức đã được dùng cho lệnh sản xuất nên không hủy được. Bạn có thể ngừng áp dụng định mức.", res);
         check.Equal("BOM còn trong database", 1, await QueryAsync(db => db.MstBoms.CountAsync(b => b.BomId == bom)));
         check.Assert();
     }
@@ -228,9 +228,10 @@ public sealed class ProductionTests : InventoryTestBase
 
         var res = await PostAsync(p, $"/api/production/plans/{id}/approve");
 
+        // v1.1 (BR-02, MSG04): chặn ở tầng phân quyền chức năng "Duyệt kế hoạch sản xuất" → 403
         var check = new Checks(Output);
-        check.Equal("HTTP status", 400, res.StatusCode);
-        check.Message("Thông báo", "Chỉ người có quyền duyệt kế hoạch sản xuất mới được thực hiện thao tác này.", res);
+        check.Equal("HTTP status", 403, res.StatusCode);
+        check.Message("Thông báo", "Vai trò của bạn chưa được phân quyền chức năng Duyệt kế hoạch sản xuất.", res);
         check.Equal("Vẫn PENDING_APPROVAL", "PENDING_APPROVAL", (await PlanAsync(id)).Status);
         check.Assert();
     }
@@ -332,7 +333,7 @@ public sealed class ProductionTests : InventoryTestBase
 
         var check = new Checks(Output);
         check.Equal("HTTP status", 400, res.StatusCode);
-        check.Message("Thông báo", "Số lượng xuất luỹ kế vượt nhu cầu theo BOM. ...", res);
+        check.Message("Thông báo", "Số lượng xuất luỹ kế vượt nhu cầu theo định mức. Vui lòng nhập lý do.", res);
         check.Equal("Tồn RM-01 không đổi", 50m, await StockAsync(K001, Ids.Rm01));
         check.Assert();
     }
@@ -453,8 +454,10 @@ public sealed class ProductionTests : InventoryTestBase
         var check = new Checks(Output);
         check.Equal("Không xác nhận: HTTP status", 400, first.StatusCode);
         check.Contains("Không xác nhận: có lời nhắc [CONFIRM_EXCEED_PLAN]", "[CONFIRM_EXCEED_PLAN]", first);
-        check.Success(confirmed);
-        check.Equal("Có xác nhận: tồn FG-01 +11", 11m, await StockAsync(K001, Ids.Fg01));
+        // v1.1 (BR-37 sửa 25/11): NVL đã xuất chỉ đủ 10 thành phẩm → có xác nhận vẫn bị chặn, phải xuất bổ sung NVL trước (MSG43)
+        check.Equal("Có xác nhận: HTTP status", 400, confirmed.StatusCode);
+        check.Contains("Có xác nhận: thông báo thiếu NVL", "NVL đã xuất chỉ đủ sản xuất tối đa 10", confirmed);
+        check.Equal("Tồn FG-01 không đổi", 0m, await StockAsync(K001, Ids.Fg01));
         check.Assert();
     }
 
@@ -462,11 +465,60 @@ public sealed class ProductionTests : InventoryTestBase
     public async Task INT_MFG_36_04_ApproveCompletion()
     {
         var (t, order) = await ArrangeInProgressAsync();
-        var res = await ApproveOrderAsync(t, order, 5m);
+        // v1.1 (BR-38): duyệt 5/10 và chọn Kết thúc lệnh kèm lý do → Manager đóng lệnh sớm
+        var res = await PostAsync(t, $"/api/production/orders/{order}/approve", new ApproveProductionOrderRequest(K001, null, null, null, null, null,
+            new() { new ApproveProductionOrderLine(await OrderItemIdAsync(order), 5m, 0m, null) }, FinishOrder: true, FinishReason: "Không sản xuất bù"));
 
         var check = new Checks(Output);
         check.Success(res);
         check.Equal("Lệnh COMPLETED", "COMPLETED", (await ProductionOrderAsync(order)).Status);
+        check.Equal("Tồn FG-01 +5", 5m, await StockAsync(K001, Ids.Fg01));
+        check.Assert();
+    }
+
+    // ───────── Active Stocktake Blocks Moves (BR-42): nhập thành phẩm / duyệt hoàn thành ─────────
+
+    [Fact(DisplayName = "INT-STK-48-01 | Finished goods receipt of a counted item")]
+    public async Task INT_STK_48_01_FinishedGoodsReceiptBlocked()
+    {
+        var (t, order) = await ArrangeInProgressAsync();
+        await ArrangeStocktakeAsync(t, K001, "DRAFT", (Ids.Fg01, 0m)); // 1. Phiếu kiểm DRAFT của K001 có FG-01
+
+        var res = await PostAsync(t, "/api/production/finished-goods-receipts", Fgr(order, 5m));
+
+        var check = new Checks(Output);
+        check.Rejected(res);
+        check.Message("Thông báo khóa kiểm kho (MSG50)", "Mặt hàng FG-01 đang được kiểm kho (phiếu ...). Không thể xác nhận giao dịch cho đến khi phiếu kiểm kho kết thúc.", res);
+        check.Equal("Tồn FG-01 không đổi", 0m, await StockAsync(K001, Ids.Fg01));
+        check.Assert();
+    }
+
+    [Fact(DisplayName = "INT-STK-48-02 | Completion approval of a counted item")]
+    public async Task INT_STK_48_02_CompletionApprovalBlocked()
+    {
+        var (t, order) = await ArrangeInProgressAsync();
+        await ArrangeStocktakeAsync(t, K001, "DRAFT", (Ids.Fg01, 0m));
+
+        var res = await ApproveOrderAsync(t, order, 10m);
+
+        var check = new Checks(Output);
+        check.Rejected(res);
+        check.Message("Thông báo khóa kiểm kho (MSG50)", "Mặt hàng FG-01 đang được kiểm kho (phiếu ...). Không thể xác nhận giao dịch cho đến khi phiếu kiểm kho kết thúc.", res);
+        check.Equal("Lệnh vẫn IN_PROGRESS", "IN_PROGRESS", (await ProductionOrderAsync(order)).Status);
+        check.Equal("Tồn FG-01 không đổi", 0m, await StockAsync(K001, Ids.Fg01));
+        check.Assert();
+    }
+
+    [Fact(DisplayName = "INT-MFG-36-06 | Approve part without finishing the order")]
+    public async Task INT_MFG_36_06_ApprovePartKeepsInProgress()
+    {
+        var (t, order) = await ArrangeInProgressAsync();
+        var res = await ApproveOrderAsync(t, order, 5m); // không chọn Kết thúc lệnh
+
+        // BR-38: chưa đủ kế hoạch và không đóng sớm → lệnh vẫn Đang sản xuất, thành phẩm vẫn nhập kho
+        var check = new Checks(Output);
+        check.Success(res);
+        check.Equal("Lệnh vẫn IN_PROGRESS", "IN_PROGRESS", (await ProductionOrderAsync(order)).Status);
         check.Equal("Tồn FG-01 +5", 5m, await StockAsync(K001, Ids.Fg01));
         check.Assert();
     }
