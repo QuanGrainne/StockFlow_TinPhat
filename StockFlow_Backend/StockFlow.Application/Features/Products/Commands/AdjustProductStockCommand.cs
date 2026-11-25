@@ -87,7 +87,13 @@ public class AdjustProductStockHandler : IRequestHandler<AdjustProductStockComma
             await using var transaction = await _context.BeginTransactionAsync(ct);
             _context.TrxStocktakes.Add(stocktake);
             var items = await StocktakeLogic.ReplaceItemsAsync(_context, stocktake,
-                new[] { new StocktakeItemRequest { ProductId = product.ProductId, ActualQty = previousQty + delta } }, userId, ct);
+                new[] { new StocktakeItemRequest
+                {
+                    ProductId = product.ProductId,
+                    ActualQty = previousQty + delta,
+                    // BR-43: dòng lệch phải có lý do – lấy ghi chú người dùng nhập, không có thì ghi nguồn điều chỉnh
+                    Reason = Truncate(string.IsNullOrWhiteSpace(req.Note) ? autoNote : req.Note.Trim(), StocktakeLogic.ReasonMaxLength),
+                } }, userId, ct);
             if (!items.IsSuccess)
                 return Result.Failure<ProductStockAdjustmentDto>(items.Error!);
             await _context.SaveChangesAsync(ct);
@@ -112,4 +118,6 @@ public class AdjustProductStockHandler : IRequestHandler<AdjustProductStockComma
     /// <summary>Giá vốn hiện tại của kho: bình quân theo SL các dòng còn hàng, nếu không có thì giá vốn chung của hàng hóa.</summary>
     private static decimal CurrentCost(IReadOnlyCollection<TrxInventoryBalance> balances, MstProduct product) =>
         InventoryCosting.CostOf(balances, product.MovingAverageCost ?? 0);
+
+    private static string Truncate(string value, int max) => value.Length > max ? value[..max] : value;
 }

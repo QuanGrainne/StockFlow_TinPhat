@@ -88,6 +88,9 @@ public class StocktakeCommandHandler :
             var items = await StocktakeLogic.ReplaceItemsAsync(_context, stocktake, req.Items, userId, ct);
             if (!items.IsSuccess)
                 return Result.Failure<StocktakeDetailDto>(items.Error!);
+            // BR-43: Hoàn thành (cân bằng kho) thì dòng nào lệch cũng phải có lý do; Lưu tạm thì chưa bắt buộc
+            if (balance && StocktakeLogic.MissingReasonError(stocktake) is { } reasonError)
+                return Result.Failure<StocktakeDetailDto>(reasonError);
 
             await _context.SaveChangesAsync(ct);
 
@@ -171,7 +174,15 @@ public class StocktakeCommandHandler :
         var items = sources
             .SelectMany(s => s.DtlStocktakeItems)
             .GroupBy(i => i.ProductId)
-            .Select(g => new StocktakeItemRequest { ProductId = g.Key, ActualQty = g.Sum(i => i.ActualQty ?? 0) })
+            .Select(g => new StocktakeItemRequest
+            {
+                ProductId = g.Key,
+                ActualQty = g.Sum(i => i.ActualQty ?? 0),
+                // Giữ lý do chênh lệch đã nhập trên các phiếu được gộp
+                Reason = string.Join("; ", g.Select(i => i.DiscrepancyReason).Where(r => !string.IsNullOrWhiteSpace(r)).Distinct()) is { Length: > 0 } r
+                    ? (r.Length > StocktakeLogic.ReasonMaxLength ? r[..StocktakeLogic.ReasonMaxLength] : r)
+                    : null,
+            })
             .ToList();
 
         var codes = sources.OrderByDescending(s => s.StocktakeId).Select(s => s.StocktakeCode ?? $"KK{s.StocktakeId:D6}").ToList();

@@ -34,7 +34,8 @@ public class UpdateStocktakeTests
     {
         Status = status,
         StocktakeCode = code,
-        Items = items.Select(i => new StocktakeItemRequest { ProductId = i.ProductId, ActualQty = i.Actual }).ToList(),
+        // BR-43: dòng lệch phải có lý do khi hoàn thành
+        Items = items.Select(i => new StocktakeItemRequest { ProductId = i.ProductId, ActualQty = i.Actual, Reason = "Lệch khi kiểm đếm" }).ToList(),
     };
 
     private static List<StockFlow.Domain.Entities.TrxInventoryTransaction> Cards(TestStockFlowDbContext db, int id) =>
