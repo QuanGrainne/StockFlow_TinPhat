@@ -17,7 +17,7 @@ public record ReceiveTransferCommand(
     int Id,
     ReceiveTransferRequest Request,
     int UserId
-) : IRequest<Result<TransferDetailDto>>;
+) : IRequest<Result<TransferDetailDto>>, IRetryOnConcurrencyConflict;
 
 public class ReceiveTransferCommandHandler : IRequestHandler<ReceiveTransferCommand, Result<TransferDetailDto>>
 {
@@ -32,6 +32,8 @@ public class ReceiveTransferCommandHandler : IRequestHandler<ReceiveTransferComm
 
     public async Task<Result<TransferDetailDto>> Handle(ReceiveTransferCommand command, CancellationToken cancellationToken)
     {
+        await using var tx = await TransferHelper.BeginLockedAsync(_context, command.Id, cancellationToken);
+
         var transfer = await _context.TrxStockTransfers
             .Include(t => t.DtlStockTransferItems)
             .FirstOrDefaultAsync(t => t.StockTransferId == command.Id, cancellationToken);
@@ -139,6 +141,7 @@ public class ReceiveTransferCommandHandler : IRequestHandler<ReceiveTransferComm
         }
 
         await _context.SaveChangesAsync(cancellationToken);
+        if (tx != null) await tx.CommitAsync(cancellationToken);
 
         return await new GetTransferByIdQueryHandler(_context).Handle(new GetTransferByIdQuery(transfer.StockTransferId), cancellationToken);
     }

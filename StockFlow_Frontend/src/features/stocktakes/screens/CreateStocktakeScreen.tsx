@@ -41,6 +41,8 @@ interface Row {
   unitCost: number;
   /** null = chưa kiểm */
   actualQty: number | null;
+  /** Lý do chênh lệch (BR-43): bắt buộc khi Hoàn thành nếu SL thực tế khác tồn kho */
+  reason?: string;
   /** Ảnh hàng hóa (dòng nạp từ phiếu cũ được bổ sung khi lấy lại tồn kho) */
   imageUrl?: string | null;
 }
@@ -50,8 +52,10 @@ type Tab = 'all' | 'match' | 'diff' | 'unchecked';
 /** Tiền tố mã khi sao chép phiếu (giống phiếu nhập) */
 const COPY_CODE_PREFIX = 'Copy_';
 
-const GRID ='36px 44px 48px 120px minmax(200px,1fr) 80px 100px 120px 100px 120px';
-const MIN_WIDTH = 36 + 44 + 48 + 120 + 200 + 80 + 100 + 120 + 100 + 120 + 24;
+const GRID ='36px 44px 48px 120px minmax(200px,1fr) 80px 100px 120px 100px 120px 200px';
+const MIN_WIDTH = 36 + 44 + 48 + 120 + 200 + 80 + 100 + 120 + 100 + 120 + 200 + 24;
+/** Độ dài tối đa lý do chênh lệch (cột discrepancy_reason) */
+const REASON_MAX = 500;
 const money = new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 0 });
 const qtyFmt = (n: number) => n.toLocaleString('vi-VN', { maximumFractionDigits: 3 });
 
@@ -160,6 +164,7 @@ export default function CreateStocktakeScreen() {
           systemQty: it.systemQty,
           unitCost: it.unitCost,
           actualQty: it.actualQty,
+          reason: it.reason ?? '',
         }));
         setRows(loaded);
         const whId = editId ? d.summary.warehouseId : activeWarehouse?.warehouseId;
@@ -331,6 +336,10 @@ export default function CreateStocktakeScreen() {
     setRows((prev) => prev.map((r) => (r.productId === productId ? { ...r, actualQty: clean === '' ? null : Number(clean) } : r)));
   };
 
+  const updateReason = (productId: number, value: string) => {
+    setRows((prev) => prev.map((r) => (r.productId === productId ? { ...r, reason: value.slice(0, REASON_MAX) } : r)));
+  };
+
   const diffOf = (r: Row) => (r.actualQty === null ? 0 : r.actualQty - r.systemQty);
   const counts = useMemo(
     () => ({
@@ -368,13 +377,25 @@ export default function CreateStocktakeScreen() {
       setTab('unchecked');
       return;
     }
+    // BR-43 / MSG51: Hoàn thành thì mọi dòng lệch phải có lý do (Lưu tạm chưa bắt buộc)
+    if (status === 'BALANCED') {
+      const missingReason = rows.filter((r) => diffOf(r) !== 0 && !r.reason?.trim());
+      if (missingReason.length > 0) {
+        showToast(
+          `Vui lòng nhập lý do cho mọi dòng có chênh lệch (${missingReason.slice(0, 5).map((r) => r.productCode).join(', ')}${missingReason.length > 5 ? '...' : ''}).`,
+          'error'
+        );
+        setTab('diff');
+        return;
+      }
+    }
     const payload: SaveStocktakePayload = {
       warehouseId,
       // Mã "Copy_..." chỉ để nhận biết phiếu sao chép → để trống cho hệ thống tự sinh KK mới
       stocktakeCode: code.trim() && !code.trim().toLowerCase().startsWith(COPY_CODE_PREFIX.toLowerCase()) ? code.trim() : null,
       notes: notes.trim() || null,
       status,
-      items: rows.map((r) => ({ productId: r.productId, actualQty: r.actualQty ?? 0 })),
+      items: rows.map((r) => ({ productId: r.productId, actualQty: r.actualQty ?? 0, reason: r.reason?.trim() || null })),
     };
     setSaving(true);
     try {
@@ -553,6 +574,7 @@ export default function CreateStocktakeScreen() {
                 <span className="text-right">Thực tế</span>
                 <span className="text-right">SL lệch</span>
                 <span className="text-right">Giá trị lệch</span>
+                <span className="pl-3">Lý do lệch</span>
               </div>
 
               {rows.length === 0 ? (
@@ -619,6 +641,22 @@ export default function CreateStocktakeScreen() {
                         {r.actualQty === null ? '—' : diff > 0 ? `+${qtyFmt(diff)}` : qtyFmt(diff)}
                       </span>
                       <span className="text-right">{r.actualQty === null ? '—' : money.format(diff * r.unitCost)}</span>
+                      <span className="pl-3">
+                        {r.actualQty !== null && diff !== 0 ? (
+                          <input
+                            type="text"
+                            value={r.reason ?? ''}
+                            onChange={(e) => updateReason(r.productId, e.target.value)}
+                            placeholder="Nhập lý do"
+                            maxLength={REASON_MAX}
+                            className={`w-full h-7 px-2 rounded-[6px] border focus:outline-none focus:border-[#0070f4] ${
+                              r.reason?.trim() ? 'border-slate-300' : 'border-[#fb2c36]'
+                            }`}
+                          />
+                        ) : (
+                          <span className="text-slate-300">—</span>
+                        )}
+                      </span>
                     </div>
                   );
                 })

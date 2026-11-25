@@ -5,6 +5,14 @@ using StockFlow.Infrastructure;
 // Support PostgreSQL timestamp without time zone with DateTime.UtcNow/DateTime.Now
 AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
 
+// Thông báo hệ thống bằng tiếng Việt (Report 3 – 4.1): số tiền/số lượng định dạng vi-VN ("2.000.000")
+// bất kể culture của máy chạy API (INT-CRD-06-01). JSON và model binding query vẫn dùng InvariantCulture.
+var viCulture = new System.Globalization.CultureInfo("vi-VN");
+System.Globalization.CultureInfo.DefaultThreadCurrentCulture = viCulture;
+System.Globalization.CultureInfo.DefaultThreadCurrentUICulture = viCulture;
+System.Globalization.CultureInfo.CurrentCulture = viCulture;
+System.Globalization.CultureInfo.CurrentUICulture = viCulture;
+
 var builder = WebApplication.CreateBuilder(args);
 
 // ─── Services ────────────────────────────────────────────────────────────────

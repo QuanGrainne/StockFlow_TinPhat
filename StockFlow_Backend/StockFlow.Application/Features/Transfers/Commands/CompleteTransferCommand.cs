@@ -13,7 +13,7 @@ using StockFlow.Domain.Entities;
 
 namespace StockFlow.Application.Features.Transfers.Commands;
 
-public record CompleteTransferCommand(int Id, int UserId) : IRequest<Result<TransferDetailDto>>;
+public record CompleteTransferCommand(int Id, int UserId) : IRequest<Result<TransferDetailDto>>, IRetryOnConcurrencyConflict;
 
 public class CompleteTransferCommandHandler : IRequestHandler<CompleteTransferCommand, Result<TransferDetailDto>>
 {
@@ -28,6 +28,8 @@ public class CompleteTransferCommandHandler : IRequestHandler<CompleteTransferCo
 
     public async Task<Result<TransferDetailDto>> Handle(CompleteTransferCommand command, CancellationToken cancellationToken)
     {
+        await using var tx = await TransferHelper.BeginLockedAsync(_context, command.Id, cancellationToken);
+
         var transfer = await _context.TrxStockTransfers
             .Include(t => t.DtlStockTransferItems)
             .FirstOrDefaultAsync(t => t.StockTransferId == command.Id, cancellationToken);
@@ -102,6 +104,7 @@ public class CompleteTransferCommandHandler : IRequestHandler<CompleteTransferCo
         }
 
         await _context.SaveChangesAsync(cancellationToken);
+        if (tx != null) await tx.CommitAsync(cancellationToken);
 
         return await new GetTransferByIdQueryHandler(_context).Handle(new GetTransferByIdQuery(transfer.StockTransferId), cancellationToken);
     }

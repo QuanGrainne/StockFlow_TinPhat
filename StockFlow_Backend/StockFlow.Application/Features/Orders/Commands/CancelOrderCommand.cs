@@ -18,7 +18,7 @@ namespace StockFlow.Application.Features.Orders.Commands;
 /// - Hóa đơn tạo từ đơn đặt hàng: chỉ tác động lên hóa đơn; đơn đặt gốc giữ nguyên trạng thái (Hoàn thành),
 ///   tiền trả trước đã trừ vào hóa đơn quay lại thành tiền khách trả trước trong công nợ.
 /// </summary>
-public record CancelOrderCommand(int OrderId) : IRequest<Result<bool>>;
+public record CancelOrderCommand(int OrderId) : IRequest<Result<bool>>, IRetryOnConcurrencyConflict;
 
 public class CancelOrderCommandHandler : IRequestHandler<CancelOrderCommand, Result<bool>>
 {

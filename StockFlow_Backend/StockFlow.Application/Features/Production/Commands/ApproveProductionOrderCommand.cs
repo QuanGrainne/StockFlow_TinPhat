@@ -19,7 +19,7 @@ namespace StockFlow.Application.Features.Production.Commands;
 /// BR-36 chỉ SL đạt vào tồn kho, BR-37 cảnh báo dùng NVL (bắt buộc ghi chú).
 /// </summary>
 public record ApproveProductionOrderCommand(int ProductionOrderId, ApproveProductionOrderRequest Request)
-    : IRequest<Result<ProductionOrderDetailDto>>;
+    : IRequest<Result<ProductionOrderDetailDto>>, IRetryOnConcurrencyConflict;
 
 public class ApproveProductionOrderCommandValidator : AbstractValidator<ApproveProductionOrderCommand>
 {

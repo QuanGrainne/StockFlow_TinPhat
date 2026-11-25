@@ -20,6 +20,8 @@ public static class DependencyInjection
         {
             cfg.RegisterServicesFromAssembly(assembly);
             cfg.AddBehavior(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
+            // Sau validation: chạy lại handler khi xung đột tồn kho (command đánh dấu IRetryOnConcurrencyConflict)
+            cfg.AddBehavior(typeof(IPipelineBehavior<,>), typeof(ConcurrencyRetryBehavior<,>));
         });
 
         services.AddValidatorsFromAssembly(assembly);

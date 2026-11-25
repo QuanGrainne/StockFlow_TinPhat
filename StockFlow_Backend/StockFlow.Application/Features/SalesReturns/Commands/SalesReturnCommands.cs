@@ -17,10 +17,10 @@ namespace StockFlow.Application.Features.SalesReturns.Commands;
 /// - Hàng trả nhập lại kho chi nhánh bán (ghi thẻ kho "Khách trả hàng"): nhân viên đã kiểm tra chất lượng trước khi nhận lại.
 /// - Công nợ khách giảm theo "Cần trả khách"; tiền trả khách ngay làm công nợ tăng lại (phiếu chi trả khách).
 /// </summary>
-public record CreateSalesReturnCommand(CreateSalesReturnRequest Request) : IRequest<Result<SalesReturnResultDto>>;
+public record CreateSalesReturnCommand(CreateSalesReturnRequest Request) : IRequest<Result<SalesReturnResultDto>>, IRetryOnConcurrencyConflict;
 
 /// <summary>Hủy phiếu trả: xuất lại kho hàng đã nhập, hoàn lại công nợ, hủy phiếu chi trả khách</summary>
-public record CancelSalesReturnCommand(int ReturnId) : IRequest<Result<bool>>;
+public record CancelSalesReturnCommand(int ReturnId) : IRequest<Result<bool>>, IRetryOnConcurrencyConflict;
 
 /// <summary>Trả thêm tiền cho khách (phần chưa trả lúc trả hàng): tạo phiếu chi, công nợ khách tăng lại tương ứng</summary>
 public record AddSalesReturnRefundCommand(int ReturnId, AddSalesReturnRefundRequest Request) : IRequest<Result<SalesReturnResultDto>>;

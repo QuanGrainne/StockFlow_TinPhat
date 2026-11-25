@@ -100,7 +100,7 @@ public sealed class ProductAndPriceBookTests : InventoryTestBase
 
         var check = new Checks(Output);
         check.Equal("HTTP status", 400, res.StatusCode);
-        check.Message("Thông báo", "Bạn không có quyền điều chỉnh tồn kho tại Kho Gia Lâm.", res);
+        check.Message("Thông báo", "Bạn không có quyền điều chỉnh tồn kho tại Kho Tổng Gia Lâm.", res);
         check.Equal("Không tạo phiếu kiểm", 0, await QueryAsync(db => db.TrxStocktakes.CountAsync()));
         check.Assert();
     }
@@ -235,7 +235,7 @@ public sealed class ProductAndPriceBookTests : InventoryTestBase
         var res = await PostAsync(a, "/api/price-books", PriceBook("Giá sỉ", DateTime.UtcNow, DateTime.UtcNow.AddDays(30)));
 
         var check = new Checks(Output);
-        check.Equal("HTTP status", 200, res.StatusCode);
+        check.Equal("HTTP status", 201, res.StatusCode);
         check.Equal("Dòng bảng giá được tạo", 1, await QueryAsync(db => db.MstPriceBooks.CountAsync(p => p.PriceBookName == "Giá sỉ")));
         check.Assert();
     }
@@ -256,16 +256,15 @@ public sealed class ProductAndPriceBookTests : InventoryTestBase
     public async Task INT_PRB_03_03_ApplyFormula()
     {
         var a = await ClientAsync(TestDataSeeder.OpsK001);
-        var id = await ArrangePriceBookAsync(a, PriceBook("Giá sỉ", DateTime.UtcNow, DateTime.UtcNow.AddDays(30)));
+        // v1.1: công thức (+10% theo giá chung) lưu trên bảng giá; apply-formula tính lại giá theo công thức đã lưu
+        var id = await ArrangePriceBookAsync(a, PriceBook("Giá sỉ", DateTime.UtcNow, DateTime.UtcNow.AddDays(30), "STANDARD", "+", 10m, "PERCENT"));
 
-        // Gửi đúng như bước trong workbook: công thức trong body của apply-formula
-        var res = await PostAsync(a, $"/api/price-books/{id}/apply-formula",
-            new JsonObject { ["source"] = "general", ["operator"] = "+", ["value"] = 10, ["unit"] = "PERCENT", ["allProducts"] = true });
+        var res = await PostAsync(a, $"/api/price-books/{id}/apply-formula", new JsonObject { ["allProducts"] = true });
         var price = await MatrixPriceAsync(a, id);
 
         var check = new Checks(Output);
-        Actual("apply-formula", $"{res.StatusCode} {res.Body}");
-        check.Equal("Giá P-TEST trong \"Giá sỉ\"", 110_000m, price);
+        check.Success(res);
+        check.Equal("Giá P-TEST trong \"Giá sỉ\" = 100.000 + 10%", 110_000m, price);
         check.Assert();
     }
 
@@ -273,14 +272,13 @@ public sealed class ProductAndPriceBookTests : InventoryTestBase
     public async Task INT_PRB_03_04_NegativeValue()
     {
         var a = await ClientAsync(TestDataSeeder.OpsK001);
-        var id = await ArrangePriceBookAsync(a, PriceBook("Giá sỉ", DateTime.UtcNow, DateTime.UtcNow.AddDays(30)));
-
-        var res = await PostAsync(a, $"/api/price-books/{id}/apply-formula",
-            new JsonObject { ["source"] = "general", ["operator"] = "+", ["value"] = -5, ["unit"] = "PERCENT", ["allProducts"] = true });
+        // v1.1: luật "không âm" kiểm khi lưu công thức của bảng giá (MSG68)
+        var res = await PostAsync(a, "/api/price-books", PriceBook("Giá âm", DateTime.UtcNow, DateTime.UtcNow.AddDays(30), "STANDARD", "+", -5m, "PERCENT"));
 
         var check = new Checks(Output);
         check.Equal("HTTP status", 400, res.StatusCode);
         check.Message("Thông báo", "Giá trị điều chỉnh không được âm.", res);
+        check.Equal("Không tạo bảng giá", 0, await QueryAsync(db => db.MstPriceBooks.CountAsync(p => p.PriceBookName == "Giá âm")));
         check.Assert();
     }
 
@@ -313,35 +311,6 @@ public sealed class ProductAndPriceBookTests : InventoryTestBase
         var check = new Checks(Output);
         check.Equal("HTTP status", 400, res.StatusCode);
         check.Message("Thông báo", "Không thể xóa 'Bảng giá chung' mặc định của hệ thống.", res);
-        check.Assert();
-    }
-
-    /// <summary>Ca BỔ SUNG cho INT-PRB-03-03: code lưu công thức trên bảng giá (tạo / sửa), apply-formula chỉ tính lại theo công thức đã lưu.</summary>
-    [Fact(DisplayName = "INT-PRB-03-S01 | (Bổ sung) Công thức +10% lưu trên bảng giá rồi áp dụng")]
-    public async Task INT_PRB_03_S01_FormulaStoredOnPriceBook()
-    {
-        var a = await ClientAsync(TestDataSeeder.OpsK001);
-        var id = await ArrangePriceBookAsync(a, PriceBook("Giá sỉ CT", DateTime.UtcNow, DateTime.UtcNow.AddDays(30), "STANDARD", "+", 10m, "PERCENT"));
-
-        var res = await PostAsync(a, $"/api/price-books/{id}/apply-formula", new JsonObject { ["allProducts"] = true });
-        var price = await MatrixPriceAsync(a, id);
-
-        var check = new Checks(Output);
-        check.Success(res);
-        check.Equal("Giá P-TEST = 100.000 + 10%", 110_000m, price);
-        check.Assert();
-    }
-
-    /// <summary>Ca BỔ SUNG cho INT-PRB-03-04: luật "không âm" nằm ở lúc lưu công thức của bảng giá.</summary>
-    [Fact(DisplayName = "INT-PRB-03-S02 | (Bổ sung) Lưu bảng giá với giá trị điều chỉnh âm")]
-    public async Task INT_PRB_03_S02_NegativeValueOnSave()
-    {
-        var a = await ClientAsync(TestDataSeeder.OpsK001);
-        var res = await PostAsync(a, "/api/price-books", PriceBook("Giá âm", DateTime.UtcNow, DateTime.UtcNow.AddDays(30), "STANDARD", "+", -5m, "PERCENT"));
-
-        var check = new Checks(Output);
-        check.Equal("HTTP status", 400, res.StatusCode);
-        check.Message("Thông báo", "Giá trị điều chỉnh không được âm.", res);
         check.Assert();
     }
 }

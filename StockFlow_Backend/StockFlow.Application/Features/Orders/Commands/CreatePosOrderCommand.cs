@@ -15,7 +15,7 @@ using StockFlow.Domain.Entities;
 
 namespace StockFlow.Application.Features.Orders.Commands;
 
-public record CreatePosOrderCommand(CreatePosOrderRequest Request) : IRequest<Result<PosOrderResultDto>>;
+public record CreatePosOrderCommand(CreatePosOrderRequest Request) : IRequest<Result<PosOrderResultDto>>, IRetryOnConcurrencyConflict;
 
 public class CreatePosOrderCommandValidator : AbstractValidator<CreatePosOrderCommand>
 {
