@@ -116,6 +116,8 @@ export default function TransfersScreen() {
     return scrollToWhenReady(`[data-doc-row="${docLink.id}"]`);
   }, [docLink]);
   const [receiveModalTransfer, setReceiveModalTransfer] = useState<TransferDetail | null>(null);
+  // Tăng sau khi nhận hàng để ô chi tiết phiếu đang mở tải lại (nó chỉ tự tải khi đổi phiếu)
+  const [detailVersion, setDetailVersion] = useState(0);
 
   const loadData = async () => {
     setLoading(true);
@@ -440,6 +442,7 @@ export default function TransfersScreen() {
                           <tr>
                             <td colSpan={10} className="p-0 border-b-2 border-[#0070f4] bg-white">
                               <TransferRowDetail
+                                key={`${t.id}-${detailVersion}`}
                                 transferId={t.id}
                                 onRefresh={loadData}
                                 onOpenReceiveScreen={(detail) => setReceiveModalTransfer(detail)}
@@ -473,6 +476,7 @@ export default function TransfersScreen() {
           onClose={() => setReceiveModalTransfer(null)}
           onSuccess={() => {
             setReceiveModalTransfer(null);
+            setDetailVersion((v) => v + 1); // chi tiết phiếu đang mở hiện ngay "Đã nhận" + SL nhận
             loadData();
           }}
         />
