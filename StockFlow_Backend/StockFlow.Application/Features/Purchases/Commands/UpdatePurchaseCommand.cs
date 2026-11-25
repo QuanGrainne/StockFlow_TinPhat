@@ -15,7 +15,7 @@ using StockFlow.Domain.Entities;
 
 namespace StockFlow.Application.Features.Purchases.Commands;
 
-public record UpdatePurchaseCommand(int Id, UpdatePurchaseRequest Request) : IRequest<Result<PurchaseDetailDto>>;
+public record UpdatePurchaseCommand(int Id, UpdatePurchaseRequest Request) : IRequest<Result<PurchaseDetailDto>>, IRetryOnConcurrencyConflict;
 
 public class UpdatePurchaseCommandHandler : IRequestHandler<UpdatePurchaseCommand, Result<PurchaseDetailDto>>
 {
@@ -225,7 +225,7 @@ public class UpdatePurchaseCommandHandler : IRequestHandler<UpdatePurchaseComman
 
             return Result.Success(detail);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not DbUpdateConcurrencyException)
         {
             return Result.Failure<PurchaseDetailDto>($"Lỗi khi cập nhật phiếu nhập: {ex.Message}");
         }

@@ -70,7 +70,8 @@ public sealed class PosStockPolicyTests : SalesTestBase
 
         var check = new Checks(Output);
         check.Equal("HTTP status", 400, res.StatusCode);
-        check.Contains("Thông báo A2 (hết hàng tồn kho)", "(A2)", res.Message);
+        // v1.1: hóa đơn POS hết hàng dùng thông báo B1 (MSG28, E34.1); A2 chỉ dùng cho đơn đặt hàng
+        check.Contains("Thông báo B1 (không đủ tồn kho)", "(B1, POS-014, INV-006)", res.Message);
         check.Equal("Tồn K001 không đổi", 0m, await StockAsync(K001, Ids.PTest));
         check.Equal("Không tạo hóa đơn", 0, await CountOrdersAsync("INVOICE"));
         check.Assert();

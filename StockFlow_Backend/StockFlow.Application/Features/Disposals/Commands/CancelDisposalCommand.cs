@@ -10,7 +10,7 @@ namespace StockFlow.Application.Features.Disposals.Commands;
 /// Hủy phiếu xuất hủy (nút "Hủy" ở chi tiết phiếu): phiếu tạm chỉ đổi trạng thái;
 /// phiếu đã hoàn thành được hoàn lại tồn kho (đúng vị trí / lô, giá vốn lúc hủy) và ghi thẻ kho.
 /// </summary>
-public record CancelDisposalCommand(int DisposalId) : IRequest<Result<DisposalDetailDto>>;
+public record CancelDisposalCommand(int DisposalId) : IRequest<Result<DisposalDetailDto>>, IRetryOnConcurrencyConflict;
 
 public class CancelDisposalCommandHandler : IRequestHandler<CancelDisposalCommand, Result<DisposalDetailDto>>
 {

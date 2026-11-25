@@ -79,4 +79,10 @@ public interface IStockFlowDbContext
     /// Bắt buộc gọi sau BeginTransactionAsync.
     /// </summary>
     Task AcquireTransactionLockAsync(string lockKey, CancellationToken cancellationToken = default);
+
+    /// <summary>Đang có transaction mở trên DbContext (handler được gọi lồng trong giao dịch của handler khác).</summary>
+    bool HasActiveTransaction { get; }
+
+    /// <summary>Bỏ theo dõi mọi entity đã nạp (dùng trước khi chạy lại handler sau xung đột đồng thời).</summary>
+    void ClearChangeTracker();
 }

@@ -59,9 +59,16 @@ public sealed class ConcurrentTransferTests : InventoryTestBase
             () => PostAsync(a, $"/api/transfers/{id}/receive", Receive(null, (Ids.PTest, 30m))),
             () => PostAsync(a2, $"/api/transfers/{id}/cancel", new { reason = "Hủy" }));
 
+        // Khóa theo phiếu chuyển (DEF-IT-01) cho 2 request chạy tuần tự:
+        // - Hủy trước: nhận bị từ chối (phiếu đã hủy) → đúng 1 request thành công.
+        // - Nhận trước: hủy chạy sau trên phiếu đã nhận (hợp lệ, xem INT-TRF-44) → cả 2 thành công, trạng thái cuối CANCELLED.
+        var receiveOk = results[0].IsSuccess;
+        var cancelOk = results[1].IsSuccess;
         var check = new Checks(Output);
-        check.Equal("Đúng 1 request thành công", 1, results.Count(r => r.IsSuccess));
         var status = (await TransferAsync(id)).Status;
+        check.True("Kết quả là một thứ tự tuần tự hợp lệ (hủy trước: chỉ hủy thành công; nhận trước: cả 2 thành công, phiếu bị hủy)",
+            cancelOk && (!receiveOk || status == "CANCELLED"),
+            $"nhận {(receiveOk ? "OK" : "bị từ chối")}, hủy {(cancelOk ? "OK" : "bị từ chối")}, trạng thái {status}");
         var k1 = await StockAsync(K001, Ids.PTest);
         var k2 = await StockAsync(K002, Ids.PTest);
         Actual("Trạng thái cuối / tồn K001 / tồn K002", new { status, k1, k2 });

@@ -11,7 +11,7 @@ namespace StockFlow.Application.Features.Disposals.Commands;
 /// Sửa phiếu tạm xuất hủy (mở lại "Phiếu tạm"): ghi lại danh sách hàng, lý do;
 /// Status = COMPLETED thì hoàn thành phiếu (trừ tồn kho). Phiếu đã hoàn thành không sửa được.
 /// </summary>
-public record UpdateDisposalCommand(int DisposalId, SaveDisposalRequest Request) : IRequest<Result<DisposalDetailDto>>;
+public record UpdateDisposalCommand(int DisposalId, SaveDisposalRequest Request) : IRequest<Result<DisposalDetailDto>>, IRetryOnConcurrencyConflict;
 
 public class UpdateDisposalCommandValidator : AbstractValidator<UpdateDisposalCommand>
 {

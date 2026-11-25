@@ -19,7 +19,7 @@ namespace StockFlow.Application.Features.Production.Commands;
 /// - BR-32: cộng dồn số đã xuất, tính lại số còn thiếu. BR-34: xuất vượt nhu cầu phải có lý do.
 /// - BR-38: lần xuất đầu tiên chuyển lệnh sang Đang sản xuất.
 /// </summary>
-public record CreateMaterialIssueCommand(CreateMaterialIssueRequest Request) : IRequest<Result<MaterialIssueDto>>;
+public record CreateMaterialIssueCommand(CreateMaterialIssueRequest Request) : IRequest<Result<MaterialIssueDto>>, IRetryOnConcurrencyConflict;
 
 public class CreateMaterialIssueCommandValidator : AbstractValidator<CreateMaterialIssueCommand>
 {

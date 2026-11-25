@@ -1298,6 +1298,9 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
                 .HasPrecision(18, 4)
                 .HasColumnName("unit_cost");
             entity.Property(e => e.WarehouseId).HasColumnName("warehouse_id");
+            // Khoá lạc quan: uint + IsRowVersion được Npgsql ánh xạ vào cột hệ thống xmin (không thêm cột thật).
+            // Hai giao dịch cùng sửa 1 dòng tồn → giao dịch sau nhận DbUpdateConcurrencyException thay vì ghi đè (DEF-IT-01).
+            entity.Property(e => e.Version).IsRowVersion();
 
             entity.HasOne(d => d.Location).WithMany(p => p.TrxInventoryBalances)
                 .HasForeignKey(d => d.LocationId)
@@ -2526,6 +2529,10 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
 
     public Task<Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction> BeginTransactionAsync(CancellationToken cancellationToken = default)
         => Database.BeginTransactionAsync(cancellationToken);
+
+    public void ClearChangeTracker() => ChangeTracker.Clear();
+
+    public bool HasActiveTransaction => Database.CurrentTransaction != null;
 
     public async Task AcquireTransactionLockAsync(string lockKey, CancellationToken cancellationToken = default)
     {

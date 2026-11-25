@@ -36,6 +36,8 @@ export interface StocktakeItem {
   discrepancy: number;
   unitCost: number;
   discrepancyValue: number;
+  /** Lý do chênh lệch (BR-43) */
+  reason?: string | null;
 }
 
 export interface StocktakeDetail {
@@ -48,5 +50,6 @@ export interface SaveStocktakePayload {
   stocktakeCode?: string | null;
   notes?: string | null;
   status: 'DRAFT' | 'BALANCED';
-  items: { productId: number; actualQty: number }[];
+  /** reason: lý do chênh lệch, bắt buộc khi Hoàn thành nếu dòng lệch (BR-43, MSG51) */
+  items: { productId: number; actualQty: number; reason?: string | null }[];
 }
