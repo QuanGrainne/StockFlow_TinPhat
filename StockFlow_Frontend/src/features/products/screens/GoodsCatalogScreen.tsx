@@ -510,6 +510,8 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoadingDb, setIsLoadingDb] = useState(false);
+  // Tăng để tải lại toàn bộ hàng hóa từ DB (VD sau khi import file)
+  const [productsReloadTick, setProductsReloadTick] = useState(0);
   const [viewingPriceBookItem, setViewingPriceBookItem] = useState<GoodsItem | null>(null);
 
   const showToast = (msg: string) => {
@@ -777,7 +779,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
       window.removeEventListener('stockflow_branch_changed', handleBranchSync);
       window.removeEventListener('stockflow:warehouse-changed', handleBranchSync);
     };
-  }, []);
+  }, [productsReloadTick]);
 
   // Xác định quyền Admin
   const rawRole = typeof window !== 'undefined' ? tabSession.get('stockflow_current_role') : null;
@@ -2393,10 +2395,10 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
   };
 
   const handleImportSuccess = (importedCount: number, fileName: string, newGoods: GoodsItem[], serverMessage?: string) => {
+    // Hiện tạm danh sách đọc từ file cho nhanh, rồi tải lại từ DB để có mã sản phẩm thật, ảnh server đã tải,
+    // tồn kho / giá vốn theo kho (trước đây giữ bản đọc từ file tới khi F5). Không ghi bản tạm vào cache.
     setGoods(newGoods);
-    try {
-      localStorage.setItem(STOCKFLOW_GOODS_STORAGE_KEY, JSON.stringify(newGoods));
-    } catch {}
+    setProductsReloadTick((t) => t + 1);
     setLastExportedFile({ fileName: fileName, workbook: null });
     setIsExportDockOpen(true);
     // Thông báo của máy chủ cho biết cả số ảnh không tải được (nếu có)

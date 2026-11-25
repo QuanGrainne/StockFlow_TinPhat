@@ -294,6 +294,7 @@ export const Header: React.FC<HeaderProps> = ({
   const handleSelectBranch = (codeOrName: string) => {
     const fac = permittedFacilities.find((f) => f.code === codeOrName || f.name === codeOrName);
     const branchName = fac ? fac.name : codeOrName;
+    const previousWarehouseId = getActiveWarehouse().warehouseId;
     setSelectedBranch(branchName);
     if (typeof window !== 'undefined') {
       tabSession.set('stockflow_selected_branch', branchName);
@@ -311,6 +312,13 @@ export const Header: React.FC<HeaderProps> = ({
       );
       if (matchingWh) {
         setActiveWarehouseGlobal(matchingWh);
+        // Đổi sang kho khác: tải lại toàn bộ trang để mọi màn lấy lại dữ liệu theo kho mới,
+        // không còn giá trị cũ của kho trước (bộ lọc, tồn kho, giá vốn, form đang mở...).
+        // Kho đã chọn lưu ở sessionStorage của tab nên tải lại vẫn giữ đúng kho mới.
+        if (matchingWh.warehouseId !== previousWarehouseId) {
+          window.location.reload();
+          return;
+        }
       }
     }
     setBranchDropdownOpen(false);
