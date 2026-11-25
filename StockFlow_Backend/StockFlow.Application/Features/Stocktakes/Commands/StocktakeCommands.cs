@@ -9,12 +9,12 @@ using StockFlow.Domain.Entities;
 namespace StockFlow.Application.Features.Stocktakes.Commands;
 
 /// <summary>Tạo phiếu kiểm kho (Lưu tạm hoặc Hoàn thành = cân bằng kho ngay).</summary>
-public record CreateStocktakeCommand(SaveStocktakeRequest Request) : IRequest<Result<StocktakeDetailDto>>;
+public record CreateStocktakeCommand(SaveStocktakeRequest Request) : IRequest<Result<StocktakeDetailDto>>, IRetryOnConcurrencyConflict;
 
 /// <summary>Sửa phiếu tạm (Lưu tạm hoặc Hoàn thành).</summary>
-public record UpdateStocktakeCommand(int Id, SaveStocktakeRequest Request) : IRequest<Result<StocktakeDetailDto>>;
+public record UpdateStocktakeCommand(int Id, SaveStocktakeRequest Request) : IRequest<Result<StocktakeDetailDto>>, IRetryOnConcurrencyConflict;
 
-public record CancelStocktakeCommand(int Id) : IRequest<Result<StocktakeDetailDto>>;
+public record CancelStocktakeCommand(int Id) : IRequest<Result<StocktakeDetailDto>>, IRetryOnConcurrencyConflict;
 
 /// <summary>Gộp nhiều phiếu tạm cùng kho thành 1 phiếu tạm mới; các phiếu cũ chuyển sang Đã hủy.</summary>
 public record MergeStocktakesCommand(MergeStocktakesRequest Request) : IRequest<Result<StocktakeDetailDto>>;
@@ -88,6 +88,9 @@ public class StocktakeCommandHandler :
             var items = await StocktakeLogic.ReplaceItemsAsync(_context, stocktake, req.Items, userId, ct);
             if (!items.IsSuccess)
                 return Result.Failure<StocktakeDetailDto>(items.Error!);
+            // BR-43: Hoàn thành (cân bằng kho) thì dòng nào lệch cũng phải có lý do; Lưu tạm thì chưa bắt buộc
+            if (balance && StocktakeLogic.MissingReasonError(stocktake) is { } reasonError)
+                return Result.Failure<StocktakeDetailDto>(reasonError);
 
             await _context.SaveChangesAsync(ct);
 
@@ -99,7 +102,7 @@ public class StocktakeCommandHandler :
 
             if (transaction != null) await transaction.CommitAsync(ct);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not DbUpdateConcurrencyException)
         {
             if (transaction != null) await transaction.RollbackAsync(ct);
             return Result.Failure<StocktakeDetailDto>($"Lỗi khi lưu phiếu kiểm kho: {ex.InnerException?.Message ?? ex.Message}");
@@ -132,7 +135,7 @@ public class StocktakeCommandHandler :
             await _context.SaveChangesAsync(ct);
             if (transaction != null) await transaction.CommitAsync(ct);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not DbUpdateConcurrencyException)
         {
             if (transaction != null) await transaction.RollbackAsync(ct);
             return Result.Failure<StocktakeDetailDto>($"Lỗi khi hủy phiếu kiểm kho: {ex.InnerException?.Message ?? ex.Message}");
@@ -171,7 +174,15 @@ public class StocktakeCommandHandler :
         var items = sources
             .SelectMany(s => s.DtlStocktakeItems)
             .GroupBy(i => i.ProductId)
-            .Select(g => new StocktakeItemRequest { ProductId = g.Key, ActualQty = g.Sum(i => i.ActualQty ?? 0) })
+            .Select(g => new StocktakeItemRequest
+            {
+                ProductId = g.Key,
+                ActualQty = g.Sum(i => i.ActualQty ?? 0),
+                // Giữ lý do chênh lệch đã nhập trên các phiếu được gộp
+                Reason = string.Join("; ", g.Select(i => i.DiscrepancyReason).Where(r => !string.IsNullOrWhiteSpace(r)).Distinct()) is { Length: > 0 } r
+                    ? (r.Length > StocktakeLogic.ReasonMaxLength ? r[..StocktakeLogic.ReasonMaxLength] : r)
+                    : null,
+            })
             .ToList();
 
         var codes = sources.OrderByDescending(s => s.StocktakeId).Select(s => s.StocktakeCode ?? $"KK{s.StocktakeId:D6}").ToList();
@@ -207,7 +218,7 @@ public class StocktakeCommandHandler :
             await _context.SaveChangesAsync(ct);
             if (transaction != null) await transaction.CommitAsync(ct);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not DbUpdateConcurrencyException)
         {
             if (transaction != null) await transaction.RollbackAsync(ct);
             return Result.Failure<StocktakeDetailDto>($"Lỗi khi gộp phiếu kiểm kho: {ex.InnerException?.Message ?? ex.Message}");

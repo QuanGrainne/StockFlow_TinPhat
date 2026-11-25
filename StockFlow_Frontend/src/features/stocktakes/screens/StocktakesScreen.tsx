@@ -700,6 +700,7 @@ function StocktakeDetailPanel({
               <th className="py-2 px-3 w-24 text-right">Thực tế</th>
               <th className="py-2 px-3 w-24 text-right">SL lệch</th>
               <th className="py-2 px-3 w-28 text-right">Giá trị lệch</th>
+              <th className="py-2 px-3">Lý do lệch</th>
             </tr>
             <tr className="bg-white border-t border-slate-200">
               <th />
@@ -719,7 +720,7 @@ function StocktakeDetailPanel({
                   className="w-full h-7 px-2 text-xs font-normal border border-slate-300 rounded-[6px] focus:outline-none focus:border-[#0070f4]"
                 />
               </th>
-              <th colSpan={5} />
+              <th colSpan={6} />
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -737,11 +738,12 @@ function StocktakeDetailPanel({
                   {signed(it.discrepancy)}
                 </td>
                 <td className="py-2 px-3 text-right">{money.format(it.discrepancyValue)}</td>
+                <td className="py-2 px-3 text-slate-600">{it.reason || ''}</td>
               </tr>
             ))}
             {items.length === 0 && (
               <tr>
-                <td colSpan={8} className="py-6 text-center text-slate-400">
+                <td colSpan={9} className="py-6 text-center text-slate-400">
                   Không có mặt hàng nào phù hợp
                 </td>
               </tr>

@@ -66,10 +66,16 @@ public abstract class InventoryTestBase : SalesTestBase
 
     // ───────────── Kiểm kho ─────────────
 
-    protected static SaveStocktakeRequest Stocktake(int warehouseId, string status, params (int ProductId, decimal Actual)[] lines) => new()
+    /// <summary>Lý do chênh lệch gửi kèm mỗi dòng (BR-43: bắt buộc khi Hoàn thành nếu dòng có chênh lệch).</summary>
+    protected const string VarianceReason = "Lệch khi kiểm đếm";
+
+    protected static SaveStocktakeRequest Stocktake(int warehouseId, string status, params (int ProductId, decimal Actual)[] lines) =>
+        StocktakeWithReason(warehouseId, status, VarianceReason, lines);
+
+    protected static SaveStocktakeRequest StocktakeWithReason(int warehouseId, string status, string? reason, params (int ProductId, decimal Actual)[] lines) => new()
     {
         WarehouseId = warehouseId, Status = status,
-        Items = lines.Select(l => new StocktakeItemRequest { ProductId = l.ProductId, ActualQty = l.Actual }).ToList(),
+        Items = lines.Select(l => new StocktakeItemRequest { ProductId = l.ProductId, ActualQty = l.Actual, Reason = reason }).ToList(),
     };
 
     protected async Task<int> ArrangeStocktakeAsync(HttpClient client, int warehouseId, string status, params (int ProductId, decimal Actual)[] lines)

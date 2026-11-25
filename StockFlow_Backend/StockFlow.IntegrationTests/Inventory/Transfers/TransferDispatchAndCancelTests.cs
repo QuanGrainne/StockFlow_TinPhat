@@ -32,7 +32,8 @@ public sealed class TransferDispatchAndCancelTests : InventoryTestBase
         check.Equal("Trạng thái", "IN_TRANSIT", (await TransferAsync(id)).Status);
         check.Equal("Tồn K001", -5m, await StockAsync(K001, Ids.PTest));
         var card = await TransferCardAsync(id);
-        check.True("Thẻ kho TRANSFER_OUT -15", card.Any(c => c.TransactionType == "TRANSFER_OUT" && c.Quantity == -15m), Describe(card));
+        // v1.1: thẻ kho tách theo dòng tồn (−10 từ dòng còn hàng, −5 vào dòng mặc định), tổng TRANSFER_OUT = −15
+        check.Equal("Tổng TRANSFER_OUT", -15m, card.Where(c => c.TransactionType == "TRANSFER_OUT").Sum(c => c.Quantity ?? 0));
         check.Assert();
     }
 

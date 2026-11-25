@@ -11,7 +11,7 @@ using StockFlow.Domain.Entities;
 
 namespace StockFlow.Application.Features.Transfers.Commands;
 
-public record CancelTransferCommand(int Id, string? Reason, int UserId) : IRequest<Result<bool>>;
+public record CancelTransferCommand(int Id, string? Reason, int UserId) : IRequest<Result<bool>>, IRetryOnConcurrencyConflict;
 
 public class CancelTransferCommandHandler : IRequestHandler<CancelTransferCommand, Result<bool>>
 {
@@ -26,6 +26,8 @@ public class CancelTransferCommandHandler : IRequestHandler<CancelTransferComman
 
     public async Task<Result<bool>> Handle(CancelTransferCommand command, CancellationToken cancellationToken)
     {
+        await using var tx = await TransferHelper.BeginLockedAsync(_context, command.Id, cancellationToken);
+
         var transfer = await _context.TrxStockTransfers
             .Include(t => t.DtlStockTransferItems)
             .FirstOrDefaultAsync(t => t.StockTransferId == command.Id, cancellationToken);
@@ -94,6 +96,7 @@ public class CancelTransferCommandHandler : IRequestHandler<CancelTransferComman
         }
 
         await _context.SaveChangesAsync(cancellationToken);
+        if (tx != null) await tx.CommitAsync(cancellationToken);
         return Result.Success(true);
     }
 }

@@ -79,12 +79,17 @@ public sealed class PurchasingTests : InventoryTestBase
     public async Task INT_PUR_30_03_OnlyDefective()
     {
         var (t, po) = await ArrangePoAsync();
+        var payable = await PayableAsync();
         var res = await PostAsync(t, $"/api/purchase-orders/{po}/receive", Receive((Ids.PTest, 0m, 5m)));
 
+        // v1.1 (BR-24, UC-31 A31.1): nhận toàn hàng lỗi được chấp nhận; hàng lỗi ghi trên phiếu, không cộng tồn, không tính tiền
         var check = new Checks(Output);
-        check.Equal("HTTP status", 400, res.StatusCode);
-        check.Message("Thông báo", "Số lượng đạt phải lớn hơn 0. Mặt hàng lỗi toàn bộ thì để trống dòng và ghi chú lý do.", res);
-        check.Equal("Không tạo phiếu nhập", 0, await QueryAsync(db => db.TrxGoodsReceipts.CountAsync()));
+        check.Success(res);
+        var gr = await QueryAsync(db => db.TrxGoodsReceipts.Include(g => g.DtlGoodsReceiptItems).SingleAsync());
+        check.Equal("Phiếu nhập COMPLETED", "COMPLETED", gr.Status);
+        check.Equal("SL lỗi ghi trên phiếu", 5m, gr.DtlGoodsReceiptItems.Single().DefectiveQty);
+        check.Equal("Tồn K001 không đổi", 100m, await StockAsync(K001, Ids.PTest));
+        check.Equal("Công nợ NCC không đổi", payable, await PayableAsync());
         check.Assert();
     }
 
@@ -309,7 +314,11 @@ public sealed class PurchasingTests : InventoryTestBase
     [Fact(DisplayName = "INT-PRT-32-04 | Supplier refund")]
     public async Task INT_PRT_32_04_SupplierRefund()
     {
-        var (t, gr) = await ArrangeReceiptAsync();
+        // v1.1 Precondition: phiếu nhập đã thanh toán đủ 600.000 → trả 10 cái (120.000) thì NCC còn phải trả lại 120.000
+        var t = await ArrangeTAsync();
+        var paid = await PostAsync(t, "/api/purchases", Purchase(K001, "COMPLETED", (Ids.PTest, 50m, 12_000m)) with { PaidAmount = 600_000m });
+        Assert.True(paid.IsSuccess, $"Arrange: phiếu nhập đã thanh toán {paid.StatusCode} {paid.Body}");
+        var gr = await QueryAsync(db => db.TrxGoodsReceipts.OrderByDescending(g => g.GrId).Select(g => g.GrId).FirstAsync());
         var ret = await ArrangeReturnAsync(t, gr, 10m);
 
         var res = await PostAsync(t, $"/api/purchasereturns/{ret}/refunds", new CreateSupplierRefundRequest(50_000m, "CASH"));

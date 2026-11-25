@@ -67,9 +67,11 @@ public sealed class BookingToInvoiceTests : SalesTestBase
     [Fact(DisplayName = "INT-SBK-13-03 | Invoice from another branch")]
     public async Task INT_SBK_13_03_InvoiceFromAnotherBranch()
     {
-        var (s, dh1, code) = await ArrangeAsync(); // User S theo Precondition: chỉ quyền kho K001
+        var (_, dh1, code) = await ArrangeAsync();
+        // v1.1 Precondition: người lập hóa đơn có quyền cả K001 và K002, để API tới được luật chi nhánh xử lý của đơn
+        var both = await ClientAsync(TestDataSeeder.SalesK001K002);
 
-        var res = await PostAsync(s, "/api/orders/pos", Pos(Ids.KhHm01, K002, "CASH", 300_000m, new[] { (Ids.PTest, 5m, PTestPrice) }, bookingOrderId: dh1));
+        var res = await PostAsync(both, "/api/orders/pos", Pos(Ids.KhHm01, K002, "CASH", 300_000m, new[] { (Ids.PTest, 5m, PTestPrice) }, bookingOrderId: dh1));
 
         var check = new Checks(Output);
         check.Equal("HTTP status", 400, res.StatusCode);
@@ -159,25 +161,6 @@ public sealed class BookingToInvoiceTests : SalesTestBase
         check.Equal("Dư nợ sau hóa đơn trả đủ = ban đầu", debtStart, await DebtAsync(Ids.KhHm01));
         var receipts = await QueryAsync(db => db.TrxFinancialTransactions.Where(t => t.PartnerId == Ids.KhHm01 && t.Status == "COMPLETED").SumAsync(t => t.Amount ?? 0));
         check.Equal("Tổng phiếu thu = giá trị hóa đơn", 500_000m, receipts);
-        check.Assert();
-    }
-
-    /// <summary>
-    /// Ca BỔ SUNG cho INT-SBK-13-03: Precondition gốc (User S chỉ có K001) làm API dừng ở kiểm tra quyền kho K002 trước;
-    /// ca này dùng tài khoản có cả K001 + K002 để kiểm tra đúng luật "hóa đơn phải xuất từ chi nhánh xử lý của đơn".
-    /// </summary>
-    [Fact(DisplayName = "INT-SBK-13-S03 | (Bổ sung) Hóa đơn khác chi nhánh, người dùng có quyền cả 2 kho")]
-    public async Task INT_SBK_13_S03_AnotherBranchWithBothWarehouses()
-    {
-        var (s, dh1, code) = await ArrangeAsync();
-        var both = await ClientAsync(TestDataSeeder.SalesK001K002);
-
-        var res = await PostAsync(both, "/api/orders/pos", Pos(Ids.KhHm01, K002, "CASH", 300_000m, new[] { (Ids.PTest, 5m, PTestPrice) }, bookingOrderId: dh1));
-
-        var check = new Checks(Output);
-        check.Equal("HTTP status", 400, res.StatusCode);
-        check.Message("Thông báo", $"Đơn đặt hàng {code} thuộc chi nhánh khác — hóa đơn phải xuất từ chi nhánh xử lý của đơn.", res.Message);
-        check.Equal("Không tạo hóa đơn", 0, await CountOrdersAsync("INVOICE"));
         check.Assert();
     }
 }

@@ -59,7 +59,8 @@ public sealed class FinanceAndCreditTests : InventoryTestBase
         var code = res.String("voucherCode") ?? "";
         var receipts = await QueryAsync(db => db.TrxFinancialTransactions.Where(t => t.TxCode == code).ToListAsync());
         Actual("Phiếu thu", receipts.Select(r => new { r.TxCode, r.TxType, r.Amount, r.ReferenceType, r.ReferenceId }));
-        check.True("Phiếu thu PTxxxx được tạo", receipts.Count > 0 && code.StartsWith("PT"), code);
+        // v1.1: phiếu thu phân bổ cho hóa đơn có mã TT + mã hóa đơn (VD TTHD00001)
+        check.True("Phiếu thu TTHDxxxxx được tạo", receipts.Count > 0 && code.StartsWith("TTHD"), code);
         check.Equal("Dư nợ KH-HM01", 3_000_000m, await DebtAsync(Ids.KhHm01));
         check.Equal("HD0001 còn nợ", 3_000_000m, (await OrderAsync(hd1))?.OutstandingAmount);
         check.True("Giao dịch loại RECEIPT", receipts.Count > 0 && receipts.All(r => r.TxType == "RECEIPT"), string.Join(", ", receipts.Select(r => r.TxType)));
@@ -299,31 +300,12 @@ public sealed class FinanceAndCreditTests : InventoryTestBase
         var (s, m) = await ArrangeCreditAsync();
         var id = await ArrangeCreditRequestAsync(s);
 
-        var res = await PostAsync(m, $"/api/credit-requests/{id}/approve", new JsonObject());
-
-        var check = new Checks(Output);
-        check.Success(res);
-        Actual("Phản hồi (MSG56)", res.Body);
-        check.Equal("Trạng thái APPROVED", "APPROVED", (await QueryAsync(db => db.TrxCreditLimitRequests.SingleAsync(r => r.RequestId == id))).Status);
-        check.Equal("Hạn mức 12.000.000", 12_000_000m, await CreditLimitAsync(Ids.KhHm01));
-        var history = await QueryAsync(db => db.TrxCreditLimitHistories.Where(h => h.PartnerId == Ids.KhHm01).ToListAsync());
-        Actual("Lịch sử hạn mức", history.Select(h => new { h.OldLimit, h.NewLimit, h.Source }));
-        check.True("1 dòng lịch sử nguồn RequestApproved", history.Count == 1 && string.Equals(history[0].Source, "RequestApproved", StringComparison.OrdinalIgnoreCase),
-            string.Join(", ", history.Select(h => h.Source)));
-        check.Assert();
-    }
-
-    /// <summary>Ca BỔ SUNG cho INT-CRD-06-04: API chỉ nhận duyệt loại NEW_LIMIT (workbook gửi body rỗng {}).</summary>
-    [Fact(DisplayName = "INT-CRD-06-S01 | (Bổ sung) Manager duyệt với ApprovalType = NEW_LIMIT")]
-    public async Task INT_CRD_06_S01_ApproveNewLimit()
-    {
-        var (s, m) = await ArrangeCreditAsync();
-        var id = await ArrangeCreditRequestAsync(s);
-
+        // v1.1: chỉ duyệt nâng hạn mức (BR-13 – bỏ ngoại lệ một lần): body { approvalType: NEW_LIMIT, approvedLimit }
         var res = await PostAsync(m, $"/api/credit-requests/{id}/approve", NewLimit(12_000_000m));
 
         var check = new Checks(Output);
         check.Success(res);
+        Actual("Phản hồi (MSG56)", res.Body);
         check.Equal("Trạng thái APPROVED", "APPROVED", (await QueryAsync(db => db.TrxCreditLimitRequests.SingleAsync(r => r.RequestId == id))).Status);
         check.Equal("Hạn mức 12.000.000", 12_000_000m, await CreditLimitAsync(Ids.KhHm01));
         var history = await QueryAsync(db => db.TrxCreditLimitHistories.Where(h => h.PartnerId == Ids.KhHm01).ToListAsync());

@@ -114,7 +114,8 @@ public sealed class MergeSalesBookingsTests : SalesTestBase
 
         var check = new Checks(Output);
         check.Equal("HTTP status", 400, res.StatusCode);
-        check.Message("Thông báo", "Có đơn đã tạo hóa đơn giao hàng, không gộp được.", res.Message);
+        // v1.1: tạo hóa đơn giao hàng đưa DH0002 về Hoàn thành → bị chặn ở luật chỉ gộp đơn Phiếu tạm (BR-09, MSG17)
+        check.Contains("Thông báo", "không gộp được: chỉ gộp đơn ở trạng thái Phiếu tạm.", res.Message);
         check.Equal("DH0001 vẫn DRAFT", "DRAFT", (await OrderAsync(dh1))?.Status);
         check.Assert();
     }

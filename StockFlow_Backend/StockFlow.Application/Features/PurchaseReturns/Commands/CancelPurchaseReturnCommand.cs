@@ -9,7 +9,7 @@ using StockFlow.Domain.Entities;
 namespace StockFlow.Application.Features.PurchaseReturns.Commands;
 
 /// <summary>Hủy phiếu trả hàng nhập (phiếu đã hoàn thành sẽ nhập lại kho và cộng lại công nợ).</summary>
-public record CancelPurchaseReturnCommand(int Id) : IRequest<Result<bool>>;
+public record CancelPurchaseReturnCommand(int Id) : IRequest<Result<bool>>, IRetryOnConcurrencyConflict;
 
 public class CancelPurchaseReturnHandler : IRequestHandler<CancelPurchaseReturnCommand, Result<bool>>
 {
@@ -49,7 +49,7 @@ public class CancelPurchaseReturnHandler : IRequestHandler<CancelPurchaseReturnC
             if (transaction != null) await transaction.CommitAsync(ct);
             return Result.Success(true);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not DbUpdateConcurrencyException)
         {
             if (transaction != null) await transaction.RollbackAsync(ct);
             return Result.Failure<bool>($"Lỗi khi hủy phiếu trả hàng nhập: {ex.Message}");

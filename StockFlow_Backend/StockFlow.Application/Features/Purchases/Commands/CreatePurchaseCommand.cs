@@ -15,7 +15,7 @@ using StockFlow.Domain.Entities;
 
 namespace StockFlow.Application.Features.Purchases.Commands;
 
-public record CreatePurchaseCommand(CreatePurchaseRequest Request) : IRequest<Result<PurchaseDetailDto>>;
+public record CreatePurchaseCommand(CreatePurchaseRequest Request) : IRequest<Result<PurchaseDetailDto>>, IRetryOnConcurrencyConflict;
 
 public class CreatePurchaseCommandHandler : IRequestHandler<CreatePurchaseCommand, Result<PurchaseDetailDto>>
 {
@@ -319,7 +319,7 @@ public class CreatePurchaseCommandHandler : IRequestHandler<CreatePurchaseComman
 
             return Result.Success(detail);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not DbUpdateConcurrencyException)
         {
             if (transaction != null)
             {

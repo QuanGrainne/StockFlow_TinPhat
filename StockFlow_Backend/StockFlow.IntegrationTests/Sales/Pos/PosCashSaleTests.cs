@@ -119,7 +119,7 @@ public sealed class PosCashSaleTests : SalesTestBase
 
         var check = new Checks(Output);
         check.Equal("HTTP status", 400, res.StatusCode);
-        check.Message("Thông báo", "Bạn không có quyền xuất hàng từ kho 'Kho Gia Lâm' (AUTH-WH).", res.Message);
+        check.Message("Thông báo", "Bạn không có quyền xuất hàng từ kho 'Kho Tổng Gia Lâm' (AUTH-WH).", res.Message);
         check.Equal("Không đổi tồn K001", 50m, await StockAsync(K001, Ids.PTest));
         check.Equal("Không tạo hóa đơn", 0, await CountOrdersAsync("INVOICE"));
         check.Assert();
