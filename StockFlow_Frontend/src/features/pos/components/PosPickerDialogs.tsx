@@ -1,5 +1,5 @@
 // src/features/pos/components/PosPickerDialogs.tsx
-// Hai popup trên thanh màn Bán hàng (như KiotViet):
+// Hai popup trên thanh màn Bán hàng:
 // - "Chọn hóa đơn trả hàng" (nút ↩): tìm hóa đơn đã hoàn thành ở chi nhánh → mở tab Trả hàng;
 //   "Trả nhanh": khách quên hóa đơn → mở tab trả hàng không theo hóa đơn.
 // - "Xử lý đặt hàng" (nút 🛍): tìm đơn đặt hàng còn mở ở chi nhánh → mở tab hóa đơn giao hàng từ đơn.

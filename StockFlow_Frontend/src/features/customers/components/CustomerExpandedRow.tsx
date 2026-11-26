@@ -79,7 +79,7 @@ function fmtDate(v?: string | null) {
   return m ? `${m[3]}/${m[2]}/${m[1]}` : v;
 }
 
-/** Ô thông tin nhãn + giá trị có gạch chân (giống form KiotViet / màn Nhà cung cấp) */
+/** Ô thông tin nhãn + giá trị có gạch chân (giống màn Nhà cung cấp) */
 function InfoField({ label, value }: { label: string; value?: string | null }) {
   return (
     <div>
@@ -139,7 +139,7 @@ export default function CustomerExpandedRow({
   );
 
   const bookings = useMemo(() => detail?.recentBookings ?? [], [detail]);
-  // Như KiotViet: khách có đơn đặt → có tab Lịch sử đặt hàng; tab bán hàng hiện khi có hóa đơn (hoặc chưa có giao dịch nào)
+  // Khách có đơn đặt → có tab Lịch sử đặt hàng; tab bán hàng hiện khi có hóa đơn (hoặc chưa có giao dịch nào)
   const tabs: { key: TabKey; label: string }[] = [
     { key: 'info', label: 'Thông tin' },
     ...(orders.length > 0 || bookings.length === 0 ? [{ key: 'orders' as const, label: 'Lịch sử bán/trả hàng' }] : []),

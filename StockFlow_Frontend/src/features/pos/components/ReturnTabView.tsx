@@ -1,5 +1,5 @@
 // src/features/pos/components/ReturnTabView.tsx
-// Nội dung tab "Trả hàng" của màn Bán hàng (như KiotViet, bỏ phần "Tìm hàng đổi"):
+// Nội dung tab "Trả hàng" của màn Bán hàng (không có phần "Tìm hàng đổi"):
 // - Trái: hàng của hóa đơn gốc, nhập SL trả (≤ SL còn được trả — BR-19), giá nhập lại.
 // - Phải: khách hàng (theo hóa đơn), "Trả hàng / HD... - người bán", tổng tiền hàng trả, giảm giá, phí trả hàng,
 //   cần trả khách, tiền trả khách + phương thức, phần trừ vào công nợ, nút TRẢ HÀNG.
@@ -73,7 +73,7 @@ export function ReturnTabView({ tab, userName, onChange, onDone, canReturn, ware
   const active = tab.lines.filter((l) => l.quantity > 0);
   const totalQty = active.reduce((s, l) => s + l.quantity, 0);
   const totalGoods = active.reduce((s, l) => s + Math.round(l.quantity * l.unitPrice), 0);
-  // Giá trị hàng trả theo giá bán trên hóa đơn ("Tổng giá gốc hàng mua" như KiotViet)
+  // Giá trị hàng trả theo giá bán trên hóa đơn ("Tổng giá gốc hàng mua")
   const originalGoods = active.reduce((s, l) => s + Math.round(l.quantity * (l.returnSalePrice ?? l.unitPrice)), 0);
   // Giảm giá tổng hóa đơn phân bổ cho hàng trả theo tỷ lệ giá trị (khớp SalesReturnOps.AllocateInvoiceDiscount)
   const invoiceDiscount = isQuick ? 0 : tab.returnInvoiceDiscount ?? 0;

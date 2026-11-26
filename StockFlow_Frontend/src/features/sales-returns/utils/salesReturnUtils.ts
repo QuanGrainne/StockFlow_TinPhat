@@ -12,7 +12,7 @@ export const RETURN_STATUS: Record<SalesReturnStatus, { label: string; cls: stri
 };
 
 export const RETURN_STATUS_OPTIONS: SalesReturnStatus[] = ['COMPLETED', 'CANCELLED'];
-/** Mặc định như KiotViet: ẩn phiếu đã hủy */
+/** Mặc định: ẩn phiếu đã hủy */
 export const RETURN_DEFAULT_STATUSES: SalesReturnStatus[] = ['COMPLETED'];
 
 export const PAY_METHOD_LABEL: Record<string, string> = { CASH: 'Tiền mặt', VIETQR: 'Chuyển khoản' };

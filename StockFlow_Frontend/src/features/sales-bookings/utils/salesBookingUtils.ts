@@ -13,7 +13,7 @@ export const BOOKING_STATUS: Record<SalesBookingStatus, { label: string; cls: st
 
 export const BOOKING_STATUS_OPTIONS: SalesBookingStatus[] = ['DRAFT', 'FINISHED', 'CANCELLED'];
 
-/** Mặc định như KiotViet: ẩn đơn đã hủy */
+/** Mặc định: ẩn đơn đã hủy */
 export const BOOKING_DEFAULT_STATUSES: SalesBookingStatus[] = ['DRAFT', 'FINISHED'];
 
 /** Đơn còn tạo hóa đơn được (Phiếu tạm) */
