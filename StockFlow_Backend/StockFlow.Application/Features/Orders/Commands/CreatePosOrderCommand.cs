@@ -219,7 +219,7 @@ public class CreatePosOrderCommandHandler : IRequestHandler<CreatePosOrderComman
         }
 
         // 5. Tính toán giảm giá từng mặt hàng (Cấp dòng) và tổng tiền hàng SubTotal
-        // Tham khảo chuẩn KiotViet: hỗ trợ chiết khấu từng mặt hàng theo % hoặc VNĐ
+        // Hỗ trợ chiết khấu từng mặt hàng theo % hoặc VNĐ
         var calculatedItems = new List<(
             PosOrderItemRequest RequestItem,
             MstProduct Product,
