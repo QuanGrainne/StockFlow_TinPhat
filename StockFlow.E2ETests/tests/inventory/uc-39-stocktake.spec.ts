@@ -1,5 +1,5 @@
 // Report 5.3 – sheet "UC-39 Stocktake" (SYS-STK-01..06). Actor "Warehouse Accountant" = whstaff01 (K001 + K002, kho làm việc K001).
-// Code: Hoàn thành = cân bằng kho ngay (không có bước Manager duyệt). STK-03 là N/A theo Note.
+// Code: Hoàn thành = cân bằng kho ngay (không có bước Manager duyệt). Ca STK-03 (đã xoá 27/11/2026: chức năng nhóm bỏ, Report 3 ghi ngoài phạm vi).
 import { test, expect, traceTc } from '../../fixtures/test';
 import { LoginPage } from '../../pages/LoginPage';
 import { DisposalFormPage, DocListPage, StocktakeFormPage } from '../../pages/InventoryPages';
@@ -148,11 +148,6 @@ test.describe(SHEET, () => {
         description: `Ngoài phạm vi BR-42: nhập hàng ${results.receipt ? 'bị chặn' : 'không chặn'}, chuyển hàng ${results.transfer ? 'bị chặn' : 'không chặn'}, POS ${results.pos ? 'bị chặn' : 'không chặn'}`,
       });
     });
-  });
-
-  test('SYS-STK-03 – Kiểm lại: phiếu quay về Đang kiểm', async ({}, testInfo) => {
-    traceTc(testInfo, 'SYS-STK-03', SHEET);
-    test.skip(true, 'N/A – Không áp dụng theo thiết kế – nhóm đã bỏ luồng duyệt kiểm kho: phiếu kiểm cân bằng kho trực tiếp khi Hoàn thành');
   });
 
   test('SYS-STK-04 – Hủy phiếu kiểm chưa gửi: CANCELLED, tồn không đổi, giải phóng hàng', async ({ page, env, db, adminApi, uid }, testInfo) => {

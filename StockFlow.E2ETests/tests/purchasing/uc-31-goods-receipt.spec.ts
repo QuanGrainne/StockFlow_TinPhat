@@ -1,6 +1,6 @@
 // Report 5.3 – sheet "UC-31 Goods Receipt" (SYS-GRN-01..12). Actor "Warehouse Accountant" = whstaff01 (K001 + K002).
 // Nhập hàng theo phiếu đặt: dòng phiếu đặt → "Nhập hàng" → /purchases/create?po=<id> (nạp phần chưa nhập) → Hoàn thành.
-// GRN-09, GRN-12 là N/A theo Note.
+// Ca GRN-03, GRN-09, GRN-12 (đã xoá 27/11/2026: chức năng nhóm bỏ, Report 3 ghi ngoài phạm vi).
 import { test, expect, traceTc } from '../../fixtures/test';
 import { LoginPage } from '../../pages/LoginPage';
 import { PoListPage, PurchaseReturnFormPage, ReceiptFormPage, ReceiptListPage } from '../../pages/PurchasingPages';
@@ -90,12 +90,6 @@ test.describe(SHEET, () => {
       const form = await openReceive(page, po.code, po.id);
       await expect(form.received(p.code)).toHaveValue('4');
     });
-  });
-
-  test('SYS-GRN-03 – Hàng theo lô: nhập số lô, hạn dùng, vị trí', async ({}, testInfo) => {
-    traceTc(testInfo, 'SYS-GRN-03', SHEET);
-    // Quyết định Round 2 (27/11/2026): chưa có quản lý hàng theo lô / hạn dùng / vị trí lưu kho → N/A
-    test.skip(true, 'N/A – Chưa có chức năng quản lý hàng theo lô / hạn dùng / vị trí lưu kho (Not implemented)');
   });
 
   test('SYS-GRN-04 – Hủy trước khi xác nhận: không lưu gì, tồn không đổi', async ({ page, env, db, adminApi, uid }, testInfo) => {
@@ -237,11 +231,6 @@ test.describe(SHEET, () => {
     expect(await receiptsOfPo(db, po.id)).toEqual([]);
   });
 
-  test('SYS-GRN-09 – Hàng đang kiểm kho: không xác nhận được phiếu nhập (BR-42)', async ({}, testInfo) => {
-    traceTc(testInfo, 'SYS-GRN-09', SHEET);
-    test.skip(true, 'N/A – Ngoài phạm vi khoá kiểm kho BR-42 (Report 3: chỉ xuất hủy, xuất NVL, nhập thành phẩm, duyệt hoàn thành)');
-  });
-
   test('SYS-GRN-10 – SL lỗi ghi riêng, chỉ SL đạt vào tồn', async ({ page, env, db, adminApi, uid }, testInfo) => {
     traceTc(testInfo, 'SYS-GRN-10', SHEET);
     const { p, s, price, po } = await arrange(adminApi, uid, 52_000, 65);
@@ -296,8 +285,4 @@ test.describe(SHEET, () => {
     expect(await supplierPayable(db, s.id)).toBe(payable0 - 3 * price);
   });
 
-  test('SYS-GRN-12 – Từ chối cả lô giao hàng kèm lý do', async ({}, testInfo) => {
-    traceTc(testInfo, 'SYS-GRN-12', SHEET);
-    test.skip(true, 'N/A – Chưa có chức năng (Note: Not implemented)');
-  });
 });

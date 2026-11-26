@@ -1,7 +1,7 @@
 // Report 5.3 – sheet "UC-83 Finance and Reports" (SYS-FIN-01..12). Actor Manager = manager01.
 // Phiếu thu (PT…) lập ở màn Khách hàng → tab "Nợ cần thu từ khách" → "Thanh toán"; phiếu chi NCC (PC…) ở màn Nhà cung cấp →
 // "Nợ cần trả nhà cung cấp" → "Thanh toán". Báo cáo (FIN-01, 02, 08–10, 12): màn /reports (UC-86/87/88/90) đã có trên dev,
-// Round 2 (27/11/2026) kiểm thật; FIN-11 (chi phí mua / nhập / NVL) vẫn N/A – chưa có báo cáo chi phí.
+// Round 2 (27/11/2026) kiểm thật; ca FIN-11 (báo cáo chi phí) (đã xoá 27/11/2026: chức năng nhóm bỏ, Report 3 ghi ngoài phạm vi).
 import { test, expect, traceTc } from '../../fixtures/test';
 import { LoginPage } from '../../pages/LoginPage';
 import { CustomersAdminPage, SuppliersPage, fieldAfter } from '../../pages/MasterDataPages';
@@ -20,13 +20,6 @@ const SHEET = 'UC-83 Finance and Reports';
 const USER = SEEDED.manager.username;
 const priceOf = (uid: string, base: number): number => base + (Number(uid.replace(/\D/g, '').slice(-3)) % 900) * 10;
 const num = (s: string | null | undefined): number => Number(s ?? 0);
-
-function na(tc: string, title: string, reason: string): void {
-  test(`${tc} – ${title}`, async ({}, testInfo) => {
-    traceTc(testInfo, tc, SHEET);
-    test.skip(true, `N/A – ${reason}`);
-  });
-}
 
 /** Khách có nợ: hóa đơn ghi nợ 2 × price */
 async function debtor(env: E2EEnv, adminApi: ApiSession, uid: string, base: number, paidInFull = false): Promise<{ c: CustomerDto; price: number; invoiceId: number; productId: number }> {
@@ -280,7 +273,6 @@ test.describe(SHEET, () => {
     expect(r?.costOfGoodsSold).toBeGreaterThan(0);
     expect(r?.grossProfit).toBe((r?.netRevenue ?? 0) - (r?.costOfGoodsSold ?? 0));
   });
-  na('SYS-FIN-11', 'Báo cáo chi phí mua, chi phí nhập, chi phí NVL', 'Chưa có chức năng (Note)');
   test('SYS-FIN-12 – Bảng điều khiển KPI và việc chờ duyệt', async ({ page, env }, testInfo) => {
     traceTc(testInfo, 'SYS-FIN-12', SHEET);
     // Expected Round 2: bảng điều khiển của Manager là tab Tổng quan của màn Báo cáo (UC-90)

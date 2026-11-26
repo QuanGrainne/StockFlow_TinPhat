@@ -1,5 +1,5 @@
 // Report 5.3 – sheet "UC-62 Sales and Credit" (SYS-MSC-01..09). Actor Manager = manager01; MSC-07 thêm e2e.manager2 (Manager thứ hai).
-// Duyệt hạn mức ở /approvals (hộp quyết định chỉ có "Duyệt nâng hạn mức" và "Từ chối"). MSC-01, 08, 09 là N/A theo Note.
+// Duyệt hạn mức ở /approvals (hộp quyết định chỉ có "Duyệt nâng hạn mức" và "Từ chối"). MSC-01 kiểm trên màn Báo cáo; ca MSC-08, 09 (đã xoá 27/11/2026: chức năng nhóm bỏ, Report 3 ghi ngoài phạm vi).
 import { openReports } from '../../fixtures/reports';
 import { test, expect, traceTc, newUserContext } from '../../fixtures/test';
 import { LoginPage } from '../../pages/LoginPage';
@@ -47,13 +47,6 @@ async function openRequest(page: Page, env: E2EEnv, reqCode: string, user: strin
   await ap.open(reqCode);
   return ap;
 }
-
-const na = (tc: string, title: string, reason: string): void => {
-  test(`${tc} – ${title}`, async ({}, testInfo) => {
-    traceTc(testInfo, tc, SHEET);
-    test.skip(true, `N/A – ${reason}`);
-  });
-};
 
 test.describe(SHEET, () => {
   test('SYS-MSC-01 – Tổng quan Bán hàng & Tín dụng', async ({ page, env }, testInfo) => {
@@ -195,6 +188,4 @@ test.describe(SHEET, () => {
     expect((await creditRequestsOf(db, c.partnerId))[0].status).toBe('APPROVED');
   });
 
-  na('SYS-MSC-08', 'Theo dõi SL yêu cầu / đã xuất, xuất một phần', 'Chưa có chức năng (Note: Not implemented)');
-  na('SYS-MSC-09', 'Phải thu, quá hạn, số ngày quá hạn, ghi chú thu nợ', 'Chưa có chức năng (Note: chỉ có thiết lập cảnh báo công nợ)');
 });

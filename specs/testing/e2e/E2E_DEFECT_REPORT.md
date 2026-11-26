@@ -22,18 +22,23 @@
 Lỗi đã biết của Report 5.2 gặp lại (DEF-IT-01/02/03/04) đã được sửa trên `dev`; SYS-TRF-N03 thêm: ô SL nhận không còn tự đổi số âm thành 0.
 Mục 3 (lệch SPEC / Expected): câu chữ đã đổi theo Expected; ca giao diện chặn sớm, BOM → định mức, BR-37 / BR-42 đã cập nhật Expected trong bản nháp Report 5.3 (Round 2).
 
-8 ca cần làm rõ – **quyết định tạm 27/11/2026 (Claude, theo uỷ quyền người dùng; nhóm duyệt lại)**, đều giữ hành vi code hiện tại:
+8 ca cần làm rõ – **đã chốt 27/11/2026 (nhóm duyệt đề xuất)**:
 
 | Ca | Quyết định |
 |---|---|
-| SYS-MRQ-03 | N/A – định mức đã dùng cho lệnh không xóa được nên không dựng được tiền đề |
-| SYS-GRN-03 | N/A – chưa có quản lý theo lô / hạn dùng / vị trí |
+| SYS-MRQ-03 | Kiểm thật: định mức đã dùng cho lệnh không xóa được (chỉ ngừng áp dụng), lệnh giữ nguyên nhu cầu NVL |
+| SYS-GRN-03 | Xoá ca – không quản lý theo lô với hàng nhập từ NCC (Report 3 BR-27) |
 | SYS-MST-01 / 15 / 17 | Danh mục Kho chỉ Admin quản lý; Manager bị chặn; test tạo / sửa / xóa kho bằng Admin |
-| SYS-PRD-N02 | Có dòng lỗi thì dừng cả file; tên trống lấy mã làm tên |
-| SYS-XCT-N05 | Màn Chuyển hàng dùng bộ lọc riêng, mặc định mọi chi nhánh được phân quyền |
+| SYS-PRD-N02 | Sửa code: hàng mới thiếu tên báo "Dòng n: Thiếu tên hàng hóa."; cả file trong một transaction |
+| SYS-XCT-N05 | Sửa code: màn Chuyển hàng lọc theo chi nhánh đang chọn trên header |
 | SYS-ORD-N02 | Bỏ yêu cầu QR trên bản in |
 
-Round 2 (E2E toàn bộ 27/11/2026): **192 Passed, 0 Failed, 55 N/A / 247 TC**.
+Phạm vi (27/11/2026): nhóm bỏ các chức năng Report 3 ghi ngoài phạm vi / không áp dụng, tài liệu theo code hiện tại. Đã **xoá 43 ca** khỏi Report 5.3 và bộ E2E
+(phiếu yêu cầu xuất kho bán hàng, phân bổ chi phí nhập – xoá sheet UC-34, UC-35; duyệt phiếu kiểm kho / xuất hủy; phân loại / sửa chữa hàng trả; theo lô, hạn dùng;
+màn tổng quan Mua hàng / Trả hàng; ghi chú nhắc nợ; gộp đơn kèm thanh toán và yêu cầu xuất; tiền tố mã chứng từ; khoá kiểm kho ngoài BR-42; báo cáo chi phí).
+Đổi sang kiểm thật trên màn Báo cáo / form hàng hóa: SYS-FIN-01/02/08/09/10/12, SYS-MIN-01/02/13, SYS-MSC-01, SYS-MST-16. Report 3 sửa kèm (dòng 27/11 trong Record of Changes).
+
+Round 2 (E2E toàn bộ 27/11/2026): **204 Passed, 0 Failed, 0 N/A / 204 TC**.
 
 ## 1. Danh sách lỗi
 

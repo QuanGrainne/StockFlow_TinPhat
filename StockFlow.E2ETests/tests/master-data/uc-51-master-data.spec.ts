@@ -1,4 +1,4 @@
-// Report 5.3 – sheet "UC-51 Master Data" (SYS-MST-01..20). Actor Manager = manager01. MST-16 là N/A theo Note.
+// Report 5.3 – sheet "UC-51 Master Data" (SYS-MST-01..20). Actor Manager = manager01. MST-16 kiểm vị trí lưu kho trên form hàng hóa.
 // Kho (/warehouses → /roles/warehouses) thuộc chức năng "Phân quyền kho" chỉ của Admin. Quyết định Round 2 (27/11/2026):
 // danh mục Kho do Admin quản lý → MST-01 kiểm Manager bị chặn ở màn Kho; MST-15 / 17 thao tác kho bằng Admin.
 import { test, expect, traceTc, newUserContext } from '../../fixtures/test';
@@ -12,6 +12,7 @@ import { createCustomer, createInvoice, phoneFrom, setCreditLimit } from '../../
 import { bomsOfProduct, creditHistory, partnerById, partnersByName, productActive, productByName, productVariantsJson, productsLike, unitConversions } from '../../fixtures/dbq3';
 import { backendError, readToast, seeMessage, uiBlocksAction } from '../../fixtures/ui';
 import type { Page } from '@playwright/test';
+import { queryRows } from '../../fixtures/pg';
 
 const SHEET = 'UC-51 Master Data';
 const USER = SEEDED.manager.username;
@@ -428,9 +429,40 @@ test.describe(SHEET, () => {
     await admin.context.close();
   });
 
-  test('SYS-MST-16 – Tạo và sửa vị trí lưu kho', async ({}, testInfo) => {
+  test('SYS-MST-16 – Tạo và sửa vị trí lưu kho', async ({ page, env, db, adminApi, uid }, testInfo) => {
     traceTc(testInfo, 'SYS-MST-16', SHEET);
-    test.skip(true, 'N/A – Chưa có chức năng danh mục vị trí lưu kho (Note: Not implemented)');
+    // Round 2 (27/11/2026): theo Report 3 (UC-49 A49.5) vị trí lưu kho tạo ngay trên form hàng hóa (mục "Vị trí, trọng lượng")
+    const p = await createProduct(adminApi, { suffix: uid, price: 48_000 });
+    const loc1 = `Kệ E2E ${uid}`;
+    const loc2 = `Kệ E2E ${uid} B`;
+    const location = async (): Promise<string | null> =>
+      (await queryRows<{ v: string | null }>(db, 'SELECT location_name AS v FROM stockflow.mst_products WHERE product_id = $1', [p.productId]))[0]?.v ?? null;
+    await login(page, env);
+    const pp = new ProductsPage(page);
+    const setLocation = async (name: string): Promise<void> => {
+      await pp.goto();
+      await pp.expand(p.code);
+      await page.getByRole('button', { name: 'Chỉnh sửa', exact: true }).first().click();
+      await expect(page.getByRole('heading', { name: 'Chỉnh sửa hàng hóa', level: 3 })).toBeVisible();
+      const accordion = pp.modal.getByRole('button', { name: /Vị trí, trọng lượng/ });
+      // Mục có thể đang mở sẵn (nhớ trạng thái lần trước): chỉ bấm mở khi chưa thấy ô chọn vị trí
+      const trigger = pp.modal.getByText(/^(Chọn vị trí|Kệ E2E .*)$/).first();
+      if (!(await trigger.isVisible())) await accordion.click();
+      await trigger.click();
+      await pp.modal.getByPlaceholder('Tìm kiếm vị trí...').fill(name);
+      await pp.modal.getByRole('button', { name: `Tạo mới “${name}”` }).click();
+      await expect(page.getByText(`Đã tạo vị trí "${name}" thành công!`)).toBeVisible();
+      const res = await pp.save();
+      expect(res?.status(), res ? await res.text() : 'không gửi request').toBeLessThan(300);
+    };
+    await test.step('1. Tạo vị trí mới cho hàng hóa → lưu', async () => {
+      await setLocation(loc1);
+      expect(await location()).toBe(loc1);
+    });
+    await test.step('2. Đổi sang vị trí khác → lưu', async () => {
+      await setLocation(loc2);
+      expect(await location()).toBe(loc2);
+    });
   });
 
   test('SYS-MST-17 – Xóa kho đang có tồn hoặc nhân sự bị từ chối', async ({ page, browser, env, adminApi, dialogs }, testInfo) => {

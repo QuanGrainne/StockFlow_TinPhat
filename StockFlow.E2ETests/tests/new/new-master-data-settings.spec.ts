@@ -301,14 +301,6 @@ test.describe(SHEET, () => {
     });
   });
 
-  test('SYS-SET-N01 – Đổi tiền tố / quy tắc mã chứng từ áp dụng cho chứng từ sau; thay đổi sai hoặc không có quyền bị từ chối', async ({}, testInfo) => {
-    traceTc(testInfo, 'SYS-SET-N01', SHEET);
-    test.skip(
-      true,
-      'N/A – Chức năng đã bỏ theo chốt nhóm 24/11/2026 (migration SimplifyOrderSettings): mã chứng từ luôn theo số thứ tự, màn Cài đặt chỉ còn 2 tuỳ chọn âm kho; quyền lưu theo chức năng "Cài đặt" (Admin, Manager)'
-    );
-  });
-
   test('SYS-SET-N02 – Cho phép bán âm kho: POS bán được vượt tồn', async ({ page, browser, env, db, adminApi, uid, dialogs }, testInfo) => {
     traceTc(testInfo, 'SYS-SET-N02', SHEET);
     const p = await createProduct(adminApi, { suffix: uid, price: 58_000 });

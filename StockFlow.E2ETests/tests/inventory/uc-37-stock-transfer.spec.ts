@@ -1,5 +1,5 @@
 // Report 5.3 – sheet "UC-37 Stock Transfer" (SYS-TRF-01..08; TRF-01 là ca pilot). Người dùng: e2e.wh.k001 (chỉ K001, kho xuất)
-// và e2e.wh.k002 (chỉ K002, kho nhận). Phiếu dựng sẵn qua API bằng Admin. TRF-07 là N/A theo Note.
+// và e2e.wh.k002 (chỉ K002, kho nhận). Phiếu dựng sẵn qua API bằng Admin. Ca TRF-07 (đã xoá 27/11/2026: chức năng nhóm bỏ, Report 3 ghi ngoài phạm vi).
 import { test, expect, traceTc, newUserContext } from '../../fixtures/test';
 import { LoginPage } from '../../pages/LoginPage';
 import { TransferCreatePage, TransferListPage } from '../../pages/TransferPages';
@@ -262,11 +262,6 @@ test.describe(SHEET, () => {
     else expect.soft(seen, `thông báo "${msg}"`).toBe(true);
     expect((await transferByCode(db, t.code))?.status, 'phiếu vẫn Đang chuyển').toBe('IN_TRANSIT');
     expect.soft(k2, 'tồn K002 không được cộng số vượt').toBe(0);
-  });
-
-  test('SYS-TRF-07 – Hàng đang kiểm kho: không xác nhận được phiếu chuyển (BR-42)', async ({}, testInfo) => {
-    traceTc(testInfo, 'SYS-TRF-07', SHEET);
-    test.skip(true, 'N/A – Ngoài phạm vi khoá kiểm kho BR-42 (Report 3: chỉ xuất hủy, xuất NVL, nhập thành phẩm, duyệt hoàn thành)');
   });
 
   test('SYS-TRF-08 – Nhận thiếu: bắt buộc ghi chú, lưu chênh lệch và hoàn tất phiếu', async ({ page, env, db, adminApi, uid }, testInfo) => {
