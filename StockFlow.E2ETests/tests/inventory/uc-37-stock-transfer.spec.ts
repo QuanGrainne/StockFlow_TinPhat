@@ -266,7 +266,7 @@ test.describe(SHEET, () => {
 
   test('SYS-TRF-07 – Hàng đang kiểm kho: không xác nhận được phiếu chuyển (BR-42)', async ({}, testInfo) => {
     traceTc(testInfo, 'SYS-TRF-07', SHEET);
-    test.skip(true, 'N/A – Khoá kiểm kho chưa áp dụng cho chuyển hàng (Note: c60ea62)');
+    test.skip(true, 'N/A – Ngoài phạm vi khoá kiểm kho BR-42 (Report 3: chỉ xuất hủy, xuất NVL, nhập thành phẩm, duyệt hoàn thành)');
   });
 
   test('SYS-TRF-08 – Nhận thiếu: bắt buộc ghi chú, lưu chênh lệch và hoàn tất phiếu', async ({ page, env, db, adminApi, uid }, testInfo) => {

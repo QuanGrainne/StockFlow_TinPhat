@@ -1,5 +1,6 @@
 // Report 5.3 – sheet "UC-62 Sales and Credit" (SYS-MSC-01..09). Actor Manager = manager01; MSC-07 thêm e2e.manager2 (Manager thứ hai).
 // Duyệt hạn mức ở /approvals (hộp quyết định chỉ có "Duyệt nâng hạn mức" và "Từ chối"). MSC-01, 08, 09 là N/A theo Note.
+import { openReports } from '../../fixtures/reports';
 import { test, expect, traceTc, newUserContext } from '../../fixtures/test';
 import { LoginPage } from '../../pages/LoginPage';
 import { ApprovalsPage } from '../../pages/SalesPages';
@@ -55,7 +56,15 @@ const na = (tc: string, title: string, reason: string): void => {
 };
 
 test.describe(SHEET, () => {
-  na('SYS-MSC-01', 'Tổng quan Bán hàng & Tín dụng', 'Chưa có màn tổng quan (Note: yêu cầu tín dụng ở /approvals)');
+  test('SYS-MSC-01 – Tổng quan Bán hàng & Tín dụng', async ({ page, env }, testInfo) => {
+    traceTc(testInfo, 'SYS-MSC-01', SHEET);
+    // Expected Round 2 (27/11/2026): tổng quan là tab Tổng quan của màn Báo cáo – KPI bán hàng và số yêu cầu hạn mức chờ duyệt
+    // (theo dõi xuất kho theo đơn không có vì POS xuất trực tiếp, xem SYS-MSC-08)
+    await openReports(page, SEEDED.manager.username, env.defaultPassword);
+    for (const k of ['Doanh thu thuần', 'Lợi nhuận gộp', 'Số hóa đơn', 'Phải thu khách hàng']) await expect(page.getByText(k, { exact: true }).first()).toBeVisible();
+    const pending = page.getByRole('link', { name: /Yêu cầu hạn mức chờ duyệt/ }).or(page.getByText('Yêu cầu hạn mức chờ duyệt', { exact: true })).first();
+    await expect(pending).toBeVisible();
+  });
 
   test('SYS-MSC-02 – Đơn chờ xử lý và đơn đã gộp hiện theo khách, giá trị, trạng thái', async ({ page, env, adminApi, uid }, testInfo) => {
     traceTc(testInfo, 'SYS-MSC-02', SHEET, { mismatch: 'Code: xem ở màn Hóa đơn và Đặt hàng (không có màn riêng).' });

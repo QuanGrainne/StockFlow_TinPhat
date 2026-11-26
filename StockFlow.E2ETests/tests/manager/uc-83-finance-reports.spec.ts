@@ -1,6 +1,7 @@
 // Report 5.3 – sheet "UC-83 Finance and Reports" (SYS-FIN-01..12). Actor Manager = manager01.
 // Phiếu thu (PT…) lập ở màn Khách hàng → tab "Nợ cần thu từ khách" → "Thanh toán"; phiếu chi NCC (PC…) ở màn Nhà cung cấp →
-// "Nợ cần trả nhà cung cấp" → "Thanh toán". Báo cáo (FIN-01, 02, 08–12) là N/A theo Note.
+// "Nợ cần trả nhà cung cấp" → "Thanh toán". Báo cáo (FIN-01, 02, 08–10, 12): màn /reports (UC-86/87/88/90) đã có trên dev,
+// Round 2 (27/11/2026) kiểm thật; FIN-11 (chi phí mua / nhập / NVL) vẫn N/A – chưa có báo cáo chi phí.
 import { test, expect, traceTc } from '../../fixtures/test';
 import { LoginPage } from '../../pages/LoginPage';
 import { CustomersAdminPage, SuppliersPage, fieldAfter } from '../../pages/MasterDataPages';
@@ -11,6 +12,7 @@ import { createCustomer, createInvoice, createSalesReturn, setCreditLimit, type 
 import { partnerById, vouchersOf } from '../../fixtures/dbq3';
 import { suppliers, type SupplierRef } from '../../fixtures/purchasing';
 import { readToast } from '../../fixtures/ui';
+import { REPORT_TABS, findReportRow, openReportTab, openReports } from '../../fixtures/reports';
 import type { E2EEnv } from '../../fixtures/env';
 import type { Locator, Page } from '@playwright/test';
 
@@ -96,8 +98,28 @@ async function submit(m: Locator, label: RegExp, timeout = 6_000): Promise<numbe
 }
 
 test.describe(SHEET, () => {
-  na('SYS-FIN-01', 'Danh sách chức năng Tài chính & Báo cáo', 'Chưa có chức năng (Note: /reports chuyển về /dashboard)');
-  na('SYS-FIN-02', 'Báo lỗi khi không lấy được dữ liệu báo cáo', 'Chưa có chức năng (Note)');
+  test('SYS-FIN-01 – Danh sách chức năng Tài chính & Báo cáo', async ({ page, env }, testInfo) => {
+    traceTc(testInfo, 'SYS-FIN-01', SHEET);
+    await openReports(page, USER, env.defaultPassword);
+    for (const name of REPORT_TABS) await expect(page.getByRole('tab', { name })).toBeVisible();
+  });
+
+  test('SYS-FIN-02 – Báo lỗi khi không lấy được dữ liệu báo cáo', async ({ page, env }, testInfo) => {
+    traceTc(testInfo, 'SYS-FIN-02', SHEET);
+    await new LoginPage(page).loginOk(USER, env.defaultPassword);
+    const re = /\/api\/reports\//i;
+    await page.route(re, (r) => r.abort('connectionrefused'));
+    await page.goto('/reports');
+    await test.step('1. API báo cáo không phản hồi → thông báo lỗi', async () => {
+      await expect(page.getByText('Không tải được báo cáo tổng quan').first()).toBeVisible();
+    });
+    await test.step('API trở lại, tải lại → có dữ liệu', async () => {
+      await page.unroute(re);
+      await page.reload();
+      await expect(page.getByText('Doanh thu thuần').first()).toBeVisible();
+      await expect(page.getByText('Không tải được báo cáo tổng quan')).toHaveCount(0);
+    });
+  });
 
   test('SYS-FIN-03 – Lập phiếu thu: lưu số tiền, phương thức; giảm nợ khách @p1', async ({ page, env, db, adminApi, uid }, testInfo) => {
     traceTc(testInfo, 'SYS-FIN-03', SHEET, { mismatch: 'Form phiếu thu không có ô "tham chiếu" (Procedure).' });
@@ -196,9 +218,76 @@ test.describe(SHEET, () => {
     expect((await vouchersOf(db, s.id)).length).toBe(before);
   });
 
-  na('SYS-FIN-08', 'Báo cáo công nợ phải thu / phải trả theo tuổi nợ', 'Chưa có chức năng (Note)');
-  na('SYS-FIN-09', 'Báo cáo nhập – xuất – tồn', 'Chưa có chức năng (Note)');
-  na('SYS-FIN-10', 'Báo cáo doanh thu, giá vốn, lãi gộp', 'Chưa có chức năng (Note)');
+  test('SYS-FIN-08 – Báo cáo công nợ phải thu / phải trả theo tuổi nợ', async ({ page, env, adminApi, uid }, testInfo) => {
+    traceTc(testInfo, 'SYS-FIN-08', SHEET);
+    const { c, price } = await debtor(env, adminApi, uid, 84_000);
+    await openReports(page, USER, env.defaultPassword);
+    await openReportTab(page, 'Công nợ');
+    await test.step('1. Phải thu khách hàng: khách vừa ghi nợ có dư nợ và tuổi nợ', async () => {
+      const search = page.getByPlaceholder(/^Tìm theo mã, tên, điện thoại/);
+      await search.fill(c.code);
+      await search.press('Enter');
+      const row = page.getByRole('row').filter({ hasText: c.code }).first();
+      await expect(row).toBeVisible();
+      await expect(row).toContainText('0–30 ngày');
+      const mgr = await ApiSession.login(env, USER, env.defaultPassword);
+      const r = await findReportRow<{ code: string; closing: number; agingBucket: string | null }>(mgr, 'debts', { type: 'RECEIVABLE', search: c.code }, (x) => x.code === c.code);
+      await mgr.dispose();
+      testInfo.annotations.push({ type: 'observed', description: `Dòng công nợ: ${JSON.stringify(r)}` });
+      expect(r?.closing).toBe(2 * price);
+      expect(r?.agingBucket).toBe('0-30');
+    });
+    // Expected Round 2: tuổi nợ áp dụng cho phải thu; phải trả NCC hiện nợ đầu kỳ, phát sinh tăng / giảm, nợ cuối kỳ
+    await test.step('2. Phải trả nhà cung cấp: nợ đầu kỳ, phát sinh, nợ cuối kỳ theo nhà cung cấp', async () => {
+      await page.getByTitle('Phải trả nhà cung cấp', { exact: true }).click();
+      for (const h of ['Tên nhà cung cấp', 'Nợ đầu kỳ', 'Phát sinh tăng', 'Phát sinh giảm', 'Nợ cuối kỳ'])
+        await expect(page.getByRole('columnheader', { name: h }).first()).toBeVisible();
+    });
+  });
+
+  test('SYS-FIN-09 – Báo cáo nhập – xuất – tồn', async ({ page, env, adminApi, uid }, testInfo) => {
+    traceTc(testInfo, 'SYS-FIN-09', SHEET);
+    const { productId } = await debtor(env, adminApi, uid, 85_000);
+    await openReports(page, USER, env.defaultPassword);
+    await openReportTab(page, 'Nhập – xuất – tồn');
+    for (const h of ['Tồn đầu kỳ', 'Nhập trong kỳ', 'Xuất trong kỳ', 'Tồn cuối kỳ']) await expect(page.getByRole('columnheader', { name: h }).first()).toBeVisible();
+    const mgr = await ApiSession.login(env, USER, env.defaultPassword);
+    type Row = { productId: number; warehouseCode: string; openingQuantity: number; inQuantity: number; outQuantity: number; closingQuantity: number; closingValue: number };
+    const r = await findReportRow<Row>(mgr, 'stock-movement', {}, (x) => x.productId === productId && x.warehouseCode === 'K001');
+    await mgr.dispose();
+    testInfo.annotations.push({ type: 'observed', description: `Dòng N-X-T (K001): ${JSON.stringify(r)}` });
+    // Dựng: nhập điều chỉnh 20, bán 2 trong ngày
+    expect([r?.openingQuantity, r?.inQuantity, r?.outQuantity, r?.closingQuantity]).toEqual([0, 20, 2, 18]);
+    expect(r?.closingValue).toBeGreaterThan(0);
+  });
+
+  test('SYS-FIN-10 – Báo cáo doanh thu, giá vốn, lãi gộp', async ({ page, env, adminApi, uid }, testInfo) => {
+    traceTc(testInfo, 'SYS-FIN-10', SHEET);
+    const { price, productId } = await debtor(env, adminApi, uid, 86_000);
+    await openReports(page, USER, env.defaultPassword);
+    await openReportTab(page, 'Doanh thu & lợi nhuận');
+    await page.getByTitle('Theo hàng hóa', { exact: true }).click();
+    for (const h of ['Giá vốn', 'Lợi nhuận gộp']) await expect(page.getByRole('columnheader', { name: h }).first()).toBeVisible();
+    const mgr = await ApiSession.login(env, USER, env.defaultPassword);
+    type Row = { code: string; netRevenue: number; costOfGoodsSold: number; grossProfit: number; quantitySold: number };
+    const prod = await adminApi.get<{ code?: string; productCode?: string }>(`/api/products/${productId}`);
+    const pcode = prod.code ?? prod.productCode ?? '';
+    const r = await findReportRow<Row>(mgr, 'revenue-profit', { groupBy: 'PRODUCT' }, (x) => x.code === pcode);
+    await mgr.dispose();
+    testInfo.annotations.push({ type: 'observed', description: `Dòng doanh thu (${pcode}): ${JSON.stringify(r)}` });
+    expect(r?.quantitySold).toBe(2);
+    expect(r?.netRevenue).toBe(2 * price);
+    expect(r?.costOfGoodsSold).toBeGreaterThan(0);
+    expect(r?.grossProfit).toBe((r?.netRevenue ?? 0) - (r?.costOfGoodsSold ?? 0));
+  });
   na('SYS-FIN-11', 'Báo cáo chi phí mua, chi phí nhập, chi phí NVL', 'Chưa có chức năng (Note)');
-  na('SYS-FIN-12', 'Bảng điều khiển KPI và việc chờ duyệt', 'Chưa có chức năng (Note: chỉ có dashboard của Admin)');
+  test('SYS-FIN-12 – Bảng điều khiển KPI và việc chờ duyệt', async ({ page, env }, testInfo) => {
+    traceTc(testInfo, 'SYS-FIN-12', SHEET);
+    // Expected Round 2: bảng điều khiển của Manager là tab Tổng quan của màn Báo cáo (UC-90)
+    await openReports(page, USER, env.defaultPassword);
+    for (const k of ['Doanh thu thuần', 'Giá vốn hàng bán', 'Lợi nhuận gộp', 'Giá trị tồn kho', 'Phải thu khách hàng', 'Phải trả nhà cung cấp'])
+      await expect(page.getByText(k, { exact: true }).first()).toBeVisible();
+    await expect(page.getByText('Việc chờ xử lý', { exact: true })).toBeVisible();
+    await expect(page.getByText('Yêu cầu hạn mức chờ duyệt', { exact: true })).toBeVisible();
+  });
 });

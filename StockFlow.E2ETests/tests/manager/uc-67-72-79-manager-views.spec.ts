@@ -15,6 +15,7 @@ import { transferDatePlusMinutes } from '../../fixtures/dbq';
 import { vouchersOf } from '../../fixtures/dbq3';
 import { createCustomer, createInvoice, createSalesReturn, setCreditLimit } from '../../fixtures/sales';
 import type { Page, TestInfo } from '@playwright/test';
+import { findReportRow, openReportTab, openReports } from '../../fixtures/reports';
 import type { E2EEnv } from '../../fixtures/env';
 
 const USER = SEEDED.manager.username;
@@ -88,8 +89,37 @@ test.describe('UC-67 Purchasing and Receiving', () => {
 
 test.describe('UC-72 Manage Inventory', () => {
   const SHEET = 'UC-72 Manage Inventory';
-  na(SHEET, 'SYS-MIN-01', 'Tổng quan Tồn kho', 'Chưa có màn tổng quan (Note)');
-  na(SHEET, 'SYS-MIN-02', 'Bảng tồn, giá vốn, giá trị theo kho', 'Chưa có báo cáo (Note: /inventory chuyển về /dashboard)');
+  // Round 2 (27/11/2026): màn Báo cáo (/reports) đã có trên dev – Tổng quan tồn kho, Nhập – xuất – tồn theo kho, Hàng dưới định mức
+  test('SYS-MIN-01 – Tổng quan Tồn kho', async ({ page, env }, testInfo) => {
+    traceTc(testInfo, 'SYS-MIN-01', SHEET);
+    await openReports(page, USER, env.defaultPassword);
+    await expect(page.getByText('Giá trị tồn kho', { exact: true }).first()).toBeVisible();
+    await expect(page.getByText('Hàng dưới định mức', { exact: true }).first()).toBeVisible();
+    await expect(page.getByText('Việc chờ xử lý', { exact: true })).toBeVisible();
+    await expect(page.getByText('Phiếu chuyển đang về kho', { exact: true })).toBeVisible();
+  });
+
+  test('SYS-MIN-02 – Bảng tồn, giá vốn, giá trị theo kho', async ({ page, env, adminApi, uid }, testInfo) => {
+    traceTc(testInfo, 'SYS-MIN-02', SHEET);
+    const p = await createProduct(adminApi, { suffix: uid, price: priceOf(uid, 61_000) });
+    await addStock(adminApi, p.productId, 'K001', 12);
+    await addStock(adminApi, p.productId, 'K002', 5);
+    await openReports(page, USER, env.defaultPassword);
+    await openReportTab(page, 'Nhập – xuất – tồn');
+    await expect(page.getByRole('columnheader', { name: 'Kho' }).first()).toBeVisible();
+    await expect(page.getByRole('columnheader', { name: 'Tồn cuối kỳ' }).first()).toBeVisible();
+    const mgr = await ApiSession.login(env, USER, env.defaultPassword);
+    type Row = { productId: number; warehouseCode: string; closingQuantity: number; closingValue: number };
+    const k1 = await findReportRow<Row>(mgr, 'stock-movement', {}, (x) => x.productId === p.productId && x.warehouseCode === 'K001');
+    const k2 = await findReportRow<Row>(mgr, 'stock-movement', {}, (x) => x.productId === p.productId && x.warehouseCode === 'K002');
+    const onlyK2 = await findReportRow<Row>(mgr, 'stock-movement', { warehouseId: 4 }, (x) => x.productId === p.productId && x.warehouseCode === 'K001');
+    await mgr.dispose();
+    testInfo.annotations.push({ type: 'observed', description: `K001: ${JSON.stringify(k1)}; K002: ${JSON.stringify(k2)}` });
+    expect([k1?.closingQuantity, k2?.closingQuantity]).toEqual([12, 5]);
+    // Giá vốn bình quân = giá trị / số lượng; lọc theo kho K002 thì không có dòng K001
+    expect(k1?.closingValue ?? 0).toBeGreaterThan(0);
+    expect(onlyK2, 'lọc theo kho K002').toBeUndefined();
+  });
 
   test('SYS-MIN-03 – Phiếu chuyển theo trạng thái, phiếu nhận thiếu hiện ghi chú chênh lệch', async ({ page, env, db, adminApi, uid }, testInfo) => {
     traceTc(testInfo, 'SYS-MIN-03', SHEET, { mismatch: 'Code: xem trên màn Chuyển hàng.' });
@@ -129,9 +159,18 @@ test.describe('UC-72 Manage Inventory', () => {
     ['SYS-MIN-10', 'Từ chối phiếu xuất hủy: tồn không đổi', 'Chưa có chức năng (Note)'],
     ['SYS-MIN-11', 'Từ chối xuất hủy không ghi chú bị từ chối', 'Chưa có chức năng (Note)'],
     ['SYS-MIN-12', 'Phiếu xuất hủy đã xử lý: báo và không đổi', 'Chưa có chức năng (Note)'],
-    ['SYS-MIN-13', 'Cảnh báo hàng chạm điểm đặt hàng lại', 'Chưa có chức năng (Note)'],
     ['SYS-MIN-14', 'Cảnh báo lô sắp hết hạn / đã hết hạn', 'Chưa có chức năng (Note)'],
   ] as const) na(SHEET, tc, title, reason);
+
+  test('SYS-MIN-13 – Cảnh báo hàng chạm điểm đặt hàng lại', async ({ page, env, adminApi, uid }, testInfo) => {
+    traceTc(testInfo, 'SYS-MIN-13', SHEET);
+    // Điểm đặt hàng lại rất cao để hàng chắc chắn đứng đầu danh sách "Hàng dưới định mức" (tối đa 20 dòng, xếp theo mức thiếu)
+    const p = await createProduct(adminApi, { suffix: uid, price: priceOf(uid, 62_000), extra: { reorderPoint: 999_999 } });
+    await addStock(adminApi, p.productId, 'K001', 3);
+    await openReports(page, USER, env.defaultPassword);
+    const section = page.locator('div').filter({ has: page.getByText('Hàng dưới định mức', { exact: true }) }).filter({ has: page.getByRole('table') }).last();
+    await expect(section.getByRole('row').filter({ hasText: p.code }).first()).toBeVisible();
+  });
 });
 
 test.describe('UC-79 Manage Returns', () => {

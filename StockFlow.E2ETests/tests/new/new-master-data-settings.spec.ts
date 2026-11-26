@@ -151,8 +151,8 @@ test.describe(SHEET, () => {
 
   test('SYS-PRD-N02 – File có dòng không hợp lệ: báo từng dòng, không tạo hàng cho dòng lỗi', async ({ page, env, db, adminApi, uid }, testInfo) => {
     traceTc(testInfo, 'SYS-PRD-N02', SHEET);
-    // Quyết định Round 2 (27/11/2026, giữ hành vi hiện tại): có dòng lỗi thì báo "Dòng n: …" và dừng cả file, không tạo hàng nào;
-    // tên trống không phải lỗi (hệ thống lấy mã hàng làm tên).
+    // Round 2 (27/11/2026, đã duyệt): dòng lỗi được báo "Dòng n: <lý do>" và dừng cả file (không tạo hàng nào);
+    // hàng mới thiếu tên là lỗi "Dòng n: Thiếu tên hàng hóa." (như form tạo hàng). File dừng ở dòng lỗi đầu tiên.
     testInfo.annotations.push({ type: 'note', description: 'File theo Procedure: 1 dòng thiếu tên (dòng 2) và 1 dòng trùng mã đã có (dòng 3, tên khác).' });
     const prefix = `E2EIMQ${codeOf(uid)}`;
     const group = await activeCategory(adminApi);
@@ -173,8 +173,14 @@ test.describe(SHEET, () => {
       const noNameMsg = page.getByText(/Dòng 2\b.*(tên|Tên)/).first();
       const shown = await page.getByText(/Dòng \d+/).allInnerTexts();
       testInfo.annotations.push({ type: 'observed', description: `Thông báo lỗi: ${shown.map((s) => s.trim()).join(' | ') || '(không có)'}` });
-      await expect.soft(dupMsg, 'dòng 3 (trùng mã) được báo').toBeVisible();
-      testInfo.annotations.push({ type: 'observed', description: `Dòng 2 (tên trống): ${(await noNameMsg.count()) ? 'có báo' : 'không báo – tên trống lấy mã làm tên (Expected Round 2)'}` });
+      await expect(noNameMsg, 'dòng 2 (thiếu tên) được báo').toHaveText(/Dòng 2: Thiếu tên hàng hóa\./);
+      testInfo.annotations.push({ type: 'observed', description: `Dòng 3 (trùng mã): ${(await dupMsg.count()) ? 'có báo' : 'không báo vì file đã dừng ở dòng 2'}` });
+    });
+    await test.step('KQ1b. File chỉ có dòng trùng mã → "Dòng 2: Trùng mã hàng …"', async () => {
+      await page.keyboard.press('Escape').catch(() => undefined);
+      await pp.goto();
+      await importFile(page, 'MauFileSanPham_E2E_trung.xlsx', [PRODUCT_TEMPLATE_HEADERS, productTemplateRow(dup)]);
+      await expect(page.getByText(new RegExp(`Dòng 2: Trùng mã hàng "?${escapeRe(existing.code)}"?`)).first()).toBeVisible();
     });
     await test.step('KQ2. Có dòng lỗi thì dừng cả file: không tạo hàng nào, hàng có sẵn không đổi', async () => {
       expect(await productCodesLike(db, noName.code), 'không tạo hàng nào từ file có dòng lỗi').toEqual([]);

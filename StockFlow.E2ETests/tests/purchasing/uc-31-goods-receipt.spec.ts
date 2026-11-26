@@ -239,7 +239,7 @@ test.describe(SHEET, () => {
 
   test('SYS-GRN-09 – Hàng đang kiểm kho: không xác nhận được phiếu nhập (BR-42)', async ({}, testInfo) => {
     traceTc(testInfo, 'SYS-GRN-09', SHEET);
-    test.skip(true, 'N/A – Khoá kiểm kho chưa áp dụng cho phiếu nhập (Note: c60ea62)');
+    test.skip(true, 'N/A – Ngoài phạm vi khoá kiểm kho BR-42 (Report 3: chỉ xuất hủy, xuất NVL, nhập thành phẩm, duyệt hoàn thành)');
   });
 
   test('SYS-GRN-10 – SL lỗi ghi riêng, chỉ SL đạt vào tồn', async ({ page, env, db, adminApi, uid }, testInfo) => {
