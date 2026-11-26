@@ -253,9 +253,13 @@ test.describe(SHEET, () => {
       await page.route(apiRe, (r) => r.abort('connectionrefused'));
       await page.goto('/products');
       await page.waitForLoadState('domcontentloaded');
-      const bodyText = (await page.locator('body').innerText()).trim();
       const errorMsg = page.getByText(/(Không thể|Không tải được|lỗi kết nối|Lỗi kết nối|máy chủ)/).first();
-      const hasError = await errorMsg.isVisible().catch(() => false);
+      // Chờ khung trang tải xong (trước đó chỉ có chữ "Đang tải..." của khung, chưa phải màn Hàng hóa)
+      const hasError = await errorMsg
+        .waitFor({ state: 'visible', timeout: 15_000 })
+        .then(() => true)
+        .catch(() => false);
+      const bodyText = (await page.locator('body').innerText()).trim();
       testInfo.annotations.push({
         type: 'observed',
         description: `Trang Hàng hóa khi API ngừng: ${bodyText.length} ký tự; thông báo lỗi: ${hasError ? (await errorMsg.innerText()).trim() : 'KHÔNG có'}; đầu trang: ${bodyText.replace(/\s+/g, ' ').slice(0, 160)}`,
