@@ -1310,7 +1310,7 @@ export default function PurchasesScreen({ onNavigate }: { onNavigate?: (screen: 
                                       </div>
                                     </div>
 
-                                    {/* Action Buttons matching KiotViet standard */}
+                                    {/* Action Buttons */}
                                     <div className="flex items-center justify-between pt-3 border-t border-slate-100">
                                       <div className="flex items-center gap-2">
                                         {!isCanceled && (

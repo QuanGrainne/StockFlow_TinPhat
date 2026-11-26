@@ -1,4 +1,4 @@
-// In phiếu trả hàng nhập (mẫu A4 theo KiotViet, dữ liệu StockFlow).
+// In phiếu trả hàng nhập (mẫu A4, dữ liệu StockFlow).
 import { escapeHtml, printDateTime, printHtml, printMoney, printQty } from '@/lib/print/printHtml';
 import type { PurchaseReturnDetail } from '../types';
 

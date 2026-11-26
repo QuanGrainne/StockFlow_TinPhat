@@ -253,7 +253,7 @@ export default function SalesReturnExpandedRow({ returnId, colSpan, onClose, onC
           <span className="shrink-0">{r.warehouseName}</span>
         </div>
 
-        {/* Lưới thông tin (như KiotViet): Người tạo, Ngày trả, Mã hóa đơn, Trả tiền khách */}
+        {/* Lưới thông tin: Người tạo, Ngày trả, Mã hóa đơn, Trả tiền khách */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-x-8 gap-y-3">
           <div className="flex items-center gap-3 min-h-8">
             <span className={labelCls}>Người tạo:</span>

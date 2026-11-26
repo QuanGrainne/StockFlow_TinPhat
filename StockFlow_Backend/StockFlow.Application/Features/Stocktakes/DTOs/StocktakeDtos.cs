@@ -14,7 +14,7 @@ public record StocktakeItemDto(
     decimal DiscrepancyValue,
     string? Reason = null);
 
-/// <summary>Phiếu kiểm kho trên danh sách (kèm tổng số liệu như KiotViet).</summary>
+/// <summary>Phiếu kiểm kho trên danh sách (kèm tổng số liệu).</summary>
 public record StocktakeListDto(
     int StocktakeId,
     string StocktakeCode,

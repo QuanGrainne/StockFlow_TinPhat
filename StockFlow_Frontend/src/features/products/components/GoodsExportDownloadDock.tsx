@@ -30,7 +30,7 @@ export default function GoodsExportDownloadDock({
 
   return (
     <div className="fixed bottom-3 right-4 z-50 w-96 max-w-[calc(100vw-2rem)] rounded-t-lg shadow-2xl border border-slate-200 overflow-hidden bg-white text-slate-800 animate-in slide-in-from-bottom-3 duration-200">
-      {/* Header xanh chuẩn KiotViet (ảnh 2) */}
+      {/* Header xanh */}
       <div className="bg-[#0070F3] text-white px-3.5 py-2.5 flex items-center justify-between text-xs font-semibold select-none">
         <div className="flex items-center gap-1.5 truncate">
           <span className="truncate">Xử lý thiết lập, import, xuất file, thanh toán</span>

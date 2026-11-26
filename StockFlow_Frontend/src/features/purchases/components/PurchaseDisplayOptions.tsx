@@ -1,6 +1,6 @@
 'use client';
 
-// Nút "con mắt" + popover "Tùy chọn hiển thị" cho bảng hàng hóa của phiếu nhập (theo mẫu KiotViet).
+// Nút "con mắt" + popover "Tùy chọn hiển thị" cho bảng hàng hóa của phiếu nhập.
 // Chỉ gồm 4 cột tùy chọn: Ảnh hàng hóa, Tồn kho, Giá vốn, Giá bán. Lựa chọn được nhớ theo trình duyệt.
 
 import React, { useEffect, useRef, useState } from 'react';

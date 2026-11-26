@@ -474,7 +474,7 @@ export default function CreatePriceBookModal({
 
                 {expandFormula && (
                   <div className="p-4 border-t border-slate-100 space-y-3 text-xs">
-                    {/* Hiển thị trên 1 HÀNG duy nhất chuẩn KiotViet */}
+                    {/* Hiển thị trên 1 HÀNG duy nhất */}
                     <div className="flex items-center gap-2 flex-nowrap w-full">
                       <span className="font-medium text-slate-700 shrink-0 whitespace-nowrap text-xs">Giá mới =</span>
 
@@ -566,7 +566,7 @@ export default function CreatePriceBookModal({
                         )}
                       </div>
 
-                      {/* Toán tử + / - dạng nút tròn KiotViet */}
+                      {/* Toán tử + / - dạng nút tròn */}
                       <div className="flex items-center gap-1 shrink-0">
                         <button
                           type="button"
@@ -627,7 +627,7 @@ export default function CreatePriceBookModal({
                           className="w-full bg-transparent text-right text-xs font-semibold text-slate-800 outline-none placeholder:text-slate-400 pr-2"
                         />
 
-                        {/* Đơn vị VND / % dạng nút KiotViet */}
+                        {/* Đơn vị VND / % dạng nút */}
                         <div className="flex items-center gap-1 border-l border-slate-300/70 pl-2 text-xs select-none shrink-0">
                           <button
                             type="button"
@@ -655,7 +655,7 @@ export default function CreatePriceBookModal({
                       </div>
                     </div>
 
-                    {/* 3 Checkboxes mở rộng chuẩn KiotViet - Chỉ hiển thị khi ĐÃ CHỌN nguồn giá */}
+                    {/* 3 Checkboxes mở rộng - Chỉ hiển thị khi ĐÃ CHỌN nguồn giá */}
                     {Boolean(formulaBaseType) && (
                       <div className="space-y-2 pt-2.5 border-t border-slate-100">
                         {/* 1. Tự động cập nhật giá theo nguồn giá đã chọn */}

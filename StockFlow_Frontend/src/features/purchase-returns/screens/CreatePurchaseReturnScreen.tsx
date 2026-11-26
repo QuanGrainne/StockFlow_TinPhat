@@ -1,6 +1,6 @@
 'use client';
 
-// Màn Trả hàng nhập (trả hàng cho nhà cung cấp) — bố cục giống màn Nhập hàng (theo KiotViet):
+// Màn Trả hàng nhập (trả hàng cho nhà cung cấp) — bố cục giống màn Nhập hàng:
 // - ?grId=<id>  : trả theo phiếu nhập (NCC + kho theo phiếu nhập, SL trả ≤ SL còn được trả "/x")
 // - ?grId=<id>&type=defect : trả hàng lỗi ghi nhận trên phiếu nhập (BR-24) — SL ≤ SL lỗi chưa trả,
 //                            không trừ tồn kho, không tính tiền (hàng lỗi chưa vào kho, chưa trả tiền NCC)

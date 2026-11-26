@@ -124,7 +124,7 @@ public class CreatePurchaseCommandHandler : IRequestHandler<CreatePurchaseComman
             return Result.Failure<PurchaseDetailDto>("Một số sản phẩm trong phiếu nhập không tồn tại trong danh mục.");
         }
 
-        // 5. Sinh mã phiếu nhập chuẩn KiotViet: PN000001, PN000002... hoặc sử dụng mã người dùng nhập
+        // 5. Sinh mã phiếu nhập: PN000001, PN000002... hoặc sử dụng mã người dùng nhập
         string grCode;
         if (string.IsNullOrWhiteSpace(req.PurchaseCode) || req.PurchaseCode.Trim().Equals("Mã phiếu tự động", StringComparison.OrdinalIgnoreCase))
         {

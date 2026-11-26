@@ -394,7 +394,7 @@ export default function SalesReturnsScreen() {
         }}
         onSelect={(orderId) => {
           setPickerOpen(false);
-          // Trả hàng ở màn Bán hàng (tab mới), như KiotViet
+          // Trả hàng ở màn Bán hàng (tab mới)
           window.open(`/pos?returnInvoice=${orderId}`, '_blank', 'noopener,noreferrer');
         }}
       />

@@ -1,6 +1,6 @@
 'use client';
 
-// Chi tiết Nhà cung cấp dạng accordion ngay dưới dòng — bố cục theo mẫu KiotViet:
+// Chi tiết Nhà cung cấp dạng accordion ngay dưới dòng — bố cục:
 //   [Thông tin] [Lịch sử nhập/trả hàng] [Nợ cần trả nhà cung cấp]
 // Giữ các thông tin cũ (phân bổ công nợ theo kho, tổng kết tài chính, lọc phiếu theo kho).
 
@@ -71,7 +71,7 @@ const outlineBtnCls =
 const primaryBtnCls =
   'inline-flex items-center gap-1.5 px-3.5 h-8 rounded-[8px] bg-[#0070f4] hover:bg-[#005ac3] text-white text-[13px] font-semibold shadow-xs transition cursor-pointer';
 
-/** Ô thông tin dạng nhãn + giá trị có gạch chân (giống form KiotViet) */
+/** Ô thông tin dạng nhãn + giá trị có gạch chân */
 function InfoField({ label, value, mono = false }: { label: string; value?: string | null; mono?: boolean }) {
   return (
     <div>

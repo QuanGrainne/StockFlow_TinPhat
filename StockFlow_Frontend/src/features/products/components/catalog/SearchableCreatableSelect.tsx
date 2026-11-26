@@ -1,10 +1,10 @@
-// src/features/products/components/catalog/KiotSelectWithSearch.tsx
+// src/features/products/components/catalog/SearchableCreatableSelect.tsx
 // T19 lát 2: chuyển nguyên văn từ screens/GoodsCatalogScreen.tsx.
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { Check, ChevronDown, Plus, Search } from 'lucide-react';
 
-// ─── Component Dropdown Nhóm hàng / Thương hiệu Chuẩn KiotViet (Kính lúp & Tạo mới) ───────────
-interface KiotSelectWithSearchProps {
+// ─── Component Dropdown Nhóm hàng / Thương hiệu (Kính lúp & Tạo mới) ───────────
+interface SearchableCreatableSelectProps {
   label: string;
   required?: boolean;
   onCreateNew?: () => void;
@@ -19,7 +19,7 @@ interface KiotSelectWithSearchProps {
   className?: string;
 }
 
-export const KiotSelectWithSearch: React.FC<KiotSelectWithSearchProps> = ({
+export const SearchableCreatableSelect: React.FC<SearchableCreatableSelectProps> = ({
   label,
   required = false,
   onCreateNew,
@@ -64,7 +64,7 @@ export const KiotSelectWithSearch: React.FC<KiotSelectWithSearchProps> = ({
 
   return (
     <div ref={containerRef} className={`relative w-full ${className}`}>
-      {/* Header dòng trên: Nhãn & Nút 'Tạo mới' màu xanh chuẩn KiotViet */}
+      {/* Header dòng trên: Nhãn & Nút 'Tạo mới' màu xanh */}
       <div className="flex items-center justify-between mb-1">
         <label className="block text-xs font-semibold text-slate-700">
           {label} {required && <span className="text-red-500">*</span>}
@@ -83,7 +83,7 @@ export const KiotSelectWithSearch: React.FC<KiotSelectWithSearchProps> = ({
         )}
       </div>
 
-      {/* Hộp chọn Trigger chuẩn KiotViet */}
+      {/* Hộp chọn Trigger */}
       <div
         onClick={() => setIsOpen(!isOpen)}
         className={`w-full h-9 px-3 rounded-lg border text-xs flex items-center justify-between cursor-pointer bg-white transition select-none ${
