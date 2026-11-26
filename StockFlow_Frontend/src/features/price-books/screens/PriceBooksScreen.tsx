@@ -10,7 +10,7 @@ import PriceBookFilterSidebar from '../components/PriceBookFilterSidebar';
 import CreatePriceBookModal from '../components/CreatePriceBookModal';
 import AddCategoryToPriceBookModal from '../components/AddCategoryToPriceBookModal';
 import InlineFormulaPopover from '../components/InlineFormulaPopover';
-import { PriceBook, PriceBookMatrixItem } from '../types';
+import { PriceBook, PriceBookMatrixItem, UpdateProductPriceItemPayload } from '../types';
 import { priceBookService } from '../services/priceBookService';
 import { apiClient } from '@/lib/api/client';
 import { useActiveWarehouse } from '@/lib/warehouse/useActiveWarehouse';
@@ -23,6 +23,9 @@ interface CategoryItem {
 }
 
 const currencyFormatter = new Intl.NumberFormat('vi-VN');
+
+/** Khóa dòng: hàng = productId; đơn vị quy đổi (cùng productId) = "productId:mãĐơnVị" */
+const rowIdOf = (r: PriceBookMatrixItem): string => (r.unitCode ? `${r.productId}:${r.unitCode}` : String(r.productId));
 
 export default function PriceBooksClient() {
   const [api, contextHolder] = notification.useNotification();
@@ -150,10 +153,10 @@ export default function PriceBooksClient() {
     loadMatrix();
   }, [loadMatrix]);
 
-  // Track Inline price edit
-  const handlePriceChange = (productId: number, priceBookId: number, rawVal: string) => {
+  // Track Inline price edit (rowId: productId, hoặc "productId:mãĐơnVị" với dòng đơn vị quy đổi)
+  const handlePriceChange = (rowId: number | string, priceBookId: number, rawVal: string) => {
     const num = Number(rawVal.replace(/\D/g, ''));
-    const key = `${productId}_${priceBookId}`;
+    const key = `${rowId}_${priceBookId}`;
     setEditedPrices(prev => ({
       ...prev,
       [key]: num,
@@ -168,13 +171,16 @@ export default function PriceBooksClient() {
     setSavingPrices(true);
     try {
       // Group by priceBookId
-      const grouped: Record<number, { productId: number; price: number }[]> = {};
+      const grouped: Record<number, UpdateProductPriceItemPayload[]> = {};
       for (const k of keys) {
-        const [prodIdStr, bookIdStr] = k.split('_');
+        const sep = k.lastIndexOf('_');
+        const [prodIdStr, unitCode] = k.slice(0, sep).split(':');
         const prodId = Number(prodIdStr);
-        const bookId = Number(bookIdStr);
+        const bookId = Number(k.slice(sep + 1));
         if (!grouped[bookId]) grouped[bookId] = [];
-        grouped[bookId].push({ productId: prodId, price: editedPrices[k] });
+        grouped[bookId].push(
+          unitCode ? { productId: prodId, price: editedPrices[k], unitCode } : { productId: prodId, price: editedPrices[k] }
+        );
       }
 
       for (const bookIdStr of Object.keys(grouped)) {
@@ -447,6 +453,19 @@ export default function PriceBooksClient() {
         width: 220,
         align: 'right',
         render: (_, record) => {
+          const rowId = rowIdOf(record);
+          // Dòng đơn vị quy đổi ở bảng giá khác Bảng giá chung: giá = giá bán của đơn vị (sửa ở Bảng giá chung),
+          // chưa thiết lập thì giá đơn vị cơ bản × quy đổi — giống màn Bán hàng
+          if (record.unitCode && !isDefaultBook) {
+            return (
+              <div
+                className="h-8 w-full rounded border border-slate-200 bg-slate-50/90 px-2.5 flex items-center justify-end text-xs font-semibold text-slate-600 cursor-not-allowed"
+                title="Giá theo đơn vị quy đổi lấy từ giá bán của đơn vị ở Bảng giá chung"
+              >
+                <span>{currencyFormatter.format(record.prices[bookId] ?? 0)} ₫</span>
+              </div>
+            );
+          }
           const isAutoUpdate = !isDefaultBook && Boolean(book?.formulaBaseType);
 
           // 1. Nếu đang BẬT "Tự động cập nhật theo giá chung" (isAutoUpdate = true):
@@ -491,7 +510,7 @@ export default function PriceBooksClient() {
 
           // 2. Nếu là Bảng giá chung hoặc ĐÃ TẮT tự động cập nhật:
           // ĐƯỢC PHÉP CHỈNH SỬA TRỰC TIẾP!
-          const editKey = `${record.productId}_${bookId}`;
+          const editKey = `${rowId}_${bookId}`;
           const isEdited = editKey in editedPrices;
           const currentVal = isEdited ? editedPrices[editKey] : (record.prices[bookId] ?? 0);
           const isLoss = !isDefaultBook && record.costPrice > 0 && currentVal > 0 && currentVal < record.costPrice;
@@ -571,7 +590,7 @@ export default function PriceBooksClient() {
                     value={currentVal ? currencyFormatter.format(currentVal) : '0'}
                     onFocus={() => setFocusedCell(editKey)}
                     onBlur={() => setTimeout(() => setFocusedCell(prev => prev === editKey ? null : prev), 250)}
-                    onChange={e => handlePriceChange(record.productId, bookId, e.target.value)}
+                    onChange={e => handlePriceChange(rowId, bookId, e.target.value)}
                     className={`h-8 w-full rounded border px-2.5 text-right text-xs font-semibold outline-none transition ${
                       isLoss
                         ? 'border-rose-400 bg-rose-50 text-rose-600 font-bold ring-1 ring-rose-300 focus:border-rose-500 focus:ring-rose-200'
@@ -754,7 +773,7 @@ export default function PriceBooksClient() {
             <Table<PriceBookMatrixItem>
               columns={columns}
               dataSource={displayedBookIds.length === 0 ? [] : matrixItems}
-              rowKey="productId"
+              rowKey={rowIdOf}
               loading={loading}
               locale={{
                 emptyText: displayedBookIds.length === 0 ? (

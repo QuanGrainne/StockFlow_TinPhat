@@ -59,28 +59,44 @@ export function calculateDaysUntilOutOfStock(
 // Khóa lưu trữ LocalStorage cho Danh mục Hàng hóa
 export const STOCKFLOW_GOODS_STORAGE_KEY = 'stockflow_goods_catalog_v1';
 
-// Quy tắc sinh mã hàng hóa tự động chuẩn SP + 6 chữ số tuần tự (SP000001, SP000002, ...)
-export const getNextProductCode = (items: GoodsItem[]): string => {
-  let maxNum = 0;
+/** Mọi mã đang dùng: mã hàng + mã của từng đơn vị quy đổi / hàng cùng loại (VD SP004330 = "bịch" của SP004328) */
+export const usedProductCodes = (items: GoodsItem[]): string[] => {
+  const codes: string[] = [];
   for (const item of items) {
-    if (!item.code) continue;
-    const match = item.code.trim().match(/^SP(\d+)$/i);
+    if (item.code) codes.push(item.code);
+    for (const v of item.variants ?? []) if (v.code) codes.push(v.code);
+  }
+  return codes;
+};
+
+/**
+ * Bộ cấp mã SP + 6 chữ số tuần tự, tiếp sau số lớn nhất đang dùng (tính cả mã đơn vị quy đổi),
+ * không trùng mã đã có và không trùng mã đã cấp trong cùng lượt lưu. `reserved`: mã sắp dùng (chưa có trong danh sách).
+ */
+export const createProductCodeAllocator = (items: GoodsItem[], reserved: string[] = []): (() => string) => {
+  const used = new Set([...usedProductCodes(items), ...reserved].map((c) => c.trim().toUpperCase()).filter(Boolean));
+  let maxNum = 0;
+  used.forEach((c) => {
+    const match = c.match(/^SP(\d+)$/i);
     if (match) {
       const num = parseInt(match[1], 10);
-      if (!isNaN(num) && num > maxNum) {
-        maxNum = num;
-      }
+      if (!isNaN(num) && num > maxNum) maxNum = num;
     }
-  }
-  const nextNum = maxNum > 0 ? maxNum + 1 : 1;
-  let code = `SP${String(nextNum).padStart(6, '0')}`;
-  let counter = nextNum;
-  while (items.some((i) => i.code?.toUpperCase() === code.toUpperCase())) {
-    counter++;
-    code = `SP${String(counter).padStart(6, '0')}`;
-  }
-  return code;
+  });
+  let counter = maxNum;
+  return () => {
+    let code: string;
+    do {
+      counter++;
+      code = `SP${String(counter).padStart(6, '0')}`;
+    } while (used.has(code));
+    used.add(code);
+    return code;
+  };
 };
+
+// Quy tắc sinh mã hàng hóa tự động chuẩn SP + 6 chữ số tuần tự (SP000001, SP000002, ...)
+export const getNextProductCode = (items: GoodsItem[]): string => createProductCodeAllocator(items)();
 
 // Định dạng ngày giờ tạo sản phẩm theo thời gian thực chuẩn Việt Nam (DD/MM/YYYY HH:mm)
 export const formatRealDateTime = (dateInput?: string | Date | null): string => {

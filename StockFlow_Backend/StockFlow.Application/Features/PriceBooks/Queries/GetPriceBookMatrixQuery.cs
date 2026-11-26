@@ -10,6 +10,8 @@ using StockFlow.Application.Common.Interfaces;
 using StockFlow.Application.Common.Inventory;
 using StockFlow.Application.Features.PriceBooks.DTOs;
 using StockFlow.Application.Features.PriceBooks.Services;
+using StockFlow.Application.Features.Products.Helpers;
+using StockFlow.Domain.Entities;
 
 namespace StockFlow.Application.Features.PriceBooks.Queries;
 
@@ -62,12 +64,15 @@ public class GetPriceBookMatrixQueryHandler : IRequestHandler<GetPriceBookMatrix
             .Include(p => p.TrxInventoryBalances)
             .AsNoTracking();
 
-        if (!string.IsNullOrWhiteSpace(request.Search))
+        var search = request.Search?.Trim().ToLower() ?? "";
+        if (search.Length > 0)
         {
-            var s = request.Search.Trim().ToLower();
+            var s = search;
+            // Mã đơn vị quy đổi (VD SP004330 = "bịch" của SP004328) nằm trong variants_json → vẫn tìm ra
             query = query.Where(p =>
                 (p.ProductCode != null && p.ProductCode.ToLower().Contains(s)) ||
-                (p.ProductName != null && p.ProductName.ToLower().Contains(s)));
+                (p.ProductName != null && p.ProductName.ToLower().Contains(s)) ||
+                (p.VariantsJson != null && p.VariantsJson.ToLower().Contains(s)));
         }
 
         if (request.CategoryId.HasValue && request.CategoryId.Value > 0)
@@ -118,16 +123,49 @@ public class GetPriceBookMatrixQueryHandler : IRequestHandler<GetPriceBookMatrix
             }
         }
 
-        var totalCount = await query.CountAsync(cancellationToken);
-
         var pageIndex = Math.Max(1, request.PageIndex);
         var pageSize = Math.Clamp(request.PageSize, 5, 100);
 
-        var pagedProducts = await query
-            .OrderBy(p => p.ProductId)
-            .Skip((pageIndex - 1) * pageSize)
-            .Take(pageSize)
-            .ToListAsync(cancellationToken);
+        // Phân trang theo DÒNG: mỗi hàng 1 dòng + mỗi đơn vị quy đổi có mã riêng 1 dòng (kiểu KiotViet), để số dòng một trang
+        // đúng bằng pageSize và tổng số khớp bảng. AllProducts (màn Bán hàng lấy giá theo mã hàng): chỉ dòng hàng như trước.
+        int totalCount;
+        List<MstProduct> pagedProducts;
+        List<(int ProductId, string? UnitCode)> pageRows;
+        if (request.AllProducts)
+        {
+            totalCount = await query.CountAsync(cancellationToken);
+            pagedProducts = await query
+                .OrderBy(p => p.ProductId)
+                .Skip((pageIndex - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync(cancellationToken);
+            pageRows = pagedProducts.Select(p => (p.ProductId, (string?)null)).ToList();
+        }
+        else
+        {
+            // Đọc nhẹ (mã, tên, variants_json, đơn vị cơ bản) của mọi hàng khớp bộ lọc để biết có bao nhiêu dòng
+            var light = await query
+                .OrderBy(p => p.ProductId)
+                .Select(p => new { p.ProductId, p.ProductCode, p.ProductName, p.VariantsJson, BaseUnitName = p.BaseUnit != null ? p.BaseUnit.UnitName : null })
+                .ToListAsync(cancellationToken);
+            var allRows = light
+                .SelectMany(x => RowCodes(
+                        new MstProduct
+                        {
+                            ProductId = x.ProductId,
+                            ProductCode = x.ProductCode,
+                            ProductName = x.ProductName,
+                            VariantsJson = x.VariantsJson,
+                            BaseUnit = x.BaseUnitName == null ? null! : new MstUnit { UnitName = x.BaseUnitName },
+                        },
+                        search)
+                    .Select(code => (x.ProductId, code)))
+                .ToList();
+            totalCount = allRows.Count;
+            pageRows = allRows.Skip((pageIndex - 1) * pageSize).Take(pageSize).ToList();
+            var pageIds = pageRows.Select(r => r.ProductId).Distinct().ToList();
+            pagedProducts = await query.Where(p => pageIds.Contains(p.ProductId)).ToListAsync(cancellationToken);
+        }
 
         var productIds = pagedProducts.Select(p => p.ProductId).ToList();
 
@@ -162,8 +200,8 @@ public class GetPriceBookMatrixQueryHandler : IRequestHandler<GetPriceBookMatrix
             .GroupBy(x => x.ProductId)
             .ToDictionary(g => g.Key, g => g.First().UnitCost);
 
-        // 6. Map kết quả DTO
-        var items = pagedProducts.Select(p =>
+        // 6. Dựng mọi dòng của các hàng trên trang (khóa "" = dòng hàng, mã đơn vị = dòng đơn vị) rồi lấy đúng các dòng của trang
+        var rowsByProduct = pagedProducts.ToDictionary(p => p.ProductId, p =>
         {
             decimal costPrice;
             decimal stockQty;
@@ -227,18 +265,54 @@ public class GetPriceBookMatrixQueryHandler : IRequestHandler<GetPriceBookMatrix
                 }
             }
 
-            return new PriceBookMatrixItemDto(
-                ProductId: p.ProductId,
-                ProductCode: p.ProductCode ?? $"SP{p.ProductId:D5}",
-                ProductName: p.ProductName ?? "",
-                CategoryName: p.Category?.CategoryName ?? "Chung",
-                UnitName: p.BaseUnit?.UnitName ?? p.BaseUnit?.Abbreviation ?? "Cái",
-                CostPrice: costPrice,
-                LatestPurchasePrice: latestPurchasePrice,
-                StockQuantity: stockQty,
-                Prices: prices
-            );
-        }).ToList();
+            var productName = p.ProductName ?? "";
+            var rows = new Dictionary<string, PriceBookMatrixItemDto>(StringComparer.OrdinalIgnoreCase)
+            {
+                [""] = new PriceBookMatrixItemDto(
+                    ProductId: p.ProductId,
+                    ProductCode: p.ProductCode ?? $"SP{p.ProductId:D5}",
+                    ProductName: productName,
+                    CategoryName: p.Category?.CategoryName ?? "Chung",
+                    UnitName: p.BaseUnit?.UnitName ?? p.BaseUnit?.Abbreviation ?? "Cái",
+                    CostPrice: costPrice,
+                    LatestPurchasePrice: latestPurchasePrice,
+                    StockQuantity: stockQty,
+                    Prices: prices
+                ),
+            };
+
+            // Đơn vị quy đổi: giá = giá bán đã thiết lập cho đơn vị (Hàng cùng loại), chưa có thì giá đơn vị cơ bản × quy đổi
+            // (giống cách màn Bán hàng tính giá theo đơn vị). Giá vốn × quy đổi, tồn ÷ quy đổi.
+            if (!request.AllProducts)
+            {
+                foreach (var unit in UnitRowsOf(p))
+                {
+                    var unitCode = unit.Code!.Trim();
+                    var unitPrices = prices.ToDictionary(
+                        kv => kv.Key,
+                        kv => (decimal?)(unit.SalePrice > 0 ? unit.SalePrice : Math.Round((kv.Value ?? 0) * unit.Rate, 0)));
+                    rows[unitCode] = new PriceBookMatrixItemDto(
+                        ProductId: p.ProductId,
+                        ProductCode: unitCode,
+                        ProductName: $"{productName} ({unit.Name})",
+                        CategoryName: p.Category?.CategoryName ?? "Chung",
+                        UnitName: unit.Name,
+                        CostPrice: Math.Round(costPrice * unit.Rate, 2),
+                        LatestPurchasePrice: Math.Round(latestPurchasePrice * unit.Rate, 2),
+                        StockQuantity: Math.Round(stockQty / unit.Rate, 2),
+                        Prices: unitPrices,
+                        UnitCode: unitCode,
+                        ConversionRate: unit.Rate
+                    );
+                }
+            }
+            return rows;
+        });
+
+        var items = pageRows
+            .Where(r => rowsByProduct.ContainsKey(r.ProductId))
+            .Select(r => rowsByProduct[r.ProductId].TryGetValue(r.UnitCode ?? "", out var row) ? row : rowsByProduct[r.ProductId][""])
+            .ToList();
 
         var result = new PriceBookMatrixResultDto(
             Items: items,
@@ -248,5 +322,37 @@ public class GetPriceBookMatrixQueryHandler : IRequestHandler<GetPriceBookMatrix
         );
 
         return Result.Success(result);
+    }
+
+    /// <summary>Đơn vị quy đổi có mã riêng (khác mã hàng) của hàng, mỗi mã một lần</summary>
+    private static IEnumerable<SaleUnit> UnitRowsOf(MstProduct p) =>
+        ProductSaleUnits.Parse(p)
+            .Where(u => !u.IsBase && !string.IsNullOrWhiteSpace(u.Code) &&
+                        !u.Code!.Trim().Equals(p.ProductCode, StringComparison.OrdinalIgnoreCase))
+            .GroupBy(u => u.Code!.Trim(), StringComparer.OrdinalIgnoreCase)
+            .Select(g => g.First());
+
+    /// <summary>
+    /// Các dòng của một hàng trong bảng: null = dòng hàng, còn lại = mã đơn vị quy đổi.
+    /// Đang tìm kiếm: dòng hàng khi chính hàng khớp (mã / tên), dòng đơn vị khi hàng khớp hoặc mã / tên đơn vị khớp;
+    /// khớp ở phần khác của variants_json (VD giá trị thuộc tính) mà không ra dòng nào thì hiện dòng hàng.
+    /// </summary>
+    private static List<string?> RowCodes(MstProduct p, string search)
+    {
+        var rows = new List<string?>();
+        var baseMatches = search.Length == 0 ||
+            (p.ProductCode ?? "").ToLower().Contains(search) ||
+            (p.ProductName ?? "").ToLower().Contains(search);
+        if (baseMatches) rows.Add(null);
+        foreach (var unit in UnitRowsOf(p))
+        {
+            var code = unit.Code!.Trim();
+            if (baseMatches || code.ToLower().Contains(search) || unit.Name.ToLower().Contains(search))
+            {
+                rows.Add(code);
+            }
+        }
+        if (rows.Count == 0) rows.Add(null);
+        return rows;
     }
 }
