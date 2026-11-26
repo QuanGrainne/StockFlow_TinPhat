@@ -82,7 +82,7 @@ import {
   DEFAULT_LOCATION_OPTIONS,
 } from '../components/catalog/goodsCatalogDefaults';
 import { CustomCombobox } from '../components/catalog/CustomCombobox';
-import { KiotSelectWithSearch } from '../components/catalog/KiotSelectWithSearch';
+import { SearchableCreatableSelect } from '../components/catalog/SearchableCreatableSelect';
 import { QuickCreateCategoryModal } from '../components/catalog/QuickCreateCategoryModal';
 import { QuickCreateLocationModal } from '../components/catalog/QuickCreateLocationModal';
 import { QuickCreateBrandModal } from '../components/catalog/QuickCreateBrandModal';
@@ -3747,7 +3747,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                       {/* Nhóm hàng & Thương hiệu Chuẩn KiotViet (Ảnh 2) */}
                       <div className="grid grid-cols-2 gap-3">
                         <div>
-                          <KiotSelectWithSearch
+                          <SearchableCreatableSelect
                             label="Nhóm hàng"
                             required
                             onCreateNew={() => {
@@ -3771,7 +3771,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                         </div>
 
                         <div>
-                          <KiotSelectWithSearch
+                          <SearchableCreatableSelect
                             label="Thương hiệu"
                             onCreateNew={() => {
                               setNewBrandName('');
@@ -4140,7 +4140,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                       <div className="p-4 space-y-3 bg-white border-t border-slate-100 overflow-visible">
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                           <div>
-                            <KiotSelectWithSearch
+                            <SearchableCreatableSelect
                               label="Vị trí"
                               onCreateNew={() => {
                                 setNewLocationName('');
