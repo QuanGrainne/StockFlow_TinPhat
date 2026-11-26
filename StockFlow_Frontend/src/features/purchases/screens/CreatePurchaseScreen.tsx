@@ -41,6 +41,9 @@ import { QuickAddSupplierModal } from '@/features/purchases/components/QuickAddS
 import { AddFromCategoryPopover } from '@/features/purchases/components/AddFromCategoryPopover';
 import { NumberInput } from '@/components/inputs/NumberInput';
 import { formatCost } from '@/lib/utils/cost';
+import { parseSaleUnits, type SaleUnitOption } from '@/lib/products/saleUnits';
+import { UnitSelect } from '@/components/products/UnitSelect';
+import * as XLSX from 'xlsx';
 import { ProductThumb } from '@/components/ProductThumb';
 import { DiscountInput, discountAmount, type DiscountType } from '@/components/inputs/DiscountInput';
 import {
@@ -73,6 +76,13 @@ export interface CreatePurchaseItemRow {
   lotNumber?: string;
   /** SL lỗi khi nhận hàng (chỉ phiếu nhập): không vào tồn kho, không tính tiền — cột Số lượng là SL đạt */
   defectQuantity?: number;
+  /**
+   * Chọn đơn vị khi nhập liệu (VD nhập theo thùng): units = đơn vị của hàng, rate = hệ số đơn vị đang chọn.
+   * Trên màn hình SL / đơn giá / giảm giá / tồn / giá vốn / giá bán theo đơn vị đang chọn;
+   * gửi lên server quy về đơn vị cơ bản (SL × hệ số, đơn giá ÷ hệ số) – phiếu lưu theo đơn vị cơ bản.
+   */
+  units?: SaleUnitOption[];
+  rate?: number;
 }
 
 /** Số tiền giảm trên 1 đơn vị (không vượt quá đơn giá) */
@@ -113,8 +123,30 @@ function buildRowFromProduct(prod: BackendProduct): CreatePurchaseItemRow {
     discountValue: 0,
     discountPercent: 0,
     lineTotal: initialPrice,
+    units: parseSaleUnits(prod.variantsJson, prod.uom || 'Cái', prod.code),
+    rate: 1,
   };
 }
+
+/** Đổi đơn vị của dòng: giá / giảm giá VNĐ / giá vốn / giá bán × (hệ số mới ÷ hệ số cũ), tồn ÷ ; SL giữ nguyên số đã nhập */
+function changeRowUnit(row: CreatePurchaseItemRow, unit: SaleUnitOption): CreatePurchaseItemRow {
+  const k = unit.rate / (row.rate ?? 1);
+  return recalcRow({
+    ...row,
+    rate: unit.rate,
+    unitName: unit.name,
+    productCode: unit.code || row.units?.[0]?.code || row.productCode,
+    unitPrice: Math.round(row.unitPrice * k),
+    discountValue: row.discountType === 'VND' ? Math.round(row.discountValue * k) : row.discountValue,
+    costPrice: row.costPrice * k,
+    salePrice: row.salePrice * k,
+    currentStock: row.currentStock / k,
+  });
+}
+
+/** SL / đơn giá gửi lên server theo đơn vị cơ bản */
+const toBaseQty = (row: CreatePurchaseItemRow, qty: number) => qty * (row.rate ?? 1);
+const toBasePrice = (row: CreatePurchaseItemRow, price: number) => Math.round((price / (row.rate ?? 1)) * 10000) / 10000;
 
 const COPY_CODE_PREFIX = 'Copy_';
 
@@ -747,46 +779,96 @@ export default function CreatePurchaseScreen({ mode = 'receipt' }: CreatePurchas
   }, [finalPayable, status, isCompletedEdit]);
 
   // ─── Excel File Template & Import Handlers ──────────────────────────────────
+  // Tải file mẫu (đúng cột mà import đọc). Không dùng hàng mẫu viết cứng:
+  // phiếu đang có hàng thì điền sẵn các dòng đó, chưa có thì chỉ có dòng tiêu đề.
   const handleDownloadTemplate = () => {
-    const csvContent =
-      'data:text/csv;charset=utf-8,' +
-      'Mã hàng,Tên hàng hóa,ĐVT,Số lượng,Đơn giá,Giảm giá(%)\n' +
-      'SP000001,Tấm ốp Nano PVC 9mm hoa văn mới,Tấm,50,120000,0\n' +
-      'SP000002,Keo dán chuyên dụng TinPhat 500ml,Chai,100,45000,5\n';
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', 'mau_nhap_hang_tinphat.csv');
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    showToast('Đã tải xuống file mẫu nhập hàng excel/csv');
+    const header = ['Mã hàng', 'Tên hàng hóa', 'ĐVT', 'Số lượng', 'Đơn giá', 'Giảm giá(%)'];
+    const rows = items.map((it) => [
+      it.productCode,
+      it.productName,
+      it.unitName,
+      it.quantity,
+      it.unitPrice,
+      it.discountType === 'PERCENT' ? it.discountValue : 0,
+    ]);
+    const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
+    ws['!cols'] = [{ wch: 16 }, { wch: 40 }, { wch: 18 }, { wch: 12 }, { wch: 14 }, { wch: 12 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'NhapHang');
+    XLSX.writeFile(wb, 'mau_nhap_hang_tinphat.xlsx');
+    showToast('Đã tải file mẫu nhập hàng (cột Mã hàng, Số lượng, Đơn giá, Giảm giá(%)).');
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Import danh sách hàng nhập từ file Excel: cột "Mã hàng", "Số lượng" (tùy chọn "Đơn giá", "Giảm giá(%)").
+  // Trước đây là import giả (luôn nạp 4 hàng đầu danh mục với SL bịa 15/30/45/60, không đọc file).
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
-
-    showToast(`Đang nhập dữ liệu từ ${file.name}...`);
-    setTimeout(async () => {
-      try {
-        const whId = activeWarehouse?.warehouseId || undefined;
-        const prods = await productService.getProducts({ warehouseId: whId, status: 'ACTIVE' });
-        if (prods.length > 0) {
-          const slice = prods.slice(0, 4).map((p, idx) => {
-            const qty = (idx + 1) * 15;
-            const price = Math.round(p.costPrice > 0 ? p.costPrice : (p.standardPrice || 50000));
-            return { ...buildRowFromProduct(p), quantity: qty, unitPrice: price, lineTotal: qty * price };
-          });
-          setItems(slice);
-          showToast(`Đã nạp ${slice.length} mặt hàng từ file dữ liệu!`);
-        }
-      } catch (err) {
-        showToast('Lỗi khi đọc file hàng hóa', 'error');
-      }
-    }, 400);
-
     if (fileInputRef.current) fileInputRef.current.value = '';
+    if (!file) return;
+    const num = (v: unknown) => Number(String(v ?? '').replace(/,/g, '').trim());
+    try {
+      const wb = XLSX.read(await file.arrayBuffer());
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const data = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: '' });
+      const lines = data
+        .map((r) => ({
+          code: String(r['Mã hàng'] ?? r['Ma hang'] ?? r['code'] ?? '').trim(),
+          qty: num(r['Số lượng'] ?? r['So luong'] ?? r['quantity']),
+          price: num(r['Đơn giá'] ?? r['Don gia'] ?? r['price']),
+          discount: num(r['Giảm giá(%)'] ?? r['Giảm giá (%)'] ?? r['discount']),
+        }))
+        .filter((l) => l.code);
+      if (lines.length === 0) {
+        showToast('File không có dữ liệu. Cần cột "Mã hàng" và "Số lượng" (tùy chọn "Đơn giá", "Giảm giá(%)").', 'error');
+        return;
+      }
+
+      const whId = activeWarehouse?.warehouseId || undefined;
+      const found = await Promise.all(
+        lines.map((l) => productService.getProducts({ warehouseId: whId, search: l.code, status: 'ACTIVE' }).catch(() => [] as BackendProduct[]))
+      );
+      const missing: string[] = [];
+      const imported: CreatePurchaseItemRow[] = [];
+      lines.forEach((l, i) => {
+        const upper = l.code.toUpperCase();
+        // Mã hàng chính, hoặc mã đơn vị quy đổi (VD SP004346 = túi của SP004345) → chọn sẵn đơn vị đó
+        const match = found[i].find(
+          (p) =>
+            p.code.toUpperCase() === upper ||
+            parseSaleUnits(p.variantsJson, p.uom || 'Cái', p.code).some((u) => (u.code || '').toUpperCase() === upper)
+        );
+        if (!match) {
+          missing.push(l.code);
+          return;
+        }
+        let row = buildRowFromProduct(match);
+        const unit = row.units?.find((u) => !u.isBase && (u.code || '').toUpperCase() === upper);
+        if (unit) row = changeRowUnit(row, unit);
+        imported.push(
+          recalcRow({
+            ...row,
+            quantity: Number.isFinite(l.qty) && l.qty > 0 ? l.qty : 1,
+            unitPrice: Number.isFinite(l.price) && l.price > 0 ? l.price : row.unitPrice,
+            discountType: Number.isFinite(l.discount) && l.discount > 0 ? 'PERCENT' : row.discountType,
+            discountValue: Number.isFinite(l.discount) && l.discount > 0 ? Math.min(100, l.discount) : row.discountValue,
+          })
+        );
+      });
+
+      // Hàng đã có trên phiếu thì thay bằng dòng trong file
+      setItems((prev) => {
+        const importedIds = new Set(imported.map((r) => r.productId));
+        return [...prev.filter((r) => !importedIds.has(r.productId)), ...imported];
+      });
+      showToast(
+        missing.length > 0
+          ? `Đã thêm ${imported.length} hàng. Không tìm thấy: ${missing.slice(0, 5).join(', ')}${missing.length > 5 ? '...' : ''}`
+          : `Đã thêm ${imported.length} hàng từ file ${file.name}`,
+        missing.length > 0 ? 'error' : 'success'
+      );
+    } catch {
+      showToast('Không đọc được file Excel.', 'error');
+    }
   };
 
   // ─── Lưu phiếu đặt hàng nhập (mode order) ────────────────────────────────────
@@ -817,8 +899,8 @@ export default function CreatePurchaseScreen({ mode = 'receipt' }: CreatePurchas
         discountAmount: Math.round(orderDiscount),
         items: items.map((i) => ({
           productId: i.productId,
-          quantity: i.quantity,
-          unitPrice: i.unitPrice,
+          quantity: toBaseQty(i, i.quantity),
+          unitPrice: toBasePrice(i, i.unitPrice),
           discountPercent: i.discountPercent || 0,
         })),
       };
@@ -882,13 +964,14 @@ export default function CreatePurchaseScreen({ mode = 'receipt' }: CreatePurchas
     try {
       setIsSubmitting(true);
       const receivedDate = purchaseDateTime ? new Date(purchaseDateTime).toISOString() : new Date().toISOString();
+      // Quy về đơn vị cơ bản (dòng chọn đơn vị quy đổi: SL × hệ số, đơn giá ÷ hệ số)
       const lineItems = items.map((i) => ({
         productId: i.productId,
-        quantity: i.quantity,
-        unitPrice: i.unitPrice,
+        quantity: toBaseQty(i, i.quantity),
+        unitPrice: toBasePrice(i, i.unitPrice),
         discountPercent: i.discountPercent || 0,
         lotNumber: i.lotNumber || null,
-        defectQuantity: i.defectQuantity || 0,
+        defectQuantity: toBaseQty(i, i.defectQuantity || 0),
       }));
       const discount = Math.round(orderDiscount);
 
@@ -1425,7 +1508,16 @@ export default function CreatePurchaseScreen({ mode = 'receipt' }: CreatePurchas
                         </div>
 
                         {/* ĐVT */}
-                        <div className="pl-2 pt-1.5 text-[#0070f4]">{row.unitName}</div>
+                        <div className="pl-2 pt-1.5 text-[#0070f4] min-w-0">
+                          <UnitSelect
+                            units={row.units}
+                            value={row.unitName}
+                            onChange={(u) =>
+                              setItems((prev) => prev.map((it) => (it.productId === row.productId ? changeRowUnit(it, u) : it)))
+                            }
+                            className="text-[#0070f4]"
+                          />
+                        </div>
 
                         {/* Tồn kho */}
                         {columns.stock && (

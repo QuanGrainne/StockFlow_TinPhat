@@ -12,6 +12,7 @@ import {
   Search,
   X,
   GripVertical,
+  Pencil,
   Plus,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
@@ -75,6 +76,9 @@ type ProductFilterSidebarProps = {
   onCreateLocation?: () => void;
   categoriesList?: string[];
   categoryCounts?: Record<string, number>;
+  /** Nhóm hàng thật trong DB: hiện nút bút chì để sửa / xóa (nhóm loại hàng, nhóm mặc định thì không) */
+  editableCategories?: string[];
+  onEditCategory?: (name: string) => void;
   suppliersList?: string[];
   locationsList?: string[];
   isCollapsed?: boolean;
@@ -100,16 +104,8 @@ export const INITIAL_FILTER_STATE: FilterSidebarState = {
   channelLinked: 'all',
 };
 
-const DEFAULT_CATEGORIES = [
-  'Thành phẩm',
-  'Nguyên vật liệu',
-  'Thang cáp',
-  'Máng cáp',
-  'Khay cáp',
-  'Tôn cuộn',
-  'Bột sơn tĩnh điện',
-  'Phụ kiện liên kết',
-];
+// Không truyền danh sách nhóm thì để trống (không dùng nhóm viết cứng không có trong DB)
+const DEFAULT_CATEGORIES: string[] = [];
 
 const DEFAULT_SUPPLIERS = [
   'kiểm kho',
@@ -1082,6 +1078,8 @@ export default function ProductFilterSidebar({
   onCreateLocation,
   categoriesList = DEFAULT_CATEGORIES,
   categoryCounts = {},
+  editableCategories,
+  onEditCategory,
   suppliersList = DEFAULT_SUPPLIERS,
   locationsList = DEFAULT_LOCATIONS,
   isCollapsed = false,
@@ -1624,6 +1622,23 @@ export default function ProductFilterSidebar({
                           <span className="truncate flex-1 font-normal text-slate-700">
                             {cat} <span className="text-slate-400 text-[11px]">({count.toLocaleString()})</span>
                           </span>
+                          {onEditCategory &&
+                            editableCategories?.some((c) => c.trim().toLowerCase() === cat.trim().toLowerCase()) && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  // Nằm trong <label>: chặn để không tick ô chọn
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  setCategoryOpen(false);
+                                  onEditCategory(cat);
+                                }}
+                                className="ml-1 p-1 rounded text-slate-400 opacity-0 group-hover:opacity-100 hover:text-[#0071BA] hover:bg-blue-50 transition cursor-pointer shrink-0"
+                                title={`Sửa / xóa nhóm hàng "${cat}"`}
+                              >
+                                <Pencil size={12} />
+                              </button>
+                            )}
                         </label>
                       );
                     })

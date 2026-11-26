@@ -30,6 +30,8 @@ import type { BackendProduct } from '@/features/products/services/productService
 import { transferService } from '@/features/transfers/services/transferService';
 import { stocktakeService } from '@/features/stocktakes/services/stocktakeService';
 import type { ProductForTransfer } from '@/features/transfers/types';
+import { UnitSelect } from '@/components/products/UnitSelect';
+import { parseSaleUnits, type SaleUnitOption } from '@/lib/products/saleUnits';
 import type { SaveStocktakePayload } from '@/features/stocktakes/types';
 
 interface Row {
@@ -45,7 +47,16 @@ interface Row {
   reason?: string;
   /** Ảnh hàng hóa (dòng nạp từ phiếu cũ được bổ sung khi lấy lại tồn kho) */
   imageUrl?: string | null;
+  /**
+   * Đếm theo đơn vị khác đơn vị cơ bản (VD đếm 3 thùng): systemQty / actualQty vẫn theo đơn vị cơ bản,
+   * chỉ hiển thị và nhập theo đơn vị đang chọn (÷ / × rate). Lưu phiếu theo đơn vị cơ bản.
+   */
+  units?: SaleUnitOption[];
+  rate?: number;
 }
+
+/** SL (đơn vị cơ bản) hiển thị theo đơn vị đang chọn */
+const inUnit = (r: { rate?: number }, qty: number) => Math.round((qty / (r.rate ?? 1)) * 1000) / 1000;
 
 type Tab = 'all' | 'match' | 'diff' | 'unchecked';
 
@@ -80,7 +91,14 @@ function nowText(): string {
 async function freshStock(warehouseId: number, code: string, productId?: number): Promise<ProductForTransfer | undefined> {
   try {
     const list = await transferService.getProductsForTransfer(warehouseId, undefined, code);
-    return list.find((p) => (productId ? p.productId === productId : p.productCode.toUpperCase() === code.toUpperCase()));
+    const upper = code.toUpperCase();
+    return list.find((p) =>
+      productId
+        ? p.productId === productId
+        : p.productCode.toUpperCase() === upper ||
+          // Mã đơn vị quy đổi (VD SP004346 = túi của SP004345)
+          parseSaleUnits(p.variantsJson, p.unitName, p.productCode).some((u) => (u.code || '').toUpperCase() === upper)
+    );
   } catch {
     return undefined;
   }
@@ -231,6 +249,8 @@ export default function CreateStocktakeScreen() {
         unitCost: p.costPrice,
         actualQty: null,
         imageUrl: p.imageUrl ?? null,
+        units: parseSaleUnits(p.variantsJson, p.unitName, p.productCode),
+        rate: 1,
       },
     ]);
     setSearch('');
@@ -254,6 +274,8 @@ export default function CreateStocktakeScreen() {
       unitCost: p.costPrice || 0,
       actualQty: null,
       imageUrl: p.imageUrl ?? null,
+      units: parseSaleUnits(p.variantsJson, p.uom || 'Cái', p.code),
+      rate: 1,
     }));
     addRows(newRows);
     if (warehouseId) refreshRows(warehouseId, newRows);
@@ -267,9 +289,10 @@ export default function CreateStocktakeScreen() {
 
   // ─── Excel: tải file mẫu, đọc file (cột "Mã hàng", "Thực tế") ───────────────
   const downloadTemplate = () => {
+    // Không dùng mã mẫu viết cứng: phiếu đang có hàng thì điền sẵn mã các dòng đó, chưa có thì chỉ có tiêu đề
     const ws = XLSX.utils.aoa_to_sheet([
       ['Mã hàng', 'Thực tế'],
-      ['SP000001', 10],
+      ...rows.map((r) => [r.productCode, r.actualQty === null ? '' : inUnit(r, r.actualQty)]),
     ]);
     ws['!cols'] = [{ wch: 18 }, { wch: 12 }];
     const wb = XLSX.utils.book_new();
@@ -306,15 +329,20 @@ export default function CreateStocktakeScreen() {
           missing.push(l.code);
           return;
         }
+        // File ghi mã đơn vị quy đổi (VD SP004346 = túi) → đếm theo đơn vị đó, lưu quy về đơn vị cơ bản
+        const units = parseSaleUnits(p.variantsJson, p.unitName, p.productCode);
+        const unit = units.find((u) => (u.code || '').toUpperCase() === l.code.toUpperCase()) ?? units[0];
         newRows.push({
           productId: p.productId,
-          productCode: p.productCode,
+          productCode: unit.code || p.productCode,
           productName: p.productName,
-          unit: p.unitName,
+          unit: unit.name,
           systemQty: p.sourceStock,
           unitCost: p.costPrice,
-          actualQty: Number.isFinite(l.actual) && l.actual >= 0 ? l.actual : null,
+          actualQty: Number.isFinite(l.actual) && l.actual >= 0 ? l.actual * unit.rate : null,
           imageUrl: p.imageUrl ?? null,
+          units,
+          rate: unit.rate,
         });
       });
       addRows(newRows);
@@ -333,7 +361,10 @@ export default function CreateStocktakeScreen() {
 
   const updateActual = (productId: number, raw: string) => {
     const clean = raw.replace(/[^\d.]/g, '');
-    setRows((prev) => prev.map((r) => (r.productId === productId ? { ...r, actualQty: clean === '' ? null : Number(clean) } : r)));
+    // Nhập theo đơn vị đang chọn → lưu theo đơn vị cơ bản (3 thùng × 100 = 300 bịch)
+    setRows((prev) =>
+      prev.map((r) => (r.productId === productId ? { ...r, actualQty: clean === '' ? null : Number(clean) * (r.rate ?? 1) } : r))
+    );
   };
 
   const updateReason = (productId: number, value: string) => {
@@ -625,20 +656,35 @@ export default function CreateStocktakeScreen() {
                       />
                       <span className="font-mono text-[#0070f4] font-medium truncate">{r.productCode}</span>
                       <span className="truncate pr-2" title={r.productName}>{r.productName}</span>
-                      <span className="text-[#0070f4]">{r.unit}</span>
-                      <span className="text-right">{qtyFmt(r.systemQty)}</span>
+                      <span className="text-[#0070f4] min-w-0">
+                        <UnitSelect
+                          units={r.units}
+                          value={r.unit}
+                          onChange={(u) =>
+                            setRows((prev) =>
+                              prev.map((x) =>
+                                x.productId === r.productId
+                                  ? { ...x, unit: u.name, rate: u.rate, productCode: u.code || x.units?.[0]?.code || x.productCode }
+                                  : x
+                              )
+                            )
+                          }
+                          className="text-[#0070f4]"
+                        />
+                      </span>
+                      <span className="text-right">{qtyFmt(inUnit(r, r.systemQty))}</span>
                       <span className="text-right">
                         <input
                           type="text"
                           inputMode="decimal"
-                          value={r.actualQty === null ? '' : String(r.actualQty)}
+                          value={r.actualQty === null ? '' : String(inUnit(r, r.actualQty))}
                           onChange={(e) => updateActual(r.productId, e.target.value)}
                           placeholder="Nhập SL"
                           className="w-24 h-7 px-2 text-right rounded-[6px] border border-slate-300 focus:outline-none focus:border-[#0070f4]"
                         />
                       </span>
                       <span className={`text-right ${diff < 0 ? 'text-[#fb2c36]' : diff > 0 ? 'text-[#16a34a]' : ''}`}>
-                        {r.actualQty === null ? '—' : diff > 0 ? `+${qtyFmt(diff)}` : qtyFmt(diff)}
+                        {r.actualQty === null ? '—' : diff > 0 ? `+${qtyFmt(inUnit(r, diff))}` : qtyFmt(inUnit(r, diff))}
                       </span>
                       <span className="text-right">{r.actualQty === null ? '—' : money.format(diff * r.unitCost)}</span>
                       <span className="pl-3">

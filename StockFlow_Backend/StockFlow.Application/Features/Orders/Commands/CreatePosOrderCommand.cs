@@ -10,6 +10,7 @@ using StockFlow.Application.Common;
 using StockFlow.Application.Common.Interfaces;
 using StockFlow.Application.Features.Customers.Helpers;
 using StockFlow.Application.Features.Orders.DTOs;
+using StockFlow.Application.Features.Products.Helpers;
 using StockFlow.Application.Features.SalesBookings.Common;
 using StockFlow.Domain.Entities;
 
@@ -202,9 +203,13 @@ public class CreatePosOrderCommandHandler : IRequestHandler<CreatePosOrderComman
         // 4. Kiểm tra sản phẩm và trạng thái kinh doanh (POS-001 -> POS-008, POS-011)
         var productIds = req.Items.Select(i => i.ProductId).Distinct().ToList();
         var products = await _context.MstProducts
+            .Include(p => p.BaseUnit)
             .Where(p => productIds.Contains(p.ProductId))
             .ToDictionaryAsync(p => p.ProductId, cancellationToken);
 
+        // Đơn vị bán của từng dòng (theo thứ tự req.Items): hệ số quy đổi lấy từ thiết lập đơn vị của hàng
+        var lineUnits = new List<(int UnitId, decimal Rate)>();
+        var unitIdCache = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         foreach (var item in req.Items)
         {
             if (!products.TryGetValue(item.ProductId, out var prod))
@@ -216,6 +221,14 @@ public class CreatePosOrderCommandHandler : IRequestHandler<CreatePosOrderComman
             {
                 return Result<PosOrderResultDto>.Failure($"Sản phẩm '{prod.ProductName}' ({prod.ProductCode}) đã ngừng kinh doanh/ngừng hoạt động (POS-003).");
             }
+
+            var saleUnit = ProductSaleUnits.Find(prod, item.UnitName);
+            if (saleUnit == null)
+            {
+                return Result<PosOrderResultDto>.Failure(
+                    $"Sản phẩm '{prod.ProductName}' ({prod.ProductCode}) không có đơn vị \"{item.UnitName}\" trong thiết lập đơn vị tính.");
+            }
+            lineUnits.Add((await ProductSaleUnits.UnitIdAsync(_context, prod, saleUnit, unitIdCache, cancellationToken), saleUnit.Rate));
         }
 
         // 5. Tính toán giảm giá từng mặt hàng (Cấp dòng) và tổng tiền hàng SubTotal
@@ -228,11 +241,14 @@ public class CreatePosOrderCommandHandler : IRequestHandler<CreatePosOrderComman
             decimal DiscountValue,
             decimal DiscountAmount,
             decimal UnitPrice,
-            decimal LineTotal
+            decimal LineTotal,
+            int UnitId,
+            decimal Rate
         )>();
 
-        foreach (var item in req.Items)
+        for (var lineIndex = 0; lineIndex < req.Items.Count; lineIndex++)
         {
+            var item = req.Items[lineIndex];
             var prod = products[item.ProductId];
             decimal origPrice = item.OriginalPrice > 0 ? item.OriginalPrice : (item.UnitPrice > 0 ? item.UnitPrice : (prod.StandardPrice ?? 0));
             string itemDiscType = string.Equals(item.DiscountType, "PERCENT", StringComparison.OrdinalIgnoreCase) ? "PERCENT" : "AMOUNT";
@@ -258,7 +274,8 @@ public class CreatePosOrderCommandHandler : IRequestHandler<CreatePosOrderComman
             decimal unitPrice = Math.Max(0, origPrice - discPerUnit);
             decimal lineTotal = Math.Round(unitPrice * item.Quantity, 2);
 
-            calculatedItems.Add((item, prod, origPrice, itemDiscType, itemDiscValue, itemTotalDiscount, unitPrice, lineTotal));
+            calculatedItems.Add((item, prod, origPrice, itemDiscType, itemDiscValue, itemTotalDiscount, unitPrice, lineTotal,
+                lineUnits[lineIndex].UnitId, lineUnits[lineIndex].Rate));
         }
 
         decimal serverSubTotal = calculatedItems.Sum(c => c.LineTotal);
@@ -305,10 +322,11 @@ public class CreatePosOrderCommandHandler : IRequestHandler<CreatePosOrderComman
             .GroupBy(b => b.ProductId)
             .ToDictionary(g => g.Key, g => g.FirstOrDefault(b => b.LocationId == null && b.LotId == null) ?? g.First());
 
-        // Gom số lượng yêu cầu theo từng sản phẩm (xử lý tình huống quét nhiều dòng cùng mã - POS-004)
-        var productQuantitySummary = req.Items
-            .GroupBy(i => i.ProductId)
-            .ToDictionary(g => g.Key, g => g.Sum(x => x.Quantity));
+        // Gom số lượng yêu cầu theo từng sản phẩm (xử lý tình huống quét nhiều dòng cùng mã - POS-004),
+        // quy về đơn vị cơ bản (1 túi = 10 bịch) để so với tồn kho
+        var productQuantitySummary = calculatedItems
+            .GroupBy(c => c.RequestItem.ProductId)
+            .ToDictionary(g => g.Key, g => g.Sum(x => x.RequestItem.Quantity * x.Rate));
 
         // Đơn đặt hàng luôn nhận kể cả khi hết hàng (bỏ tuỳ chọn A2).
         // Hàng đang tạm giữ cho các đơn đặt hàng khác (hàng khách đặt ở các đơn còn mở của chi nhánh, trừ chính đơn đang giao):
@@ -496,7 +514,7 @@ public class CreatePosOrderCommandHandler : IRequestHandler<CreatePosOrderComman
             await _context.SaveChangesAsync(cancellationToken);
 
             // 9. Thêm chi tiết đơn hàng DtlOrderItems kèm chiết khấu cấp dòng
-            var addedOrderItems = new List<(DtlOrderItem OrderItem, PosOrderItemRequest RequestItem, MstProduct Product)>();
+            var addedOrderItems = new List<(DtlOrderItem OrderItem, PosOrderItemRequest RequestItem, MstProduct Product, decimal Rate)>();
             foreach (var c in calculatedItems)
             {
                 var item = c.RequestItem;
@@ -505,8 +523,10 @@ public class CreatePosOrderCommandHandler : IRequestHandler<CreatePosOrderComman
                 {
                     OrderId = order.OrderId,
                     ProductId = item.ProductId,
+                    // Số lượng / đơn giá theo đơn vị bán; hệ số quy đổi để trừ tồn, trả hàng, báo cáo
                     Quantity = item.Quantity,
-                    UnitId = item.UnitId > 0 ? item.UnitId : prod.BaseUnitId,
+                    UnitId = c.UnitId,
+                    ConversionRate = c.Rate,
                     OriginalPrice = c.OriginalPrice,
                     DiscountType = c.DiscountType,
                     DiscountValue = c.DiscountValue,
@@ -515,7 +535,7 @@ public class CreatePosOrderCommandHandler : IRequestHandler<CreatePosOrderComman
                     LineTotal = c.LineTotal
                 };
                 _context.DtlOrderItems.Add(orderItem);
-                addedOrderItems.Add((orderItem, item, prod));
+                addedOrderItems.Add((orderItem, item, prod, c.Rate));
             }
 
             await _context.SaveChangesAsync(cancellationToken);
@@ -540,21 +560,23 @@ public class CreatePosOrderCommandHandler : IRequestHandler<CreatePosOrderComman
                 _context.TrxStockIssues.Add(stockIssue);
                 await _context.SaveChangesAsync(cancellationToken);
 
-                foreach (var (orderItem, item, prod) in addedOrderItems)
+                foreach (var (orderItem, item, prod, rate) in addedOrderItems)
                 {
+                    // Phiếu xuất, tồn kho, thẻ kho luôn theo đơn vị cơ bản (1 túi = 10 bịch → xuất 10)
+                    var baseQty = item.Quantity * rate;
                     var stockIssueItem = new DtlStockIssueItem
                     {
                         StockIssueId = stockIssue.StockIssueId,
                         OrderItemId = orderItem.OrderItemId,
-                        RequestedQty = item.Quantity,
-                        ActualIssuedQty = item.Quantity
+                        RequestedQty = baseQty,
+                        ActualIssuedQty = baseQty
                     };
                     _context.DtlStockIssueItems.Add(stockIssueItem);
 
                     // Trừ tồn kho tại kho xuất
                     if (balanceMap.TryGetValue(item.ProductId, out var balance))
                     {
-                        balance.Quantity = (balance.Quantity ?? 0) - item.Quantity;
+                        balance.Quantity = (balance.Quantity ?? 0) - baseQty;
                         balance.LastUpdated = finalOrderDate;
                     }
                     else
@@ -563,7 +585,7 @@ public class CreatePosOrderCommandHandler : IRequestHandler<CreatePosOrderComman
                         {
                             WarehouseId = req.WarehouseId,
                             ProductId = item.ProductId,
-                            Quantity = -item.Quantity,
+                            Quantity = -baseQty,
                             LastUpdated = finalOrderDate
                         };
                         _context.TrxInventoryBalances.Add(newBalance);
@@ -578,12 +600,13 @@ public class CreatePosOrderCommandHandler : IRequestHandler<CreatePosOrderComman
                         WarehouseId = req.WarehouseId,
                         ProductId = item.ProductId,
                         TransactionType = "ISSUE_SALE",
-                        Quantity = -item.Quantity,
+                        Quantity = -baseQty,
                         ReferenceType = "STOCK_ISSUE",
                         ReferenceId = stockIssue.StockIssueId,
                         TransactionDate = VietnamTime.From(finalOrderDate),
                         CreatedBy = currentUserId,
-                        TransactionPrice = orderItem.UnitPrice,
+                        // Giá trên thẻ kho theo đơn vị cơ bản
+                        TransactionPrice = rate > 0 ? Math.Round((orderItem.UnitPrice ?? 0) / rate, 2) : orderItem.UnitPrice,
                         UnitCost = issuedBalance.UnitCost ?? prod.MovingAverageCost,
                         BalanceAfter = issuedBalance.Quantity
                     });
@@ -647,12 +670,13 @@ CreatedBy = currentUserId,
                     booking,
                     calculatedItems.Select(c => new SalesBookingOps.InvoiceLine(
                         c.RequestItem.ProductId,
-                        c.RequestItem.UnitId > 0 ? c.RequestItem.UnitId : c.Product.BaseUnitId,
+                        c.UnitId,
                         c.RequestItem.Quantity,
                         c.OriginalPrice,
                         c.DiscountType,
                         c.DiscountValue,
-                        c.UnitPrice)).ToList(),
+                        c.UnitPrice,
+                        c.Rate)).ToList(),
                     new SalesBookingOps.InvoiceMoney(serverSubTotal, orderDiscountType, orderDiscountValue, orderDiscountAmount, finalTotal),
                     currentUserId);
 

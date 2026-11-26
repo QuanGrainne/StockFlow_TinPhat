@@ -266,6 +266,10 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
                 .HasPrecision(18, 2)
                 .HasColumnName("quantity");
             entity.Property(e => e.UnitId).HasColumnName("unit_id");
+            // Số đơn vị cơ bản trong 1 đơn vị bán của dòng (bán theo đơn vị quy đổi, VD 1 túi = 10 bịch)
+            entity.Property(e => e.ConversionRate)
+                .HasPrecision(18, 4)
+                .HasColumnName("conversion_rate");
             entity.Property(e => e.UnitPrice)
                 .HasPrecision(18, 2)
                 .HasColumnName("unit_price");

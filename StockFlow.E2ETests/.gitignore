@@ -1,0 +1,12 @@
+# Thông tin kết nối và mật khẩu thật: chỉ ở máy cá nhân, không commit
+.env.e2e.local
+
+node_modules/
+
+# Trạng thái lượt chạy, phiên đăng nhập đã lưu, kết quả và bằng chứng (ảnh, video, trace)
+.e2e-run/
+.auth/
+test-results/
+reports/html/
+reports/results.json
+reports/raw/
