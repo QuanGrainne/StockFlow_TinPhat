@@ -12,7 +12,7 @@ import { ChevronLeft, ChevronRight, FileDown, Inbox, Plus, RefreshCw, Search, St
 
 import { orderService } from '@/features/orders/services/orderService';
 import type { OrderListFilter, OrderListItem } from '@/features/orders/types';
-import { KiotVietOrderDetail } from '@/features/orders/components/KiotVietOrderDetail';
+import { OrderDetailPanel } from '@/features/orders/components/OrderDetailPanel';
 import OrderFilterSidebar, { type OrderSidebarState } from '@/features/orders/components/OrderFilterSidebar';
 import { exportInvoicesToXLSX, formatDateTime } from '@/features/orders/utils/invoiceUtils';
 import { priceBookService } from '@/features/price-books/services/priceBookService';
@@ -419,10 +419,12 @@ export default function OrdersScreen({}: OrdersScreenProps = {}) {
                             {r.orderCode}
                           </td>
                           <td className="py-2.5 px-3 whitespace-nowrap">{formatDateTime(r.orderDate)}</td>
-                          <td className="py-2.5 px-3 font-mono text-[12px] whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                          {/* Chỉ chặn bấm trên chính mã trả hàng; bấm chỗ trống trong ô vẫn mở / đóng chi tiết hóa đơn */}
+                          <td className="py-2.5 px-3 font-mono text-[12px] whitespace-nowrap">
                             {r.returnCode ? (
                               <a
                                 href={documentLinkHref('/sales-returns', { code: r.returnCode })}
+                                onClick={(e) => e.stopPropagation()}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="text-[#0070f4] hover:underline"
@@ -470,7 +472,7 @@ export default function OrdersScreen({}: OrdersScreenProps = {}) {
                         {isExpanded && (
                           <tr>
                             <td colSpan={COLUMN_COUNT} className="p-0 bg-white">
-                              <KiotVietOrderDetail
+                              <OrderDetailPanel
                                 orderId={r.orderId}
                                 onClose={() => setExpandedId(null)}
                                 onReloadList={reload}

@@ -1,6 +1,6 @@
 'use client';
 
-// Modal "Điều chỉnh" công nợ (theo mẫu KiotViet) — dùng chung cho Khách hàng và Nhà cung cấp:
+// Modal "Điều chỉnh" công nợ — dùng chung cho Khách hàng và Nhà cung cấp:
 // "Giá trị nợ điều chỉnh" = công nợ SAU điều chỉnh:
 //   Khách hàng (nợ cần thu): dương = khách nợ cửa hàng; âm = cửa hàng nợ khách; 0 = hết nợ.
 //   Nhà cung cấp (nợ cần trả): dương = cửa hàng nợ NCC; âm = NCC nợ cửa hàng; 0 = hết nợ.

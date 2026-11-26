@@ -9,7 +9,7 @@ export const STOCKTAKE_STATUS_LABEL: Record<StocktakeStatus, string> = {
   CANCELLED: 'Đã hủy',
 };
 
-/** In phiếu kiểm kho (A4, theo mẫu KiotViet, dữ liệu StockFlow). */
+/** In phiếu kiểm kho (A4, dữ liệu StockFlow). */
 export function printStocktake(detail: StocktakeDetail): void {
   const s = detail.summary;
   const signedQty = (n: number) => (n > 0 ? `+${printQty(n)}` : printQty(n));

@@ -1,5 +1,5 @@
 // src/features/transfers/components/TransferFilterSidebar.tsx
-// Sidebar bộ lọc chuẩn giao diện KiotViet cho Màn hình 1 (Danh sách chuyển hàng)
+// Sidebar bộ lọc cho Màn hình 1 (Danh sách chuyển hàng)
 
 import { clampPopoverLeft, DATE_POPOVER_WIDTH, PRESET_POPOVER_WIDTH } from '@/lib/ui/popover';
 import React, { useState, useRef, useEffect } from 'react';
@@ -575,7 +575,7 @@ export const TransferFilterSidebar: React.FC<Props> = ({
             />
           </div>
 
-          {/* Dropdown Menu (Theo đúng ảnh mẫu KiotViet) */}
+          {/* Dropdown Menu */}
           {statusDropdownOpen && (
             <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-[8px] border border-slate-200 shadow-[0_6px_20px_rgba(0,0,0,0.12)] py-1.5 z-50 max-h-60 overflow-y-auto animate-in fade-in zoom-in-95 duration-100">
               {/* Option: Tất cả */}

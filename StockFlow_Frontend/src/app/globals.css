@@ -120,7 +120,7 @@ body {
   display: none;
 }
 
-/* Hóa đơn (orders): header xanh nhạt, dòng tổng ở đầu bảng, dòng đang mở có viền xanh như KiotViet */
+/* Hóa đơn (orders): header xanh nhạt, dòng tổng ở đầu bảng, dòng đang mở có viền xanh */
 .stockflow-invoices-table .ant-table-thead > tr > th {
   background: #e8f2ff;
   color: #334155;

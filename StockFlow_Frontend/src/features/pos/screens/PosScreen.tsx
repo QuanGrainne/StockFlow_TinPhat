@@ -1,5 +1,5 @@
 // src/features/pos/screens/PosScreen.tsx
-// Màn hình Bán hàng tại quầy (POS) theo mẫu KiotViet:
+// Màn hình Bán hàng tại quầy (POS):
 // - Thanh trên màu xanh: tìm hàng hóa (F3), các tab hóa đơn, nút tải lại, người dùng, menu (Hiển thị, Về trang quản lý).
 // - Bên trái: danh sách hàng trong hóa đơn (ảnh, mã, tên, ĐVT, SL ± có tồn/đặt, đơn giá có popover giảm giá, thành tiền, ghi chú),
 //   ghi chú đơn hàng ở dưới.
@@ -1630,7 +1630,7 @@ export default function PosScreen() {
                     </button>
                   )}
                 </div>
-                {/* Dư nợ hiện tại của khách: hiện bên dưới ô khách hàng (giống KiotViet) */}
+                {/* Dư nợ hiện tại của khách: hiện bên dưới ô khách hàng */}
                 {tab.customer.currentDebt > 0 && (
                   <span className="mt-1 inline-block px-1.5 py-0.5 rounded bg-[#fef2f2] text-[12px] text-[#fb2c36]">
                     Nợ: {fmt(tab.customer.currentDebt)}
@@ -1835,7 +1835,7 @@ export default function PosScreen() {
 
             {isBooking ? (
               <>
-                {/* Như KiotViet: tiền khách đã trả trừ khách cần trả.
+                {/* Tiền khách đã trả trừ khách cần trả.
                     Dương = Tiền thừa trả khách; âm = phần khách còn phải trả → "Tính vào công nợ" (khách lẻ: "Còn thiếu") */}
                 <div className="flex items-center justify-between">
                   <span>{bookingPaidTotal < due ? (tab.customer ? 'Tính vào công nợ' : 'Còn thiếu') : 'Tiền thừa trả khách'}</span>
@@ -1862,7 +1862,7 @@ export default function PosScreen() {
                     <span className="font-semibold">{fmt(change)}</span>
                   </div>
                 )}
-                {/* Như KiotViet: khách trả thừa mà còn nợ cũ → chọn trả lại tiền thừa hoặc tính vào công nợ */}
+                {/* Khách trả thừa mà còn nợ cũ → chọn trả lại tiền thừa hoặc tính vào công nợ */}
                 {canExcessToDebt && (
                   <div className="space-y-2.5">
                     <label className="flex items-center justify-between gap-2 cursor-pointer">

@@ -1,6 +1,6 @@
 'use client';
 
-// Modal "Thanh toán" nợ của khách hàng (theo mẫu KiotViet): tạo phiếu thu PT..., phân bổ vào các hóa đơn còn nợ.
+// Modal "Thanh toán" nợ của khách hàng: tạo phiếu thu PT..., phân bổ vào các hóa đơn còn nợ.
 // Đối xứng với SupplierPaymentModal (phiếu chi trả nợ nhà cung cấp).
 
 import { tabSession } from '@/lib/auth/tabSession';

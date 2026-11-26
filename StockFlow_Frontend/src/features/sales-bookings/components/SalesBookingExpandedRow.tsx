@@ -1,6 +1,6 @@
 "use client";
 
-// Chi tiết Đơn đặt hàng dạng dòng mở rộng — bố cục theo KiotViet:
+// Chi tiết Đơn đặt hàng dạng dòng mở rộng — bố cục:
 //   [Thông tin] (+ [Lịch sử hóa đơn] khi đã tạo hóa đơn, [Lịch sử thanh toán] khi có phiếu thu của đơn / hóa đơn của đơn)
 //   Thông tin: khách hàng + mã đơn, lưới thông tin (người tạo, ngày đặt, bảng giá, chi nhánh, dự kiến giao, trạng thái),
 //   bảng hàng, ghi chú + tổng tiền. Đơn đã tạo hóa đơn: SL trên đơn = SL hóa đơn.

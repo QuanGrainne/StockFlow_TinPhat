@@ -15,7 +15,7 @@ const formatDiscountValue = (v: number, t: DiscountType) =>
   t === 'PERCENT' ? v.toLocaleString('vi-VN', { maximumFractionDigits: 2 }) : v.toLocaleString('vi-VN');
 
 /**
- * Ô Giảm giá dùng chung (giống KiotViet): hiển thị số tiền giảm; bấm vào mở popover
+ * Ô Giảm giá dùng chung: hiển thị số tiền giảm; bấm vào mở popover
  * "Giảm giá [giá trị] [VND | %]". `base` là số tiền gốc để quy đổi % (đơn giá cho từng dòng,
  * tổng tiền hàng cho cả phiếu).
  */

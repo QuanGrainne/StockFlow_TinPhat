@@ -1,5 +1,5 @@
 // src/lib/warehouse/useActiveWarehouse.ts
-// Quản lý Chi nhánh / Kho hàng đang kích hoạt trên toàn hệ thống (KiotViet Pattern)
+// Quản lý Chi nhánh / Kho hàng đang kích hoạt trên toàn hệ thống (chọn chi nhánh dùng chung)
 // và danh sách kho mà tài khoản đang đăng nhập được phân quyền (jnc_user_warehouse_access).
 // Danh sách kho lấy từ GET /api/warehouses/my-warehouses: Admin thấy mọi kho đang hoạt động,
 // vai trò khác chỉ thấy kho được gán. Mọi ô chọn / bộ lọc kho làm việc dùng danh sách này.

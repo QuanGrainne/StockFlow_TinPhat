@@ -66,7 +66,7 @@ export interface PosTab {
   returnSellerName?: string | null;
   returnFee?: number;
   returnWalkIn?: boolean;
-  /** Trả hàng theo hóa đơn: tổng tiền hàng và giảm giá tổng của hóa đơn gốc (phân bổ giảm giá như KiotViet) */
+  /** Trả hàng theo hóa đơn: tổng tiền hàng và giảm giá tổng của hóa đơn gốc (phân bổ giảm giá) */
   returnInvoiceSubTotal?: number;
   returnInvoiceDiscount?: number;
   /** Người dùng đã tự sửa Giảm giá (không còn lấy theo phân bổ) */

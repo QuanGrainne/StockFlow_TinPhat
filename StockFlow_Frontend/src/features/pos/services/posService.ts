@@ -262,7 +262,7 @@ export const posService = {
   },
 
   /**
-   * Lấy lịch sử các đơn hàng POS (hỗ trợ đầy đủ bộ lọc KiotViet và phân trang)
+   * Lấy lịch sử các đơn hàng POS (hỗ trợ đầy đủ bộ lọc và phân trang)
    */
   async getRecentOrders(params?: OrderFilterParams): Promise<any> {
     try {

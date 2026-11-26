@@ -155,3 +155,13 @@ Nhánh: `fix/frontend` (theo yêu cầu người phụ trách, đã có code m�
 | Literal trạng thái chuyển kho | 18 | 0 |
 | `transfer.Status = "..."` | 3 | 0 |
 | Import chéo components/screens giữa feature | (chưa đo) | 10 (đều là ngoại lệ đã biết) |
+
+## T25 – Dọn tên "KiotViet" khỏi code (plan: `docs/plans/PLAN_don-ten-kiotviet.md`)
+- [x] Đường cơ sở: dotnet build 0 lỗi / 2 cảnh báo (NU1900); lint 116 lỗi / 107 cảnh báo; build FE đạt, 46 trang; "kiot" FE 85 dòng, BE 21 dòng
+- [x] Bước 1: `orders/components/KiotVietOrderDetail.tsx` → `OrderDetailPanel.tsx` (git mv, 3 file, 10 dòng)  - [x] Thử `/orders` mở rộng dòng + `/orders/[id]` (người phụ trách)
+- [x] Bước 2: `products/components/catalog/KiotSelectWithSearch.tsx` → `SearchableCreatableSelect.tsx` (git mv, 2 file, 10 dòng)  - [x] Thử dropdown Nhóm hàng/Thương hiệu/Vị trí: tìm + chọn + xoá + Tạo mới (người phụ trách)
+- [x] Bước 3–5: comment FE nhóm Bán hàng (21 dòng/16 file), Mua hàng–Kho (24/16), Hàng hóa–Bảng giá–dùng chung (20/8); chỉ dòng comment, số dòng thêm = xoá
+- [x] Bước 6: comment BE 16 dòng/12 file; giữ 5 dòng nói KiotViet là nguồn dữ liệu (IImageStorage, ImportProductsCommand, LocalImageStorage)
+- [x] Bước 7: "kiot" FE 85 → 0, BE 21 → 5; không còn tên component cũ; dotnet build 0/2 (giống mốc); lint 116/107 (giống mốc); build FE đạt, route giống mốc; check-structure --strict: không vi phạm mới; tổng diff 56 file, +101/−101
+- Ghi chú: dòng T19 lát 2 ở trên vẫn ghi tên cũ `KiotSelectWithSearch.tsx` vì là lịch sử, không sửa
+- [x] **Xác nhận:** (người phụ trách)

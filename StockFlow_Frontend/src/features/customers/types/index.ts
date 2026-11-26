@@ -181,8 +181,23 @@ export interface CustomerDebtLedgerEntry {
   balanceAfter: number;
 }
 
+/** Phiếu trả hàng trong tab "Lịch sử bán/trả hàng" */
+export interface CustomerRecentReturn {
+  returnId: number;
+  returnCode: string;
+  returnDate?: string | null;
+  /** Cần trả khách */
+  totalAmount: number;
+  status?: string | null;
+  createdByName?: string | null;
+  warehouseName?: string | null;
+  /** Hóa đơn gốc (null = trả nhanh) */
+  invoiceCode?: string | null;
+}
+
 export interface CustomerDetail extends Customer {
   recentOrders?: CustomerRecentOrder[];
+  recentReturns?: CustomerRecentReturn[];
   debtLedger?: CustomerDebtLedgerEntry[];
   /** Lịch sử đặt hàng (đơn đặt của khách) */
   recentBookings?: CustomerRecentOrder[];
