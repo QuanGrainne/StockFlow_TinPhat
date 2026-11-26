@@ -150,11 +150,11 @@ test.describe('UC-72 Manage Inventory', () => {
   });
 
   for (const [tc, title, reason] of [
-    ['SYS-MIN-04', 'Duyệt phiếu kiểm: điều chỉnh tồn', 'Chưa có chức năng (phiếu kiểm cân bằng trực tiếp)'],
-    ['SYS-MIN-05', 'Từ chối phiếu kiểm: tồn không đổi', 'Chưa có chức năng (Note)'],
-    ['SYS-MIN-06', 'Yêu cầu kiểm lại', 'Chưa có chức năng (Note)'],
-    ['SYS-MIN-07', 'Từ chối / kiểm lại không ghi chú bị từ chối', 'Chưa có chức năng (Note)'],
-    ['SYS-MIN-08', 'Phiếu kiểm đã xử lý: báo và không đổi', 'Chưa có chức năng (Note)'],
+    ['SYS-MIN-04', 'Duyệt phiếu kiểm: điều chỉnh tồn', 'Không áp dụng theo thiết kế – nhóm đã bỏ luồng duyệt kiểm kho: phiếu kiểm cân bằng kho trực tiếp khi Hoàn thành'],
+    ['SYS-MIN-05', 'Từ chối phiếu kiểm: tồn không đổi', 'Không áp dụng theo thiết kế – nhóm đã bỏ luồng duyệt kiểm kho: phiếu kiểm cân bằng kho trực tiếp khi Hoàn thành'],
+    ['SYS-MIN-06', 'Yêu cầu kiểm lại', 'Không áp dụng theo thiết kế – nhóm đã bỏ luồng duyệt kiểm kho: phiếu kiểm cân bằng kho trực tiếp khi Hoàn thành'],
+    ['SYS-MIN-07', 'Từ chối / kiểm lại không ghi chú bị từ chối', 'Không áp dụng theo thiết kế – nhóm đã bỏ luồng duyệt kiểm kho: phiếu kiểm cân bằng kho trực tiếp khi Hoàn thành'],
+    ['SYS-MIN-08', 'Phiếu kiểm đã xử lý: báo và không đổi', 'Không áp dụng theo thiết kế – nhóm đã bỏ luồng duyệt kiểm kho: phiếu kiểm cân bằng kho trực tiếp khi Hoàn thành'],
     ['SYS-MIN-09', 'Duyệt phiếu xuất hủy: trừ tồn', 'Chưa có chức năng (phiếu xuất hủy hoàn thành trực tiếp)'],
     ['SYS-MIN-10', 'Từ chối phiếu xuất hủy: tồn không đổi', 'Chưa có chức năng (Note)'],
     ['SYS-MIN-11', 'Từ chối xuất hủy không ghi chú bị từ chối', 'Chưa có chức năng (Note)'],

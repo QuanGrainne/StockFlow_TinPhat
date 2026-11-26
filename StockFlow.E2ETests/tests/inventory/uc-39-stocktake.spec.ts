@@ -152,7 +152,7 @@ test.describe(SHEET, () => {
 
   test('SYS-STK-03 – Kiểm lại: phiếu quay về Đang kiểm', async ({}, testInfo) => {
     traceTc(testInfo, 'SYS-STK-03', SHEET);
-    test.skip(true, 'N/A – Chưa có chức năng (không có bước duyệt / kiểm lại)');
+    test.skip(true, 'N/A – Không áp dụng theo thiết kế – nhóm đã bỏ luồng duyệt kiểm kho: phiếu kiểm cân bằng kho trực tiếp khi Hoàn thành');
   });
 
   test('SYS-STK-04 – Hủy phiếu kiểm chưa gửi: CANCELLED, tồn không đổi, giải phóng hàng', async ({ page, env, db, adminApi, uid }, testInfo) => {
