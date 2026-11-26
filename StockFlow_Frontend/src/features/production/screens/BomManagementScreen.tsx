@@ -31,12 +31,14 @@ type Confirm = { kind: 'activate' | 'deactivate' | 'delete'; bom: BomSummary } |
 export default function BomManagementScreen() {
   const features = useProductionFeatures();
   // Link mở thẳng 1 định mức (?code=BOM-...&id=, VD bấm mã định mức ở chi tiết lệnh sản xuất):
-  // điền mã vào ô tìm, mở sẵn chi tiết và cuộn tới dòng đó (bộ lọc mặc định đã là mọi trạng thái, toàn thời gian)
+  // điền mã vào ô tìm, mở sẵn chi tiết và cuộn tới dòng đó (khi có link: mọi trạng thái, toàn thời gian,
+  // vì định mức được mở có thể đã ngừng áp dụng)
   const searchParams = useSearchParams();
   const [docLink] = useState(() => readDocumentLink(searchParams));
   const [query, setQuery] = useState(() => docLink?.code ?? '');
+  // Mặc định chỉ xem định mức đang áp dụng; muốn xem bản ngừng áp dụng thì tick thêm ở sidebar
   const [filter, setFilter] = useState<ProductionListFilter>({
-    statuses: ['ACTIVE', 'INACTIVE'],
+    statuses: docLink ? ['ACTIVE', 'INACTIVE'] : ['ACTIVE'],
     timeRange: 'all',
     warehouseIds: [],
     needsReviewOnly: false,
