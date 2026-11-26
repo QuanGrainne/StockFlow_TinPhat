@@ -5,6 +5,23 @@
 - Không sửa code nghiệp vụ. Lỗi được ghi kèm bằng chứng; người phụ trách quyết định cách sửa.
 - Bằng chứng (trace, ảnh, error-context) nằm ở `StockFlow.E2ETests/test-results/<tên test>/` sau mỗi lượt chạy (thư mục bị ignore). Có thể chạy lại bằng `npx playwright test --grep <mã TC>`.
 
+## 0. Trạng thái sau khi sửa (Round 2, 26/11/2026 – nhánh `fix/system-test-r1`)
+
+| Mã | Trạng thái | Cách sửa |
+|---|---|---|
+| DEF-E2E-01 | Đã sửa | `getDefaultReceiveDate` so theo phút; cùng phút với giờ chuyển thì gợi ý giờ chuyển + 1 phút |
+| DEF-E2E-02 | Đã sửa | Phân trang 15 dòng / trang ở màn Nhân viên; thêm mới thì chuyển tới trang cuối |
+| DEF-E2E-03 | Đã sửa | Bỏ bắt buộc chọn kho khi tạo / sửa nhân viên |
+| DEF-E2E-04 | Đã sửa | `CreateRoleCommand` so cả tên hiển thị và mã vai trò; lỗi hiện trong hộp thoại |
+| DEF-E2E-05 | Đã sửa | Admin luôn có mọi chức năng (`AdminLockedFeatureIds` = mọi chức năng), cột Quản trị viên bị khoá |
+| DEF-E2E-06 | Đã sửa | Quyền mặc định SalesStaff thêm SALES_DELETE (không thêm SALES_APPROVE); seeder bù quyền cho DB cũ |
+| DEF-E2E-07 | Đã sửa | Câu báo lỗi mật khẩu dùng đúng câu backend "… phải có ít nhất 1 chữ in hoa (BR-35)." |
+| DEF-E2E-08 | Đã sửa | Quyền mặc định WarehouseStaff thêm PURCHASE_UPDATE; seeder bù quyền cho DB cũ |
+| DEF-E2E-09 | Đã sửa | Khung trang báo "Không thể kết nối đến máy chủ. Vui lòng thử lại." + Thử lại khi không tải được quyền; màn Hàng hóa báo lỗi + Thử lại và không xoá danh sách |
+
+Lỗi đã biết của Report 5.2 gặp lại (DEF-IT-01/02/03/04) đã được sửa trên `dev`; SYS-TRF-N03 thêm: ô SL nhận không còn tự đổi số âm thành 0.
+Mục 3 (lệch SPEC / Expected): câu chữ đã đổi theo Expected; ca giao diện chặn sớm, BOM → định mức, BR-37 / BR-42 đã cập nhật Expected trong bản nháp Report 5.3 (Round 2). Còn cần nhóm làm rõ: SYS-MRQ-03, SYS-MST-01 / 15 / 17, SYS-PRD-N02, SYS-XCT-N05, SYS-ORD-N02 (QR trên bản in), SYS-GRN-03 (quản lý theo lô chưa làm).
+
 ## 1. Danh sách lỗi
 
 | Mã | Loại | Mức | Tóm tắt | TC |
