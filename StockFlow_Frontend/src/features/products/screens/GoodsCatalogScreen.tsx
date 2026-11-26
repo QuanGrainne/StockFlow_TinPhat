@@ -259,7 +259,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
   }, [filterSidebarState]);
 
   // Danh sách các danh mục, nhà cung cấp, vị trí trích xuất tự động từ dữ liệu thực
-  // Quản lý danh mục & thương hiệu bổ sung linh hoạt (Chuẩn KiotViet)
+  // Quản lý danh mục & thương hiệu bổ sung linh hoạt
   const [customCategories, setCustomCategories] = useState<string[]>([]);
   const [customBrands, setCustomBrands] = useState<string[]>([]);
   const [isQuickCategoryModalOpen, setIsQuickCategoryModalOpen] = useState(false);
@@ -314,7 +314,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
     return Array.from(set).sort((a, b) => a.localeCompare(b, 'vi'));
   }, [goods]);
 
-  // Quản lý vị trí kho tùy chỉnh (Chuẩn KiotViet - Ảnh 2)
+  // Quản lý vị trí kho tùy chỉnh
   const [customLocations, setCustomLocations] = useState<string[]>([]);
   const [isQuickLocationModalOpen, setIsQuickLocationModalOpen] = useState(false);
   const [newLocationName, setNewLocationName] = useState('');
@@ -3744,7 +3744,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                         />
                       </div>
 
-                      {/* Nhóm hàng & Thương hiệu Chuẩn KiotViet (Ảnh 2) */}
+                      {/* Nhóm hàng & Thương hiệu */}
                       <div className="grid grid-cols-2 gap-3">
                         <div>
                           <SearchableCreatableSelect
@@ -4928,7 +4928,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
         workbook={lastExportedFile?.workbook || null}
       />
 
-      {/* QUICK MODAL: TẠO MỚI NHÓM HÀNG CHUẨN KIOTVIET (ẢNH 2) */}
+      {/* QUICK MODAL: TẠO MỚI NHÓM HÀNG */}
       {isQuickCategoryModalOpen && (
         <QuickCreateCategoryModal
           setIsQuickCategoryModalOpen={setIsQuickCategoryModalOpen}

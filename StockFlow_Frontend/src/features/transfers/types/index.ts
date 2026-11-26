@@ -1,5 +1,5 @@
 // src/features/transfers/types/index.ts
-// Các kiểu dữ liệu chuẩn nghiệp vụ Chuyển hàng (Inventory Transfer) theo giao diện KiotViet
+// Các kiểu dữ liệu chuẩn nghiệp vụ Chuyển hàng (Inventory Transfer)
 
 export type TransferStatus = 'DRAFT' | 'IN_TRANSIT' | 'RECEIVED' | 'CANCELLED';
 

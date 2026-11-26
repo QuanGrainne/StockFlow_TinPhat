@@ -1,5 +1,5 @@
 // src/features/transfers/screens/TransfersScreen.tsx
-// Màn hình 1: Danh sách phiếu chuyển hàng chuẩn theo giao diện KiotViet Ảnh 1
+// Màn hình 1: Danh sách phiếu chuyển hàng
 
 'use client';
 
@@ -72,7 +72,7 @@ export default function TransfersScreen() {
   const searchParams = useSearchParams();
   const [docLink] = useState(() => readDocumentLink(searchParams));
 
-  // State bộ lọc chuẩn ảnh 1 KiotViet
+  // State bộ lọc
   const [filters, setFilters] = useState<TransferFilterState>(() => {
     if (docLink) {
       const { timeRange, dateFrom, dateTo } = linkDateFilter(docLink.date);

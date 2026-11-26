@@ -1,6 +1,6 @@
 'use client';
 
-// Danh sách phiếu kiểm kho (KiotViet "Phiếu kiểm kho"): lọc kho / thời gian / trạng thái,
+// Danh sách phiếu kiểm kho: lọc kho / thời gian / trạng thái,
 // xem chi tiết dưới dòng, gộp nhiều phiếu tạm, hủy, sao chép, in, xuất file.
 
 import React, { useEffect, useMemo, useState } from 'react';

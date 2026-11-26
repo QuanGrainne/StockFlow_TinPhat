@@ -1,6 +1,6 @@
 'use client';
 
-// Modal "Thanh toán" nợ nhà cung cấp (theo mẫu KiotViet): tạo phiếu chi PC..., phân bổ vào các phiếu nhập còn nợ.
+// Modal "Thanh toán" nợ nhà cung cấp: tạo phiếu chi PC..., phân bổ vào các phiếu nhập còn nợ.
 
 import { tabSession } from '@/lib/auth/tabSession';
 import React, { useMemo, useState } from 'react';

@@ -1,4 +1,4 @@
-// In phiếu nhập hàng (mẫu A4 theo KiotViet, dữ liệu StockFlow).
+// In phiếu nhập hàng (mẫu A4, dữ liệu StockFlow).
 // Dựng HTML riêng trong iframe ẩn rồi gọi hộp thoại in của trình duyệt → chỉ in đúng phiếu, không in giao diện.
 import { escapeHtml, printDateTime, printHtml, printMoney, printQty } from '@/lib/print/printHtml';
 import type { PurchaseDetail } from '../types';
@@ -16,7 +16,7 @@ export function buildPurchaseReceiptHtml(detail: PurchaseDetail): string {
 
   const rows = items
     .map((it, idx) => {
-      // Chiết khấu hiển thị theo tiền trên 1 đơn vị (giống KiotViet)
+      // Chiết khấu hiển thị theo tiền trên 1 đơn vị
       const unitDiscount = (it.unitPrice || 0) * ((it.discountPercent || 0) / 100);
       const name = it.unit ? `${it.productName} (${it.unit})` : it.productName;
       return `<tr>

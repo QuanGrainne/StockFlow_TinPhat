@@ -1,5 +1,5 @@
 // src/features/transfers/screens/CreateTransferScreen.tsx
-// Màn hình 2: Tạo mới & Chỉnh sửa phiếu chuyển hàng theo đúng thiết kế KiotViet Ảnh 2
+// Màn hình 2: Tạo mới & Chỉnh sửa phiếu chuyển hàng
 
 'use client';
 
