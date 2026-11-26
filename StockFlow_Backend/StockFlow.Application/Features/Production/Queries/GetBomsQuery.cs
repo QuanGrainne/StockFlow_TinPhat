@@ -36,10 +36,11 @@ public class GetBomsQueryHandler : IRequestHandler<GetBomsQuery, Result<List<Bom
                              || (b.Product.ProductName != null && b.Product.ProductName.ToLower().Contains(s)));
         }
 
+        // Đang áp dụng lên trước; trong mỗi nhóm, mới tạo lên đầu (cùng thời điểm tạo thì id lớn hơn đứng trước)
         var list = await ProductionReader.BomSummaries(q
                 .OrderByDescending(b => b.IsActive == true)
-                .ThenBy(b => b.Product.ProductCode)
-                .ThenByDescending(b => b.CreatedAt))
+                .ThenByDescending(b => b.CreatedAt)
+                .ThenByDescending(b => b.BomId))
             .ToListAsync(ct);
         return Result.Success(list);
     }
