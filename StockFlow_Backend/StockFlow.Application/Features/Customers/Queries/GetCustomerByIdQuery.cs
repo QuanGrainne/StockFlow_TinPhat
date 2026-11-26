@@ -70,6 +70,21 @@ public class GetCustomerByIdQueryHandler : IRequestHandler<GetCustomerByIdQuery,
                 o.OrderId, o.OrderCode ?? $"HD{o.OrderId:D6}", o.OrderDate, o.Total, o.Status, o.Seller, o.Warehouse, o.Paid, o.Outstanding))
             .ToList();
 
+        // ── Lịch sử trả hàng (phiếu trả của khách, hiện chung tab Lịch sử bán/trả hàng) ──
+        var recentReturns = await _context.TrxReturnRequests.AsNoTracking()
+            .Where(r => r.PartnerId == partner.PartnerId)
+            .OrderByDescending(r => r.RequestDate).ThenByDescending(r => r.ReturnRequestId)
+            .Select(r => new CustomerRecentReturnDto(
+                r.ReturnRequestId,
+                r.ReturnCode ?? "",
+                r.RequestDate,
+                r.TotalAmount,
+                r.Status,
+                r.CreatedByNavigation.FullName ?? r.CreatedByNavigation.Username,
+                r.Warehouse != null ? r.Warehouse.WarehouseName : null,
+                r.SalesOrder != null ? r.SalesOrder.OrderCode : null))
+            .ToListAsync(cancellationToken);
+
         // ── Sổ nợ cần thu (dùng chung với báo cáo công nợ UC-86 – CustomerDebtLedger) ──
         var movements = await CustomerDebtLedger.LoadMovementsAsync(_context, new[] { partner.PartnerId }, cancellationToken);
 
@@ -109,7 +124,8 @@ public class GetCustomerByIdQueryHandler : IRequestHandler<GetCustomerByIdQuery,
             TotalSales: dto.TotalSales,
             TotalSalesNetReturns: dto.TotalSalesNetReturns,
             DebtLedger: ledger,
-            RecentBookings: recentBookings);
+            RecentBookings: recentBookings,
+            RecentReturns: recentReturns);
 
         return Result<CustomerDetailDto>.Success(detail);
     }

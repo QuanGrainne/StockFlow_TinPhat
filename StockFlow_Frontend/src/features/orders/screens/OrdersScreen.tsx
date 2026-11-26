@@ -419,10 +419,12 @@ export default function OrdersScreen({}: OrdersScreenProps = {}) {
                             {r.orderCode}
                           </td>
                           <td className="py-2.5 px-3 whitespace-nowrap">{formatDateTime(r.orderDate)}</td>
-                          <td className="py-2.5 px-3 font-mono text-[12px] whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                          {/* Chỉ chặn bấm trên chính mã trả hàng; bấm chỗ trống trong ô vẫn mở / đóng chi tiết hóa đơn */}
+                          <td className="py-2.5 px-3 font-mono text-[12px] whitespace-nowrap">
                             {r.returnCode ? (
                               <a
                                 href={documentLinkHref('/sales-returns', { code: r.returnCode })}
+                                onClick={(e) => e.stopPropagation()}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="text-[#0070f4] hover:underline"
