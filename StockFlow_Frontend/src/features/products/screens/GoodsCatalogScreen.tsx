@@ -75,7 +75,6 @@ import {
   parseDateToComparable,
 } from '../components/catalog/goodsCatalogUtils';
 import {
-  INITIAL_GOODS_LIST,
   DEFAULT_SUBCATEGORY_OPTIONS,
   DEFAULT_BRAND_OPTIONS,
   DEFAULT_UOM_OPTIONS,
@@ -83,7 +82,7 @@ import {
   DEFAULT_LOCATION_OPTIONS,
 } from '../components/catalog/goodsCatalogDefaults';
 import { CustomCombobox } from '../components/catalog/CustomCombobox';
-import { KiotSelectWithSearch } from '../components/catalog/KiotSelectWithSearch';
+import { SearchableCreatableSelect } from '../components/catalog/SearchableCreatableSelect';
 import { QuickCreateCategoryModal } from '../components/catalog/QuickCreateCategoryModal';
 import { QuickCreateLocationModal } from '../components/catalog/QuickCreateLocationModal';
 import { QuickCreateBrandModal } from '../components/catalog/QuickCreateBrandModal';
@@ -107,6 +106,63 @@ export {
 interface GoodsCatalogScreenProps {
   onNavigate?: (screenId: string) => void;
   currentRole?: string;
+}
+
+/** Dữ liệu để mở modal Thiết lập ĐVT & thuộc tính cho một hàng hóa */
+interface ConfigModalSource {
+  units: GoodsUnitConversion[];
+  attributes: GoodsAttributeDef[];
+  variants: GoodsVariantItem[];
+  cost: number;
+  price: number;
+  stock: number;
+  code: string;
+  uom: string;
+}
+
+/**
+ * Bỏ các đơn vị (khác đơn vị cơ bản) không còn dòng hàng cùng loại nào.
+ * Chỉ áp dụng khi đã có danh sách hàng cùng loại; hàng chưa thiết lập thì giữ nguyên.
+ */
+function pruneUnitsWithoutVariants(units: GoodsUnitConversion[], variants: GoodsVariantItem[]): GoodsUnitConversion[] {
+  if (variants.length === 0) return units;
+  return units.filter((u) => u.isBase || variants.some((v) => v.unitName === u.name));
+}
+
+/**
+ * Vế phải công thức quy đổi để hiển thị: "10 túi" nếu đơn vị được đặt theo đơn vị khác (và đơn vị đó còn),
+ * ngược lại "100 chùm" theo đơn vị cơ bản như bình thường.
+ */
+function unitRateLabel(u: GoodsUnitConversion, units: GoodsUnitConversion[], baseName: string): string {
+  if (u.refUnitName && u.refRate && units.some((x) => x.name === u.refUnitName)) {
+    return `${u.refRate.toLocaleString('vi-VN')} ${u.refUnitName}`;
+  }
+  return `${u.conversionRate.toLocaleString('vi-VN')} ${baseName}`;
+}
+
+/** Đơn vị, thuộc tính, hàng cùng loại gửi lên API (lưu trong variants_json của hàng hóa) */
+function toApiUnitConfig(units: GoodsUnitConversion[], attributes: GoodsAttributeDef[], variants: GoodsVariantItem[]) {
+  return {
+    units: units.map((u) => ({
+      name: u.name,
+      conversionRate: u.conversionRate,
+      isBase: u.isBase,
+      isDirectSale: u.isDirectSale ?? true,
+      refUnitName: u.refUnitName,
+      refRate: u.refRate,
+    })),
+    attributes: attributes.map((a) => ({ name: a.name, values: a.values })),
+    variants: variants.map((v) => ({
+      attributeValue: v.attributeValue,
+      unitName: v.unitName,
+      conversionRate: v.conversionRate,
+      code: v.code,
+      barcode: v.barcode,
+      costPrice: v.costPrice,
+      salePrice: v.salePrice,
+      stock: v.stock,
+    })),
+  };
 }
 
 export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
@@ -203,7 +259,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
   }, [filterSidebarState]);
 
   // Danh sách các danh mục, nhà cung cấp, vị trí trích xuất tự động từ dữ liệu thực
-  // Quản lý danh mục & thương hiệu bổ sung linh hoạt (Chuẩn KiotViet)
+  // Quản lý danh mục & thương hiệu bổ sung linh hoạt
   const [customCategories, setCustomCategories] = useState<string[]>([]);
   const [customBrands, setCustomBrands] = useState<string[]>([]);
   const [isQuickCategoryModalOpen, setIsQuickCategoryModalOpen] = useState(false);
@@ -258,7 +314,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
     return Array.from(set).sort((a, b) => a.localeCompare(b, 'vi'));
   }, [goods]);
 
-  // Quản lý vị trí kho tùy chỉnh (Chuẩn KiotViet - Ảnh 2)
+  // Quản lý vị trí kho tùy chỉnh
   const [customLocations, setCustomLocations] = useState<string[]>([]);
   const [isQuickLocationModalOpen, setIsQuickLocationModalOpen] = useState(false);
   const [newLocationName, setNewLocationName] = useState('');
@@ -311,7 +367,8 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
       const stored = tabSession.get('stockflow_selected_branch');
       if (stored && stored !== 'ALL') return stored;
     }
-    return 'Kho Tổng Gia Lâm';
+    // Chưa biết kho làm việc: để trống, effect bên dưới tự chọn kho đầu tiên được phân quyền (lấy từ DB)
+    return '';
   });
 
   // Danh sách các cơ sở kho thực tế (lấy động từ Database qua adminService)
@@ -349,7 +406,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
   // Modal Xác nhận phạm vi áp dụng giá vốn (Chuẩn StockFlow - Ảnh 2)
   const [costConfirmModalOpen, setCostConfirmModalOpen] = useState(false);
   const [costScope, setCostScope] = useState<'ALL' | 'BRANCH'>('ALL');
-  const [costSelectedBranches, setCostSelectedBranches] = useState<string[]>(['Kho Tổng Gia Lâm']);
+  const [costSelectedBranches, setCostSelectedBranches] = useState<string[]>([]);
   const [branchDropdownOpen, setBranchDropdownOpen] = useState(false);
   const [pendingKeepOpen, setPendingKeepOpen] = useState(false);
   const [editInitialSnapshot, setEditInitialSnapshot] = useState<any>(null);
@@ -369,7 +426,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
   const [formBrand, setFormBrand] = useState('');
   const [formUom, setFormUom] = useState('Hộp');
   const [formSpec, setFormSpec] = useState('');
-  const [formWarehouse, setFormWarehouse] = useState('Kho Tổng Gia Lâm');
+  const [formWarehouse, setFormWarehouse] = useState('');
   const [formCostPrice, setFormCostPrice] = useState<number | string>(0);
   const [formStandardPrice, setFormStandardPrice] = useState<number | string>(0);
   const [formStockQuantity, setFormStockQuantity] = useState<number | string>(0);
@@ -442,12 +499,19 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
   const [tempVariants, setTempVariants] = useState<GoodsVariantItem[]>([]);
   const [showAddUnitInline, setShowAddUnitInline] = useState(false);
   const [newUnitName, setNewUnitName] = useState('');
-  const [newUnitRate, setNewUnitRate] = useState<number>(4);
+  // Ô nhập dạng chuỗi để không hiện số 0 thừa ("010")
+  const [newUnitRate, setNewUnitRate] = useState<string>('');
+  // Đơn vị đích của công thức quy đổi (rỗng = đơn vị cơ bản), VD 1 thùng = 10 túi
+  const [newUnitRefName, setNewUnitRefName] = useState<string>('');
+  const [unitFormError, setUnitFormError] = useState<string | null>(null);
+  const [savingUnitConfig, setSavingUnitConfig] = useState(false);
   const [activeQuickTagAttrIndex, setActiveQuickTagAttrIndex] = useState<number | null>(null);
 
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoadingDb, setIsLoadingDb] = useState(false);
+  // Tăng để tải lại toàn bộ hàng hóa từ DB (VD sau khi import file)
+  const [productsReloadTick, setProductsReloadTick] = useState(0);
   const [viewingPriceBookItem, setViewingPriceBookItem] = useState<GoodsItem | null>(null);
 
   const showToast = (msg: string) => {
@@ -510,6 +574,8 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                   conversionRate: u.ConversionRate ?? u.conversionRate ?? 1,
                   isBase: u.IsBase ?? u.isBase ?? false,
                   isDirectSale: u.IsDirectSale ?? u.isDirectSale ?? true,
+                  refUnitName: u.RefUnitName ?? u.refUnitName ?? undefined,
+                  refRate: u.RefRate ?? u.refRate ?? undefined,
                 }));
               }
               if (vObj.attributes) {
@@ -553,7 +619,8 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
             brand: p.brand || undefined,
             uom: p.uom || 'Cái',
             specification: p.description || 'Quy cách chuẩn',
-            warehouse: 'Kho Tổng Gia Lâm',
+            // DB chưa lưu "kho tạo" của hàng hóa: để trống → dùng kho chính (kho đang hoạt động đầu tiên, xem creationWarehouseOf)
+            warehouse: '',
             stockQuantity: Number(p.stockQuantity) || 0,
             reservedQuantity: 0,
             availableQuantity: Number(p.stockQuantity) || 0,
@@ -588,7 +655,8 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
             // Tồn kho theo từng kho lấy từ DB (ProductDto.warehouses = Σ trx_inventory_balances theo kho).
             // Trước đây gán số cố định theo mã hàng hoặc dồn toàn bộ tổng tồn vào "Kho Tổng Gia Lâm" → hiển thị sai.
             stockByWarehouse: (Array.isArray(p.warehouses) ? p.warehouses : []).map(
-              (w: { warehouseCode?: string; warehouseName?: string; quantity?: number; unitCost?: number; reservedQuantity?: number }) => ({
+              (w: { warehouseId?: number; warehouseCode?: string; warehouseName?: string; quantity?: number; unitCost?: number; reservedQuantity?: number }) => ({
+                warehouseId: typeof w.warehouseId === 'number' ? w.warehouseId : undefined,
                 warehouseName: w.warehouseName || '',
                 warehouseCode: w.warehouseCode || undefined,
                 actualStock: Number(w.quantity) || 0,
@@ -597,16 +665,8 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                 costPrice: w.unitCost !== undefined && w.unitCost !== null ? Number(w.unitCost) || 0 : undefined,
               })
             ),
-            stockCardRecent: (() => {
-              const code = (p.code || p.productCode || '').toUpperCase();
-              if (code === 'TP-KE001') {
-                return [
-                  { date: '23/09/2026 10:28', docCode: 'NK-2026-099', type: 'NHAP' as const, typeName: 'Nhập kho từ NCC', qtyChange: 80, balance: 280, partnerOrDept: 'Kho Đông Anh' },
-                  { date: '15/09/2026 14:10', docCode: 'NK-2026-054', type: 'NHAP' as const, typeName: 'Nhập kho lô đầu', qtyChange: 200, balance: 200, partnerOrDept: 'Kho Tổng Gia Lâm' },
-                ];
-              }
-              return [];
-            })(),
+            // Thẻ kho thật xem ở tab "Thẻ kho" (API); không dùng dữ liệu mẫu
+            stockCardRecent: [],
           };
         });
 
@@ -719,7 +779,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
       window.removeEventListener('stockflow_branch_changed', handleBranchSync);
       window.removeEventListener('stockflow:warehouse-changed', handleBranchSync);
     };
-  }, []);
+  }, [productsReloadTick]);
 
   // Xác định quyền Admin
   const rawRole = typeof window !== 'undefined' ? tabSession.get('stockflow_current_role') : null;
@@ -774,25 +834,49 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
     return () => document.removeEventListener('mousedown', handleOutsideClick);
   }, []);
 
+  // "Kho tạo" của hàng hóa (kho áp dụng định mức tồn). Hàng lấy từ DB chưa lưu kho tạo → kho chính = kho đang hoạt động
+  // đầu tiên trong DB (danh sách /api/warehouses xếp theo id), không gán cứng tên kho.
+  const creationWarehouseOf = (item: GoodsItem): string => item.warehouse || facilities[0]?.name || '';
+
+  // Tìm kho (theo tên hoặc mã) trong danh sách cơ sở kho lấy từ DB
+  const findFacility = (whNameOrCode: string): WarehouseFacility | undefined => {
+    const key = whNameOrCode.trim().toLowerCase();
+    return facilities.find(
+      (f) => f.name.trim().toLowerCase() === key || (f.code && f.code.trim().toLowerCase() === key)
+    );
+  };
+
+  // Ghép 1 dòng tồn theo kho (từ API) với 1 kho: ưu tiên warehouseId, rồi mã kho, rồi tên kho (khớp chính xác).
+  // Không dò theo tên địa danh cố định (Gia Lâm / Đông Anh...) vì tên, mã kho do người dùng đặt.
+  const matchWarehouseStock = (
+    w: GoodsItem['stockByWarehouse'][number],
+    target: { warehouseId?: number; code?: string; name?: string }
+  ): boolean => {
+    if (target.warehouseId !== undefined && w.warehouseId !== undefined) return w.warehouseId === target.warehouseId;
+    const wCode = (w.warehouseCode || '').trim().toLowerCase();
+    const wName = (w.warehouseName || '').trim().toLowerCase();
+    const tCode = (target.code || '').trim().toLowerCase();
+    const tName = (target.name || '').trim().toLowerCase();
+    return (!!tCode && wCode === tCode) || (!!tName && wName === tName);
+  };
+
   // Helper tính toán số lượng tồn kho và giá vốn theo chi nhánh kho đang chọn
   const getProductStockForWarehouse = (item: GoodsItem, whCodeOrName: string) => {
     const targetWh = (!whCodeOrName || whCodeOrName === 'ALL')
-      ? (warehouseFilter && warehouseFilter !== 'ALL' ? warehouseFilter : 'Kho Tổng Gia Lâm')
+      ? (warehouseFilter && warehouseFilter !== 'ALL' ? warehouseFilter : getActiveWarehouse().name)
       : whCodeOrName;
 
     const norm = targetWh.trim().toLowerCase();
-    const entry = item.stockByWarehouse?.find((w) => {
-      const wName = (w.warehouseName || '').trim().toLowerCase();
-      const wCode = (w.warehouseCode || '').trim().toLowerCase();
-      if (wName === norm || wCode === norm) return true;
-      if (norm.includes('gia lâm') && (wName.includes('gia lâm') || wCode === 'k001')) return true;
-      if (norm.includes('đông anh') && (wName.includes('đông anh') || wCode === 'k002')) return true;
-      if (norm.includes('hà đông') && (wName.includes('hà đông') || wCode === 'k003')) return true;
-      if (norm.includes('hoàn kiếm') && (wName.includes('hoàn kiếm') || wCode === 'k004')) return true;
-      return false;
-    });
+    const targetFac = findFacility(targetWh);
+    const entry = item.stockByWarehouse?.find((w) =>
+      matchWarehouseStock(w, {
+        warehouseId: targetFac?.warehouseId,
+        code: targetFac?.code ?? targetWh,
+        name: targetFac?.name ?? targetWh,
+      })
+    );
 
-    const isCreationWh = norm === (item.warehouse || '').trim().toLowerCase();
+    const isCreationWh = norm === creationWarehouseOf(item).trim().toLowerCase();
     const hasWarehouseList = item.stockByWarehouse && item.stockByWarehouse.length > 0;
     const actual = entry
       ? Number(entry.actualStock) || 0
@@ -829,14 +913,6 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
       warehouseName: entry ? entry.warehouseName : targetWh,
       breakdown: item.stockByWarehouse || [],
     };
-  };
-
-  // Tìm kho (theo tên hoặc mã) trong danh sách cơ sở kho lấy từ DB
-  const findFacility = (whNameOrCode: string): WarehouseFacility | undefined => {
-    const key = whNameOrCode.trim().toLowerCase();
-    return facilities.find(
-      (f) => f.name.trim().toLowerCase() === key || (f.code && f.code.trim().toLowerCase() === key)
-    );
   };
 
   // Lấy productId số của hàng hóa (dữ liệu cũ trong cache có thể chỉ có mã)
@@ -1072,7 +1148,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
     const validFacs = permittedFacilities.length > 0 ? permittedFacilities : facilities;
     const activeWh = warehouseFilter && warehouseFilter !== 'ALL' && validFacs.some((f) => f.name === warehouseFilter || f.code === warehouseFilter)
       ? warehouseFilter
-      : (validFacs[0]?.name || 'Kho Tổng Gia Lâm');
+      : (validFacs[0]?.name || '');
     setFormWarehouse(activeWh);
     setFormStandardPrice(0);
     setFormCostPrice(0);
@@ -1109,7 +1185,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
   const handleStockQuantityChange = (val: string | number) => {
     setFormStockQuantity(val);
     const num = Math.max(0, parseCleanNumber(val));
-    const activeWh = formWarehouse || warehouseFilter || 'Kho Tổng Gia Lâm';
+    const activeWh = formWarehouse || warehouseFilter || facilities[0]?.name || '';
     setFormWarehouseStocks((prev) => ({
       ...prev,
       [activeWh]: num,
@@ -1132,7 +1208,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
     // Xác định kho làm việc hiện tại mà người dùng đang đứng
     const activeWh = warehouseFilter && warehouseFilter !== 'ALL'
       ? warehouseFilter
-      : (facilities[0]?.name || item.warehouse || 'Kho Tổng Gia Lâm');
+      : creationWarehouseOf(item);
     setFormWarehouse(activeWh);
 
     // Lấy thông tin tồn kho và giá vốn riêng biệt của chi nhánh kho này
@@ -1153,7 +1229,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
     setFormStockQuantity(branchStock);
 
     // Định mức tồn kho: ở các kho khác ngoài kho tạo, định mức tồn về 0 theo yêu cầu người dùng
-    const isCreationWh = activeWh.trim().toLowerCase() === (item.warehouse || '').trim().toLowerCase();
+    const isCreationWh = activeWh.trim().toLowerCase() === creationWarehouseOf(item).trim().toLowerCase();
     const branchMinSafe = isCreationWh
       ? (match?.minSafeStock !== undefined ? Number(match.minSafeStock) || 0 : (item.minSafeStock || 0))
       : (match?.minSafeStock !== undefined && match.minSafeStock !== item.minSafeStock ? Number(match.minSafeStock) || 0 : 0);
@@ -1174,7 +1250,11 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
     setFormImageUrl(item.imageUrl || '');
     setFormImages(item.imageUrl ? [item.imageUrl] : []);
     setFormDescription(item.description || '');
-    const curUnits = item.units && item.units.length > 0 ? item.units : [{ name: item.uom, conversionRate: 1, isBase: true, isDirectSale: true }];
+    // Bỏ đơn vị đã xoá hết dòng hàng cùng loại (dữ liệu cũ còn sót, VD "thùng" đã xoá nhưng vẫn nằm trong danh sách đơn vị)
+    const curUnits = pruneUnitsWithoutVariants(
+      item.units && item.units.length > 0 ? item.units : [{ name: item.uom, conversionRate: 1, isBase: true, isDirectSale: true }],
+      item.variants || []
+    );
     setFormUnits(curUnits);
     setFormAttributes(item.attributes || []);
     setFormVariants(item.variants || []);
@@ -1224,57 +1304,145 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
     });
 
     setEditModalOpen(true);
+
+    // Trả dữ liệu của chính hàng này để mở ngay modal Thiết lập ĐVT (state form chỉ cập nhật ở lần render sau)
+    const source: ConfigModalSource = {
+      units: curUnits,
+      attributes: item.attributes || [],
+      variants: item.variants || [],
+      cost: branchCost,
+      price: item.standardPrice || 0,
+      stock: branchStock,
+      code: item.code,
+      uom: item.uom,
+    };
+    return source;
   };
 
-  // Mở Modal 2 Thiết lập ĐVT & Thuộc tính (Ảnh 2, 3, 4)
-  const handleOpenConfigModal = () => {
-    const curUnits = formUnits.length > 0 ? [...formUnits] : [{ name: formUom || 'Hộp', conversionRate: 1, isBase: true, isDirectSale: true }];
-    const curAttrs = [...formAttributes];
+  // Mở Modal 2 Thiết lập ĐVT & Thuộc tính (Ảnh 2, 3, 4).
+  // Không truyền source = lấy từ form đang mở; nút "Thêm hàng hóa cùng loại" ở danh sách truyền dữ liệu của hàng đó.
+  const handleOpenConfigModal = (source?: ConfigModalSource) => {
+    const src: ConfigModalSource = source ?? {
+      units: formUnits,
+      attributes: formAttributes,
+      variants: formVariants,
+      cost: Number(formCostPrice) || 0,
+      price: Number(formStandardPrice) || 0,
+      stock: Number(formStockQuantity) || 0,
+      code: formCode,
+      uom: formUom,
+    };
+    const allUnits = src.units.length > 0 ? [...src.units] : [{ name: src.uom || 'Cái', conversionRate: 1, isBase: true, isDirectSale: true }];
+    // Đơn vị đã xoá hết dòng hàng cùng loại thì không sinh lại (dữ liệu cũ còn sót đơn vị trong danh sách)
+    const curUnits = pruneUnitsWithoutVariants(allUnits, src.variants);
+    const curAttrs = [...src.attributes];
     setTempUnits(curUnits);
     setTempAttributes(curAttrs);
 
     const generated = generateVariantMatrix(
       curUnits,
       curAttrs,
-      formVariants,
-      Number(formCostPrice) || 0,
-      Number(formStandardPrice) || 0,
-      Number(formStockQuantity) || 0,
-      formCode || 'SP'
+      src.variants,
+      src.cost,
+      src.price,
+      src.stock,
+      src.code || 'SP'
     );
     setTempVariants(generated);
     setShowAddUnitInline(false);
+    setNewUnitName('');
+    setNewUnitRate('');
+    setNewUnitRefName('');
     setActiveQuickTagAttrIndex(null);
     setConfigModalOpen(true);
   };
 
-  // Lưu Modal 2 trở lại Modal 1
-  const handleApplyConfigModal = () => {
-    setFormUnits(tempUnits);
-    setFormAttributes(tempAttributes);
-    setFormVariants(tempVariants);
-    const baseU = tempUnits.find((u) => u.isBase);
-    if (baseU) {
-      setFormUom(baseU.name);
+  // Đưa cấu hình ĐVT / thuộc tính / hàng cùng loại về form chỉnh sửa (và snapshot nếu đã lưu DB)
+  const applyUnitConfigToForm = (
+    units: GoodsUnitConversion[],
+    attrs: GoodsAttributeDef[],
+    variants: GoodsVariantItem[],
+    savedToDb: boolean
+  ) => {
+    setFormUnits(units);
+    setFormAttributes(attrs);
+    setFormVariants(variants);
+    const baseU = units.find((u) => u.isBase);
+    if (baseU) setFormUom(baseU.name);
+    if (savedToDb && editingItem) {
+      // Đã lưu DB: cập nhật mốc so sánh của form và dòng trong danh sách để không phải lưu thêm lượt nữa
+      setEditInitialSnapshot((prev: Record<string, unknown> | null) =>
+        prev ? { ...prev, units, attributes: attrs, variants, uom: baseU?.name ?? prev.uom } : prev
+      );
+      const patch = { units, attributes: attrs, variants, uom: baseU?.name ?? editingItem.uom };
+      setEditingItem({ ...editingItem, ...patch });
+      setGoods((prev) => prev.map((g) => (g.id === editingItem.id ? { ...g, ...patch } : g)));
     }
-    setConfigModalOpen(false);
-    showToast('Đã lưu cấu hình đơn vị tính & thuộc tính!');
   };
 
-  // Thêm đơn vị quy đổi mới trong Modal 2
-  const handleAddUnit = () => {
-    if (!newUnitName.trim()) {
-      alert('Vui lòng nhập tên đơn vị tính!');
+  /**
+   * Lưu ngay cấu hình ĐVT / thuộc tính / hàng cùng loại vào DB khi đang sửa hàng đã có.
+   * Trả false nếu là hàng đang tạo mới (chưa có trong DB: lưu cùng lúc bấm Lưu hàng hóa).
+   */
+  const persistUnitConfig = async (
+    units: GoodsUnitConversion[],
+    attrs: GoodsAttributeDef[],
+    variants: GoodsVariantItem[]
+  ): Promise<boolean> => {
+    if (modalMode !== 'edit' || !editingItem) return false;
+    const id = await resolveNumericProductId(editingItem);
+    if (!id) return false;
+    await productService.updateProduct(id, toApiUnitConfig(units, attrs, variants));
+    return true;
+  };
+
+  // Bấm Xong: lưu cấu hình (đang sửa hàng đã có thì lưu thẳng DB) rồi quay về form
+  const handleApplyConfigModal = async () => {
+    const units = pruneUnitsWithoutVariants(tempUnits, tempVariants);
+    setSavingUnitConfig(true);
+    try {
+      const saved = await persistUnitConfig(units, tempAttributes, tempVariants);
+      applyUnitConfigToForm(units, tempAttributes, tempVariants, saved);
+      setConfigModalOpen(false);
+      showToast(saved ? 'Đã lưu đơn vị tính & thuộc tính.' : 'Đã cập nhật đơn vị tính & thuộc tính, sẽ lưu cùng hàng hóa.');
+    } catch (err) {
+      showToast(`Không lưu được đơn vị tính: ${err instanceof Error ? err.message : 'lỗi không xác định'}`);
+    } finally {
+      setSavingUnitConfig(false);
+    }
+  };
+
+  // Thêm đơn vị quy đổi mới trong Modal 2.
+  // Quy đổi theo đơn vị chọn (VD 1 thùng = 10 túi), lưu ra số đơn vị cơ bản: 10 × (1 túi = 10 chùm) = 100 chùm.
+  const handleAddUnit = async () => {
+    const name = newUnitName.trim();
+    if (!name) {
+      setUnitFormError('Vui lòng nhập tên đơn vị tính.');
       return;
     }
-    const updatedUnits: GoodsUnitConversion[] = [
-      ...tempUnits,
-      { name: newUnitName.trim(), conversionRate: Number(newUnitRate) || 1, isBase: false, isDirectSale: true },
-    ];
-    setTempUnits(updatedUnits);
-    setNewUnitName('');
-    setNewUnitRate(4);
-    setShowAddUnitInline(false);
+    if (tempUnits.some((u) => u.name.trim().toLowerCase() === name.toLowerCase())) {
+      setUnitFormError(`Đơn vị "${name}" đã có trong danh sách.`);
+      return;
+    }
+    const rate = Number(newUnitRate);
+    if (!Number.isFinite(rate) || rate <= 0) {
+      setUnitFormError('Số lượng quy đổi phải lớn hơn 0.');
+      return;
+    }
+    const baseUnit = tempUnits.find((u) => u.isBase);
+    const refUnit = tempUnits.find((u) => u.name === newUnitRefName) ?? baseUnit;
+    const conversionRate = rate * (refUnit?.conversionRate ?? 1);
+    if (conversionRate === 1) {
+      setUnitFormError(`Đơn vị mới phải khác đơn vị cơ bản (1 ${name} đang bằng 1 ${baseUnit?.name ?? 'đơn vị cơ bản'}).`);
+      return;
+    }
+    // Đặt theo đơn vị khác đơn vị cơ bản thì nhớ công thức gốc để hiển thị "1 thùng = 10 túi"
+    const newUnit: GoodsUnitConversion = { name, conversionRate, isBase: false, isDirectSale: true };
+    if (refUnit && !refUnit.isBase) {
+      newUnit.refUnitName = refUnit.name;
+      newUnit.refRate = rate;
+    }
+    const updatedUnits: GoodsUnitConversion[] = [...tempUnits, newUnit];
 
     // Tự sinh lại biến thể
     const gen = generateVariantMatrix(
@@ -1286,7 +1454,25 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
       Number(formStockQuantity) || 0,
       formCode || 'SP'
     );
-    setTempVariants(gen);
+
+    // Bấm "Lưu đơn vị" là lưu luôn (hàng đã có trong DB), không phải bấm Lưu hàng hóa thêm lượt nữa
+    setSavingUnitConfig(true);
+    try {
+      const saved = await persistUnitConfig(updatedUnits, tempAttributes, gen);
+      setTempUnits(updatedUnits);
+      setTempVariants(gen);
+      applyUnitConfigToForm(updatedUnits, tempAttributes, gen, saved);
+      setNewUnitName('');
+      setNewUnitRate('');
+      setNewUnitRefName('');
+      setUnitFormError(null);
+      setShowAddUnitInline(false);
+      showToast(saved ? `Đã lưu đơn vị "${name}".` : `Đã thêm đơn vị "${name}", sẽ lưu cùng hàng hóa.`);
+    } catch (err) {
+      setUnitFormError(`Không lưu được đơn vị: ${err instanceof Error ? err.message : 'lỗi không xác định'}`);
+    } finally {
+      setSavingUnitConfig(false);
+    }
   };
 
   // Thêm thuộc tính mới trong Modal 2
@@ -1364,9 +1550,15 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
     );
   };
 
-  // Xóa một biến thể khỏi bảng ma trận
+  // Xóa một biến thể khỏi bảng ma trận. Đơn vị (khác đơn vị cơ bản) không còn dòng nào thì gỡ luôn khỏi
+  // danh sách đơn vị, nếu không lần mở sau ma trận sẽ tự sinh lại dòng vừa xoá.
   const handleDeleteVariantRow = (varId: string) => {
-    setTempVariants((prev) => prev.filter((v) => v.id !== varId));
+    const removed = tempVariants.find((v) => v.id === varId);
+    const remaining = tempVariants.filter((v) => v.id !== varId);
+    setTempVariants(remaining);
+    if (removed && !remaining.some((v) => v.unitName === removed.unitName)) {
+      setTempUnits((prev) => prev.filter((u) => u.isBase || u.name !== removed.unitName));
+    }
   };
 
   // Lưu hàng hóa: mở modal xác nhận phạm vi áp dụng giá vốn chuẩn StockFlow (Ảnh 2)
@@ -1405,8 +1597,8 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
 
     // CHỈ KHI NÀO SỬA GIÁ VỐN (hoặc tạo mới có giá vốn > 0): mới mở modal xác nhận phạm vi giá vốn (Ảnh 2)
     setCostScope('ALL');
-    const defaultBranch = formWarehouse || warehouseFilter || 'Kho Tổng Gia Lâm';
-    setCostSelectedBranches([defaultBranch]);
+    const defaultBranch = formWarehouse || warehouseFilter || facilities[0]?.name || '';
+    setCostSelectedBranches(defaultBranch ? [defaultBranch] : []);
     setBranchDropdownOpen(false);
     setCostBranchSearch('');
     setPendingKeepOpen(keepOpen);
@@ -1421,21 +1613,14 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
     setCostConfirmModalOpen(false);
     setBranchDropdownOpen(false);
     const finalCode = formCode.trim() ? formCode.trim().toUpperCase() : suggestedProductCode;
-    const activeWh = formWarehouse || warehouseFilter || 'Kho Tổng Gia Lâm';
+    const activeWh = formWarehouse || warehouseFilter || facilities[0]?.name || '';
     const numEnteredStock = Math.max(0, parseCleanNumber(formStockQuantity));
     const numEnteredCost = Math.max(0, parseCleanNumber(formCostPrice));
     const numEnteredSalePrice = Math.max(0, parseCleanNumber(formStandardPrice));
     const numEnteredMinSafe = Math.max(0, parseCleanNumber(formMinSafe));
     const numEnteredMaxSafe = formMaxSafe === '' ? 999999999 : Math.max(0, parseCleanNumber(formMaxSafe));
 
-    const targetFacilities = permittedFacilities.length > 0
-      ? permittedFacilities
-      : (facilities.length > 0
-        ? facilities
-        : [
-            { code: 'K001', name: 'Kho Tổng Gia Lâm', address: 'Số 18 Đường Dệt May, Gia Lâm' },
-            { code: 'K002', name: 'Kho Đông Anh', address: 'CCN Nguyên Khê, Đông Anh' },
-          ]);
+    const targetFacilities = permittedFacilities.length > 0 ? permittedFacilities : facilities;
 
     const builtStockByWarehouse = targetFacilities.map((fac) => {
       const isCurrentActive =
@@ -1477,7 +1662,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
       const price = numEnteredSalePrice;
 
       // Định mức tồn kho: ở các kho khác ngoài kho tạo, định mức tồn luôn set về 0
-      const itemCreationWh = (editingItem?.warehouse || activeWh).trim().toLowerCase();
+      const itemCreationWh = (editingItem ? creationWarehouseOf(editingItem) : activeWh).trim().toLowerCase();
       const isWhCreation = fac.name.trim().toLowerCase() === itemCreationWh ||
         (fac.code && fac.code.trim().toLowerCase() === itemCreationWh);
 
@@ -1525,7 +1710,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
       reservedQuantity: editingItem ? editingItem.reservedQuantity : 0,
       availableQuantity: totalActualStock,
       minSafeStock: editingItem
-        ? (activeWh.trim().toLowerCase() === (editingItem.warehouse || '').trim().toLowerCase()
+        ? (activeWh.trim().toLowerCase() === creationWarehouseOf(editingItem).trim().toLowerCase()
             ? numEnteredMinSafe
             : editingItem.minSafeStock)
         : numEnteredMinSafe,
@@ -1537,7 +1722,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
         : (applyCostScope === 'BRANCH'
             ? (targetBranchesForCost.some(
                 (b) =>
-                  b.trim().toLowerCase() === (editingItem?.warehouse || activeWh).trim().toLowerCase()
+                  b.trim().toLowerCase() === (editingItem ? creationWarehouseOf(editingItem) : activeWh).trim().toLowerCase()
               )
                 ? numEnteredCost
                 : (editingItem?.costPrice ?? 0))
@@ -1620,26 +1805,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
       description: savedItem.description,
       // Tồn kho không gửi kèm ở đây: được cân chỉnh riêng từng kho qua /stock-adjustments sau khi lưu
       createdAt: new Date().toISOString(),
-      units: savedItem.units?.map((u) => ({
-        name: u.name,
-        conversionRate: u.conversionRate,
-        isBase: u.isBase,
-        isDirectSale: u.isDirectSale ?? true,
-      })),
-      attributes: savedItem.attributes?.map((a) => ({
-        name: a.name,
-        values: a.values,
-      })),
-      variants: savedItem.variants?.map((v) => ({
-        attributeValue: v.attributeValue,
-        unitName: v.unitName,
-        conversionRate: v.conversionRate,
-        code: v.code,
-        barcode: v.barcode,
-        costPrice: v.costPrice,
-        salePrice: v.salePrice,
-        stock: v.stock,
-      })),
+      ...toApiUnitConfig(savedItem.units ?? [], savedItem.attributes ?? [], savedItem.variants ?? []),
     };
 
     setIsSaving(true);
@@ -1841,16 +2007,6 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
           } catch {}
         }
       }
-    }
-  };
-
-  const handleResetToDefault = () => {
-    if (window.confirm('Bạn có muốn đặt lại danh mục hàng hóa về dữ liệu mẫu ban đầu? (Tất cả sản phẩm đã tự tạo trước đó sẽ được khôi phục về danh mục gốc)')) {
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem(STOCKFLOW_GOODS_STORAGE_KEY);
-      }
-      setGoods(INITIAL_GOODS_LIST);
-      showToast('Đã khôi phục danh mục mẫu ban đầu thành công!');
     }
   };
 
@@ -2239,10 +2395,10 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
   };
 
   const handleImportSuccess = (importedCount: number, fileName: string, newGoods: GoodsItem[], serverMessage?: string) => {
+    // Hiện tạm danh sách đọc từ file cho nhanh, rồi tải lại từ DB để có mã sản phẩm thật, ảnh server đã tải,
+    // tồn kho / giá vốn theo kho (trước đây giữ bản đọc từ file tới khi F5). Không ghi bản tạm vào cache.
     setGoods(newGoods);
-    try {
-      localStorage.setItem(STOCKFLOW_GOODS_STORAGE_KEY, JSON.stringify(newGoods));
-    } catch {}
+    setProductsReloadTick((t) => t + 1);
     setLastExportedFile({ fileName: fileName, workbook: null });
     setIsExportDockOpen(true);
     // Thông báo của máy chủ cho biết cả số ảnh không tải được (nếu có)
@@ -2551,7 +2707,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                     </button>
                   </th>
 
-                  <th className="sticky top-0 z-20 bg-[#f7f8f9] py-2.5 px-2 w-12 text-center border-b border-slate-200" title="Hình ảnh sản phẩm"></th>
+                  <th className="sticky top-0 z-20 bg-[#f7f8f9] py-2.5 px-2 w-12 min-w-[52px] text-center border-b border-slate-200" title="Hình ảnh sản phẩm"></th>
                   <th className="sticky top-0 z-20 bg-[#f7f8f9] py-2.5 px-4 min-w-[200px] border-b border-slate-200">MÃ HÀNG</th>
                   <th className="sticky top-0 z-20 bg-[#f7f8f9] py-2.5 px-4 min-w-[240px] border-b border-slate-200">TÊN HÀNG</th>
                   <th className="sticky top-0 z-20 bg-[#f7f8f9] py-2.5 px-4 text-right min-w-[120px] border-b border-slate-200">GIÁ BÁN</th>
@@ -2618,7 +2774,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
 
                       {/* Ảnh Thumbnail Nhỏ Cạnh Tên / Mã Hàng (Chuẩn 100% Ảnh Chụp StockFlow) */}
                       <td
-                        className="py-2.5 px-2 text-center w-12 relative"
+                        className="py-2.5 px-2 text-center w-12 min-w-[52px] relative"
                         onClick={(e) => e.stopPropagation()}
                       >
                         <div
@@ -2630,7 +2786,9 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                             <img
                               src={item.imageUrl}
                               alt={item.name}
-                              className="w-9 h-9 object-cover rounded-lg border border-slate-200 shadow-2xs group-hover:border-blue-500 group-hover:ring-2 group-hover:ring-blue-100 transition cursor-pointer bg-white"
+                              // max-w-none + shrink-0: ảnh trong ô bảng có max-width % (mặc định của Tailwind) bị trình duyệt
+                              // coi là rộng tối thiểu 0 → bảng thiếu chỗ thì cột ảnh co mất, chỉ còn vạch viền (bản deploy)
+                              className="w-9 h-9 max-w-none shrink-0 object-cover rounded-lg border border-slate-200 shadow-2xs group-hover:border-blue-500 group-hover:ring-2 group-hover:ring-blue-100 transition cursor-pointer bg-white"
                               onClick={() => setExpandedRowId(isExpanded ? null : item.id)}
                             />
                           ) : (
@@ -3123,10 +3281,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
 
                                     <button
                                       type="button"
-                                      onClick={() => {
-                                        handleOpenEdit(item);
-                                        handleOpenConfigModal();
-                                      }}
+                                      onClick={() => handleOpenConfigModal(handleOpenEdit(item))}
                                       className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg border border-blue-200 hover:bg-blue-50 text-blue-700 text-xs font-semibold transition cursor-pointer"
                                     >
                                       <Plus size={13} />
@@ -3162,50 +3317,41 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
 
                             {/* Tab 4: TỒN KHO CHI TIẾT TỪNG CHI NHÁNH */}
                             {expandedTab === 'stockByWh' && (() => {
-                              const standardFacilities = [
-                                { code: 'K001', name: 'Kho Tổng Gia Lâm', address: 'Số 18 Đường Dệt May, Gia Lâm, Hà Nội' },
-                                { code: 'K002', name: 'Kho Đông Anh', address: 'CCN Nguyên Khê, Đông Anh, Hà Nội' },
-                                { code: 'K003', name: 'Kho Hà Đông', address: 'Km14 Quốc lộ 6, Yên Nghĩa, Hà Đông, Hà Nội' },
-                                { code: 'K004', name: 'Kho Hoàn Kiếm', address: '42 Phố Trần Hưng Đạo, Hoàn Kiếm, Hà Nội' },
-                              ];
-
-                              const facList = (permittedFacilities.length >= 4 ? permittedFacilities : standardFacilities);
+                              // Danh sách kho lấy thật từ DB (GET /api/warehouses), chỉ các kho tài khoản được phân quyền
+                              // (Admin = mọi kho đang hoạt động). Tồn từng kho = ProductDto.warehouses, ghép theo warehouseId.
+                              const facList = permittedFacilities.length > 0 ? permittedFacilities : facilities;
+                              const currentFac = findFacility(warehouseFilter);
 
                               const stockRows = facList.map((fac) => {
-                                const entry = item.stockByWarehouse?.find((w) => {
-                                  const wName = (w.warehouseName || '').trim().toLowerCase();
-                                  const wCode = (w.warehouseCode || '').trim().toLowerCase();
-                                  const fName = (fac.name || '').trim().toLowerCase();
-                                  const fCode = (fac.code || '').trim().toLowerCase();
-                                  return (
-                                    wName === fName ||
-                                    wCode === fCode ||
-                                    (fName.includes('gia lâm') && (wName.includes('gia lâm') || wCode === 'k001')) ||
-                                    (fName.includes('đông anh') && (wName.includes('đông anh') || wCode === 'k002')) ||
-                                    (fName.includes('hà đông') && (wName.includes('hà đông') || wCode === 'k003')) ||
-                                    (fName.includes('hoàn kiếm') && (wName.includes('hoàn kiếm') || wCode === 'k004'))
-                                  );
-                                });
+                                const entry = item.stockByWarehouse?.find((w) =>
+                                  matchWarehouseStock(w, { warehouseId: fac.warehouseId, code: fac.code, name: fac.name })
+                                );
 
                                 const actual = entry ? Number(entry.actualStock) || 0 : 0;
                                 const available = entry ? Number(entry.availableStock) || 0 : 0;
-                                const costPrice = entry?.costPrice !== undefined ? Number(entry.costPrice) || 0 : (item.costPrice || 0);
-                                const isCurrentFilter = warehouseFilter.toLowerCase().includes(fac.name.toLowerCase()) ||
-                                  fac.name.toLowerCase().includes(warehouseFilter.toLowerCase()) ||
-                                  warehouseFilter.toUpperCase() === fac.code.toUpperCase();
+                                const isCurrentFilter = currentFac
+                                  ? (currentFac.warehouseId ?? currentFac.code) === (fac.warehouseId ?? fac.code)
+                                  : false;
 
                                 return {
                                   ...fac,
                                   actual,
                                   available,
-                                  costPrice,
                                   isCurrentFilter,
                                 };
                               });
 
                               const totalActual = stockRows.reduce((sum, r) => sum + r.actual, 0);
                               const totalAvailable = stockRows.reduce((sum, r) => sum + r.available, 0);
-                              const currentStockRow = stockRows.find((r) => r.isCurrentFilter) || stockRows[0];
+                              const currentStockRow = stockRows.find((r) => r.isCurrentFilter) ?? stockRows[0];
+
+                              if (!currentStockRow) {
+                                return (
+                                  <div className="p-6 text-center text-xs text-slate-500 bg-white rounded-xl border border-slate-200">
+                                    Đang tải danh sách chi nhánh kho...
+                                  </div>
+                                );
+                              }
 
                               return (
                                 <div className="space-y-4">
@@ -3350,10 +3496,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                                   </div>
                                   <button
                                     type="button"
-                                    onClick={() => {
-                                      handleOpenEdit(item);
-                                      handleOpenConfigModal();
-                                    }}
+                                    onClick={() => handleOpenConfigModal(handleOpenEdit(item))}
                                     className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[8px] bg-[#0070f4] hover:bg-[#005ac3] text-xs font-semibold text-white transition cursor-pointer"
                                   >
                                     <Plus size={13} />
@@ -3383,7 +3526,14 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                                               {item.name} - {v.attributeValue ? `${v.attributeValue} - ` : ''}{v.unitName}
                                             </td>
                                             <td className="py-2.5 px-3 text-slate-500">
-                                              1 {v.unitName} = {v.conversionRate} {item.uom}
+                                              {(() => {
+                                                // Đơn vị đặt theo đơn vị khác thì hiện đúng công thức đó (1 thùng = 10 túi)
+                                                const unit = item.units?.find((u) => u.name === v.unitName);
+                                                const rhs = unit
+                                                  ? unitRateLabel(unit, item.units ?? [], item.uom)
+                                                  : `${v.conversionRate.toLocaleString('vi-VN')} ${item.uom}`;
+                                                return `1 ${v.unitName} = ${rhs}`;
+                                              })()}
                                             </td>
                                             <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-900">
                                               {v.salePrice.toLocaleString('vi-VN')} đ
@@ -3594,10 +3744,10 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                         />
                       </div>
 
-                      {/* Nhóm hàng & Thương hiệu Chuẩn KiotViet (Ảnh 2) */}
+                      {/* Nhóm hàng & Thương hiệu */}
                       <div className="grid grid-cols-2 gap-3">
                         <div>
-                          <KiotSelectWithSearch
+                          <SearchableCreatableSelect
                             label="Nhóm hàng"
                             required
                             onCreateNew={() => {
@@ -3621,7 +3771,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                         </div>
 
                         <div>
-                          <KiotSelectWithSearch
+                          <SearchableCreatableSelect
                             label="Thương hiệu"
                             onCreateNew={() => {
                               setNewBrandName('');
@@ -3990,7 +4140,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                       <div className="p-4 space-y-3 bg-white border-t border-slate-100 overflow-visible">
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                           <div>
-                            <KiotSelectWithSearch
+                            <SearchableCreatableSelect
                               label="Vị trí"
                               onCreateNew={() => {
                                 setNewLocationName('');
@@ -4095,7 +4245,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
 
                     <button
                       type="button"
-                      onClick={handleOpenConfigModal}
+                      onClick={() => handleOpenConfigModal()}
                       className="shrink-0 px-4 py-2 rounded-lg border border-blue-600 text-blue-600 hover:bg-blue-50 font-bold text-xs transition cursor-pointer shadow-2xs"
                     >
                       Thiết lập
@@ -4137,15 +4287,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                   </div>
 
                   <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
-                    {(permittedFacilities.length > 0
-                      ? permittedFacilities
-                      : (facilities.length > 0
-                        ? facilities
-                        : [
-                            { code: 'K001', name: 'Kho Tổng Gia Lâm', address: 'Số 18 Đường Dệt May, Gia Lâm' },
-                            { code: 'K002', name: 'Kho Đông Anh', address: 'CCN Nguyên Khê, Đông Anh' },
-                          ])
-                    ).map((fac) => {
+                    {(permittedFacilities.length > 0 ? permittedFacilities : facilities).map((fac) => {
                       const curQty = formWarehouseStocks[fac.name] ?? 0;
                       return (
                         <div
@@ -4307,14 +4449,32 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                       }`}
                     >
                       <span className="font-bold">
-                        {u.name} {u.isBase ? '(Đơn vị cơ bản)' : `(${u.conversionRate} ${tempUnits.find((x) => x.isBase)?.name || 'Cơ bản'})`}
+                        {u.name}{' '}
+                        {u.isBase
+                          ? '(Đơn vị cơ bản)'
+                          : `(${unitRateLabel(u, tempUnits, tempUnits.find((x) => x.isBase)?.name || 'Cơ bản')})`}
                       </span>
                       <button
                         type="button"
                         onClick={() => {
-                          const rate = prompt(`Nhập tỷ lệ quy đổi cho "${u.name}":`, u.conversionRate.toString());
+                          // Sửa theo đúng đơn vị đang quy đổi (VD thùng đặt theo túi thì nhập số túi)
+                          const ref = u.refUnitName ? tempUnits.find((x) => x.name === u.refUnitName) : undefined;
+                          const label = ref ? ref.name : tempUnits.find((x) => x.isBase)?.name || 'đơn vị cơ bản';
+                          const current = ref && u.refRate ? u.refRate : u.conversionRate;
+                          const rate = prompt(`1 ${u.name} = ? ${label}`, current.toString());
                           if (rate && Number(rate) > 0) {
-                            const updated = tempUnits.map((x, i) => (i === uIdx ? { ...x, conversionRate: Number(rate) } : x));
+                            const r = Number(rate);
+                            const edited: GoodsUnitConversion = ref
+                              ? { ...u, refRate: r, conversionRate: r * ref.conversionRate }
+                              : { ...u, conversionRate: r, refUnitName: undefined, refRate: undefined };
+                            // Đơn vị khác đặt theo đơn vị vừa sửa thì tính lại số đơn vị cơ bản
+                            const updated = tempUnits.map((x, i) =>
+                              i === uIdx
+                                ? edited
+                                : x.refUnitName === u.name && x.refRate
+                                  ? { ...x, conversionRate: x.refRate * edited.conversionRate }
+                                  : x
+                            );
                             setTempUnits(updated);
                             const gen = generateVariantMatrix(
                               updated,
@@ -4338,7 +4498,10 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                         <button
                           type="button"
                           onClick={() => {
-                            const updated = tempUnits.filter((_, i) => i !== uIdx);
+                            // Đơn vị khác đặt theo đơn vị bị xoá thì hiển thị lại theo đơn vị cơ bản (số quy đổi giữ nguyên)
+                            const updated = tempUnits
+                              .filter((_, i) => i !== uIdx)
+                              .map((x) => (x.refUnitName === u.name ? { ...x, refUnitName: undefined, refRate: undefined } : x));
                             setTempUnits(updated);
                             const gen = generateVariantMatrix(
                               updated,
@@ -4361,7 +4524,13 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
 
                   <button
                     type="button"
-                    onClick={() => setShowAddUnitInline(true)}
+                    onClick={() => {
+                      setNewUnitName('');
+                      setNewUnitRate('');
+                      setNewUnitRefName('');
+                      setUnitFormError(null);
+                      setShowAddUnitInline(true);
+                    }}
                     className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-dashed border-blue-300 text-blue-600 hover:bg-blue-50 font-bold text-xs transition cursor-pointer"
                   >
                     <Plus size={13} />
@@ -4371,40 +4540,84 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
 
                 {/* Inline Form Thêm Đơn Vị Mới (Hỗ trợ TỰ NHẬP tên đơn vị tự do) */}
                 {showAddUnitInline && (
-                  <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center gap-3 animate-in fade-in flex-wrap">
+                  <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2 animate-in fade-in">
+                  <div className="flex items-center gap-3 flex-wrap">
                     <div className="w-48">
                       <CustomCombobox
                         value={newUnitName}
-                        onChange={setNewUnitName}
+                        onChange={(v) => {
+                          setNewUnitName(v);
+                          setUnitFormError(null);
+                        }}
                         options={['Lốc', 'Thùng', 'Kiện', 'Bao', 'Pallet', 'Bịch', 'Lon', 'Lô', 'Cuộn']}
                         placeholder="Tự nhập ĐVT (Lốc, Thùng...)"
                       />
                     </div>
-                    <div className="flex items-center gap-1 text-slate-600 text-xs">
+                    <div className="flex items-center gap-1.5 text-slate-600 text-xs">
                       <span>1 {newUnitName || 'Đơn vị'} =</span>
                       <input
-                        type="number"
-                        min={1}
+                        type="text"
+                        inputMode="decimal"
                         value={newUnitRate}
-                        onChange={(e) => setNewUnitRate(Number(e.target.value))}
+                        placeholder="SL"
+                        onChange={(e) => {
+                          // Chỉ nhận số, bỏ số 0 thừa ở đầu ("010" → "10")
+                          const v = e.target.value.replace(/[^\d.]/g, '').replace(/^0+(?=\d)/, '');
+                          setNewUnitRate(v);
+                          setUnitFormError(null);
+                        }}
                         className="w-16 h-9 px-2 rounded-lg border border-slate-200 bg-white font-mono text-center text-xs"
                       />
-                      <span className="font-semibold text-slate-800">{tempUnits.find((u) => u.isBase)?.name || 'Cơ bản'}</span>
+                      {/* Đơn vị quy đổi: chọn đơn vị cơ bản hoặc một đơn vị đã có (VD 1 thùng = 10 túi) */}
+                      <select
+                        value={newUnitRefName || tempUnits.find((u) => u.isBase)?.name || ''}
+                        onChange={(e) => {
+                          const base = tempUnits.find((u) => u.isBase)?.name;
+                          setNewUnitRefName(e.target.value === base ? '' : e.target.value);
+                          setUnitFormError(null);
+                        }}
+                        className="h-9 px-2 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-800 cursor-pointer focus:outline-none focus:border-[#0071BA]"
+                        title="Đơn vị quy đổi"
+                      >
+                        {tempUnits.map((u) => (
+                          <option key={u.name} value={u.name}>
+                            {u.name}
+                          </option>
+                        ))}
+                      </select>
+                      {(() => {
+                        // Gợi ý số đơn vị cơ bản khi quy đổi theo đơn vị khác đơn vị cơ bản
+                        const base = tempUnits.find((u) => u.isBase);
+                        const ref = tempUnits.find((u) => u.name === newUnitRefName);
+                        const rate = Number(newUnitRate);
+                        if (!base || !ref || ref.isBase || !(rate > 0)) return null;
+                        return (
+                          <span className="text-[11px] text-slate-500">
+                            (= {(rate * ref.conversionRate).toLocaleString('vi-VN')} {base.name})
+                          </span>
+                        );
+                      })()}
                     </div>
                     <button
                       type="button"
-                      onClick={handleAddUnit}
-                      className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs transition cursor-pointer shadow-xs"
+                      onClick={() => void handleAddUnit()}
+                      disabled={savingUnitConfig}
+                      className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs transition cursor-pointer shadow-xs disabled:opacity-60 disabled:cursor-not-allowed"
                     >
-                      Lưu đơn vị
+                      {savingUnitConfig ? 'Đang lưu...' : 'Lưu đơn vị'}
                     </button>
                     <button
                       type="button"
-                      onClick={() => setShowAddUnitInline(false)}
+                      onClick={() => {
+                        setShowAddUnitInline(false);
+                        setUnitFormError(null);
+                      }}
                       className="px-3 py-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-white text-xs transition cursor-pointer"
                     >
                       Hủy
                     </button>
+                  </div>
+                  {unitFormError && <div className="text-[11px] font-medium text-rose-600">{unitFormError}</div>}
                   </div>
                 )}
               </div>
@@ -4655,10 +4868,11 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
               </button>
               <button
                 type="button"
-                onClick={handleApplyConfigModal}
-                className="px-6 py-2 rounded-[8px] bg-[#0070f4] hover:bg-[#005ac3] text-xs font-bold text-white transition cursor-pointer shadow-xs"
+                onClick={() => void handleApplyConfigModal()}
+                disabled={savingUnitConfig}
+                className="px-6 py-2 rounded-[8px] bg-[#0070f4] hover:bg-[#005ac3] text-xs font-bold text-white transition cursor-pointer shadow-xs disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                Xong
+                {savingUnitConfig ? 'Đang lưu...' : 'Xong'}
               </button>
             </div>
           </div>
@@ -4702,6 +4916,8 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
         onClose={() => setIsImportModalOpen(false)}
         existingGoods={goods}
         onImportSuccess={handleImportSuccess}
+        warehouses={permittedFacilities.length > 0 ? permittedFacilities : facilities}
+        defaultWarehouse={warehouseFilter}
       />
 
       {/* FLOATING DOCK DOWNLOAD FILE ĐÃ KẾT XUẤT (ẢNH 2) */}
@@ -4712,7 +4928,7 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
         workbook={lastExportedFile?.workbook || null}
       />
 
-      {/* QUICK MODAL: TẠO MỚI NHÓM HÀNG CHUẨN KIOTVIET (ẢNH 2) */}
+      {/* QUICK MODAL: TẠO MỚI NHÓM HÀNG */}
       {isQuickCategoryModalOpen && (
         <QuickCreateCategoryModal
           setIsQuickCategoryModalOpen={setIsQuickCategoryModalOpen}

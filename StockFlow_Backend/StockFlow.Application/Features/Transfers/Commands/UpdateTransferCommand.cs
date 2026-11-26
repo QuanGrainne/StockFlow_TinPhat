@@ -7,6 +7,7 @@ using Microsoft.EntityFrameworkCore;
 using StockFlow.Application.Common;
 using StockFlow.Application.Common.Interfaces;
 using StockFlow.Application.Features.Transfers.DTOs;
+using StockFlow.Application.Features.Transfers.Helpers;
 using StockFlow.Application.Features.Transfers.Queries;
 using StockFlow.Domain.Entities;
 
@@ -31,6 +32,8 @@ public class UpdateTransferCommandHandler : IRequestHandler<UpdateTransferComman
 
     public async Task<Result<TransferDetailDto>> Handle(UpdateTransferCommand command, CancellationToken cancellationToken)
     {
+        await using var tx = await TransferHelper.BeginLockedAsync(_context, command.Id, cancellationToken);
+
         var req = command.Request;
         var transfer = await _context.TrxStockTransfers
             .Include(t => t.DtlStockTransferItems)
@@ -62,6 +65,11 @@ public class UpdateTransferCommandHandler : IRequestHandler<UpdateTransferComman
             return Result.Failure<TransferDetailDto>("Vui lòng chọn ít nhất 1 mặt hàng cần chuyển.");
         }
 
+        if (req.Items.Any(it => it.TransferPrice < 0))
+        {
+            return Result.Failure<TransferDetailDto>("Giá chuyển không được âm.");
+        }
+
         transfer.DestWarehouseId = req.DestWarehouseId;
         if (req.TransferDate.HasValue)
         {
@@ -82,12 +90,15 @@ public class UpdateTransferCommandHandler : IRequestHandler<UpdateTransferComman
                 Quantity = it.Quantity,
                 IssuedQuantity = 0,
                 ReceivedQuantity = null,
+                // Giá chuyển chỉ để theo dõi giá trị luân chuyển, không ảnh hưởng giá vốn
+                TransferPrice = it.TransferPrice,
                 Notes = string.IsNullOrWhiteSpace(it.Notes) ? null : it.Notes.Trim(),
             };
             await _context.DtlStockTransferItems.AddAsync(item, cancellationToken);
         }
 
         await _context.SaveChangesAsync(cancellationToken);
+        if (tx != null) await tx.CommitAsync(cancellationToken);
 
         return await new GetTransferByIdQueryHandler(_context).Handle(new GetTransferByIdQuery(transfer.StockTransferId), cancellationToken);
     }

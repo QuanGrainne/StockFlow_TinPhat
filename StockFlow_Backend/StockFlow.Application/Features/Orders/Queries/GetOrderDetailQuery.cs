@@ -45,6 +45,7 @@ public class GetOrderDetailQueryHandler : IRequestHandler<GetOrderDetailQuery, R
             .Include(o => o.UpdatedByNavigation)
             .Include(o => o.DtlOrderItems).ThenInclude(i => i.Product).ThenInclude(p => p.BaseUnit)
             .Include(o => o.DtlOrderItems).ThenInclude(i => i.Unit)
+            .Include(o => o.Warehouse)
             .Include(o => o.TrxStockIssues).ThenInclude(si => si.Warehouse)
             .Include(o => o.TrxStockIssues).ThenInclude(si => si.ProcessedByNavigation)
             .Include(o => o.TrxStockIssues).ThenInclude(si => si.RequestedByNavigation)
@@ -69,8 +70,9 @@ public class GetOrderDetailQueryHandler : IRequestHandler<GetOrderDetailQuery, R
             return Result<OrderDetailDto>.Failure("Bạn không có quyền truy cập dữ liệu của chi nhánh/kho này.");
         }
 
-        // Kho hiển thị trên hóa đơn (giữ nguyên cách lấy cũ, chỉ dùng để hiển thị)
-        var primaryWarehouse = order.TrxStockIssues.Select(si => si.Warehouse).FirstOrDefault();
+        // Kho hiển thị trên hóa đơn: kho của phiếu xuất; chưa có phiếu xuất (đơn đặt / phiếu tạm) thì kho bán của đơn.
+        // Không gán cứng kho mặc định (id / tên kho mỗi hệ thống khác nhau).
+        var primaryWarehouse = order.TrxStockIssues.Select(si => si.Warehouse).FirstOrDefault() ?? order.Warehouse;
 
         // Lấy lịch sử giao dịch thanh toán
         var financialTxs = await _context.TrxFinancialTransactions
@@ -176,7 +178,7 @@ public class GetOrderDetailQueryHandler : IRequestHandler<GetOrderDetailQuery, R
                 DiscountAmount = discAmt,
                 UnitPrice = item.UnitPrice ?? origPrice,
                 LineTotal = lineTot,
-                WarehouseName = primaryWarehouse?.WarehouseName ?? "Kho Tổng",
+                WarehouseName = primaryWarehouse?.WarehouseName ?? string.Empty,
                 LotNumber = lotNumber,
                 ExpiryDate = expiryDate
             });
@@ -332,9 +334,9 @@ public class GetOrderDetailQueryHandler : IRequestHandler<GetOrderDetailQuery, R
             CreatedByUsername = order.CreatedByNavigation?.Username ?? "admin",
             UpdatedById = order.UpdatedBy,
             UpdatedByName = order.UpdatedByNavigation?.FullName,
-            WarehouseId = primaryWarehouse?.WarehouseId ?? 3,
-            WarehouseName = primaryWarehouse?.WarehouseName ?? "Kho Tổng Gia Lâm",
-            WarehouseCode = primaryWarehouse?.WarehouseCode ?? "K001",
+            WarehouseId = primaryWarehouse?.WarehouseId ?? order.WarehouseId,
+            WarehouseName = primaryWarehouse?.WarehouseName ?? string.Empty,
+            WarehouseCode = primaryWarehouse?.WarehouseCode ?? string.Empty,
             SalesRepName = salesRepName,
             Notes = order.Notes,
             PriceBookName = priceBookName ?? "Bảng giá chung",

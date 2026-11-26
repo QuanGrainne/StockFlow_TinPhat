@@ -28,7 +28,7 @@ import { adminService } from '@/features/admin/services/adminService';
 import { usePathname, useRouter } from 'next/navigation';
 import { permissionService } from '@/features/admin/services/permissionService';
 import { SCREEN_PATH_MAP, canOpenScreen } from '@/lib/navigation/navbar';
-import { setActiveWarehouseGlobal, useAuthorizedWarehouses } from '@/lib/warehouse/useActiveWarehouse';
+import { getActiveWarehouse, setActiveWarehouseGlobal, useAuthorizedWarehouses } from '@/lib/warehouse/useActiveWarehouse';
 import { ROLE_SWITCHER_ENABLED } from '@/lib/auth/flags';
 import { BrandLogo } from '@/components/brand/BrandLogo';
 import { ChangePasswordModal } from '@/components/layout/ChangePasswordModal';
@@ -81,8 +81,10 @@ export const Header: React.FC<HeaderProps> = ({
     if (typeof window !== 'undefined') {
       const stored = tabSession.get('stockflow_selected_branch');
       if (stored && stored !== 'ALL') return stored;
+      // Chưa lưu: lấy tên kho làm việc (rỗng nếu chưa tải) → effect bên dưới tự chọn kho được phân quyền đầu tiên
+      return getActiveWarehouse().name;
     }
-    return 'Kho Tổng Gia Lâm';
+    return '';
   });
   const [branchDropdownOpen, setBranchDropdownOpen] = useState(false);
   const [branchSearch, setBranchSearch] = useState('');
@@ -292,6 +294,7 @@ export const Header: React.FC<HeaderProps> = ({
   const handleSelectBranch = (codeOrName: string) => {
     const fac = permittedFacilities.find((f) => f.code === codeOrName || f.name === codeOrName);
     const branchName = fac ? fac.name : codeOrName;
+    const previousWarehouseId = getActiveWarehouse().warehouseId;
     setSelectedBranch(branchName);
     if (typeof window !== 'undefined') {
       tabSession.set('stockflow_selected_branch', branchName);
@@ -309,6 +312,13 @@ export const Header: React.FC<HeaderProps> = ({
       );
       if (matchingWh) {
         setActiveWarehouseGlobal(matchingWh);
+        // Đổi sang kho khác: tải lại toàn bộ trang để mọi màn lấy lại dữ liệu theo kho mới,
+        // không còn giá trị cũ của kho trước (bộ lọc, tồn kho, giá vốn, form đang mở...).
+        // Kho đã chọn lưu ở sessionStorage của tab nên tải lại vẫn giữ đúng kho mới.
+        if (matchingWh.warehouseId !== previousWarehouseId) {
+          window.location.reload();
+          return;
+        }
       }
     }
     setBranchDropdownOpen(false);
@@ -439,7 +449,7 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       </div>
 
-      {/* Right: Branch Selector (Khớp Ảnh 1 KiotViet) & User Profile */}
+      {/* Right: Branch Selector & User Profile */}
       <div className="flex flex-wrap items-center gap-3 relative ml-auto">
         {/* Bộ chọn Chi Nhánh Kho theo Phân Quyền (Data Isolation) */}
         {!authorizedLoaded ? null : permittedFacilities.length === 0 ? (

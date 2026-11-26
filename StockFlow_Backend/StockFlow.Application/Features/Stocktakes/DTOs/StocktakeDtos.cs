@@ -11,9 +11,10 @@ public record StocktakeItemDto(
     decimal ActualQty,
     decimal Discrepancy,
     decimal UnitCost,
-    decimal DiscrepancyValue);
+    decimal DiscrepancyValue,
+    string? Reason = null);
 
-/// <summary>Phiếu kiểm kho trên danh sách (kèm tổng số liệu như KiotViet).</summary>
+/// <summary>Phiếu kiểm kho trên danh sách (kèm tổng số liệu).</summary>
 public record StocktakeListDto(
     int StocktakeId,
     string StocktakeCode,
@@ -43,6 +44,8 @@ public class StocktakeItemRequest
 {
     public int ProductId { get; set; }
     public decimal ActualQty { get; set; }
+    /// <summary>Lý do chênh lệch (BR-43): bắt buộc khi Hoàn thành nếu SL thực tế khác tồn hệ thống.</summary>
+    public string? Reason { get; set; }
 }
 
 /// <summary>Lưu phiếu kiểm: Status DRAFT = Lưu tạm, BALANCED = Hoàn thành (cân bằng kho).</summary>

@@ -163,11 +163,11 @@ public class ReceiveTransferTests
         Assert.Equal(20, TestData.StockOf(db, TestData.K002));
     }
 
-    [Fact(DisplayName = "ReceiveTransfer/UTCID07 – nhận 31 > 30 đã xuất: phải bị từ chối (workbook ghi dự kiến Fail)")]
+    [Fact(DisplayName = "ReceiveTransfer/UTCID07 – nhận 31 > 30 đã xuất: bị chặn, kho nhận giữ 20")]
     [Trait("Function", Function)]
     [Trait("UTCID", "ReceiveTransfer/UTCID07")]
     [Trait("Type", "A")]
-    public async Task UTCID07_ReceiveAboveDispatched_IsRejected()
+    public async Task UTCID07_ReceiveAboveDispatched_ReturnsError()
     {
         // Arrange
         var (db, handler, id, _) = Arrange();
@@ -175,9 +175,29 @@ public class ReceiveTransferTests
         // Act
         var result = await handler.Handle(new ReceiveTransferCommand(id, Received(31), TestData.UserId), CancellationToken.None);
 
-        // Assert – Expected theo workbook: yêu cầu bị từ chối, tồn kho nhận không đổi.
-        // Workbook không ghi câu thông báo cụ thể nên chỉ kiểm IsSuccess = false.
-        Assert.False(result.IsSuccess, "Nhận 31 trong khi chỉ xuất 30 nhưng handler vẫn chấp nhận (N-02 / ISS-05).");
+        // Assert – chốt lại 24/11/2026: số lượng nhận không được lớn hơn số lượng chuyển
+        Assert.False(result.IsSuccess);
+        Assert.Equal("Hàng P-TEST - Sản phẩm test: số lượng nhận (31) không được lớn hơn số lượng chuyển (30).", result.Error);
+        Assert.Equal(20, TestData.StockOf(db, TestData.K002));
+        var saved = await db.TrxStockTransfers.AsNoTracking().SingleAsync(t => t.StockTransferId == id);
+        Assert.Equal(TransferStatus.InTransit, saved.Status);
+    }
+
+    [Fact(DisplayName = "ReceiveTransfer/UTCID08 – số lượng nhận âm: bị chặn, kho nhận giữ 20")]
+    [Trait("Function", Function)]
+    [Trait("UTCID", "ReceiveTransfer/UTCID08")]
+    [Trait("Type", "A")]
+    public async Task UTCID08_NegativeReceivedQuantity_ReturnsError()
+    {
+        // Arrange
+        var (db, handler, id, _) = Arrange();
+
+        // Act
+        var result = await handler.Handle(new ReceiveTransferCommand(id, Received(-5, "Ghi chú"), TestData.UserId), CancellationToken.None);
+
+        // Assert
+        Assert.False(result.IsSuccess);
+        Assert.Equal("Hàng P-TEST - Sản phẩm test: số lượng nhận không được âm.", result.Error);
         Assert.Equal(20, TestData.StockOf(db, TestData.K002));
     }
 }

@@ -21,6 +21,9 @@ public partial class TrxInventoryBalance
 
     public DateTime? LastUpdated { get; set; }
 
+    /// <summary>Token khoá lạc quan: ánh xạ vào cột hệ thống xmin của PostgreSQL (không phải cột thật).</summary>
+    public uint Version { get; set; }
+
     public virtual MstWarehouseLocation? Location { get; set; }
 
     public virtual MstInventoryLot? Lot { get; set; }

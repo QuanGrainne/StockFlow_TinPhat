@@ -12,7 +12,7 @@ namespace StockFlow.Application.Features.Customers.Commands;
 public class AdjustCustomerDebtRequest
 {
     /// <summary>
-    /// Giá trị nợ điều chỉnh = Nợ cần thu SAU điều chỉnh (như KiotViet):
+    /// Giá trị nợ điều chỉnh = Nợ cần thu SAU điều chỉnh:
     /// dương = khách nợ cửa hàng; âm = cửa hàng nợ khách; 0 = hết nợ. Sổ công nợ ghi chênh lệch (sau − trước).
     /// </summary>
     public decimal NewDebt { get; set; }
@@ -24,7 +24,7 @@ public class AdjustCustomerDebtRequest
 public record AdjustCustomerDebtResultDto(string Code, decimal OldDebt, decimal NewDebt, decimal Difference);
 
 /// <summary>
-/// Điều chỉnh công nợ khách hàng (mẫu KiotViet "Điều chỉnh"): đặt Nợ cần thu bằng "Giá trị nợ điều chỉnh".
+/// Điều chỉnh công nợ khách hàng (thao tác "Điều chỉnh"): đặt Nợ cần thu bằng "Giá trị nợ điều chỉnh".
 /// Dương = khách nợ cửa hàng; âm = cửa hàng nợ khách (khách trả thừa, đặt cọc, hoàn tiền đổi trả...); 0 = hết nợ.
 /// Ghi 1 phiếu mã DC000001... (trx_financial_transactions, tx_type = DEBT_ADJUST, amount = nợ sau − nợ trước)
 /// để sổ công nợ có dòng "Điều chỉnh" (cột Giá trị = chênh lệch, Dư nợ = giá trị nhập).

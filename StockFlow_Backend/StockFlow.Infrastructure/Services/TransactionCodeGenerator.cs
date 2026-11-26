@@ -1,5 +1,4 @@
 using System;
-using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
@@ -74,48 +73,9 @@ public class TransactionCodeGenerator : ITransactionCodeGenerator
                 break;
         }
 
-        string rule = settings.OrderCodeRule?.ToUpperInvariant() ?? "SEQUENTIAL";
-
-        switch (rule)
-        {
-            case "DATETIME":
-            {
-                long seq = await _context.GetNextSequenceValueAsync(sequenceName, cancellationToken);
-                string datePart = DateTime.UtcNow.ToString("yyMMddHHmm");
-                string subSeq = (seq % 1000).ToString("D2");
-                return $"{prefix}{datePart}{subSeq}";
-            }
-
-            case "RANDOM":
-            {
-                const string chars = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
-                for (int attempt = 0; attempt < 5; attempt++)
-                {
-                    byte[] randomBytes = new byte[7];
-                    RandomNumberGenerator.Fill(randomBytes);
-                    char[] charsArr = new char[7];
-                    for (int i = 0; i < 7; i++)
-                    {
-                        charsArr[i] = chars[randomBytes[i] % chars.Length];
-                    }
-                    string candidate = $"{prefix}-{new string(charsArr)}";
-                    bool exists = await _context.TrxOrders.AnyAsync(o => o.OrderCode == candidate, cancellationToken);
-                    if (!exists)
-                    {
-                        return candidate;
-                    }
-                }
-                // Fallback if max attempts reached
-                return $"{prefix}-{Guid.NewGuid().ToString("N")[..8].ToUpperInvariant()}";
-            }
-
-            case "SEQUENTIAL":
-            default:
-            {
-                long seqVal = await _context.GetNextSequenceValueAsync(sequenceName, cancellationToken);
-                return $"{prefix}{seqVal:D5}";
-            }
-        }
+        // Mã chứng từ luôn theo số thứ tự: tiền tố + số sequence 5 chữ số (bỏ quy tắc theo ngày giờ / ngẫu nhiên 24/11/2026)
+        long seqVal = await _context.GetNextSequenceValueAsync(sequenceName, cancellationToken);
+        return $"{prefix}{seqVal:D5}";
     }
 }
 

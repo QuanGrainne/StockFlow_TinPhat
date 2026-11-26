@@ -1,5 +1,5 @@
 // src/features/purchases/screens/CreatePurchaseScreen.tsx
-// Màn hình Tạo mới & Chỉnh sửa phiếu nhập hàng chuẩn hóa theo giao diện Chuyển hàng & KiotViet
+// Màn hình Tạo mới & Chỉnh sửa phiếu nhập hàng chuẩn hóa theo giao diện Chuyển hàng
 
 'use client';
 
@@ -605,7 +605,8 @@ export default function CreatePurchaseScreen({ mode = 'receipt' }: CreatePurchas
     const timer = setTimeout(async () => {
       setIsSearching(true);
       try {
-        const whId = activeWarehouse?.warehouseId || 1;
+        // Chưa xác định kho (đang tải) thì tìm không theo kho, không ngầm dùng kho id 1
+        const whId = activeWarehouse?.warehouseId || undefined;
         const prods = await productService.getProducts({
           warehouseId: whId,
           search: searchQuery,
@@ -769,7 +770,7 @@ export default function CreatePurchaseScreen({ mode = 'receipt' }: CreatePurchas
     showToast(`Đang nhập dữ liệu từ ${file.name}...`);
     setTimeout(async () => {
       try {
-        const whId = activeWarehouse?.warehouseId || 1;
+        const whId = activeWarehouse?.warehouseId || undefined;
         const prods = await productService.getProducts({ warehouseId: whId, status: 'ACTIVE' });
         if (prods.length > 0) {
           const slice = prods.slice(0, 4).map((p, idx) => {
@@ -863,6 +864,19 @@ export default function CreatePurchaseScreen({ mode = 'receipt' }: CreatePurchas
       return;
     }
 
+    // Không ngầm dùng kho / nhà cung cấp id 1 khi chưa xác định được (trước đây `|| 1`)
+    const partnerId = Number(selectedSupplier.id);
+    if (!Number.isInteger(partnerId) || partnerId <= 0) {
+      showToast('Nhà cung cấp không hợp lệ. Vui lòng chọn lại nhà cung cấp.', 'warning');
+      setIsSidebarCollapsed(false);
+      return;
+    }
+    const targetWarehouseId = fixedWarehouse?.id ?? activeWarehouse?.warehouseId ?? 0;
+    if (!editPurchaseId && !(targetWarehouseId > 0)) {
+      showToast('Chưa xác định kho nhập hàng. Vui lòng chọn chi nhánh làm việc ở góc trên.', 'warning');
+      return;
+    }
+
     if (warnZeroReceived()) return;
 
     try {
@@ -881,7 +895,7 @@ export default function CreatePurchaseScreen({ mode = 'receipt' }: CreatePurchas
       if (editPurchaseId) {
         // Sửa phiếu (tạm hoặc đã nhập): cập nhật dòng hàng + giảm giá; backend tự đảo/ghi lại tồn kho nếu đã nhập
         const updated = await purchaseService.updatePurchase(editPurchaseId, {
-          partnerId: Number(selectedSupplier.id),
+          partnerId,
           externalPoNumber: externalPoNumber.trim() || null,
           receivedDate,
           notes: notes.trim() || null,
@@ -896,8 +910,8 @@ export default function CreatePurchaseScreen({ mode = 'receipt' }: CreatePurchas
         }
       } else {
         const result = await purchaseService.createPurchase({
-          warehouseId: fixedWarehouse?.id ?? (activeWarehouse?.warehouseId || 1),
-          partnerId: Number(selectedSupplier.id) || 1,
+          warehouseId: targetWarehouseId,
+          partnerId,
           purchaseOrderId: linkedPo?.id,
           // Mã "Copy_PN..." chỉ để nhận biết phiếu sao chép → để backend tự sinh mã PN mới
           purchaseCode: purchaseCode.trim().startsWith(COPY_CODE_PREFIX) ? undefined : purchaseCode.trim() || undefined,
@@ -932,7 +946,7 @@ export default function CreatePurchaseScreen({ mode = 'receipt' }: CreatePurchas
     executeSave('DRAFT');
   };
 
-  // Lưu phiếu đã nhập hàng (giống KiotViet: hỏi xác nhận cập nhật)
+  // Lưu phiếu đã nhập hàng (hỏi xác nhận cập nhật)
   const handleSaveCompleted = () => {
     if (items.length === 0) {
       showToast('Vui lòng chọn ít nhất 1 mặt hàng vào phiếu nhập', 'warning');
@@ -1187,7 +1201,7 @@ export default function CreatePurchaseScreen({ mode = 'receipt' }: CreatePurchas
                   KHO LÀM VIỆC
                 </div>
                 <div className="font-bold text-[#15171a] truncate leading-tight">
-                  {activeWarehouse?.name || 'Kho Tổng Gia Lâm'}
+                  {activeWarehouse?.name || 'Chưa chọn kho'}
                 </div>
               </div>
               <ChevronDown
@@ -1676,7 +1690,7 @@ export default function CreatePurchaseScreen({ mode = 'receipt' }: CreatePurchas
               {/* Kho nhận hàng (giữ từ form cũ) */}
               <div className="flex items-center justify-between gap-3">
                 <span>Kho nhận hàng</span>
-                <span className="text-right truncate">{fixedWarehouse?.name || activeWarehouse?.name || 'Kho Tổng Gia Lâm'}</span>
+                <span className="text-right truncate">{fixedWarehouse?.name || activeWarehouse?.name || 'Chưa chọn kho'}</span>
               </div>
 
               {/* Mã đặt hàng nhập */}
@@ -1782,7 +1796,7 @@ export default function CreatePurchaseScreen({ mode = 'receipt' }: CreatePurchas
 
               )}
 
-              {/* Tính vào công nợ (âm = còn nợ nhà cung cấp, giống KiotViet) */}
+              {/* Tính vào công nợ (âm = còn nợ nhà cung cấp) */}
               {!isOrder && (
               <div className="flex items-center justify-between gap-3">
                 <span>Tính vào công nợ</span>

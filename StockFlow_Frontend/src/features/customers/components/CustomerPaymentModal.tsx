@@ -1,6 +1,6 @@
 'use client';
 
-// Modal "Thanh toán" nợ của khách hàng (theo mẫu KiotViet): tạo phiếu thu PT..., phân bổ vào các hóa đơn còn nợ.
+// Modal "Thanh toán" nợ của khách hàng: tạo phiếu thu PT..., phân bổ vào các hóa đơn còn nợ.
 // Đối xứng với SupplierPaymentModal (phiếu chi trả nợ nhà cung cấp).
 
 import { tabSession } from '@/lib/auth/tabSession';
@@ -164,10 +164,14 @@ export default function CustomerPaymentModal({ customer, currentDebt, openOrders
           collector: collectorName || 'Nhân viên',
           notes: notes.trim(),
           debtAfter: result.remainingDebt,
-          lines: allocList.map((a) => ({
-            code: openOrders.find((o) => o.orderId === a.orderId)?.orderCode ?? `#${a.orderId}`,
-            amount: a.amount,
-          })),
+          // In theo phân bổ server đã lưu: phần "chưa phân bổ" đã được tự trừ vào hóa đơn cũ nhất,
+          // phần còn thừa (không còn hóa đơn nợ) là dòng "Không gắn hóa đơn"
+          lines: result.allocations
+            ? result.allocations.map((a) => ({ code: a.orderCode ?? 'Không gắn hóa đơn', amount: a.amount }))
+            : allocList.map((a) => ({
+                code: openOrders.find((o) => o.orderId === a.orderId)?.orderCode ?? `#${a.orderId}`,
+                amount: a.amount,
+              })),
         });
         if (!printed) message.warning('Trình duyệt đã chặn cửa sổ in. Vui lòng cho phép cửa sổ bật lên.');
       }

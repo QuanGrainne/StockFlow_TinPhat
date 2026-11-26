@@ -8,7 +8,7 @@ using StockFlow.Domain.Entities;
 namespace StockFlow.Application.Features.Stocktakes.Helpers;
 
 /// <summary>
-/// Nghiệp vụ kiểm kho (giống KiotViet):
+/// Nghiệp vụ kiểm kho:
 /// - Phiếu tạm (DRAFT): ghi số lượng thực tế, chưa đổi tồn kho.
 /// - Hoàn thành = Cân bằng kho (BALANCED): tồn kho của từng hàng được đặt bằng SL thực tế
 ///   (chênh lệch tính lại theo tồn hiện tại lúc cân bằng), ghi thẻ kho STOCKTAKE_IN / STOCKTAKE_OUT, giá vốn giữ nguyên.
@@ -65,12 +65,14 @@ public static class StocktakeLogic
         var lines = requested
             .Where(i => i.ProductId > 0)
             .GroupBy(i => i.ProductId)
-            .Select(g => new { ProductId = g.Key, Actual = g.Last().ActualQty })
+            .Select(g => new { ProductId = g.Key, Actual = g.Last().ActualQty, Reason = g.Last().Reason?.Trim() })
             .ToList();
         if (lines.Count == 0)
             return Result.Failure<bool>("Vui lòng chọn ít nhất 1 hàng hóa để kiểm kho.");
         if (lines.Any(l => l.Actual < 0))
             return Result.Failure<bool>("Số lượng thực tế không được âm.");
+        if (lines.Any(l => l.Reason is { Length: > ReasonMaxLength }))
+            return Result.Failure<bool>($"Lý do chênh lệch tối đa {ReasonMaxLength} ký tự.");
 
         var ids = lines.Select(l => l.ProductId).ToList();
         var products = await context.MstProducts.Where(p => ids.Contains(p.ProductId)).ToDictionaryAsync(p => p.ProductId, ct);
@@ -87,15 +89,34 @@ public static class StocktakeLogic
             stocktake.DtlStocktakeItems.Add(new DtlStocktakeItem
             {
                 ProductId = line.ProductId,
+                Product = products[line.ProductId],
                 SystemQty = qty,
                 ActualQty = line.Actual,
                 Discrepancy = line.Actual - qty,
+                DiscrepancyReason = string.IsNullOrWhiteSpace(line.Reason) ? null : line.Reason,
                 UnitCost = cost,
                 AdjustmentStatus = "PENDING",
                 RecordedBy = userId,
             });
         }
         return Result.Success(true);
+    }
+
+    public const int ReasonMaxLength = 500;
+
+    /// <summary>
+    /// BR-43 / MSG51: mọi dòng có chênh lệch (SL thực tế khác tồn hệ thống) phải có lý do trước khi cân bằng kho.
+    /// Gọi sau ReplaceItemsAsync (Discrepancy đã tính theo tồn hiện tại). Trả về thông báo lỗi, hoặc null nếu hợp lệ.
+    /// </summary>
+    public static string? MissingReasonError(TrxStocktake stocktake)
+    {
+        var missing = stocktake.DtlStocktakeItems
+            .Where(i => (i.Discrepancy ?? 0) != 0 && string.IsNullOrWhiteSpace(i.DiscrepancyReason))
+            .Select(i => i.Product?.ProductCode ?? $"#{i.ProductId}")
+            .ToList();
+        return missing.Count == 0
+            ? null
+            : $"Vui lòng nhập lý do cho mọi dòng có chênh lệch ({string.Join(", ", missing)}).";
     }
 
     /// <summary>Cân bằng kho: đặt tồn kho = SL thực tế (chênh lệch tính theo tồn hiện tại), ghi thẻ kho.</summary>
@@ -219,7 +240,8 @@ public static class StocktakeLogic
                 ActualQty: i.ActualQty ?? 0,
                 Discrepancy: i.Discrepancy ?? 0,
                 UnitCost: i.UnitCost ?? 0,
-                DiscrepancyValue: Math.Round((i.Discrepancy ?? 0) * (i.UnitCost ?? 0), 0, MidpointRounding.AwayFromZero)))
+                DiscrepancyValue: Math.Round((i.Discrepancy ?? 0) * (i.UnitCost ?? 0), 0, MidpointRounding.AwayFromZero),
+                Reason: i.DiscrepancyReason))
             .ToList();
         return new StocktakeDetailDto(ToListDto(t, names), items);
     }

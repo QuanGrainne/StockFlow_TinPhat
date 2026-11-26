@@ -117,16 +117,19 @@ public class GetTransfersQueryHandler : IRequestHandler<GetTransfersQuery, Resul
             decimal totalQty = 0;
             decimal totalReceived = 0;
             decimal totalAmount = 0;
+            decimal receivedAmount = 0;
 
             foreach (var item in t.DtlStockTransferItems)
             {
                 var qty = item.Quantity ?? 0;
                 var rec = item.ReceivedQuantity ?? 0;
-                var price = item.UnitCost ?? item.Product?.MovingAverageCost ?? 0;
+                // Giá trị chuyển theo giá chuyển trên phiếu (chưa nhập thì theo giá vốn)
+                var price = item.TransferPrice ?? item.UnitCost ?? item.Product?.MovingAverageCost ?? 0;
 
                 totalQty += qty;
                 totalReceived += rec;
                 totalAmount += qty * price;
+                receivedAmount += rec * price;
             }
 
             return new TransferListDto(
@@ -146,7 +149,8 @@ public class GetTransfersQueryHandler : IRequestHandler<GetTransfersQuery, Resul
                 TotalQuantity: totalQty,
                 TotalReceivedQuantity: t.IsReceived() ? totalReceived : null,
                 TotalAmount: totalAmount,
-                Notes: t.Notes
+                Notes: t.Notes,
+                TotalReceivedAmount: t.IsReceived() ? receivedAmount : null
             );
         }).ToList();
 

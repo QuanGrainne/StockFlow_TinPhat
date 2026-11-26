@@ -1,5 +1,6 @@
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
+using StockFlow.Domain.Entities;
 using StockFlow.Application.Features.Admin.DTOs;
 using StockFlow.Application.Features.Auth.DTOs;
 using StockFlow.Application.Features.Roles.DTOs;
@@ -336,7 +337,9 @@ public sealed class AccountAdminSettingsTests : InventoryTestBase
         check.Assert();
     }
 
-    // ───────── Order Settings Affect Sales ─────────
+    // ───────── Cài đặt giao dịch (bán vượt tồn kho, chuyển hàng khi âm kho) ─────────
+    // Từ 24/11/2026 chỉ còn 2 tuỳ chọn; mã chứng từ luôn theo số thứ tự, luôn nhận đơn đặt hàng;
+    // quyền lưu theo chức năng "Cài đặt" (feat-settings) trong ma trận phân quyền, không gán cứng Admin.
 
     private async Task<ApiResult> PutSettingsAsync(HttpClient client, Action<JsonObject> change)
     {
@@ -347,66 +350,84 @@ public sealed class AccountAdminSettingsTests : InventoryTestBase
         return await PutAsync(client, "/api/settings/orders", body);
     }
 
-    [Fact(DisplayName = "INT-SET-41-01 | Change code rule")]
-    public async Task INT_SET_41_01_ChangeCodeRule()
+    [Fact(DisplayName = "INT-SET-41-01 | Code always sequential")]
+    public async Task INT_SET_41_01_CodeAlwaysSequential()
     {
         await SetStockAsync(K001, Ids.PTest, 50);
-        var admin = await ClientAsync(TestDataSeeder.Admin);
-        var put = await PutSettingsAsync(admin, b => b["orderCodeRule"] = "DATETIME");
-
         var pos = await PostAsync(await ClientAsync(TestDataSeeder.SalesK001), "/api/orders/pos", Pos(WalkIn, K001, "CASH", 100_000m, new[] { (Ids.PTest, 1m, PTestPrice) }));
 
         var check = new Checks(Output);
-        check.Success(put);
         check.Success(pos);
         var code = pos.String("orderCode") ?? "";
-        var stamp = DateTime.Now.ToString("yyMMdd");
-        check.True("Mã hóa đơn theo quy tắc DATETIME (tiền tố + yyMMdd…)", code.StartsWith("HD") && code.Length > 8 && code.Contains(stamp), code);
+        check.True("Mã hóa đơn theo số thứ tự (HD + 5 chữ số)", System.Text.RegularExpressions.Regex.IsMatch(code, @"^HD\d{5}$"), code);
         check.Assert();
     }
 
-    [Fact(DisplayName = "INT-SET-41-02 | Invalid rule")]
-    public async Task INT_SET_41_02_InvalidRule()
+    [Fact(DisplayName = "INT-SET-41-02 | Negative transfer turned off")]
+    public async Task INT_SET_41_02_NegativeTransferTurnedOff()
     {
-        var res = await PutSettingsAsync(await ClientAsync(TestDataSeeder.Admin), b => b["orderCodeRule"] = "ABC");
+        await SetStockAsync(K001, Ids.PTest, 10);
+        var admin = await ClientAsync(TestDataSeeder.Admin);
+        var put = await PutSettingsAsync(admin, b => b["allowNegativeStockTransfer"] = false);
+
+        var req = TransferRequest(K001, K002, (Ids.PTest, 15m));
+        req.Status = TransferStatus.InTransit;
+        var res = await PostAsync(admin, "/api/transfers", req);
+
         var check = new Checks(Output);
+        check.Success(put);
         check.Equal("HTTP status", 400, res.StatusCode);
-        check.Message("Thông báo", "Quy tắc sinh mã không hợp lệ: ABC. Chấp nhận: SEQUENTIAL, DATETIME, RANDOM.", res);
+        check.Message("Thông báo", "Hàng P-TEST ... Cài đặt hiện không cho chuyển hàng khi âm kho.", res);
+        check.Equal("Tồn K001 không đổi", 10m, await StockAsync(K001, Ids.PTest));
         check.Assert();
     }
 
-    [Fact(DisplayName = "INT-SET-41-03 | Prefix too long")]
-    public async Task INT_SET_41_03_PrefixTooLong()
+    [Fact(DisplayName = "INT-SET-41-03 | Negative transfer allowed by default")]
+    public async Task INT_SET_41_03_NegativeTransferAllowedByDefault()
     {
-        var res = await PutSettingsAsync(await ClientAsync(TestDataSeeder.Admin), b => b["orderCodePrefix"] = "ABCDEFGHIJK");
+        await SetStockAsync(K001, Ids.PTest, 10);
+        var admin = await ClientAsync(TestDataSeeder.Admin);
+        var put = await PutSettingsAsync(admin, b => b["allowNegativeStockTransfer"] = true);
+
+        var req = TransferRequest(K001, K002, (Ids.PTest, 15m));
+        req.Status = TransferStatus.InTransit;
+        var res = await PostAsync(admin, "/api/transfers", req);
+
         var check = new Checks(Output);
-        check.Equal("HTTP status", 400, res.StatusCode);
-        check.Message("Thông báo", "Tiền tố mã chứng từ không được vượt quá 10 ký tự.", res);
+        check.Success(put);
+        check.Success(res);
+        check.Equal("Tồn K001 âm", -5m, await StockAsync(K001, Ids.PTest));
         check.Assert();
     }
 
-    [Fact(DisplayName = "INT-SET-41-04 | Stop new bookings")]
-    public async Task INT_SET_41_04_StopNewBookings()
+    [Fact(DisplayName = "INT-SET-41-04 | Booking accepted when out of stock")]
+    public async Task INT_SET_41_04_BookingAcceptedWhenOutOfStock()
     {
-        await SetStockAsync(K001, Ids.PTest, 50);
-        Assert.True((await PutSettingsAsync(await ClientAsync(TestDataSeeder.Admin), b => b["enableOrderPlacement"] = false)).IsSuccess);
-
+        await SetStockAsync(K001, Ids.PTest, 0);
         var res = await PostAsync(await ClientAsync(TestDataSeeder.SalesK001), "/api/sales-bookings", Booking(Ids.KhHm01, K001, new[] { (Ids.PTest, 1m, PTestPrice) }));
 
         var check = new Checks(Output);
-        check.Equal("HTTP status", 400, res.StatusCode);
-        check.Message("Thông báo", "Hệ thống hiện đang tạm ngừng tiếp nhận đơn đặt hàng mới theo chính sách cài đặt (A1).", res);
-        check.Equal("Không tạo đơn đặt", 0, await CountOrdersAsync("BOOKING"));
+        check.Success(res);
+        check.Equal("Tạo 1 đơn đặt", 1, await CountOrdersAsync("BOOKING"));
         check.Assert();
     }
 
-    [Fact(DisplayName = "INT-SET-41-05 | Non-admin changes settings")]
-    public async Task INT_SET_41_05_NonAdminChangesSettings()
+    [Fact(DisplayName = "INT-SET-41-05 | Role without Settings feature")]
+    public async Task INT_SET_41_05_RoleWithoutSettingsFeature()
     {
-        var res = await PutSettingsAsync(await ClientAsync(TestDataSeeder.Manager), b => b["allowNegativeStockSale"] = true);
+        var res = await PutSettingsAsync(await ClientAsync(TestDataSeeder.SalesK001), b => b["allowNegativeStockSale"] = true);
         var check = new Checks(Output);
-        check.Equal("HTTP status", 400, res.StatusCode);
-        check.Message("Thông báo", "Chỉ Quản trị viên (Admin) mới có quyền thay đổi thiết lập đơn hàng và quy tắc giao dịch.", res);
+        check.Equal("HTTP status", 403, res.StatusCode);
+        check.Assert();
+    }
+
+    [Fact(DisplayName = "INT-SET-41-06 | Manager changes settings")]
+    public async Task INT_SET_41_06_ManagerChangesSettings()
+    {
+        var res = await PutSettingsAsync(await ClientAsync(TestDataSeeder.Manager), b => b["allowNegativeStockSale"] = false);
+        var check = new Checks(Output);
+        check.Success(res);
+        check.Equal("Thiết lập trong DB", false, await QueryAsync(async db => (await db.MstOrderSettings.SingleAsync(x => x.SettingId == 1)).AllowNegativeStockSale));
         check.Assert();
     }
 }

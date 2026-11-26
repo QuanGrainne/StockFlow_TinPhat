@@ -820,6 +820,11 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("stock_transfer_id");
 
+                    b.Property<decimal?>("TransferPrice")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("transfer_price");
+
                     b.Property<decimal?>("UnitCost")
                         .HasPrecision(18, 4)
                         .HasColumnType("numeric(18,4)")
@@ -1220,17 +1225,9 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("allow_negative_stock_sale");
 
-                    b.Property<bool>("AllowOrderWhenOutOfStock")
+                    b.Property<bool>("AllowNegativeStockTransfer")
                         .HasColumnType("boolean")
-                        .HasColumnName("allow_order_when_out_of_stock");
-
-                    b.Property<bool>("AllowSellingReservedStock")
-                        .HasColumnType("boolean")
-                        .HasColumnName("allow_selling_reserved_stock");
-
-                    b.Property<bool>("AllowTransferringOrderBranch")
-                        .HasColumnType("boolean")
-                        .HasColumnName("allow_transferring_order_branch");
+                        .HasColumnName("allow_negative_stock_transfer");
 
                     b.Property<string>("BookingCodePrefix")
                         .IsRequired()
@@ -1238,47 +1235,17 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(10)")
                         .HasColumnName("booking_code_prefix");
 
-                    b.Property<bool>("ConfirmBeforeCompleteOrder")
-                        .HasColumnType("boolean")
-                        .HasColumnName("confirm_before_complete_order");
-
-                    b.Property<bool>("EnableOrderPlacement")
-                        .HasColumnType("boolean")
-                        .HasColumnName("enable_order_placement");
-
-                    b.Property<bool>("EnablePrintQuotation")
-                        .HasColumnType("boolean")
-                        .HasColumnName("enable_print_quotation");
-
-                    b.Property<bool>("EnableReturnTimeLimit")
-                        .HasColumnType("boolean")
-                        .HasColumnName("enable_return_time_limit");
-
-                    b.Property<bool>("LockTransactionTime")
-                        .HasColumnType("boolean")
-                        .HasColumnName("lock_transaction_time");
-
                     b.Property<string>("OrderCodePrefix")
                         .IsRequired()
                         .HasMaxLength(10)
                         .HasColumnType("character varying(10)")
                         .HasColumnName("order_code_prefix");
 
-                    b.Property<string>("OrderCodeRule")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasColumnName("order_code_rule");
-
                     b.Property<string>("ReturnCodePrefix")
                         .IsRequired()
                         .HasMaxLength(10)
                         .HasColumnType("character varying(10)")
                         .HasColumnName("return_code_prefix");
-
-                    b.Property<int>("ReturnTimeLimitDays")
-                        .HasColumnType("integer")
-                        .HasColumnName("return_time_limit_days");
 
                     b.Property<string>("TransferCodePrefix")
                         .IsRequired()
@@ -2305,6 +2272,12 @@ namespace StockFlow.Infrastructure.Persistence.Migrations
                         .HasPrecision(18, 4)
                         .HasColumnType("numeric(18,4)")
                         .HasColumnName("unit_cost");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
 
                     b.Property<int>("WarehouseId")
                         .HasColumnType("integer")

@@ -13,7 +13,7 @@ namespace StockFlow.Application.Features.Disposals.Commands;
 /// Tạo phiếu xuất hủy: Status = DRAFT (Lưu tạm, chưa trừ tồn) hoặc COMPLETED (Hoàn thành, trừ tồn kho ngay).
 /// Phải có quyền trên kho hủy (cô lập dữ liệu theo kho).
 /// </summary>
-public record CreateDisposalCommand(SaveDisposalRequest Request) : IRequest<Result<DisposalDetailDto>>;
+public record CreateDisposalCommand(SaveDisposalRequest Request) : IRequest<Result<DisposalDetailDto>>, IRetryOnConcurrencyConflict;
 
 public class SaveDisposalRequestValidator : AbstractValidator<SaveDisposalRequest>
 {

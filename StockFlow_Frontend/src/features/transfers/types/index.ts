@@ -1,5 +1,5 @@
 // src/features/transfers/types/index.ts
-// Các kiểu dữ liệu chuẩn nghiệp vụ Chuyển hàng (Inventory Transfer) theo giao diện KiotViet
+// Các kiểu dữ liệu chuẩn nghiệp vụ Chuyển hàng (Inventory Transfer)
 
 export type TransferStatus = 'DRAFT' | 'IN_TRANSIT' | 'RECEIVED' | 'CANCELLED';
 
@@ -22,6 +22,8 @@ export interface TransferRecord {
   totalQuantity: number;
   totalReceivedQuantity?: number | null;
   totalAmount: number;
+  /** Giá trị nhận = Σ SL nhận × giá chuyển; null khi phiếu chưa nhận */
+  totalReceivedAmount?: number | null;
   notes?: string | null;
   isStarred?: boolean;
   isMatched?: boolean | null;

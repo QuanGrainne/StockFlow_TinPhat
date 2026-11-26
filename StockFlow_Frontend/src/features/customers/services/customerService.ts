@@ -108,6 +108,17 @@ interface BackendCustomerDetailDto extends BackendCustomerDto {
     paidAmount?: number | null;
     outstandingAmount?: number | null;
   }>;
+  /** Phiếu trả hàng của khách (tab Lịch sử bán/trả hàng) */
+  recentReturns?: Array<{
+    returnId: number;
+    returnCode: string;
+    returnDate?: string | null;
+    totalAmount: number;
+    status?: string | null;
+    createdByName?: string | null;
+    warehouseName?: string | null;
+    invoiceCode?: string | null;
+  }> | null;
   debtLedger?: Array<{
     code: string;
     date?: string | null;
@@ -285,6 +296,16 @@ export const customerService = {
       ...mapDtoToCustomer(dto),
       recentOrders: (dto.recentOrders ?? []).map(mapRecentOrder),
       recentBookings: (dto.recentBookings ?? []).map(mapRecentOrder),
+      recentReturns: (dto.recentReturns ?? []).map((r) => ({
+        returnId: r.returnId,
+        returnCode: r.returnCode,
+        returnDate: r.returnDate ?? null,
+        totalAmount: Number(r.totalAmount) || 0,
+        status: r.status ?? null,
+        createdByName: r.createdByName ?? null,
+        warehouseName: r.warehouseName ?? null,
+        invoiceCode: r.invoiceCode ?? null,
+      })),
       debtLedger: (dto.debtLedger ?? []).map((l) => ({
         code: l.code,
         date: l.date ?? null,

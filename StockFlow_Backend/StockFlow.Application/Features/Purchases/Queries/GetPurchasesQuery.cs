@@ -48,11 +48,10 @@ public class GetPurchasesQueryHandler : IRequestHandler<GetPurchasesQuery, Resul
                 .AsQueryable();
 
             // 1. Phân quyền truy cập kho của người dùng (Data Isolation)
+            // BR-04: luôn lọc theo kho được gán; chưa được gán / bị thu hồi hết kho → danh sách rỗng
+            // (trước đây danh sách rỗng thì bỏ qua lọc nên thấy mọi phiếu nhập – DEF-IT-04).
             var authorizedWarehouseIds = await _currentUserService.GetAuthorizedWarehouseIdsAsync(cancellationToken);
-            if (authorizedWarehouseIds.Count > 0)
-            {
-                query = query.Where(r => authorizedWarehouseIds.Contains(r.WarehouseId));
-            }
+            query = query.Where(r => authorizedWarehouseIds.Contains(r.WarehouseId));
 
             // 2. Lọc theo kho cụ thể hoặc danh sách kho được chọn
             if (request.WarehouseIds != null && request.WarehouseIds.Count > 0)

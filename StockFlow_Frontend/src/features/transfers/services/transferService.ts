@@ -33,6 +33,7 @@ interface ApiTransferList {
   totalQuantity: number;
   totalReceivedQuantity?: number | null;
   totalAmount: number;
+  totalReceivedAmount?: number | null;
   notes?: string | null;
 }
 
@@ -117,6 +118,7 @@ function mapRecord(t: ApiTransferList, starred: number[]): TransferRecord {
     totalQuantity: t.totalQuantity ?? 0,
     totalReceivedQuantity: received,
     totalAmount: t.totalAmount ?? 0,
+    totalReceivedAmount: t.totalReceivedAmount ?? null,
     notes: t.notes,
     isStarred: starred.includes(t.stockTransferId),
     isMatched: received !== null ? received === (t.totalQuantity ?? 0) : null,

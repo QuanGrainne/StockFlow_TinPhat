@@ -19,7 +19,7 @@ namespace StockFlow.Application.Features.Production.Commands;
 /// BR-36 chỉ SL đạt vào tồn kho, BR-37 cảnh báo dùng NVL (bắt buộc ghi chú).
 /// </summary>
 public record ApproveProductionOrderCommand(int ProductionOrderId, ApproveProductionOrderRequest Request)
-    : IRequest<Result<ProductionOrderDetailDto>>;
+    : IRequest<Result<ProductionOrderDetailDto>>, IRetryOnConcurrencyConflict;
 
 public class ApproveProductionOrderCommandValidator : AbstractValidator<ApproveProductionOrderCommand>
 {
@@ -31,6 +31,9 @@ public class ApproveProductionOrderCommandValidator : AbstractValidator<ApproveP
         RuleFor(x => x.Request.LocationName).MaximumLength(90).WithMessage("Vị trí tối đa 90 ký tự.");
         RuleFor(x => x.Request.ReviewNote).MaximumLength(500).WithMessage("Ghi chú cảnh báo tối đa 500 ký tự.");
         RuleFor(x => x.Request.Lines).NotEmpty().WithMessage("Vui lòng nhập số lượng thực tế của thành phẩm.");
+        RuleFor(x => x.Request.FinishReason)
+            .NotEmpty().When(x => x.Request.FinishOrder).WithMessage("Vui lòng nhập lý do kết thúc lệnh.")
+            .MaximumLength(300).WithMessage("Lý do kết thúc lệnh tối đa 300 ký tự.");
         RuleFor(x => x.Request.Lines)
             .Must(lines => lines.Sum(l => l.AcceptedQuantity + l.DefectQuantity) > 0)
             .WithMessage("Tổng số lượng thành phẩm (đạt + lỗi) phải lớn hơn 0.")
@@ -171,7 +174,7 @@ public class ApproveProductionOrderCommandHandler : IRequestHandler<ApproveProdu
         }
 
         // BR-38: chỉ chuyển Hoàn thành khi mọi thành phẩm đã nhập đủ SL kế hoạch (cùng luật với nhập thủ công).
-        // Nhập chưa đủ → lệnh vẫn Đang sản xuất để duyệt nhập tiếp đợt sau; muốn kết thúc sớm thì dùng "Đóng lệnh".
+        // Nhập chưa đủ → lệnh vẫn Đang sản xuất để duyệt nhập tiếp đợt sau; muốn kết thúc sớm thì dùng "Kết thúc lệnh".
         var fullyReceived = order.DtlProductionOrderItems.Count > 0
             ? order.DtlProductionOrderItems.All(i => i.ActualQuantity >= i.PlannedQuantity)
             : (order.ActualQuantity ?? 0) >= (order.PlannedQuantity ?? 0);
@@ -181,9 +184,16 @@ public class ApproveProductionOrderCommandHandler : IRequestHandler<ApproveProdu
         var approveNote = fullyReceived
             ? $"[Duyệt hoàn thành {now:dd/MM/yyyy HH:mm} - {approver}] Phiếu nhập thành phẩm: {string.Join(", ", codes)}"
             : $"[Duyệt nhập thành phẩm {now:dd/MM/yyyy HH:mm} - {approver}] Phiếu nhập thành phẩm: {string.Join(", ", codes)} (chưa đủ kế hoạch)";
+        // Chưa đủ kế hoạch nhưng người duyệt chọn "Kết thúc lệnh" (không sản xuất bù): ghi lý do rồi chuyển Hoàn thành,
+        // giống nút "Kết thúc lệnh" (cùng quyền PROD_APPROVE). Đủ kế hoạch thì bỏ qua lựa chọn này.
+        var finishEarly = !fullyReceived && req.FinishOrder;
+        if (finishEarly)
+        {
+            approveNote += $"\n[Kết thúc lệnh {now:dd/MM/yyyy HH:mm} - {approver}] {req.FinishReason!.Trim()}";
+        }
         var notes = string.IsNullOrWhiteSpace(order.Notes) ? approveNote : $"{order.Notes}\n{approveNote}";
         order.Notes = notes.Length > NotesMaxLength ? notes[^NotesMaxLength..] : notes;
-        if (fullyReceived) order.MarkCompleted();
+        if (fullyReceived || finishEarly) order.MarkCompleted();
 
         await _context.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);

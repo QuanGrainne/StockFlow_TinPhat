@@ -12,7 +12,7 @@ namespace StockFlow.Application.Features.Suppliers.Commands;
 public class AdjustSupplierDebtRequest
 {
     /// <summary>
-    /// Giá trị nợ điều chỉnh = Nợ cần trả NCC SAU điều chỉnh (như KiotViet):
+    /// Giá trị nợ điều chỉnh = Nợ cần trả NCC SAU điều chỉnh:
     /// dương = cửa hàng nợ NCC; âm = NCC nợ cửa hàng (trả thừa, NCC hoàn tiền...); 0 = hết nợ.
     /// </summary>
     public decimal NewDebt { get; set; }
@@ -24,7 +24,7 @@ public class AdjustSupplierDebtRequest
 public record AdjustSupplierDebtResultDto(string Code, decimal OldDebt, decimal NewDebt, decimal Difference);
 
 /// <summary>
-/// Điều chỉnh công nợ nhà cung cấp (mẫu KiotViet "Điều chỉnh"), đối xứng với điều chỉnh công nợ khách hàng:
+/// Điều chỉnh công nợ nhà cung cấp (thao tác "Điều chỉnh"), đối xứng với điều chỉnh công nợ khách hàng:
 /// đặt Nợ cần trả NCC bằng "Giá trị nợ điều chỉnh". Ghi 1 phiếu mã DC000001...
 /// (trx_financial_transactions, tx_type = SUPPLIER_DEBT_ADJUST, amount = nợ sau − nợ trước)
 /// để sổ "Nợ cần trả nhà cung cấp" có dòng "Điều chỉnh" (Giá trị = chênh lệch, Dư nợ = giá trị nhập).

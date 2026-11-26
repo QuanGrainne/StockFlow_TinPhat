@@ -12,7 +12,7 @@ using StockFlow.Application.Features.Purchases.Helpers;
 
 namespace StockFlow.Application.Features.Purchases.Commands;
 
-public record CancelPurchaseCommand(int Id, CancelPurchaseRequest? Request = null) : IRequest<Result<bool>>;
+public record CancelPurchaseCommand(int Id, CancelPurchaseRequest? Request = null) : IRequest<Result<bool>>, IRetryOnConcurrencyConflict;
 
 public class CancelPurchaseCommandHandler : IRequestHandler<CancelPurchaseCommand, Result<bool>>
 {
@@ -123,7 +123,7 @@ public class CancelPurchaseCommandHandler : IRequestHandler<CancelPurchaseComman
 
             return Result.Success(true);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not DbUpdateConcurrencyException)
         {
             return Result.Failure<bool>($"Lỗi khi hủy phiếu nhập: {ex.Message}");
         }

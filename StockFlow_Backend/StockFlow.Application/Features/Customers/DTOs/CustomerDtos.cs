@@ -78,7 +78,17 @@ public record CustomerPaymentResultDto(
     string VoucherCode,
     decimal Amount,
     decimal AllocatedAmount,
-    decimal RemainingDebt
+    decimal RemainingDebt,
+    // Phân bổ thực tế đã lưu (gồm phần chưa phân bổ đã tự trừ vào hóa đơn cũ nhất) — để in phiếu thu đúng số liệu
+    List<CustomerPaymentAllocationResultDto>? Allocations = null
+);
+
+/// <summary>Một phần của phiếu thu vừa tạo: mã phiếu, hóa đơn (null = phần không gắn hóa đơn), số tiền.</summary>
+public record CustomerPaymentAllocationResultDto(
+    string VoucherCode,
+    int? OrderId,
+    string? OrderCode,
+    decimal Amount
 );
 
 /// <summary>Phiếu chi trả tiền cho khách khi cửa hàng đang nợ khách (Nợ cần thu &lt; 0).</summary>
@@ -138,7 +148,23 @@ public record CustomerDetailDto(
     decimal TotalSalesNetReturns = 0,
     List<CustomerDebtLedgerEntryDto>? DebtLedger = null,
     // Lịch sử đặt hàng (đơn đặt của khách, order_type = BOOKING)
-    List<CustomerRecentOrderDto>? RecentBookings = null
+    List<CustomerRecentOrderDto>? RecentBookings = null,
+    // Phiếu trả hàng của khách (tab "Lịch sử bán/trả hàng" hiện chung với hóa đơn)
+    List<CustomerRecentReturnDto>? RecentReturns = null
+);
+
+/// <summary>Phiếu trả hàng trong tab "Lịch sử bán/trả hàng"</summary>
+public record CustomerRecentReturnDto(
+    int ReturnId,
+    string ReturnCode,
+    DateTime? ReturnDate,
+    /// <summary>Cần trả khách</summary>
+    decimal TotalAmount,
+    string? Status,
+    string? CreatedByName,
+    string? WarehouseName,
+    /// <summary>Hóa đơn gốc (null = trả nhanh)</summary>
+    string? InvoiceCode
 );
 
 /// <summary>Request tạo mới khách hàng.</summary>

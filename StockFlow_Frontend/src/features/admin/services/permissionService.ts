@@ -573,6 +573,7 @@ export interface NavFeatureConfig {
  * Đặt ngay sau chức năng `after` trong ma trận (cùng nhóm navbar).
  * - feat-prod-plan: mục "Lập lệnh sản xuất" đã gỡ khỏi navbar (17/11/2026, lệnh lập từ kế hoạch đã duyệt);
  *   thiếu dòng này thì ma trận không tick được và lưu ma trận sẽ xoá mất quyền lập lệnh.
+ * - feat-settings: "Cài đặt" (nút bánh răng cạnh avatar), trước đây gán cứng chỉ Admin lưu được (24/11/2026).
  */
 const ACTION_FEATURES: (Omit<NavFeatureConfig, 'group'> & { after: string })[] = [
   {
@@ -582,6 +583,14 @@ const ACTION_FEATURES: (Omit<NavFeatureConfig, 'group'> & { after: string })[] =
     moduleKey: 'PROD',
     tabIds: [],
     after: 'feat-prod',
+  },
+  {
+    id: 'feat-settings',
+    name: 'Cài đặt',
+    desc: 'Cài đặt giao dịch (nút cạnh avatar): bán hàng vượt tồn kho, chuyển hàng khi âm kho',
+    moduleKey: 'AUTH',
+    tabIds: ['admin-order-settings'],
+    after: 'feat-warehouse-perms',
   },
 ];
 
@@ -627,7 +636,7 @@ const PROD_ACCOUNTANT_FEATS = ['feat-production-plans', 'feat-prod', 'feat-prod-
 
 export const DEFAULT_ROLE_FEATURE_PERMS: Record<string, string[]> = {
   ROLE_ADMIN: NAVBAR_FEATURES.map((f) => f.id),
-  ROLE_MANAGER: [...GOODS_FEATS, ...STOCK_FEATS, 'feat-customers', ...SALES_FEATS, 'feat-credit-approvals', ...PURCHASE_FEATS, ...PROD_FEATS, 'feat-bom'],
+  ROLE_MANAGER: [...GOODS_FEATS, ...STOCK_FEATS, 'feat-customers', ...SALES_FEATS, 'feat-credit-approvals', ...PURCHASE_FEATS, ...PROD_FEATS, 'feat-bom', 'feat-reports', 'feat-settings'],
   ROLE_SALES: ['feat-goods', 'feat-customers', ...SALES_FEATS],
   // UC-33: nhân viên kho lập phiếu chuyển và xác nhận nhận hàng
   ROLE_WAREHOUSE: ['feat-goods', ...STOCK_FEATS, ...PURCHASE_FEATS],

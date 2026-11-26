@@ -1,5 +1,5 @@
-// src/features/orders/components/KiotVietOrderDetail.tsx
-// Chi tiết 1 hóa đơn (mở rộng ngay dưới dòng trong màn Hóa đơn), theo mẫu KiotViet:
+// src/features/orders/components/OrderDetailPanel.tsx
+// Chi tiết 1 hóa đơn (mở rộng ngay dưới dòng trong màn Hóa đơn):
 // - Tab "Thông tin": khách, mã, trạng thái, người tạo/bán, ngày bán, kênh bán, bảng giá, dòng hàng, ghi chú, tổng kết.
 // - Tab "Lịch sử thanh toán": các phiếu thu của hóa đơn.
 // - Thao tác: Hủy, Sao chép (mở sang màn Bán hàng), Xuất file, Lưu, In.
@@ -27,7 +27,7 @@ const outlineBtnCls =
 const primaryBtnCls =
   'inline-flex items-center gap-1.5 px-3.5 h-8 rounded-[8px] bg-[#0070f4] hover:bg-[#005ac3] text-white text-[13px] font-semibold shadow-xs transition cursor-pointer';
 
-interface KiotVietOrderDetailProps {
+interface OrderDetailPanelProps {
   orderId?: number | string;
   orderCode?: string;
   onClose?: () => void;
@@ -102,7 +102,7 @@ function CancelConfirmDialog({
   );
 }
 
-export const KiotVietOrderDetail: React.FC<KiotVietOrderDetailProps> = ({
+export const OrderDetailPanel: React.FC<OrderDetailPanelProps> = ({
   orderId,
   orderCode,
   onClose,

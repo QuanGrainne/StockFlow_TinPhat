@@ -71,9 +71,8 @@ public class SalesBookingCommandHandler :
         var userId = _currentUser.UserId.Value;
         var req = command.Request;
 
+        // Luôn nhận đơn đặt hàng, kể cả khi hết tồn (bỏ các tuỳ chọn đặt hàng 24/11/2026)
         var settings = await _context.MstOrderSettings.AsNoTracking().FirstOrDefaultAsync(s => s.SettingId == 1, ct) ?? new MstOrderSetting();
-        if (command.OrderId == null && !settings.EnableOrderPlacement)
-            return Fail("Hệ thống đang tạm ngừng nhận đơn đặt hàng mới (Thiết lập đơn hàng).");
 
         TrxOrder? booking = null;
         if (command.OrderId.HasValue)
@@ -107,18 +106,6 @@ public class SalesBookingCommandHandler :
         {
             if (!products.TryGetValue(id, out var p)) return Fail($"Hàng hóa ID {id} không tồn tại.");
             if (p.IsActive == false) return Fail($"Hàng '{p.ProductName}' ({p.ProductCode}) đã ngừng kinh doanh.");
-        }
-
-        // A2: không cho đặt hàng đã hết tồn
-        if (!settings.AllowOrderWhenOutOfStock)
-        {
-            var stock = await _context.TrxInventoryBalances.AsNoTracking()
-                .Where(b => b.WarehouseId == req.WarehouseId && productIds.Contains(b.ProductId))
-                .GroupBy(b => b.ProductId).Select(g => new { g.Key, Qty = g.Sum(x => x.Quantity ?? 0) })
-                .ToDictionaryAsync(x => x.Key, x => x.Qty, ct);
-            var empty = productIds.FirstOrDefault(id => stock.GetValueOrDefault(id) <= 0);
-            if (empty > 0)
-                return Fail($"Hàng '{products[empty].ProductName}' đã hết tồn tại {warehouse.WarehouseName}. Thiết lập hiện không cho đặt hàng khi hết tồn.");
         }
 
         // Tiền: giảm giá dòng theo VNĐ / % trên 1 đơn vị, rồi giảm giá đơn
@@ -158,7 +145,7 @@ public class SalesBookingCommandHandler :
         var now = VietnamTime.Now;
         var orderDate = now;
         if (booking != null) orderDate = booking.OrderDate ?? now;
-        else if (!settings.LockTransactionTime && req.OrderDate.HasValue)
+        else if (req.OrderDate.HasValue)
         {
             orderDate = VietnamTime.From(req.OrderDate);
             if (orderDate > now.AddMinutes(1)) return Fail("Không được đặt hàng với thời gian trong tương lai.");

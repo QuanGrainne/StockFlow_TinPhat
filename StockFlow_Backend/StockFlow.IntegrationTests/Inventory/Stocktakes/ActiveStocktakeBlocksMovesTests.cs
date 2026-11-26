@@ -1,5 +1,4 @@
 using StockFlow.Application.Features.PurchaseReturns.DTOs;
-using StockFlow.Application.Features.Purchases.DTOs;
 using StockFlow.IntegrationTests.Infrastructure;
 using Xunit;
 using Xunit.Abstractions;
@@ -7,10 +6,13 @@ using Xunit.Abstractions;
 namespace StockFlow.IntegrationTests.Inventory.Stocktakes;
 
 /// <summary>
-/// Report 5.2 – sheet "Active Stocktake Blocks Moves" (chức năng 23, BR-42 theo workbook).
-/// Precondition: User A (K001) có quyền kho; phiếu kiểm P-TEST tại K001 đang mở (Phiếu tạm, chưa cân bằng / hủy).
-/// 48-01…06 kiểm theo Expected của workbook (bị chặn). Report 3 hiện hành BR-42 chỉ chặn xuất NVL, nhập thành phẩm,
-/// duyệt hoàn thành, xuất hủy (StocktakeGuard) → các ca này thuộc nhóm "cần quyết định", không đánh dấu Passed khi lệch.
+/// Report 5.2 – sheet "Active Stocktake Blocks Moves" (chức năng 23, BR-42 theo Report 3 bản 24/11/2026).
+/// BR-42: khi phiếu kiểm kho của một kho đang ở Phiếu tạm, không được xác nhận xuất NVL, nhập thành phẩm,
+/// duyệt hoàn thành và xuất hủy các mặt hàng trong phiếu tại kho đó.
+/// - 48-01, 48-02 (nhập thành phẩm, duyệt hoàn thành) nằm trong ProductionTests vì cần lệnh sản xuất.
+///   Xuất NVL và xuất hủy đã có ở INT-MFG-35-06, INT-DSP-29-07.
+/// - 48-03…06: giao dịch ngoài phạm vi BR-42 (nhập hàng, bán POS, chuyển kho, trả NCC) vẫn thực hiện được.
+/// - 48-07…10: xuất hủy (giao dịch bị khóa) vẫn làm được khi hàng / kho nằm ngoài phiếu, hoặc phiếu đã kết thúc.
 /// User A dùng it.ops.k001k002 (cần cả quyền nhập hàng / bán hàng / chuyển kho mà Precondition không ghi).
 /// </summary>
 public sealed class ActiveStocktakeBlocksMovesTests : InventoryTestBase
@@ -27,52 +29,38 @@ public sealed class ActiveStocktakeBlocksMovesTests : InventoryTestBase
 
     private Task<int> ActiveStocktakeAsync(HttpClient a) => ArrangeStocktakeAsync(a, K001, "DRAFT", (Ids.PTest, 100m));
 
-    private async Task<Checks> BlockedAsync(ApiResult res, decimal expectedK001)
+    private async Task<Checks> ContinuesAsync(ApiResult res, decimal expectedK001)
     {
         var check = new Checks(Output);
-        check.Rejected(res);
-        // Bị từ chối phải là do phiếu kiểm đang mở, không phải lý do khác (tránh Passed giả)
-        check.Contains("Lý do từ chối là hàng đang kiểm kho", "kiểm kho", res);
-        check.Equal("Tồn K001 không đổi", expectedK001, await StockAsync(K001, Ids.PTest));
+        check.Success(res);
+        check.Equal("Tồn K001", expectedK001, await StockAsync(K001, Ids.PTest));
         return check;
     }
 
-    [Fact(DisplayName = "INT-STK-48-01 | Goods receipt of a counted item")]
-    public async Task INT_STK_48_01_GoodsReceipt()
+    [Fact(DisplayName = "INT-STK-48-03 | Goods receipt of a counted item continues")]
+    public async Task INT_STK_48_03_GoodsReceiptContinues()
     {
         var a = await ArrangeAsync();
         await ActiveStocktakeAsync(a);
 
         var res = await PostAsync(a, "/api/purchases", Purchase(K001, "COMPLETED", (Ids.PTest, 5m, 10_000m)));
 
-        (await BlockedAsync(res, 100m)).Assert();
+        (await ContinuesAsync(res, 105m)).Assert();
     }
 
-    [Fact(DisplayName = "INT-STK-48-02 | Completing a draft receipt of a counted item")]
-    public async Task INT_STK_48_02_CompleteDraftReceipt()
-    {
-        var a = await ArrangeAsync();
-        var gr = await ArrangePurchaseAsync(a, K001, "DRAFT", (Ids.PTest, 5m, 10_000m));
-        await ActiveStocktakeAsync(a);
-
-        var res = await SendAsync(a, HttpMethod.Patch, $"/api/purchases/{gr}/complete", new CompletePurchaseRequest());
-
-        (await BlockedAsync(res, 100m)).Assert();
-    }
-
-    [Fact(DisplayName = "INT-STK-48-03 | POS sale of a counted item")]
-    public async Task INT_STK_48_03_PosSale()
+    [Fact(DisplayName = "INT-STK-48-04 | POS sale of a counted item continues")]
+    public async Task INT_STK_48_04_PosSaleContinues()
     {
         var a = await ArrangeAsync();
         await ActiveStocktakeAsync(a);
 
         var res = await PostAsync(a, "/api/orders/pos", Pos(WalkIn, K001, "CASH", 100_000m, new[] { (Ids.PTest, 1m, PTestPrice) }));
 
-        (await BlockedAsync(res, 100m)).Assert();
+        (await ContinuesAsync(res, 99m)).Assert();
     }
 
-    [Fact(DisplayName = "INT-STK-48-04 | Transfer dispatch of a counted item")]
-    public async Task INT_STK_48_04_TransferDispatch()
+    [Fact(DisplayName = "INT-STK-48-05 | Transfer dispatch of a counted item continues")]
+    public async Task INT_STK_48_05_TransferDispatchContinues()
     {
         var a = await ArrangeAsync();
         var id = await ArrangeDraftTransferAsync(a, K001, K002, (Ids.PTest, 10m));
@@ -80,23 +68,11 @@ public sealed class ActiveStocktakeBlocksMovesTests : InventoryTestBase
 
         var res = await PostAsync(a, $"/api/transfers/{id}/complete");
 
-        (await BlockedAsync(res, 100m)).Assert();
+        (await ContinuesAsync(res, 90m)).Assert();
     }
 
-    [Fact(DisplayName = "INT-STK-48-05 | Transfer receipt of a counted item")]
-    public async Task INT_STK_48_05_TransferReceipt()
-    {
-        var a = await ArrangeAsync();
-        var id = await ArrangeInTransitTransferAsync(a, K002, K001, (Ids.PTest, 10m)); // đang chuyển về K001
-        await ActiveStocktakeAsync(a);
-
-        var res = await PostAsync(a, $"/api/transfers/{id}/receive", Receive(null, (Ids.PTest, 10m)));
-
-        (await BlockedAsync(res, 100m)).Assert();
-    }
-
-    [Fact(DisplayName = "INT-STK-48-06 | Purchase return of a counted item")]
-    public async Task INT_STK_48_06_PurchaseReturn()
+    [Fact(DisplayName = "INT-STK-48-06 | Purchase return of a counted item continues")]
+    public async Task INT_STK_48_06_PurchaseReturnContinues()
     {
         var a = await ArrangeAsync();
         var gr = await ArrangePurchaseAsync(a, K001, "COMPLETED", (Ids.PTest, 10m, 10_000m)); // phiếu nhập để trả hàng
@@ -109,7 +85,7 @@ public sealed class ActiveStocktakeBlocksMovesTests : InventoryTestBase
             new SavePurchaseReturnRequest(Ids.Ncc01, new() { new PurchaseReturnItemRequest(Ids.PTest, 2m, 10_000m, grItemId) },
                 WarehouseId: K001, GrId: gr, Status: "COMPLETED"));
 
-        (await BlockedAsync(res, stock)).Assert();
+        (await ContinuesAsync(res, stock - 2m)).Assert();
     }
 
     [Fact(DisplayName = "INT-STK-48-07 | Item outside the stocktake continues")]
@@ -118,7 +94,7 @@ public sealed class ActiveStocktakeBlocksMovesTests : InventoryTestBase
         var a = await ArrangeAsync();
         await ActiveStocktakeAsync(a);
 
-        var res = await PostAsync(a, "/api/orders/pos", Pos(WalkIn, K001, "CASH", 50_000m, new[] { (Ids.POther, 1m, POtherPrice) }));
+        var res = await PostAsync(a, "/api/disposals", Disposal(K001, "COMPLETED", "Hàng vỡ", (Ids.POther, 1m)));
 
         var check = new Checks(Output);
         check.Success(res);
@@ -132,7 +108,7 @@ public sealed class ActiveStocktakeBlocksMovesTests : InventoryTestBase
         var a = await ArrangeAsync();
         await ActiveStocktakeAsync(a);
 
-        var res = await PostAsync(a, "/api/orders/pos", Pos(WalkIn, K002, "CASH", 100_000m, new[] { (Ids.PTest, 1m, PTestPrice) }));
+        var res = await PostAsync(a, "/api/disposals", Disposal(K002, "COMPLETED", "Hàng vỡ", (Ids.PTest, 1m)));
 
         var check = new Checks(Output);
         check.Success(res);
@@ -148,11 +124,9 @@ public sealed class ActiveStocktakeBlocksMovesTests : InventoryTestBase
         var balance = await PutAsync(a, $"/api/stocktakes/{id}", Stocktake(K001, "BALANCED", (Ids.PTest, 100m))); // 1. Balance
         Assert.True(balance.IsSuccess, balance.Body);
 
-        var res = await PostAsync(a, "/api/orders/pos", Pos(WalkIn, K001, "CASH", 100_000m, new[] { (Ids.PTest, 1m, PTestPrice) }));
+        var res = await PostAsync(a, "/api/disposals", Disposal(K001, "COMPLETED", "Hàng vỡ", (Ids.PTest, 1m)));
 
-        var check = new Checks(Output);
-        check.Success(res);
-        check.Assert();
+        (await ContinuesAsync(res, 99m)).Assert();
     }
 
     [Fact(DisplayName = "INT-STK-48-10 | Moves are allowed after cancelling")]
@@ -163,10 +137,8 @@ public sealed class ActiveStocktakeBlocksMovesTests : InventoryTestBase
         var cancel = await PostAsync(a, $"/api/stocktakes/{id}/cancel"); // 1. Cancel
         Assert.True(cancel.IsSuccess, cancel.Body);
 
-        var res = await PostAsync(a, "/api/orders/pos", Pos(WalkIn, K001, "CASH", 100_000m, new[] { (Ids.PTest, 1m, PTestPrice) }));
+        var res = await PostAsync(a, "/api/disposals", Disposal(K001, "COMPLETED", "Hàng vỡ", (Ids.PTest, 1m)));
 
-        var check = new Checks(Output);
-        check.Success(res);
-        check.Assert();
+        (await ContinuesAsync(res, 99m)).Assert();
     }
 }

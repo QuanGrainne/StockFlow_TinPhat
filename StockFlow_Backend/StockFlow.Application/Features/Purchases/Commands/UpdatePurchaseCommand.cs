@@ -15,7 +15,7 @@ using StockFlow.Domain.Entities;
 
 namespace StockFlow.Application.Features.Purchases.Commands;
 
-public record UpdatePurchaseCommand(int Id, UpdatePurchaseRequest Request) : IRequest<Result<PurchaseDetailDto>>;
+public record UpdatePurchaseCommand(int Id, UpdatePurchaseRequest Request) : IRequest<Result<PurchaseDetailDto>>, IRetryOnConcurrencyConflict;
 
 public class UpdatePurchaseCommandHandler : IRequestHandler<UpdatePurchaseCommand, Result<PurchaseDetailDto>>
 {
@@ -96,6 +96,11 @@ public class UpdatePurchaseCommandHandler : IRequestHandler<UpdatePurchaseComman
             if (partner == null)
             {
                 return Result.Failure<PurchaseDetailDto>($"Không tìm thấy nhà cung cấp ID #{req.PartnerId}.");
+            }
+            // Chỉ nhập hàng từ nhà cung cấp (SUPPLIER / BOTH), không nhận khách hàng (ISS-01)
+            if (!partner.IsSupplier())
+            {
+                return Result.Failure<PurchaseDetailDto>("Đối tác được chọn không phải nhà cung cấp.");
             }
 
             // Gồm cả sản phẩm của dòng cũ (để đảo nhập kho khi sửa phiếu đã nhập)
@@ -220,7 +225,7 @@ public class UpdatePurchaseCommandHandler : IRequestHandler<UpdatePurchaseComman
 
             return Result.Success(detail);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not DbUpdateConcurrencyException)
         {
             return Result.Failure<PurchaseDetailDto>($"Lỗi khi cập nhật phiếu nhập: {ex.Message}");
         }

@@ -284,6 +284,9 @@ export interface ApproveProductionOrderPayload {
   confirmExceedPlan?: boolean;
   /** Vị trí lưu kho chọn từ trường "Vị trí" của danh mục Hàng hóa (không bắt buộc) */
   locationName?: string | null;
+  /** Kết thúc lệnh sau khi duyệt dù chưa đủ kế hoạch (không sản xuất bù); bật thì bắt buộc finishReason */
+  finishOrder?: boolean;
+  finishReason?: string | null;
 }
 
 export interface MaterialUsageWarning {

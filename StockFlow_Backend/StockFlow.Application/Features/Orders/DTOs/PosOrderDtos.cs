@@ -20,7 +20,8 @@ public class PosOrderItemRequest
 public class CreatePosOrderRequest
 {
     public int PartnerId { get; set; }
-    public int WarehouseId { get; set; } = 3; // Default Kho Tổng Gia Lâm (K001)
+    // Kho xuất hàng (kho làm việc ở POS) — bắt buộc gửi lên, không mặc định kho cố định
+    public int WarehouseId { get; set; }
     public string PaymentMethod { get; set; } = "CASH"; // CASH, VIETQR, DEBT
     public decimal SubTotal { get; set; }
     public string DiscountType { get; set; } = "AMOUNT"; // "PERCENT" hoặc "AMOUNT"

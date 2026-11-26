@@ -202,8 +202,8 @@ public class CreatePosOrderTests
     [Trait("Type", "A")]
     public async Task UTCID09_FutureSaleDate_ReturnsError()
     {
-        // Arrange – điều kiện ngầm: Thiết lập cho chọn thời gian giao dịch (LockTransactionTime = false, mặc định DB là true)
-        var (db, handler) = Arrange(settings: s => s.LockTransactionTime = false);
+        // Arrange – thời gian giao dịch luôn cho chọn (đã bỏ tuỳ chọn khoá thời gian 24/11/2026)
+        var (db, handler) = Arrange();
         var request = Sale(0, 2, "CASH", 200_000);
         request.OrderDate = VietnamTime.Now.AddDays(1);
 
@@ -255,7 +255,8 @@ public class CreatePosOrderTests
     {
         // Arrange
         using var _ = new VietnameseCulture();
-        var (db, handler) = Arrange(stock: 10);
+        // Cài đặt tắt "bán hàng vượt tồn kho" (mặc định từ 24/11/2026 là cho phép) → không bán phần hàng khách đã đặt
+        var (db, handler) = Arrange(stock: 10, settings: st => st.AllowNegativeStockSale = false);
         SalesData.AddBooking(db, "DH0009", SalesData.KhHm02, TestData.K001, SalesBookingOps.Draft,
             new[] { (TestData.PTest, 8m, SalesData.PTestPrice) });
 
@@ -265,7 +266,7 @@ public class CreatePosOrderTests
         // Assert
         Assert.False(result.IsSuccess);
         Assert.Equal(
-            "Sản phẩm 'Sản phẩm test' (Mã: P-TEST) có tồn kho 10 nhưng đang tạm giữ 8 cho các đơn đặt hàng khác. Tồn khả dụng: 2, Yêu cầu xuất: 5. Chính sách hệ thống không cho phép bán hàng đang tạm giữ (A3).",
+            "Sản phẩm 'Sản phẩm test' (Mã: P-TEST) có tồn kho 10 nhưng đang tạm giữ 8 cho các đơn đặt hàng khác. Tồn khả dụng: 2, Yêu cầu xuất: 5. Cài đặt hiện không cho bán hàng vượt tồn kho.",
             result.Error);
         Assert.Equal(10, TestData.StockOf(db, TestData.K001));
     }

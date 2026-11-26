@@ -50,7 +50,7 @@ const STATUS_OPTIONS: { label: string; value: PurchaseStatus }[] = [
   { label: 'Đã hủy',        value: 'canceled' },
 ];
 
-// ─── Preset Columns (Bỏ âm lịch, bỏ quý - chuẩn KiotViet như chuyển hàng) ─────
+// ─── Preset Columns (Bỏ âm lịch, bỏ quý - như Chuyển hàng) ─────
 
 const PRESET_COLUMNS = [
   {
@@ -542,7 +542,7 @@ export default function PurchaseFilterSidebar({
               />
             </div>
 
-            {/* Dropdown Menu (Theo đúng ảnh mẫu KiotViet) */}
+            {/* Dropdown Menu */}
             {warehouseDropdownOpen && (
               <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-[8px] border border-slate-200 shadow-[0_6px_20px_rgba(0,0,0,0.12)] py-1.5 z-50 max-h-60 overflow-y-auto animate-in fade-in zoom-in-95 duration-100">
                 {/* Option: Tất cả */}
@@ -798,7 +798,7 @@ export default function PurchaseFilterSidebar({
         </div>
       )}
 
-      {/* ── Preset Popover (Portal - Chuẩn 4 cột KiotViet như Chuyển hàng) ── */}
+      {/* ── Preset Popover (Portal - 4 cột như Chuyển hàng) ── */}
       {mounted &&
         showPresetPopover &&
         createPortal(

@@ -388,6 +388,9 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
             entity.Property(e => e.UnitCost)
                 .HasPrecision(18, 4)
                 .HasColumnName("unit_cost");
+            entity.Property(e => e.TransferPrice)
+                .HasPrecision(18, 4)
+                .HasColumnName("transfer_price");
             entity.Property(e => e.Notes)
                 .HasMaxLength(500)
                 .HasColumnName("notes");
@@ -1295,6 +1298,9 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
                 .HasPrecision(18, 4)
                 .HasColumnName("unit_cost");
             entity.Property(e => e.WarehouseId).HasColumnName("warehouse_id");
+            // Khoá lạc quan: uint + IsRowVersion được Npgsql ánh xạ vào cột hệ thống xmin (không thêm cột thật).
+            // Hai giao dịch cùng sửa 1 dòng tồn → giao dịch sau nhận DbUpdateConcurrencyException thay vì ghi đè (DEF-IT-01).
+            entity.Property(e => e.Version).IsRowVersion();
 
             entity.HasOne(d => d.Location).WithMany(p => p.TrxInventoryBalances)
                 .HasForeignKey(d => d.LocationId)
@@ -2220,21 +2226,10 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
             entity.ToTable("mst_order_settings", "stockflow");
 
             entity.Property(e => e.SettingId).HasColumnName("setting_id");
-            entity.Property(e => e.EnableOrderPlacement).HasColumnName("enable_order_placement");
-            entity.Property(e => e.AllowOrderWhenOutOfStock).HasColumnName("allow_order_when_out_of_stock");
-            entity.Property(e => e.AllowSellingReservedStock).HasColumnName("allow_selling_reserved_stock");
-            entity.Property(e => e.AllowTransferringOrderBranch).HasColumnName("allow_transferring_order_branch");
-
+            // Mặc định true đặt ở entity + SQL migration (không dùng HasDefaultValue: EF sẽ bỏ qua giá trị false khi insert)
             entity.Property(e => e.AllowNegativeStockSale).HasColumnName("allow_negative_stock_sale");
-            entity.Property(e => e.EnablePrintQuotation).HasColumnName("enable_print_quotation");
-            entity.Property(e => e.ConfirmBeforeCompleteOrder).HasColumnName("confirm_before_complete_order");
+            entity.Property(e => e.AllowNegativeStockTransfer).HasColumnName("allow_negative_stock_transfer");
 
-            entity.Property(e => e.EnableReturnTimeLimit).HasColumnName("enable_return_time_limit");
-            entity.Property(e => e.ReturnTimeLimitDays).HasColumnName("return_time_limit_days");
-
-            entity.Property(e => e.LockTransactionTime).HasColumnName("lock_transaction_time");
-
-            entity.Property(e => e.OrderCodeRule).HasMaxLength(20).HasColumnName("order_code_rule");
             entity.Property(e => e.OrderCodePrefix).HasMaxLength(10).HasColumnName("order_code_prefix");
             entity.Property(e => e.BookingCodePrefix).HasMaxLength(10).HasColumnName("booking_code_prefix");
             entity.Property(e => e.ReturnCodePrefix).HasMaxLength(10).HasColumnName("return_code_prefix");
@@ -2534,6 +2529,10 @@ public partial class StockFlowDbContext : DbContext, IStockFlowDbContext
 
     public Task<Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction> BeginTransactionAsync(CancellationToken cancellationToken = default)
         => Database.BeginTransactionAsync(cancellationToken);
+
+    public void ClearChangeTracker() => ChangeTracker.Clear();
+
+    public bool HasActiveTransaction => Database.CurrentTransaction != null;
 
     public async Task AcquireTransactionLockAsync(string lockKey, CancellationToken cancellationToken = default)
     {

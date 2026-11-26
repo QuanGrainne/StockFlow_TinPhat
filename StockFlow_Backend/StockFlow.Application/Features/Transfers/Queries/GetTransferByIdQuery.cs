@@ -64,6 +64,7 @@ public class GetTransferByIdQueryHandler : IRequestHandler<GetTransferByIdQuery,
         decimal totalQty = 0;
         decimal totalReceived = 0;
         decimal totalAmount = 0;
+        decimal receivedAmount = 0;
         var itemDtos = new List<TransferItemDetailDto>();
 
         foreach (var item in t.DtlStockTransferItems)
@@ -71,15 +72,21 @@ public class GetTransferByIdQueryHandler : IRequestHandler<GetTransferByIdQuery,
             var p = item.Product;
             var qty = item.Quantity ?? 0;
             var rec = item.ReceivedQuantity;
-            // Giá chuyển = giá vốn kho xuất lúc xuất (đã lưu); phiếu tạm thì lấy giá vốn hiện tại của kho xuất
-            var price = item.UnitCost
+            // Giá chuyển = giá người dùng nhập trên phiếu; chưa nhập thì lấy giá vốn kho xuất lúc xuất (đã lưu),
+            // phiếu tạm thì lấy giá vốn hiện tại của kho xuất. Chỉ để hiển thị, không ảnh hưởng giá vốn.
+            var price = item.TransferPrice
+                ?? item.UnitCost
                 ?? (p != null
                     ? TransferStockOps.CostOf(stockBalances.Where(b => b.WarehouseId == t.SourceWarehouseId && b.ProductId == item.ProductId), p)
                     : 0);
             var lineTotal = qty * price;
 
             totalQty += qty;
-            if (rec.HasValue) totalReceived += rec.Value;
+            if (rec.HasValue)
+            {
+                totalReceived += rec.Value;
+                receivedAmount += rec.Value * price;
+            }
             totalAmount += lineTotal;
 
             var sourceStock = stockBalances
@@ -139,7 +146,8 @@ public class GetTransferByIdQueryHandler : IRequestHandler<GetTransferByIdQuery,
             Notes: t.Notes,
             Items: itemDtos,
             ReceivedByName: receivedByName,
-            ReceiveNotes: t.ReceiveNotes
+            ReceiveNotes: t.ReceiveNotes,
+            TotalReceivedAmount: t.IsReceived() ? receivedAmount : null
         );
 
         return Result.Success(detail);

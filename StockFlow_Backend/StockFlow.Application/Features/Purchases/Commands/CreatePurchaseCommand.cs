@@ -15,7 +15,7 @@ using StockFlow.Domain.Entities;
 
 namespace StockFlow.Application.Features.Purchases.Commands;
 
-public record CreatePurchaseCommand(CreatePurchaseRequest Request) : IRequest<Result<PurchaseDetailDto>>;
+public record CreatePurchaseCommand(CreatePurchaseRequest Request) : IRequest<Result<PurchaseDetailDto>>, IRetryOnConcurrencyConflict;
 
 public class CreatePurchaseCommandHandler : IRequestHandler<CreatePurchaseCommand, Result<PurchaseDetailDto>>
 {
@@ -86,6 +86,11 @@ public class CreatePurchaseCommandHandler : IRequestHandler<CreatePurchaseComman
         {
             return Result.Failure<PurchaseDetailDto>($"Không tìm thấy nhà cung cấp ID #{req.PartnerId}.");
         }
+        // Chỉ nhập hàng từ nhà cung cấp (SUPPLIER / BOTH), không nhận khách hàng (ISS-01)
+        if (!partner.IsSupplier())
+        {
+            return Result.Failure<PurchaseDetailDto>("Đối tác được chọn không phải nhà cung cấp.");
+        }
 
         // Nhập hàng theo phiếu đặt hàng nhập: phải đúng NCC, đúng kho và phiếu còn đang chờ nhập
         TrxPurchaseOrder? purchaseOrder = null;
@@ -119,7 +124,7 @@ public class CreatePurchaseCommandHandler : IRequestHandler<CreatePurchaseComman
             return Result.Failure<PurchaseDetailDto>("Một số sản phẩm trong phiếu nhập không tồn tại trong danh mục.");
         }
 
-        // 5. Sinh mã phiếu nhập chuẩn KiotViet: PN000001, PN000002... hoặc sử dụng mã người dùng nhập
+        // 5. Sinh mã phiếu nhập: PN000001, PN000002... hoặc sử dụng mã người dùng nhập
         string grCode;
         if (string.IsNullOrWhiteSpace(req.PurchaseCode) || req.PurchaseCode.Trim().Equals("Mã phiếu tự động", StringComparison.OrdinalIgnoreCase))
         {
@@ -314,7 +319,7 @@ public class CreatePurchaseCommandHandler : IRequestHandler<CreatePurchaseComman
 
             return Result.Success(detail);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not DbUpdateConcurrencyException)
         {
             if (transaction != null)
             {

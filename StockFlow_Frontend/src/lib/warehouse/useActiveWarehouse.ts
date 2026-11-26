@@ -1,5 +1,5 @@
 // src/lib/warehouse/useActiveWarehouse.ts
-// Quản lý Chi nhánh / Kho hàng đang kích hoạt trên toàn hệ thống (KiotViet Pattern)
+// Quản lý Chi nhánh / Kho hàng đang kích hoạt trên toàn hệ thống (chọn chi nhánh dùng chung)
 // và danh sách kho mà tài khoản đang đăng nhập được phân quyền (jnc_user_warehouse_access).
 // Danh sách kho lấy từ GET /api/warehouses/my-warehouses: Admin thấy mọi kho đang hoạt động,
 // vai trò khác chỉ thấy kho được gán. Mọi ô chọn / bộ lọc kho làm việc dùng danh sách này.
@@ -23,8 +23,11 @@ interface MyWarehouseDto {
   status?: string | null;
 }
 
-/** Kho tạm dùng trước khi tải xong danh sách kho được phân quyền (giữ hành vi cũ); sẽ tự sửa sau khi tải */
-const FALLBACK_WAREHOUSE: WarehouseItem = { warehouseId: 3, code: 'K001', name: 'Kho Tổng Gia Lâm' };
+/**
+ * "Chưa có kho" (id 0) dùng trước khi tải xong danh sách kho được phân quyền; tải xong sẽ tự chuyển sang kho
+ * được phép đầu tiên (reconcileActiveWarehouse). Không gán cứng kho cụ thể vì id / tên kho mỗi hệ thống khác nhau.
+ */
+const FALLBACK_WAREHOUSE: WarehouseItem = { warehouseId: 0, code: '', name: '' };
 
 const EVENT_NAME = 'stockflow:warehouse-changed';
 

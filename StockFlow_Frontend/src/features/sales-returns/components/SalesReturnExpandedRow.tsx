@@ -147,6 +147,20 @@ export default function SalesReturnExpandedRow({ returnId, colSpan, onClose, onC
   if (!r) return wrap(<div className="p-6 text-center text-xs text-[#677484]">Không tìm thấy phiếu trả hàng.</div>);
 
   const cancelled = r.status === 'CANCELLED';
+  // Phần chưa trả tiền mặt đã được trừ thẳng vào công nợ khách (sổ công nợ: trả hàng − cần trả khách,
+  // trả tiền khách +). Khách lẻ bắt buộc trả đủ nên phần này chỉ có ở khách có mã.
+  const offsetToDebt = cancelled ? 0 : Math.max(0, r.totalAmount - r.refundAmount);
+  const methodLabel = PAY_METHOD_LABEL[r.paymentMethod ?? ''] ?? r.paymentMethod ?? '';
+  const refundStatusText =
+    r.refundAmount > 0 && offsetToDebt > 0
+      ? `${methodLabel} ${formatVnd(r.refundAmount)}, còn lại trừ vào công nợ`
+      : r.refundAmount > 0
+        ? methodLabel
+        : offsetToDebt > 0
+          ? 'Đã trừ vào công nợ'
+          : cancelled
+            ? 'Chưa trả'
+            : '—';
   const st = RETURN_STATUS[r.status] ?? { label: r.status, cls: 'bg-slate-50 text-slate-600 border-slate-200' };
   const totalQty = r.items.reduce((s, i) => s + i.quantity, 0);
   const refunds = r.refunds ?? [];
@@ -239,7 +253,7 @@ export default function SalesReturnExpandedRow({ returnId, colSpan, onClose, onC
           <span className="shrink-0">{r.warehouseName}</span>
         </div>
 
-        {/* Lưới thông tin (như KiotViet): Người tạo, Ngày trả, Mã hóa đơn, Trả tiền khách */}
+        {/* Lưới thông tin: Người tạo, Ngày trả, Mã hóa đơn, Trả tiền khách */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-x-8 gap-y-3">
           <div className="flex items-center gap-3 min-h-8">
             <span className={labelCls}>Người tạo:</span>
@@ -251,7 +265,7 @@ export default function SalesReturnExpandedRow({ returnId, colSpan, onClose, onC
           </div>
           <div className="flex items-center gap-3 min-h-8">
             <span className={labelCls}>Trả tiền khách:</span>
-            <span>{r.refundAmount > 0 ? PAY_METHOD_LABEL[r.paymentMethod ?? ''] ?? r.paymentMethod : 'Chưa trả'}</span>
+            <span>{refundStatusText}</span>
           </div>
           <div className="flex items-center gap-3 min-h-8">
             <span className={labelCls}>Mã hóa đơn:</span>
@@ -337,8 +351,8 @@ export default function SalesReturnExpandedRow({ returnId, colSpan, onClose, onC
             <div className="flex justify-between">
               <dt className="text-[#677484]">Đã trả khách</dt>
               <dd
-                className={`font-mono ${r.refundAmount < r.totalAmount && !cancelled ? 'text-[#fb2c36]' : ''}`}
-                title={r.refundAmount < r.totalAmount && !cancelled ? `Còn ${formatVnd(r.totalAmount - r.refundAmount)} trừ vào công nợ khách` : undefined}
+                className="font-mono"
+                title={offsetToDebt > 0 ? `${formatVnd(offsetToDebt)} đã trừ vào công nợ khách` : undefined}
               >
                 {formatVnd(r.refundAmount)}
               </dd>

@@ -15,9 +15,14 @@ export interface GoodsVariantItem {
 
 export interface GoodsUnitConversion {
   name: string;
+  /** Số đơn vị cơ bản trong 1 đơn vị này (dùng tính giá, tồn) */
   conversionRate: number;
   isBase: boolean;
   isDirectSale: boolean;
+  /** Quy đổi theo đơn vị khác đơn vị cơ bản (VD 1 thùng = 10 túi): tên đơn vị đó, chỉ để hiển thị */
+  refUnitName?: string;
+  /** Số lượng theo refUnitName (VD 10) */
+  refRate?: number;
 }
 
 export interface GoodsAttributeDef {
@@ -61,6 +66,8 @@ export interface GoodsItem {
   attributes?: GoodsAttributeDef[];
   variants?: GoodsVariantItem[];
   stockByWarehouse: {
+    /** Id kho trong DB (ProductWarehouseStockDto.warehouseId) — dùng để ghép đúng kho, không dò theo tên */
+    warehouseId?: number;
     warehouseName: string;
     warehouseCode?: string;
     actualStock: number;

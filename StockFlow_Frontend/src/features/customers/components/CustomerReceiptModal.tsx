@@ -289,7 +289,7 @@ export default function CustomerReceiptModal({ partnerId, code, onClose, onChang
                         <td />
                       </tr>
                       {r.allocations.map((a) => {
-                        // Trạng thái của phiếu thu (như KiotViet): đã thu xong là "Đã thanh toán", kể cả khi hóa đơn còn nợ
+                        // Trạng thái của phiếu thu: đã thu xong là "Đã thanh toán", kể cả khi hóa đơn còn nợ
                         return (
                           <tr key={a.orderId}>
                             <td className="py-2 px-3">

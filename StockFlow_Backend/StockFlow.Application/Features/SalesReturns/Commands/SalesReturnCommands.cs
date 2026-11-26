@@ -17,10 +17,10 @@ namespace StockFlow.Application.Features.SalesReturns.Commands;
 /// - Hàng trả nhập lại kho chi nhánh bán (ghi thẻ kho "Khách trả hàng"): nhân viên đã kiểm tra chất lượng trước khi nhận lại.
 /// - Công nợ khách giảm theo "Cần trả khách"; tiền trả khách ngay làm công nợ tăng lại (phiếu chi trả khách).
 /// </summary>
-public record CreateSalesReturnCommand(CreateSalesReturnRequest Request) : IRequest<Result<SalesReturnResultDto>>;
+public record CreateSalesReturnCommand(CreateSalesReturnRequest Request) : IRequest<Result<SalesReturnResultDto>>, IRetryOnConcurrencyConflict;
 
 /// <summary>Hủy phiếu trả: xuất lại kho hàng đã nhập, hoàn lại công nợ, hủy phiếu chi trả khách</summary>
-public record CancelSalesReturnCommand(int ReturnId) : IRequest<Result<bool>>;
+public record CancelSalesReturnCommand(int ReturnId) : IRequest<Result<bool>>, IRetryOnConcurrencyConflict;
 
 /// <summary>Trả thêm tiền cho khách (phần chưa trả lúc trả hàng): tạo phiếu chi, công nợ khách tăng lại tương ứng</summary>
 public record AddSalesReturnRefundCommand(int ReturnId, AddSalesReturnRefundRequest Request) : IRequest<Result<SalesReturnResultDto>>;
@@ -141,7 +141,7 @@ public class SalesReturnCommandHandler :
         var totalGoods = lines.Sum(l => Math.Round(l.Quantity * l.ReturnPrice, 2));
         var discount = Math.Min(totalGoods, req.DiscountAmount);
 
-        // Hóa đơn có giảm giá tổng: hàng trả phải chịu phần giảm giá phân bổ (như KiotViet),
+        // Hóa đơn có giảm giá tổng: hàng trả phải chịu phần giảm giá phân bổ,
         // để không trả khách nhiều hơn số tiền khách đã thực trả cho hàng đó.
         if (invoice != null && invoice.DiscountAmount > 0)
         {
@@ -163,7 +163,8 @@ public class SalesReturnCommandHandler :
         var settings = await _context.MstOrderSettings.AsNoTracking().FirstOrDefaultAsync(s => s.SettingId == 1, ct) ?? new MstOrderSetting();
         var now = VietnamTime.Now;
         var returnDate = now;
-        if (!settings.LockTransactionTime && req.ReturnDate.HasValue)
+        // Thời gian trả hàng: luôn cho chọn (bỏ tuỳ chọn khoá thời gian), không ở tương lai, không trước lúc bán
+        if (req.ReturnDate.HasValue)
         {
             returnDate = VietnamTime.From(req.ReturnDate);
             if (returnDate > now.AddMinutes(1)) return Fail("Thời gian trả hàng không được ở tương lai.");

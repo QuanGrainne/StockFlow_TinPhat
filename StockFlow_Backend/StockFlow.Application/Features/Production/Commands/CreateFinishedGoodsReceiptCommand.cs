@@ -20,7 +20,7 @@ namespace StockFlow.Application.Features.Production.Commands;
 /// Giá vốn: nhập thành phẩm không tính lại giá vốn, giữ giá vốn đang có của hàng (FinishedGoodsRules).
 /// </summary>
 public record CreateFinishedGoodsReceiptCommand(CreateFinishedGoodsReceiptRequest Request)
-    : IRequest<Result<FinishedGoodsReceiptDto>>;
+    : IRequest<Result<FinishedGoodsReceiptDto>>, IRetryOnConcurrencyConflict;
 
 public class CreateFinishedGoodsReceiptCommandValidator : AbstractValidator<CreateFinishedGoodsReceiptCommand>
 {

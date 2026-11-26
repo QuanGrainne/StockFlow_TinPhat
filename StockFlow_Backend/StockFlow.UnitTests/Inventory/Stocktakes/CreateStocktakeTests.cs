@@ -68,7 +68,8 @@ public class CreateStocktakeTests
         WarehouseId = warehouseId,
         Status = status,
         StocktakeCode = code,
-        Items = items.Select(i => new StocktakeItemRequest { ProductId = i.ProductId, ActualQty = i.Actual }).ToList(),
+        // BR-43: dòng lệch phải có lý do khi hoàn thành
+        Items = items.Select(i => new StocktakeItemRequest { ProductId = i.ProductId, ActualQty = i.Actual, Reason = "Lệch khi kiểm đếm" }).ToList(),
     };
 
     [Fact(DisplayName = "CreateStocktake/UTCID02 – tạo và cân bằng ngay, thực tế 95: BALANCED, tồn 95, STOCKTAKE_OUT −5")]
@@ -83,6 +84,35 @@ public class CreateStocktakeTests
         var card = Assert.Single(db.TrxInventoryTransactions.AsNoTracking().ToList());
         Assert.Equal("STOCKTAKE_OUT", card.TransactionType);
         Assert.Equal(-5, card.Quantity);
+    }
+
+    [Fact(DisplayName = "CreateStocktake/UTCID08 – hoàn thành, thực tế 95 nhưng không nhập lý do: MSG51, không tạo phiếu, tồn không đổi (BR-43)")]
+    [Trait("Function", Function)][Trait("UTCID", "CreateStocktake/UTCID08")][Trait("Type", "A")]
+    public async Task UTCID08_BalanceVarianceWithoutReason_ReturnsError()
+    {
+        var (db, h) = Arrange();
+        var req = new SaveStocktakeRequest
+        {
+            WarehouseId = TestData.K001,
+            Status = "BALANCED",
+            Items = new List<StocktakeItemRequest> { new() { ProductId = TestData.PTest, ActualQty = 95, Reason = "  " } },
+        };
+        var r = await h.Handle(new CreateStocktakeCommand(req), CancellationToken.None);
+        Assert.False(r.IsSuccess);
+        Assert.Equal("Vui lòng nhập lý do cho mọi dòng có chênh lệch (P-TEST).", r.Error);
+        Assert.Equal(100, TestData.StockOf(db, TestData.K001));
+        Assert.Empty(db.TrxInventoryTransactions.AsNoTracking());
+    }
+
+    [Fact(DisplayName = "CreateStocktake/UTCID09 – hoàn thành có lý do: lưu lý do trên dòng và trả về trong chi tiết (BR-43)")]
+    [Trait("Function", Function)][Trait("UTCID", "CreateStocktake/UTCID09")][Trait("Type", "N")]
+    public async Task UTCID09_BalanceVarianceWithReason_StoresReason()
+    {
+        var (db, h) = Arrange();
+        var r = await h.Handle(new CreateStocktakeCommand(Req(TestData.K001, "BALANCED", null, (TestData.PTest, 95))), CancellationToken.None);
+        Assert.True(r.IsSuccess, r.Error);
+        Assert.Equal("Lệch khi kiểm đếm", Assert.Single(r.Value!.Items).Reason);
+        Assert.Equal("Lệch khi kiểm đếm", (await db.DtlStocktakeItems.AsNoTracking().SingleAsync()).DiscrepancyReason);
     }
 
     [Fact(DisplayName = "CreateStocktake/UTCID03 – kho ngừng hoạt động")]

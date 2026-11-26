@@ -1,5 +1,5 @@
 // src/features/transfers/screens/TransfersScreen.tsx
-// Màn hình 1: Danh sách phiếu chuyển hàng chuẩn theo giao diện KiotViet Ảnh 1
+// Màn hình 1: Danh sách phiếu chuyển hàng
 
 'use client';
 
@@ -72,7 +72,7 @@ export default function TransfersScreen() {
   const searchParams = useSearchParams();
   const [docLink] = useState(() => readDocumentLink(searchParams));
 
-  // State bộ lọc chuẩn ảnh 1 KiotViet
+  // State bộ lọc
   const [filters, setFilters] = useState<TransferFilterState>(() => {
     if (docLink) {
       const { timeRange, dateFrom, dateTo } = linkDateFilter(docLink.date);
@@ -116,6 +116,8 @@ export default function TransfersScreen() {
     return scrollToWhenReady(`[data-doc-row="${docLink.id}"]`);
   }, [docLink]);
   const [receiveModalTransfer, setReceiveModalTransfer] = useState<TransferDetail | null>(null);
+  // Tăng sau khi nhận hàng để ô chi tiết phiếu đang mở tải lại (nó chỉ tự tải khi đổi phiếu)
+  const [detailVersion, setDetailVersion] = useState(0);
 
   const loadData = async () => {
     setLoading(true);
@@ -266,6 +268,7 @@ export default function TransfersScreen() {
                   <th className="sticky top-0 z-20 bg-[#f7f8f9] py-2.5 px-3 border-b border-slate-200">Từ chi nhánh</th>
                   <th className="sticky top-0 z-20 bg-[#f7f8f9] py-2.5 px-3 border-b border-slate-200">Tới chi nhánh</th>
                   <th className="sticky top-0 z-20 bg-[#f7f8f9] py-2.5 px-3 text-right border-b border-slate-200">Giá trị chuyển</th>
+                  <th className="sticky top-0 z-20 bg-[#f7f8f9] py-2.5 px-3 text-right border-b border-slate-200">Giá trị nhận</th>
                   <th className="sticky top-0 z-20 bg-[#f7f8f9] py-2.5 px-3 text-center border-b border-slate-200">Trạng thái</th>
                 </tr>
               </thead>
@@ -278,13 +281,16 @@ export default function TransfersScreen() {
                     <td className="py-2.5 px-3 text-right font-mono font-bold text-[#15171a]">
                       {transfers.reduce((sum, t) => sum + (t.totalAmount || 0), 0).toLocaleString('vi-VN')}
                     </td>
+                    <td className="py-2.5 px-3 text-right font-mono font-bold text-[#15171a]">
+                      {transfers.reduce((sum, t) => sum + (t.totalReceivedAmount ?? 0), 0).toLocaleString('vi-VN')}
+                    </td>
                     <td></td>
                   </tr>
                 )}
 
                 {loading ? (
                   <tr>
-                    <td colSpan={9} className="py-20 text-center text-[#677484]">
+                    <td colSpan={10} className="py-20 text-center text-[#677484]">
                       <RefreshCw size={20} className="animate-spin mx-auto mb-2 text-[#0070f4]" />
                       Đang tải danh sách phiếu chuyển hàng...
                     </td>
@@ -292,7 +298,7 @@ export default function TransfersScreen() {
                 ) : transfers.length === 0 ? (
                   // Empty State theo đúng thiết kế
                   <tr>
-                    <td colSpan={9} className="py-24 text-center">
+                    <td colSpan={10} className="py-24 text-center">
                       <div className="flex flex-col items-center justify-center">
                         <div className="w-16 h-16 rounded-full bg-[#e6f1fe] text-[#0070f4] flex items-center justify-center mb-3">
                           <Inbox size={32} className="stroke-[1.5]" />
@@ -414,6 +420,13 @@ export default function TransfersScreen() {
                               : '—'}
                           </td>
 
+                          {/* Giá trị nhận (chỉ có khi phiếu đã nhận) */}
+                          <td className="py-2.5 px-3 text-right font-mono font-bold text-[#15171a]">
+                            {t.totalReceivedAmount !== null && t.totalReceivedAmount !== undefined
+                              ? t.totalReceivedAmount.toLocaleString('vi-VN')
+                              : '—'}
+                          </td>
+
                           {/* Trạng thái */}
                           <td className="py-2.5 px-3 text-center">
                             <span
@@ -427,8 +440,9 @@ export default function TransfersScreen() {
                         {/* Chi tiết phiếu dạng Accordion ngay dưới dòng theo Ảnh 2 & Ảnh 3 */}
                         {isExpanded && (
                           <tr>
-                            <td colSpan={9} className="p-0 border-b-2 border-[#0070f4] bg-white">
+                            <td colSpan={10} className="p-0 border-b-2 border-[#0070f4] bg-white">
                               <TransferRowDetail
+                                key={`${t.id}-${detailVersion}`}
                                 transferId={t.id}
                                 onRefresh={loadData}
                                 onOpenReceiveScreen={(detail) => setReceiveModalTransfer(detail)}
@@ -462,6 +476,7 @@ export default function TransfersScreen() {
           onClose={() => setReceiveModalTransfer(null)}
           onSuccess={() => {
             setReceiveModalTransfer(null);
+            setDetailVersion((v) => v + 1); // chi tiết phiếu đang mở hiện ngay "Đã nhận" + SL nhận
             loadData();
           }}
         />

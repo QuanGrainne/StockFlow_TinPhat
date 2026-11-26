@@ -13,7 +13,7 @@ using StockFlow.Domain.Entities;
 
 namespace StockFlow.Application.Features.Transfers.Commands;
 
-public record CompleteTransferCommand(int Id, int UserId) : IRequest<Result<TransferDetailDto>>;
+public record CompleteTransferCommand(int Id, int UserId) : IRequest<Result<TransferDetailDto>>, IRetryOnConcurrencyConflict;
 
 public class CompleteTransferCommandHandler : IRequestHandler<CompleteTransferCommand, Result<TransferDetailDto>>
 {
@@ -28,6 +28,8 @@ public class CompleteTransferCommandHandler : IRequestHandler<CompleteTransferCo
 
     public async Task<Result<TransferDetailDto>> Handle(CompleteTransferCommand command, CancellationToken cancellationToken)
     {
+        await using var tx = await TransferHelper.BeginLockedAsync(_context, command.Id, cancellationToken);
+
         var transfer = await _context.TrxStockTransfers
             .Include(t => t.DtlStockTransferItems)
             .FirstOrDefaultAsync(t => t.StockTransferId == command.Id, cancellationToken);
@@ -66,6 +68,25 @@ public class CompleteTransferCommandHandler : IRequestHandler<CompleteTransferCo
             return Result.Failure<TransferDetailDto>($"Không tìm thấy hàng hóa #{string.Join(", #", missing)}.");
         }
 
+        // Cài đặt "Cho phép chuyển hàng khi âm kho" (mặc định bật): bật thì cho xuất dù tồn kho xuất không đủ (kho xuất âm),
+        // màn hình tạo phiếu cảnh báo và hỏi xác nhận; tắt thì chặn khi SL chuyển vượt tồn kho xuất.
+        var settings = await _context.MstOrderSettings.AsNoTracking().FirstOrDefaultAsync(s => s.SettingId == 1, cancellationToken)
+            ?? new MstOrderSetting();
+        if (!settings.AllowNegativeStockTransfer)
+        {
+            foreach (var g in transfer.DtlStockTransferItems.GroupBy(i => i.ProductId))
+            {
+                var requested = g.Sum(i => i.Quantity ?? 0);
+                var (stock, _) = await TransferStockOps.WarehouseStockAsync(_context, transfer.SourceWarehouseId, products[g.Key], cancellationToken);
+                if (stock < requested)
+                {
+                    var p = products[g.Key];
+                    return Result.Failure<TransferDetailDto>(
+                        $"Hàng {p.ProductCode} - {p.ProductName} chỉ còn tồn {stock:0.##} tại kho xuất, không đủ chuyển {requested:0.##}. Cài đặt hiện không cho chuyển hàng khi âm kho.");
+                }
+            }
+        }
+
         // Trừ tồn kho xuất theo giá vốn hiện tại của kho, lưu giá vốn để nhập vào kho nhận / hoàn khi hủy
         foreach (var item in transfer.DtlStockTransferItems)
         {
@@ -83,6 +104,7 @@ public class CompleteTransferCommandHandler : IRequestHandler<CompleteTransferCo
         }
 
         await _context.SaveChangesAsync(cancellationToken);
+        if (tx != null) await tx.CommitAsync(cancellationToken);
 
         return await new GetTransferByIdQueryHandler(_context).Handle(new GetTransferByIdQuery(transfer.StockTransferId), cancellationToken);
     }

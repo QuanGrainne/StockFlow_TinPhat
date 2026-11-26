@@ -1,6 +1,6 @@
 'use client';
 
-// Danh sách phiếu Trả hàng nhập (trả hàng cho nhà cung cấp) — bố cục giống màn Nhập hàng (KiotViet)
+// Danh sách phiếu Trả hàng nhập (trả hàng cho nhà cung cấp) — bố cục giống màn Nhập hàng
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';

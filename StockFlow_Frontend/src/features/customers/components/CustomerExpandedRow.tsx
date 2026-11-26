@@ -13,11 +13,21 @@ import DebtRefundModal from '@/components/debt/DebtRefundModal';
 import DebtVoucherModal from '@/components/debt/DebtVoucherModal';
 import { customerService } from '../services/customerService';
 import { InvoicePreviewModal } from '@/features/orders';
-import { Customer, CustomerDebtLedgerEntry, CustomerDetail } from '../types';
+import { Customer, CustomerDebtLedgerEntry, CustomerDetail, CustomerRecentOrder, CustomerRecentReturn } from '../types';
 import { exportCustomerBookingsToXLSX, exportCustomerLedgerToXLSX, exportCustomerOrdersToXLSX, GENDER_LABEL } from '../utils/exportExcel';
 import { BOOKING_STATUS } from '@/features/sales-bookings/utils/salesBookingUtils';
 import type { SalesBookingStatus } from '@/features/sales-bookings/types';
 import { documentLinkHref, toLinkDate } from '@/lib/navigation/documentLink';
+
+/** Một dòng tab "Lịch sử bán/trả hàng": hóa đơn hoặc phiếu trả hàng */
+type SalesHistoryRow =
+  | { kind: 'ORDER'; key: string; date: string | null; order: CustomerRecentOrder }
+  | { kind: 'RETURN'; key: string; date: string | null; ret: CustomerRecentReturn };
+
+const RETURN_STATUS_LABEL: Record<string, { label: string; cls: string }> = {
+  COMPLETED: { label: 'Đã trả', cls: 'bg-[#e6f8ec] text-[#16a34a] border-[#bbf7d0]' },
+  CANCELLED: { label: 'Đã hủy', cls: 'bg-[#fef2f2] text-[#fb2c36] border-[#fecaca]' },
+};
 
 const bookingStatusOf = (s?: string | null) =>
   BOOKING_STATUS[(s || '').toUpperCase() as SalesBookingStatus] ?? { label: s || '—', cls: 'bg-slate-50 text-slate-600 border-slate-200' };
@@ -79,7 +89,7 @@ function fmtDate(v?: string | null) {
   return m ? `${m[3]}/${m[2]}/${m[1]}` : v;
 }
 
-/** Ô thông tin nhãn + giá trị có gạch chân (giống form KiotViet / màn Nhà cung cấp) */
+/** Ô thông tin nhãn + giá trị có gạch chân (giống màn Nhà cung cấp) */
 function InfoField({ label, value }: { label: string; value?: string | null }) {
   return (
     <div>
@@ -138,11 +148,22 @@ export default function CustomerExpandedRow({
     [orders]
   );
 
+  // Tab "Lịch sử bán/trả hàng": hóa đơn + phiếu trả hàng, mới nhất trước
+  const returns = useMemo(() => detail?.recentReturns ?? [], [detail]);
+  const salesHistory = useMemo<SalesHistoryRow[]>(
+    () =>
+      [
+        ...orders.map((o): SalesHistoryRow => ({ kind: 'ORDER', key: `o-${o.orderId}`, date: o.orderDate ?? null, order: o })),
+        ...returns.map((r): SalesHistoryRow => ({ kind: 'RETURN', key: `r-${r.returnId}`, date: r.returnDate ?? null, ret: r })),
+      ].sort((a, b) => (b.date || '').localeCompare(a.date || '')),
+    [orders, returns]
+  );
+
   const bookings = useMemo(() => detail?.recentBookings ?? [], [detail]);
-  // Như KiotViet: khách có đơn đặt → có tab Lịch sử đặt hàng; tab bán hàng hiện khi có hóa đơn (hoặc chưa có giao dịch nào)
+  // Khách có đơn đặt → có tab Lịch sử đặt hàng; tab bán hàng hiện khi có hóa đơn / phiếu trả (hoặc chưa có giao dịch nào)
   const tabs: { key: TabKey; label: string }[] = [
     { key: 'info', label: 'Thông tin' },
-    ...(orders.length > 0 || bookings.length === 0 ? [{ key: 'orders' as const, label: 'Lịch sử bán/trả hàng' }] : []),
+    ...(salesHistory.length > 0 || bookings.length === 0 ? [{ key: 'orders' as const, label: 'Lịch sử bán/trả hàng' }] : []),
     ...(bookings.length > 0 ? [{ key: 'bookings' as const, label: 'Lịch sử đặt hàng' }] : []),
     { key: 'debts', label: 'Nợ cần thu từ khách' },
     { key: 'creditLimit', label: 'Lịch sử hạn mức' },
@@ -272,7 +293,7 @@ export default function CustomerExpandedRow({
                       <table className="w-full text-left border-collapse">
                         <thead className={theadCls}>
                           <tr>
-                            <th className="py-2 px-3 w-40">Mã hóa đơn</th>
+                            <th className="py-2 px-3 w-40">Mã chứng từ</th>
                             <th className="py-2 px-3 w-40">Thời gian</th>
                             <th className="py-2 px-3">Người bán</th>
                             <th className="py-2 px-3">Chi nhánh</th>
@@ -281,20 +302,57 @@ export default function CustomerExpandedRow({
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100 text-[13px]">
-                          {orders.length === 0 ? (
+                          {salesHistory.length === 0 ? (
                             <tr>
                               <td colSpan={6} className="py-6 text-center text-[#677484] text-xs">
-                                Khách hàng chưa có hóa đơn nào
+                                Khách hàng chưa có hóa đơn hay phiếu trả hàng nào
                               </td>
                             </tr>
                           ) : (
-                            orders.map((o) => {
+                            salesHistory.map((row) => {
+                              if (row.kind === 'RETURN') {
+                                const r = row.ret;
+                                const rst = RETURN_STATUS_LABEL[(r.status || '').toUpperCase()] ?? {
+                                  label: r.status || '—',
+                                  cls: 'bg-slate-50 text-slate-600 border-slate-200',
+                                };
+                                return (
+                                  <tr key={row.key} className="hover:bg-[#f7f8f9]">
+                                    <td className="py-2.5 px-3 font-medium">
+                                      <a
+                                        href={documentLinkHref('/sales-returns', {
+                                          code: r.returnCode,
+                                          id: r.returnId,
+                                          date: toLinkDate(r.returnDate),
+                                        })}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-[#0070f4] hover:underline"
+                                        title={`Mở phiếu trả hàng ${r.returnCode}${r.invoiceCode ? ` (hóa đơn ${r.invoiceCode})` : ''}`}
+                                      >
+                                        {r.returnCode}
+                                      </a>
+                                    </td>
+                                    <td className="py-2.5 px-3 whitespace-nowrap">{fmtDateTime(r.returnDate ?? undefined)}</td>
+                                    <td className="py-2.5 px-3">{r.createdByName || '—'}</td>
+                                    <td className="py-2.5 px-3">{r.warehouseName || '—'}</td>
+                                    {/* Trả hàng làm giảm doanh số: hiện số âm */}
+                                    <td className="py-2.5 px-3 text-right">{money.format(-r.totalAmount)}</td>
+                                    <td className="py-2.5 px-3">
+                                      <span className={`inline-block px-2 py-0.5 rounded-[4px] text-[11px] font-semibold border ${rst.cls}`}>
+                                        {rst.label}
+                                      </span>
+                                    </td>
+                                  </tr>
+                                );
+                              }
+                              const o = row.order;
                               const st = ORDER_STATUS[(o.status || '').toUpperCase()] ?? {
                                 label: o.status || '—',
                                 cls: 'bg-slate-50 text-slate-600 border-slate-200',
                               };
                               return (
-                                <tr key={o.orderId} className="hover:bg-[#f7f8f9]">
+                                <tr key={row.key} className="hover:bg-[#f7f8f9]">
                                   <td className="py-2.5 px-3 font-medium">
                                     <button
                                       type="button"
