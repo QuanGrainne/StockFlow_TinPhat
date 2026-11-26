@@ -24,7 +24,7 @@ import {
 } from 'lucide-react';
 import { StaffAccount, UserRole, RoleDefinition, WarehouseFacility } from '../types';
 import { adminService } from '../services/adminService';
-import { PASSWORD_RULES, firstPasswordViolation, lowerFirst } from '@/lib/auth/passwordPolicy';
+import { PASSWORD_RULES, firstPasswordViolation, passwordRuleMessage } from '@/lib/auth/passwordPolicy';
 
 /** Số tài khoản mỗi trang (theo chuẩn màn Hàng hóa) */
 const STAFF_PAGE_SIZE = 15;
@@ -83,6 +83,8 @@ export const StaffAccountsScreen: React.FC<StaffAccountsScreenProps> = ({
   const [formUsername, setFormUsername] = useState('');
   const [formAvatar, setFormAvatar] = useState<string>('');
   const [formEmail, setFormEmail] = useState('');
+  // Lỗi theo ô (SYS-ACC-06): tô đỏ ô và hiện câu giống backend CreateStaffCommand
+  const [formErrors, setFormErrors] = useState<{ name?: string; email?: string }>({});
   const [formPhone, setFormPhone] = useState('');
   const [formTitle, setFormTitle] = useState('');
   const [formRole, setFormRole] = useState<UserRole>('ROLE_WAREHOUSE');
@@ -245,6 +247,7 @@ export const StaffAccountsScreen: React.FC<StaffAccountsScreenProps> = ({
     setFormRole(defaultRole);
     setFormPassword('TinPhat@2026');
     setFormWarehouses(warehouseList[0] ? [warehouseList[0].code] : []);
+    setFormErrors({});
     setEditModalOpen(true);
   };
 
@@ -273,6 +276,7 @@ export const StaffAccountsScreen: React.FC<StaffAccountsScreenProps> = ({
     setFormPassword('');
     const normalizedWarehouses = (staff.assignedWarehouses || []).map((code) => normalizeWarehouseCode(code));
     setFormWarehouses(normalizedWarehouses.length > 0 ? normalizedWarehouses : (warehouseList[0] ? [warehouseList[0].code] : []));
+    setFormErrors({});
     setEditModalOpen(true);
   };
 
@@ -280,10 +284,12 @@ export const StaffAccountsScreen: React.FC<StaffAccountsScreenProps> = ({
     e.preventDefault();
 
     const trimmedName = formName.trim();
-    if (!trimmedName) {
-      alert('Vui lòng nhập Họ và tên nhân viên');
-      return;
-    }
+    const errors: { name?: string; email?: string } = {};
+    if (!trimmedName) errors.name = 'Họ và tên nhân viên không được để trống.';
+    const trimmedEmail = formEmail.trim();
+    if (trimmedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) errors.email = 'Email không đúng định dạng.';
+    setFormErrors(errors);
+    if (errors.name || errors.email) return;
 
     const trimmedUsername = formUsername.trim().toLowerCase();
     if (!trimmedUsername) {
@@ -302,7 +308,7 @@ export const StaffAccountsScreen: React.FC<StaffAccountsScreenProps> = ({
     if (trimmedPassword) {
       const violation = firstPasswordViolation(trimmedPassword);
       if (violation) {
-        alert(`Mật khẩu chưa đạt yêu cầu: ${lowerFirst(violation.label)}.\nMật khẩu cần tối thiểu 8 ký tự, có chữ in hoa, chữ thường, chữ số và ký tự đặc biệt.`);
+        alert(`${passwordRuleMessage('Mật khẩu', violation)}\nMật khẩu cần tối thiểu 8 ký tự, có chữ in hoa, chữ thường, chữ số và ký tự đặc biệt.`);
         return;
       }
     }
@@ -412,6 +418,8 @@ export const StaffAccountsScreen: React.FC<StaffAccountsScreenProps> = ({
           password: formPassword.trim() || 'TinPhat@2026',
         });
         showToast(`Đã thêm nhân viên mới ${trimmedName}`);
+        // Danh sách xếp theo thứ tự tạo: chuyển tới trang cuối để thấy ngay tài khoản vừa thêm (trang bị kẹp về trang cuối)
+        setPage(Number.MAX_SAFE_INTEGER);
       }
 
       setEditModalOpen(false);
@@ -791,7 +799,7 @@ export const StaffAccountsScreen: React.FC<StaffAccountsScreenProps> = ({
               </div>
             </div>
 
-            <form onSubmit={handleSaveStaff} className="flex-1 min-h-0 flex flex-col">
+            <form noValidate onSubmit={handleSaveStaff} className="flex-1 min-h-0 flex flex-col">
               <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4 space-y-3.5">
               {/* Mục Avatar nhân viên */}
               <div className="flex items-center gap-4 p-3 rounded-xl bg-slate-50 border border-slate-200/80">
@@ -887,12 +895,18 @@ export const StaffAccountsScreen: React.FC<StaffAccountsScreenProps> = ({
                   </label>
                   <input
                     type="text"
-                    required
                     value={formName}
-                    onChange={(e) => setFormName(e.target.value)}
+                    onChange={(e) => {
+                      setFormName(e.target.value);
+                      setFormErrors((prev) => ({ ...prev, name: undefined }));
+                    }}
                     placeholder="Bắt buộc"
-                    className="w-full h-10 px-3.5 rounded-xl border border-slate-200 text-xs focus:outline-none focus:border-blue-500 shadow-xs placeholder:text-slate-400"
+                    aria-invalid={!!formErrors.name}
+                    className={`w-full h-10 px-3.5 rounded-xl border text-xs focus:outline-none focus:border-blue-500 shadow-xs placeholder:text-slate-400 ${
+                      formErrors.name ? 'border-rose-400 bg-rose-50/40' : 'border-slate-200'
+                    }`}
                   />
+                  {formErrors.name && <p className="mt-1 text-[11px] text-rose-600">{formErrors.name}</p>}
                 </div>
               </div>
 
@@ -972,13 +986,18 @@ export const StaffAccountsScreen: React.FC<StaffAccountsScreenProps> = ({
                     onChange={(e) => {
                       const newEmail = e.target.value;
                       setFormEmail(newEmail);
+                      setFormErrors((prev) => ({ ...prev, email: undefined }));
                       if (!editingStaff && (!formUsername || formUsername === formEmail.split('@')[0])) {
                         setFormUsername(newEmail.split('@')[0].toLowerCase());
                       }
                     }}
                     placeholder=""
-                    className="w-full h-10 px-3.5 rounded-xl border border-slate-200 text-xs focus:outline-none focus:border-blue-500 shadow-xs"
+                    aria-invalid={!!formErrors.email}
+                    className={`w-full h-10 px-3.5 rounded-xl border text-xs focus:outline-none focus:border-blue-500 shadow-xs ${
+                      formErrors.email ? 'border-rose-400 bg-rose-50/40' : 'border-slate-200'
+                    }`}
                   />
+                  {formErrors.email && <p className="mt-1 text-[11px] text-rose-600">{formErrors.email}</p>}
                 </div>
               </div>
 

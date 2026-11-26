@@ -110,6 +110,12 @@ function DetailModalBody({
         if (!alive) return;
         setDetail({ id: requestId, data: d });
         setApprovedLimit(d.requestedLimit);
+        // Popup này mở để ra quyết định: dòng trong danh sách còn "Chờ duyệt" nhưng người khác đã xử lý
+        // → báo MSG57 và làm mới danh sách (E62.2, SYS-MSC-07); popup vẫn hiện kết quả xử lý để xem.
+        if (d.status !== 'PENDING') {
+          message.warning('Yêu cầu này đã được xử lý (MSG57).');
+          onChanged();
+        }
       })
       .catch((err: unknown) => {
         if (!alive) return;
@@ -119,6 +125,8 @@ function DetailModalBody({
     return () => {
       alive = false;
     };
+    // onChanged chỉ dùng khi tải xong; không đưa vào deps để tránh tải lại khi danh sách làm mới
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [requestId, onClose]);
 
   useEffect(() => {

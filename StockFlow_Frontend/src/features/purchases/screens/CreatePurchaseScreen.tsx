@@ -465,7 +465,7 @@ export default function CreatePurchaseScreen({ mode = 'receipt' }: CreatePurchas
         if (!isOrder) {
           // Nhập theo phiếu đặt: chỉ nạp phần chưa nhập
           if (po.status !== 'ORDERED' && po.status !== 'PARTIAL') {
-            showToast('Phiếu đặt hàng nhập không ở trạng thái chờ nhập hàng', 'error');
+            showToast(`Phiếu đặt hàng nhập ${po.poCode} không ở trạng thái chờ nhập hàng.`, 'error');
             router.replace(backTo);
             return;
           }

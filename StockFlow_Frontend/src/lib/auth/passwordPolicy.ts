@@ -4,23 +4,22 @@
 
 export interface PasswordRule {
   label: string;
+  /** Phần sau tên ô trong câu báo lỗi, trùng câu backend PasswordPolicy.cs (VD "phải có ít nhất 1 chữ in hoa (BR-35)") */
+  requirement: string;
   test: (value: string) => boolean;
 }
 
 export const PASSWORD_RULES: PasswordRule[] = [
-  { label: 'Tối thiểu 8 ký tự', test: (v) => v.length >= 8 },
-  { label: 'Có chữ in hoa (A–Z)', test: (v) => /[A-Z]/.test(v) },
-  { label: 'Có chữ thường (a–z)', test: (v) => /[a-z]/.test(v) },
-  { label: 'Có chữ số (0–9)', test: (v) => /[0-9]/.test(v) },
-  { label: 'Có ký tự đặc biệt (!@#...)', test: (v) => /[^A-Za-z0-9]/.test(v) },
+  { label: 'Tối thiểu 8 ký tự', requirement: 'phải có tối thiểu 8 ký tự (BR-35)', test: (v) => v.length >= 8 },
+  { label: 'Có chữ in hoa (A–Z)', requirement: 'phải có ít nhất 1 chữ in hoa (BR-35)', test: (v) => /[A-Z]/.test(v) },
+  { label: 'Có chữ thường (a–z)', requirement: 'phải có ít nhất 1 chữ thường (BR-35)', test: (v) => /[a-z]/.test(v) },
+  { label: 'Có chữ số (0–9)', requirement: 'phải có ít nhất 1 chữ số (BR-35)', test: (v) => /[0-9]/.test(v) },
+  { label: 'Có ký tự đặc biệt (!@#...)', requirement: 'phải có ít nhất 1 ký tự đặc biệt (BR-35)', test: (v) => /[^A-Za-z0-9]/.test(v) },
 ];
 
-/**
- * Viết thường chữ đầu của nhãn để ghép vào câu báo lỗi. Không dùng toLowerCase() cho cả nhãn
- * vì sẽ đổi "(A–Z)" thành "(a–z)" (DEF-E2E-07).
- */
-export function lowerFirst(label: string): string {
-  return label.charAt(0).toLowerCase() + label.slice(1);
+/** Câu báo lỗi như backend, VD "Mật khẩu mới phải có ít nhất 1 chữ in hoa (BR-35)." */
+export function passwordRuleMessage(fieldLabel: string, rule: PasswordRule): string {
+  return `${fieldLabel} ${rule.requirement}.`;
 }
 
 /** Quy tắc đầu tiên mật khẩu chưa đạt; null = đạt hết */

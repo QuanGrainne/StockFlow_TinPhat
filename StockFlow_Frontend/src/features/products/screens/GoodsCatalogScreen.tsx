@@ -1571,11 +1571,11 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
   const handleSaveItem = (e?: React.FormEvent, keepOpen = false) => {
     if (e) e.preventDefault();
     if (!formName.trim()) {
-      alert('Vui lòng nhập Tên hàng hóa!');
+      alert('Tên hàng hóa không được để trống.');
       return;
     }
     if (isProductCodeDuplicate) {
-      alert(`Mã hàng hóa '${formCode.trim().toUpperCase()}' đã tồn tại trong hệ thống! Vui lòng chọn mã khác.`);
+      alert(`Mã hàng hóa '${formCode.trim().toUpperCase()}' đã tồn tại trong hệ thống.`);
       return;
     }
 
@@ -4486,6 +4486,11 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                           const label = ref ? ref.name : tempUnits.find((x) => x.isBase)?.name || 'đơn vị cơ bản';
                           const current = ref && u.refRate ? u.refRate : u.conversionRate;
                           const rate = prompt(`1 ${u.name} = ? ${label}`, current.toString());
+                          // Hệ số 0 / âm / không phải số: báo lỗi thay vì lặng lẽ bỏ qua (SYS-MST-08)
+                          if (rate !== null && !(Number(rate) > 0)) {
+                            alert('Số lượng quy đổi phải lớn hơn 0.');
+                            return;
+                          }
                           if (rate && Number(rate) > 0) {
                             const r = Number(rate);
                             const edited: GoodsUnitConversion = ref
