@@ -148,8 +148,10 @@ function mapDetail(d: ApiTransferDetail): TransferDetail {
 }
 
 export const transferService = {
-  async getTransfers(filters?: Partial<TransferFilterState>): Promise<TransferRecord[]> {
+  /** involvedWarehouseId: chỉ lấy phiếu có kho xuất hoặc kho nhận là kho này (chi nhánh đang chọn trên header) */
+  async getTransfers(filters?: Partial<TransferFilterState>, involvedWarehouseId?: number | null): Promise<TransferRecord[]> {
     const params = new URLSearchParams();
+    if (involvedWarehouseId) params.append('warehouseIds', String(involvedWarehouseId));
     if (filters?.sourceWarehouseId && filters.sourceWarehouseId !== 'ALL') {
       params.append('sourceWarehouseId', String(filters.sourceWarehouseId));
     }

@@ -461,9 +461,15 @@ export default function GoodsImportModal({
         if (!code && !name) continue;
 
         const productCode = code || `SP${Date.now() + i}`;
-        const productName = name || code;
-
         const existing = goodsByCode.get(productCode.toUpperCase());
+
+        // Tên bắt buộc với hàng mới (như form tạo hàng, SYS-MST-03 / SYS-PRD-N02); hàng đã có thì giữ tên cũ.
+        // Có dòng lỗi thì dừng cả file, không nhập dở.
+        if (!name && !existing) {
+          setErrorMessage(`Dòng ${i + 1}: Thiếu tên hàng hóa.`);
+          return;
+        }
+        const productName = name || existing?.name || code;
 
         if (existing) {
           // Trùng mã hàng

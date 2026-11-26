@@ -119,12 +119,17 @@ export default function TransfersScreen() {
   // Tăng sau khi nhận hàng để ô chi tiết phiếu đang mở tải lại (nó chỉ tự tải khi đổi phiếu)
   const [detailVersion, setDetailVersion] = useState(0);
 
+  // Danh sách theo chi nhánh đang chọn trên header (phiếu có kho xuất hoặc kho nhận là chi nhánh này), như các màn
+  // chứng từ khác; bộ lọc Chuyển đi / Nhận về chọn phía còn lại (SYS-XCT-N05). Mở thẳng một phiếu bằng link thì không lọc.
+  const { activeWarehouse } = useActiveWarehouse();
+  const involvedWarehouseId = docLink ? null : activeWarehouse?.warehouseId ?? null;
+
   const loadData = async () => {
     setLoading(true);
     try {
       const [facs, list] = await Promise.all([
         adminService.getWarehouseFacilities(),
-        transferService.getTransfers(filters),
+        transferService.getTransfers(filters, involvedWarehouseId),
       ]);
       setWarehouses(facs);
       setTransfers(list);
@@ -137,7 +142,8 @@ export default function TransfersScreen() {
 
   useEffect(() => {
     loadData();
-  }, [filters]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters, involvedWarehouseId]);
 
   const handleUpdateFilters = (updated: Partial<TransferFilterState>) => {
     setFilters((prev) => ({ ...prev, ...updated }));
