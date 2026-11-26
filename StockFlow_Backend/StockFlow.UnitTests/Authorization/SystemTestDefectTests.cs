@@ -1,3 +1,5 @@
+using StockFlow.Application.Features.Admin.Commands;
+using StockFlow.Application.Features.Admin.DTOs;
 using StockFlow.Application.Features.Roles.Commands;
 using StockFlow.Application.Features.Roles.Common;
 using StockFlow.Application.Features.Roles.DTOs;
@@ -7,7 +9,7 @@ using Xunit;
 
 namespace StockFlow.UnitTests.Authorization;
 
-/// <summary>Hồi quy các lỗi phân quyền tìm thấy ở system test Report 5.3 (DEF-E2E-04, 05, 06, 08).</summary>
+/// <summary>Hồi quy các lỗi phân quyền tìm thấy ở system test Report 5.3 (DEF-E2E-04, 05, 06, 08; SYS-ROL-08).</summary>
 public class SystemTestDefectTests
 {
     private static Task<StockFlow.Application.Common.Result<RoleDto>> CreateRole(TestStockFlowDbContext db, string name, string code) =>
@@ -46,6 +48,17 @@ public class SystemTestDefectTests
         var features = await new UserPermissionService(db).GetFeatureCodesAsync(AuthData.Admin);
         foreach (var f in FeatureConstants.Features)
             Assert.Contains(f.Code, features);
+    }
+
+    [Fact(DisplayName = "SYS-ROL-08 – sửa nhân viên với vai trò rỗng: báo \"Vai trò không được để trống.\", giữ vai trò cũ")]
+    public async Task UpdateStaff_EmptyRole_Rejected()
+    {
+        var db = AuthData.Db();
+        var req = new UpdateStaffRequest { Name = "Nhân viên bán hàng 01", Phone = "0912345678", Role = "", AssignedWarehouses = new() { "K001" } };
+        var r = await new UpdateStaffCommandHandler(db, AuthData.Hasher).Handle(new UpdateStaffCommand(AuthData.Sales, req), CancellationToken.None);
+        Assert.False(r.IsSuccess);
+        Assert.Equal("Vai trò không được để trống.", r.Error);
+        Assert.Contains(db.JncUserRoles, ur => ur.UserId == AuthData.Sales && ur.RoleId == AuthData.SalesRole);
     }
 
     [Fact(DisplayName = "DEF-E2E-06/08 – quyền mặc định: SalesStaff có SALES_DELETE, WarehouseStaff có PURCHASE_UPDATE")]
