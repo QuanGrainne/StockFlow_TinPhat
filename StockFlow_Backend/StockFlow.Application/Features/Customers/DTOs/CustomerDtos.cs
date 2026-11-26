@@ -148,7 +148,23 @@ public record CustomerDetailDto(
     decimal TotalSalesNetReturns = 0,
     List<CustomerDebtLedgerEntryDto>? DebtLedger = null,
     // Lịch sử đặt hàng (đơn đặt của khách, order_type = BOOKING)
-    List<CustomerRecentOrderDto>? RecentBookings = null
+    List<CustomerRecentOrderDto>? RecentBookings = null,
+    // Phiếu trả hàng của khách (tab "Lịch sử bán/trả hàng" hiện chung với hóa đơn)
+    List<CustomerRecentReturnDto>? RecentReturns = null
+);
+
+/// <summary>Phiếu trả hàng trong tab "Lịch sử bán/trả hàng"</summary>
+public record CustomerRecentReturnDto(
+    int ReturnId,
+    string ReturnCode,
+    DateTime? ReturnDate,
+    /// <summary>Cần trả khách</summary>
+    decimal TotalAmount,
+    string? Status,
+    string? CreatedByName,
+    string? WarehouseName,
+    /// <summary>Hóa đơn gốc (null = trả nhanh)</summary>
+    string? InvoiceCode
 );
 
 /// <summary>Request tạo mới khách hàng.</summary>

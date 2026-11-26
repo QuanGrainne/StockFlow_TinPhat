@@ -310,8 +310,8 @@ export default function SalesReturnsScreen() {
                           <td className="py-2.5 px-3 text-right font-mono">{formatVnd(r.totalGoodsAmount)}</td>
                           <td className="py-2.5 px-3 text-right font-mono">{formatVnd(r.totalAmount)}</td>
                           <td
-                            className={`py-2.5 px-3 text-right font-mono ${!cancelled && r.refundAmount < r.totalAmount ? 'text-[#fb2c36]' : ''}`}
-                            title={!cancelled && r.refundAmount < r.totalAmount ? 'Chưa trả đủ tiền cho khách (phần còn lại trừ vào công nợ)' : undefined}
+                            className="py-2.5 px-3 text-right font-mono"
+                            title={!cancelled && r.refundAmount < r.totalAmount ? 'Phần chưa trả tiền mặt đã trừ vào công nợ khách' : undefined}
                           >
                             {formatVnd(r.refundAmount)}
                           </td>
