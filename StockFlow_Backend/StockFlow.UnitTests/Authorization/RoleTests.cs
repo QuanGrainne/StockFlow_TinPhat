@@ -128,14 +128,14 @@ public class SaveFeatureMatrixTests
         Assert.Empty(RoleSetup.FeatureCodes(db, AuthData.ProductionRole));
     }
 
-    [Fact(DisplayName = "SaveFeatureMatrix/UTCID03 – ROLE_ADMIN []: vẫn giữ FEAT_ROLES, FEAT_ROLE_MATRIX")]
+    [Fact(DisplayName = "SaveFeatureMatrix/UTCID03 – ROLE_ADMIN []: vẫn giữ mọi chức năng (DEF-E2E-05)")]
     [Trait("Function", Function)][Trait("UTCID", "SaveFeatureMatrix/UTCID03")][Trait("Type", "B")]
     public async Task UTCID03_AdminEmpty_KeepsLockedFeatures()
     {
         var db = AuthData.Db();
         var r = await Save(db, new() { ["ROLE_ADMIN"] = new() });
         Assert.True(r.IsSuccess, r.Error);
-        Assert.Equal(new[] { "FEAT_ROLES", "FEAT_ROLE_MATRIX" }, RoleSetup.FeatureCodes(db, AuthData.AdminRole));
+        Assert.Equal(FeatureConstants.Features.Select(f => f.Code).OrderBy(c => c, StringComparer.Ordinal), RoleSetup.FeatureCodes(db, AuthData.AdminRole));
     }
 
     [Fact(DisplayName = "SaveFeatureMatrix/UTCID04 – ma trận rỗng {}")]
@@ -246,12 +246,13 @@ public class GetPermissionCodesTests
         Assert.Equal(new[] { "AUTH_READ", "SALES_CREATE", "SALES_READ" }, (await Codes(db, AuthData.Manager)).OrderBy(c => c));
     }
 
-    [Fact(DisplayName = "GetPermissionCodes/UTCID03 – SalesStaff chưa có ma trận: 12 mã mặc định ROLE_SALES")]
+    [Fact(DisplayName = "GetPermissionCodes/UTCID03 – SalesStaff chưa có ma trận: 13 mã mặc định ROLE_SALES (có SALES_DELETE)")]
     [Trait("Function", Function)][Trait("UTCID", "GetPermissionCodes/UTCID03")][Trait("Type", "N")]
     public async Task UTCID03_NoMatrix_Defaults()
     {
         var codes = await Codes(AuthData.Db(), AuthData.Sales);
-        Assert.Equal(12, codes.Count);
+        Assert.Equal(13, codes.Count);
+        Assert.Contains("SALES_DELETE", codes);
         Assert.Equal(PermissionConstants.GetDefaultPermissionCodes("ROLE_SALES").OrderBy(c => c), codes.OrderBy(c => c));
     }
 
@@ -267,7 +268,7 @@ public class GetPermissionCodesTests
         Assert.Equal(new[] { "PROD_READ", "STOCK_CREATE", "STOCK_READ" }, (await Codes(db, AuthData.Warehouse)).OrderBy(c => c));
     }
 
-    [Fact(DisplayName = "GetPermissionCodes/UTCID05 – SalesStaff chỉ có mã chức năng FEAT_POS: vẫn 12 mã mặc định")]
+    [Fact(DisplayName = "GetPermissionCodes/UTCID05 – SalesStaff chỉ có mã chức năng FEAT_POS: vẫn 13 mã mặc định")]
     [Trait("Function", Function)][Trait("UTCID", "GetPermissionCodes/UTCID05")][Trait("Type", "N")]
     public async Task UTCID05_OnlyFeatureCode_Defaults()
     {
