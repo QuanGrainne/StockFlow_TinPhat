@@ -449,7 +449,7 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       </div>
 
-      {/* Right: Branch Selector (Khớp Ảnh 1 KiotViet) & User Profile */}
+      {/* Right: Branch Selector & User Profile */}
       <div className="flex flex-wrap items-center gap-3 relative ml-auto">
         {/* Bộ chọn Chi Nhánh Kho theo Phân Quyền (Data Isolation) */}
         {!authorizedLoaded ? null : permittedFacilities.length === 0 ? (

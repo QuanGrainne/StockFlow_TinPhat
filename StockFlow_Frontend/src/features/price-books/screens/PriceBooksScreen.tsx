@@ -80,7 +80,7 @@ export default function PriceBooksClient() {
     return priceBooks.find(b => selectedPriceBookIds.includes(b.priceBookId) && !b.isDefault) || null;
   }, [priceBooks, selectedPriceBookIds]);
 
-  // Rule KiotViet:
+  // Quy tắc hiển thị bảng giá:
   // 1. Khi không chọn bảng giá nào: displayedBookIds = [] (hiện Chưa có bảng giá)
   // 2. Khi chọn bảng giá chung: hiện bảng giá chung
   // 3. Khi chọn bảng giá nam (hoặc bảng giá khác): phải hiện bảng giá chung cạnh nhưng không được mất đi
@@ -97,7 +97,7 @@ export default function PriceBooksClient() {
     try {
       const data = await priceBookService.getPriceBooks();
       setPriceBooks(data);
-      // Lần đầu mở màn hình: mặc định lọc theo "Bảng giá chung" (giống KiotViet)
+      // Lần đầu mở màn hình: mặc định lọc theo "Bảng giá chung"
       if (!hasInitSelectionRef.current) {
         hasInitSelectionRef.current = true;
         const def = data.find(b => b.isDefault) || data[0];
@@ -849,7 +849,7 @@ export default function PriceBooksClient() {
             title: 'Thành công',
             description: `Bảng giá "${saved.priceBookName}" đã được lưu.`,
           });
-          // Tự động chọn bảng giá mới này trên sidebar theo đúng KiotViet!
+          // Tự động chọn bảng giá mới này trên sidebar
           setSelectedPriceBookIds([saved.priceBookId]);
           loadPriceBooks();
           loadMatrix();

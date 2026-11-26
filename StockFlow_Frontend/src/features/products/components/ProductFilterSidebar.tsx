@@ -95,7 +95,7 @@ export const INITIAL_FILTER_STATE: FilterSidebarState = {
   locations: [],
   productTypes: [],
   directSale: 'all',
-  // Mặc định chỉ hiện hàng đang kinh doanh (giống KiotViet)
+  // Mặc định chỉ hiện hàng đang kinh doanh
   businessStatus: 'active',
   channelLinked: 'all',
 };
@@ -1492,7 +1492,7 @@ export default function ProductFilterSidebar({
               </button>
             </div>
           )}
-        {/* 1. Nhóm hàng (Multi-select Popover Chuẩn KiotViet) */}
+        {/* 1. Nhóm hàng (Multi-select Popover) */}
         <div>
           <div className="flex items-center justify-between mb-1.5">
             <span className="text-[13px] font-semibold text-slate-800">Nhóm hàng</span>
@@ -1550,7 +1550,7 @@ export default function ProductFilterSidebar({
               </div>
             </div>
 
-            {/* Category Popover Nổi (Chuẩn KiotViet - Ảnh 2 - Render qua Portal để KHÔNG BỊ CẮT) */}
+            {/* Category Popover Nổi (Render qua Portal để KHÔNG BỊ CẮT) */}
             {categoryOpen && categoryCoords && typeof document !== 'undefined' && createPortal(
               <div
                 data-portal-popover="true"
@@ -2175,7 +2175,7 @@ export default function ProductFilterSidebar({
         </div>
       )}
 
-      {/* Preset Popover (Chuẩn KiotViet Chuyển hàng) */}
+      {/* Preset Popover (như Chuyển hàng) */}
       {mounted &&
         showPresetPopover &&
         createPortal(
@@ -2229,7 +2229,7 @@ export default function ProductFilterSidebar({
           document.body
         )}
 
-      {/* Custom Calendar Popover (Chuẩn KiotViet Chuyển hàng: Dual Calendar Side-by-Side độc lập) */}
+      {/* Custom Calendar Popover (như Chuyển hàng: Dual Calendar Side-by-Side độc lập) */}
       {mounted &&
         showCustomPopover &&
         createPortal(
