@@ -138,6 +138,15 @@ export interface StockCardEntry {
   partnerName: string | null;
 }
 
+export interface ProductListParams {
+  search?: string;
+  type?: string;
+  categoryId?: number;
+  warehouseId?: number;
+  lowStockOnly?: boolean;
+  status?: string;
+}
+
 export const productService = {
   /** Thẻ kho của hàng hóa tại 1 chi nhánh (chỉ xem) */
   getStockCard(id: number | string, warehouseId: number): Promise<StockCardEntry[]> {
@@ -149,33 +158,32 @@ export const productService = {
     return apiClient.post<ProductStockAdjustmentResult>(`/api/Products/${id}/stock-adjustments`, payload);
   },
 
-  async getProducts(params?: {
-    search?: string;
-    type?: string;
-    categoryId?: number;
-    warehouseId?: number;
-    lowStockOnly?: boolean;
-    status?: string;
-  }): Promise<Product[]> {
+  async getProducts(params?: ProductListParams): Promise<Product[]> {
     try {
-      const token = typeof window !== 'undefined' ? tabSession.get('stockflow_token') ?? undefined : undefined;
-      const query = new URLSearchParams();
-      if (params?.search) query.append('search', params.search);
-      if (params?.type && params.type !== 'ALL') query.append('type', params.type);
-      if (params?.categoryId) query.append('categoryId', params.categoryId.toString());
-      if (params?.warehouseId) query.append('warehouseId', params.warehouseId.toString());
-      if (params?.lowStockOnly) query.append('lowStockOnly', 'true');
-      if (params?.status) query.append('status', params.status);
-
-      const qs = query.toString() ? `?${query.toString()}` : '';
-      const data = await apiClient.get<Product[]>(`/api/Products${qs}`, token);
-      if (Array.isArray(data)) {
-        return data;
-      }
+      return await productService.getProductsOrThrow(params);
     } catch (e) {
       console.warn('API getProducts failed (offline or unauthorized), using local cached data:', e);
     }
     return [];
+  },
+
+  /**
+   * Như getProducts nhưng ném lỗi khi không gọi được API, để màn hình phân biệt
+   * "DB chưa có hàng hóa" (mảng rỗng) với "mất kết nối" (DEF-E2E-09).
+   */
+  async getProductsOrThrow(params?: ProductListParams): Promise<Product[]> {
+    const token = typeof window !== 'undefined' ? tabSession.get('stockflow_token') ?? undefined : undefined;
+    const query = new URLSearchParams();
+    if (params?.search) query.append('search', params.search);
+    if (params?.type && params.type !== 'ALL') query.append('type', params.type);
+    if (params?.categoryId) query.append('categoryId', params.categoryId.toString());
+    if (params?.warehouseId) query.append('warehouseId', params.warehouseId.toString());
+    if (params?.lowStockOnly) query.append('lowStockOnly', 'true');
+    if (params?.status) query.append('status', params.status);
+
+    const qs = query.toString() ? `?${query.toString()}` : '';
+    const data = await apiClient.get<Product[]>(`/api/Products${qs}`, token);
+    return Array.isArray(data) ? data : [];
   },
 
   async getProductById(id: number | string): Promise<Product | null> {

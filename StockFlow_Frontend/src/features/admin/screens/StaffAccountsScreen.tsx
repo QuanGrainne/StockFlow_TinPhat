@@ -24,7 +24,10 @@ import {
 } from 'lucide-react';
 import { StaffAccount, UserRole, RoleDefinition, WarehouseFacility } from '../types';
 import { adminService } from '../services/adminService';
-import { PASSWORD_RULES, firstPasswordViolation } from '@/lib/auth/passwordPolicy';
+import { PASSWORD_RULES, firstPasswordViolation, lowerFirst } from '@/lib/auth/passwordPolicy';
+
+/** Số tài khoản mỗi trang (theo chuẩn màn Hàng hóa) */
+const STAFF_PAGE_SIZE = 15;
 
 const getNextStaffCode = (list: StaffAccount[]): string => {
   let maxId = 0;
@@ -70,6 +73,8 @@ export const StaffAccountsScreen: React.FC<StaffAccountsScreenProps> = ({
     initialFilter === 'ACTIVE' ? 'ACTIVE' : 'ALL'
   );
   const [roleFilter, setRoleFilter] = useState<string>('ALL');
+  // Trang đang xem gắn với bộ lọc lúc chọn trang: đổi bộ lọc thì tự về trang 1
+  const [pageState, setPageState] = useState({ filterKey: '', page: 1 });
   // Modal State: Create / Edit
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editingStaff, setEditingStaff] = useState<StaffAccount | null>(null);
@@ -167,6 +172,17 @@ export const StaffAccountsScreen: React.FC<StaffAccountsScreenProps> = ({
     }
     return true;
   });
+
+  // Phân trang phía client, 15 dòng / trang như màn Hàng hóa (DEF-E2E-02)
+  const filterKey = `${search}|${statusFilter}|${roleFilter}`;
+  const page = pageState.filterKey === filterKey ? pageState.page : 1;
+  const setPage = (next: number) => setPageState({ filterKey, page: next });
+  const totalPages = Math.max(1, Math.ceil(filteredStaffList.length / STAFF_PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const pagedStaffList = filteredStaffList.slice(
+    (currentPage - 1) * STAFF_PAGE_SIZE,
+    currentPage * STAFF_PAGE_SIZE
+  );
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -286,7 +302,7 @@ export const StaffAccountsScreen: React.FC<StaffAccountsScreenProps> = ({
     if (trimmedPassword) {
       const violation = firstPasswordViolation(trimmedPassword);
       if (violation) {
-        alert(`Mật khẩu chưa đạt yêu cầu: ${violation.label.toLowerCase()}.\nMật khẩu cần tối thiểu 8 ký tự, có chữ in hoa, chữ thường, chữ số và ký tự đặc biệt.`);
+        alert(`Mật khẩu chưa đạt yêu cầu: ${lowerFirst(violation.label)}.\nMật khẩu cần tối thiểu 8 ký tự, có chữ in hoa, chữ thường, chữ số và ký tự đặc biệt.`);
         return;
       }
     }
@@ -302,15 +318,10 @@ export const StaffAccountsScreen: React.FC<StaffAccountsScreenProps> = ({
     const isEditingAdmin = isTargetAdmin(editingStaff);
     const finalRoleToSave = isEditingAdmin ? 'ROLE_ADMIN' : formRole;
 
-    // Bắt buộc chọn ít nhất 1 kho trực thuộc cho nhân viên
+    // Cho phép tài khoản chưa có kho (quyết định nhóm 10/11/2026, giống màn Phân quyền kho) – DEF-E2E-03
     const finalWarehousesToSave = Array.from(
       new Set(formWarehouses.map((w) => normalizeWarehouseCode(w)).filter(Boolean))
     );
-
-    if (finalWarehousesToSave.length === 0) {
-      alert('Vui lòng chọn ít nhất 1 chi nhánh kho trực thuộc cho nhân viên!');
-      return;
-    }
 
     const matchedRole = availableRoles.find(
       (r) =>
@@ -561,7 +572,7 @@ export const StaffAccountsScreen: React.FC<StaffAccountsScreenProps> = ({
                   </td>
                 </tr>
               ) : (
-                filteredStaffList.map((staff) => {
+                pagedStaffList.map((staff) => {
                   const isLocked = staff.status === 'LOCKED';
                   const initials = staff.name
                     .split(' ')
@@ -726,20 +737,28 @@ export const StaffAccountsScreen: React.FC<StaffAccountsScreenProps> = ({
         {/* Footer Pagination */}
         <div className="p-4 border-t border-slate-200/80 flex items-center justify-between text-xs text-slate-500">
           <div>
-            Hiển thị <span className="font-bold text-slate-800">{staffList.length}</span> trên{' '}
-            <span className="font-bold text-slate-800">{staffList.length}</span> tài khoản
+            Hiển thị <span className="font-bold text-slate-800">{pagedStaffList.length}</span> trên{' '}
+            <span className="font-bold text-slate-800">{filteredStaffList.length}</span> tài khoản
           </div>
           <div className="flex items-center gap-2">
             <button
-              disabled
-              className="p-1 rounded border border-slate-200 text-slate-300 cursor-not-allowed"
+              type="button"
+              aria-label="Trang trước"
+              disabled={currentPage <= 1}
+              onClick={() => setPage(currentPage - 1)}
+              className="p-1 rounded border border-slate-200 text-slate-600 hover:bg-slate-50 cursor-pointer disabled:text-slate-300 disabled:hover:bg-transparent disabled:cursor-not-allowed"
             >
               <ChevronLeft size={14} />
             </button>
-            <span className="font-semibold text-slate-700">Trang 1 / 1</span>
+            <span className="font-semibold text-slate-700">
+              Trang {currentPage} / {totalPages}
+            </span>
             <button
-              disabled
-              className="p-1 rounded border border-slate-200 text-slate-300 cursor-not-allowed"
+              type="button"
+              aria-label="Trang sau"
+              disabled={currentPage >= totalPages}
+              onClick={() => setPage(currentPage + 1)}
+              className="p-1 rounded border border-slate-200 text-slate-600 hover:bg-slate-50 cursor-pointer disabled:text-slate-300 disabled:hover:bg-transparent disabled:cursor-not-allowed"
             >
               <ChevronRight size={14} />
             </button>
@@ -1083,8 +1102,8 @@ export const StaffAccountsScreen: React.FC<StaffAccountsScreenProps> = ({
                 </div>
 
                 {formWarehouses.length === 0 && (
-                  <p className="text-[11px] text-rose-500 font-semibold flex items-center gap-1 pt-0.5">
-                    ⚠️ Bắt buộc phải chọn ít nhất 1 chi nhánh kho trực thuộc cho nhân viên.
+                  <p className="text-[11px] text-slate-500 flex items-center gap-1 pt-0.5">
+                    Chưa gán kho: nhân viên chưa xem / thao tác được dữ liệu kho nào. Có thể gán sau ở màn Phân quyền kho.
                   </p>
                 )}
               </div>

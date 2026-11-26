@@ -15,6 +15,14 @@ export const PASSWORD_RULES: PasswordRule[] = [
   { label: 'Có ký tự đặc biệt (!@#...)', test: (v) => /[^A-Za-z0-9]/.test(v) },
 ];
 
+/**
+ * Viết thường chữ đầu của nhãn để ghép vào câu báo lỗi. Không dùng toLowerCase() cho cả nhãn
+ * vì sẽ đổi "(A–Z)" thành "(a–z)" (DEF-E2E-07).
+ */
+export function lowerFirst(label: string): string {
+  return label.charAt(0).toLowerCase() + label.slice(1);
+}
+
 /** Quy tắc đầu tiên mật khẩu chưa đạt; null = đạt hết */
 export function firstPasswordViolation(value: string): PasswordRule | null {
   return PASSWORD_RULES.find((r) => !r.test(value)) ?? null;

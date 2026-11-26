@@ -418,8 +418,8 @@ export const SCREEN_FEATURE_MAP: Record<string, string> = Object.fromEntries(
   NAV_ITEMS_FLAT.flatMap((i) => [i.screen, ...(i.aliases ?? [])].map((s) => [s, i.featureId]))
 );
 
-/** Quyền cốt lõi của Admin luôn bật (không tự khóa mình khỏi màn phân quyền) */
-export const ADMIN_LOCKED_FEATURES = ['feat-roles', 'feat-role-matrix'];
+/** Admin luôn có mọi chức năng (SPEC FR-ROLE-04): cả cột Quản trị viên trên ma trận bị khóa (DEF-E2E-05) */
+export const ADMIN_LOCKED_FEATURES = Array.from(new Set(NAV_ITEMS_FLAT.map((i) => i.featureId)));
 
 /**
  * Màn mở được nhưng không nằm trên navbar: đường dẫn + các chức năng (chỉ cần 1) được phép mở.
