@@ -154,7 +154,8 @@ test.describe(SHEET, () => {
 
   test('SYS-MIS-06 – Xuất lũy kế vượt nhu cầu bị từ chối (cần lý do)', async ({ page, env, db, adminApi, uid }, testInfo) => {
     traceTc(testInfo, 'SYS-MIS-06', SHEET);
-    const expected = 'Số lượng xuất luỹ kế vượt nhu cầu theo BOM.';
+    // Expected Round 2: thuật ngữ BOM → "định mức"
+    const expected = 'Số lượng xuất luỹ kế vượt nhu cầu theo định mức.';
     const o = await order(adminApi, uid);
     await new LoginPage(page).loginOk(USER, env.defaultPassword);
     const mi = new MaterialIssuePage(page);

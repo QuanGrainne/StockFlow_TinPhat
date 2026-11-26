@@ -95,14 +95,31 @@ export async function priceOf(db: Client, priceBookId: number, productId: number
   return r.length ? Number(r[0].v) : null;
 }
 
-export async function orderSettingsRow(db: Client): Promise<{ order_code_prefix: string | null; order_code_rule: string | null; allow_negative_stock_sale: boolean | null; allow_selling_reserved_stock: boolean | null }> {
+/** Cài đặt giao dịch. Từ 24/11/2026 (migration SimplifyOrderSettings) chỉ còn 2 tuỳ chọn bán / chuyển khi âm kho;
+ *  các cột order_code_rule, allow_selling_reserved_stock đã bị xoá. */
+export async function orderSettingsRow(db: Client): Promise<{ allow_negative_stock_sale: boolean | null; allow_negative_stock_transfer: boolean | null }> {
   return (
-    await queryRows<{ order_code_prefix: string | null; order_code_rule: string | null; allow_negative_stock_sale: boolean | null; allow_selling_reserved_stock: boolean | null }>(
+    await queryRows<{ allow_negative_stock_sale: boolean | null; allow_negative_stock_transfer: boolean | null }>(
       db,
-      `SELECT order_code_prefix, order_code_rule, allow_negative_stock_sale, allow_selling_reserved_stock
+      `SELECT allow_negative_stock_sale, allow_negative_stock_transfer
          FROM stockflow.mst_order_settings WHERE setting_id = 1`
     )
   )[0];
+}
+
+/** Tạm đặt cài đặt giao dịch qua API (Admin) trong lúc chạy fn, rồi trả lại như cũ */
+export async function withOrderSettings(
+  admin: { get<T>(url: string): Promise<T>; put(url: string, body: unknown): Promise<unknown> },
+  patch: Record<string, unknown>,
+  fn: () => Promise<void>
+): Promise<void> {
+  const original = await admin.get<Record<string, unknown>>('/api/settings/orders');
+  await admin.put('/api/settings/orders', { ...original, ...patch });
+  try {
+    await fn();
+  } finally {
+    await admin.put('/api/settings/orders', original);
+  }
 }
 
 export async function receiptsOfProduct(db: Client, productId: number): Promise<{ gr_id: number; gr_code: string; status: string }[]> {

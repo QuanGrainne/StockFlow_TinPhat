@@ -9,7 +9,7 @@ import { ApiSession } from '../../fixtures/api';
 import { addStock, createProduct } from '../../fixtures/data';
 import { createCustomer, createInvoice, phoneFrom, setCreditLimit } from '../../fixtures/sales';
 import { bomsOfProduct, creditHistory, partnerById, partnersByName, productActive, productByName, productVariantsJson, productsLike, unitConversions } from '../../fixtures/dbq3';
-import { backendError, readToast, uiBlocksAction } from '../../fixtures/ui';
+import { backendError, readToast, uiBlocksAction, needsClarification } from '../../fixtures/ui';
 import type { Page } from '@playwright/test';
 
 const SHEET = 'UC-51 Master Data';
@@ -389,7 +389,7 @@ test.describe(SHEET, () => {
       const mgr = await ApiSession.login(env, USER, env.defaultPassword);
       const be = await backendError(() => mgr.post('/api/warehouses', { warehouseCode: `KE2E${uid.replace(/\D/g, '').slice(-4)}`, warehouseName: `Kho E2E ${uid}`, address: 'E2E' }));
       await mgr.dispose();
-      uiBlocksAction(testInfo, 'màn Kho (Phân quyền kho) chỉ dành cho Admin', 'Warehouse saved.', be);
+      needsClarification(testInfo, 'màn Kho (Phân quyền kho) chỉ dành cho Admin – actor của UC-51 phần Kho', 'Warehouse saved.', be);
     } else expect.soft(false, 'Manager mở được màn Kho: cần bổ sung bước tạo / sửa kho trong test').toBe(true);
   });
 
@@ -407,7 +407,7 @@ test.describe(SHEET, () => {
       const mgr = await ApiSession.login(env, USER, env.defaultPassword);
       const be = await backendError(() => mgr.delete('/api/warehouses/3'));
       await mgr.dispose();
-      uiBlocksAction(testInfo, 'màn Kho (Phân quyền kho) chỉ dành cho Admin', 'thông báo kho đang có tồn / nhân sự', be);
+      needsClarification(testInfo, 'màn Kho (Phân quyền kho) chỉ dành cho Admin – actor của UC-51 phần Kho', 'thông báo kho đang có tồn / nhân sự', be);
     } else expect.soft(false, 'Manager mở được màn Kho: cần bổ sung bước xóa kho trong test').toBe(true);
   });
 
@@ -443,6 +443,9 @@ test.describe(SHEET, () => {
     const bp = new BomPage(page);
     await bp.goto();
     await page.getByPlaceholder('Theo mã định mức, mã / tên thành phẩm').fill(fg.code);
+    // Từ commit dd6bdab danh sách mặc định chỉ lọc "Đang áp dụng": bật thêm "Ngừng áp dụng" để thấy phiên bản 2.0
+    const inactive = page.getByRole('checkbox', { name: 'Ngừng áp dụng' });
+    if (!(await inactive.isChecked())) await inactive.check();
     await page.getByRole('row').filter({ hasText: fg.code }).first().click();
     const v2row = page.getByRole('row').filter({ hasText: v2.summary.bomCode }).last();
     await expect(v2row).toBeVisible();
@@ -467,7 +470,8 @@ test.describe(SHEET, () => {
 
   test('SYS-MST-20 – Định mức không có NVL bị từ chối', async ({ page, env, db, adminApi, uid }, testInfo) => {
     traceTc(testInfo, 'SYS-MST-20', SHEET);
-    const expected = 'BOM phải có ít nhất một nguyên vật liệu.';
+    // Expected Round 2: thuật ngữ BOM → "định mức" (thống nhất với giao diện / backend)
+    const expected = 'Định mức phải có ít nhất một nguyên vật liệu.';
     const fg = await createProduct(adminApi, { suffix: `${uid}fg`, price: 500_000, namePrefix: 'TP E2E' });
     await login(page, env);
     const bp = new BomPage(page);

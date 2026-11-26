@@ -242,18 +242,26 @@ test.describe(SHEET, () => {
   });
 
   test('SYS-TRF-06 – Nhận vượt số đã xuất bị từ chối', async ({ page, env, db, adminApi, uid }, testInfo) => {
-    traceTc(testInfo, 'SYS-TRF-06', SHEET, { knownDefect: 'DEF-IT-02 (Report 5.2): không kiểm SL nhận vượt SL xuất' });
+    traceTc(testInfo, 'SYS-TRF-06', SHEET);
     const p = await createProduct(adminApi, { suffix: uid, price: 95_000 });
     await addStock(adminApi, p.productId, 'K001', 10);
     const t = await inTransitTransfer(adminApi, 'K001', 'K002', p.productId, 5);
     await new LoginPage(page).loginOk(E2E_ACCOUNTS.whK002.username, env.defaultPassword);
-    const list = await openReceiveScreen(page, db, t.code, t.id);
+    await openReceiveScreen(page, db, t.code, t.id);
     await page.getByRole('spinbutton').fill('8');
-    const res = await list.confirmReceive();
+    // Giao diện chặn ngay (không gửi request) với cùng câu backend; nếu có gửi thì backend phải trả lỗi
+    const res = page.waitForResponse((r) => /\/api\/transfers\/\d+\/receive$/i.test(new URL(r.url()).pathname), { timeout: 5_000 }).catch(() => null);
+    await page.getByRole('button', { name: 'Nhận hàng', exact: true }).last().click();
+    const msg = `Hàng ${p.code} - ${p.name}: số lượng nhận (8) không được lớn hơn số lượng chuyển (5).`;
+    // Toast chỉ hiện vài giây: bắt ngay sau khi bấm, trước khi chờ xem có request không
+    const seen = await page.getByText(msg).waitFor({ state: 'visible', timeout: 4_000 }).then(() => true).catch(() => false);
+    const r = await res;
     const k2 = await stockQty(db, p.productId, 'K002');
-    testInfo.annotations.push({ type: 'observed', description: `Nhận 8 / xuất 5 → HTTP ${res.status()}; trạng thái ${(await transferByCode(db, t.code))?.status}; tồn K002 ${k2}` });
-    expect.soft(res.status(), 'nhận vượt số đã xuất phải bị từ chối').toBeGreaterThanOrEqual(400);
-    expect.soft(k2, 'tồn K002 không được cộng số vượt').toBeLessThanOrEqual(5);
+    testInfo.annotations.push({ type: 'observed', description: `Nhận 8 / xuất 5 → ${r ? `HTTP ${r.status()}` : 'không gửi request'}; trạng thái ${(await transferByCode(db, t.code))?.status}; tồn K002 ${k2}` });
+    if (r) expect.soft(r.status(), 'nhận vượt số đã xuất phải bị từ chối').toBeGreaterThanOrEqual(400);
+    else expect.soft(seen, `thông báo "${msg}"`).toBe(true);
+    expect((await transferByCode(db, t.code))?.status, 'phiếu vẫn Đang chuyển').toBe('IN_TRANSIT');
+    expect.soft(k2, 'tồn K002 không được cộng số vượt').toBe(0);
   });
 
   test('SYS-TRF-07 – Hàng đang kiểm kho: không xác nhận được phiếu chuyển (BR-42)', async ({}, testInfo) => {

@@ -62,8 +62,24 @@ export class StocktakeFormPage extends LineForm {
     return this.page.getByRole('complementary').getByPlaceholder('Ghi chú');
   }
 
-  /** Hoàn thành → hộp "Cân bằng kho" → Đồng ý (form kiểm dữ liệu sau khi đồng ý) */
-  async complete(): Promise<Response | null> {
+  /** Ô lý do của các dòng lệch (BR-43: hoàn thành thì dòng lệch bắt buộc có lý do – bản sửa DEF-IT-07) */
+  get reasonInputs(): Locator {
+    return this.page.getByPlaceholder('Nhập lý do');
+  }
+
+  /** Điền lý do cho mọi dòng lệch còn trống */
+  async fillDiffReasons(text = 'E2E chênh lệch kiểm kho'): Promise<void> {
+    const n = await this.reasonInputs.count();
+    for (let i = 0; i < n; i++) {
+      const input = this.reasonInputs.nth(i);
+      if (!(await input.inputValue()).trim()) await input.fill(text);
+    }
+  }
+
+  /** Hoàn thành → hộp "Cân bằng kho" → Đồng ý (form kiểm dữ liệu sau khi đồng ý).
+   *  Tự điền lý do cho dòng lệch còn trống; truyền fillReasons=false khi ca cần kiểm thiếu lý do. */
+  async complete(fillReasons = true): Promise<Response | null> {
+    if (fillReasons) await this.fillDiffReasons();
     await this.page.getByRole('button', { name: 'Hoàn thành', exact: true }).click();
     await expect(this.page.getByText(/Bạn có chắc chắn muốn Cân bằng kho\?/)).toBeVisible();
     const res = this.waitSave();

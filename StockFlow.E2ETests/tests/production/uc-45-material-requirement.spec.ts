@@ -6,7 +6,7 @@ import { ProductionOrdersPage } from '../../pages/ProductionPages';
 import { SEEDED, WAREHOUSES } from '../../fixtures/accounts';
 import { addStock, createProduct, type ProductDto } from '../../fixtures/data';
 import { arrangeProductionOrder, issueMaterial, type ProductionOrderRef } from '../../fixtures/production';
-import { backendError, makeAccount, uiBlocksAction } from '../../fixtures/ui';
+import { backendError, makeAccount, needsClarification } from '../../fixtures/ui';
 import type { ApiSession } from '../../fixtures/api';
 
 const SHEET = 'UC-45 Material Requirement';
@@ -83,7 +83,7 @@ test.describe(SHEET, () => {
       deleted = del === '(không lỗi)';
       const off = deleted ? '(bỏ qua)' : await backendError(() => adminApi.post(`/api/production/boms/${o.bomId}/deactivate`));
       testInfo.annotations.push({ type: 'observed', description: `Xóa định mức: "${del}"; ngừng áp dụng định mức thay thế: "${off}"` });
-      if (!deleted) uiBlocksAction(testInfo, 'không xóa được định mức đã dùng cho lệnh sản xuất – tiền đề không dựng được', 'Error message shown', del);
+      if (!deleted) needsClarification(testInfo, 'không xóa được định mức đã dùng cho lệnh sản xuất – tiền đề không dựng được', 'Error message shown', del);
     });
     await test.step('1. Mở nhu cầu NVL của lệnh', async () => {
       await new LoginPage(page).loginOk(SEEDED.production.username, env.defaultPassword);
