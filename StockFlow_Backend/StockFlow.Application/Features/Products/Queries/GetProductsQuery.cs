@@ -56,9 +56,12 @@ public class GetProductsQueryHandler : IRequestHandler<GetProductsQuery, Result<
         if (!string.IsNullOrWhiteSpace(query.Search))
         {
             var s = query.Search.ToLower().Trim();
+            // Mã đơn vị quy đổi / hàng cùng loại nằm trong variants_json ("Code":"SP004346") → ra hàng chính
+            var codeInJson = "\"code\":\"" + s;
             productsQuery = productsQuery.Where(p =>
                 (p.ProductCode != null && p.ProductCode.ToLower().Contains(s)) ||
-                (p.ProductName != null && p.ProductName.ToLower().Contains(s)));
+                (p.ProductName != null && p.ProductName.ToLower().Contains(s)) ||
+                (p.VariantsJson != null && p.VariantsJson.ToLower().Contains(codeInJson)));
         }
 
         if (!string.IsNullOrWhiteSpace(query.Type) && query.Type != "ALL")

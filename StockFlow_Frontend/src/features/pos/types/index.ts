@@ -1,6 +1,11 @@
 // src/features/pos/types/index.ts
 // Các kiểu dữ liệu cốt lõi cho màn hình bán hàng StockFlow POS
 
+import type { SaleUnitOption } from '@/lib/products/saleUnits';
+
+/** Đơn vị bán của hàng: đơn vị cơ bản (rate 1) hoặc đơn vị quy đổi (VD "túi (10 bịch/túi)", rate 10) */
+export type PosSaleUnit = SaleUnitOption;
+
 export interface PosProduct {
   id: string;
   productId: number;
@@ -20,6 +25,8 @@ export interface PosProduct {
   minSafeStock?: number | null;
   imageUrl?: string | null;
   description?: string | null;
+  /** Đơn vị bán (đơn vị cơ bản đứng đầu) – bán theo đơn vị quy đổi */
+  units: PosSaleUnit[];
 }
 
 export interface CartItem {

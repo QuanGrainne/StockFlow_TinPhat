@@ -34,7 +34,9 @@ public record SalesBookingItemDto(
     string DiscountType,
     decimal DiscountValue,
     decimal UnitPrice,
-    decimal LineTotal);
+    decimal LineTotal,
+    /// <summary>Hệ số quy đổi của đơn vị bán (1 = đơn vị cơ bản)</summary>
+    decimal ConversionRate = 1);
 
 /// <summary>Hóa đơn đã tạo từ đơn đặt hàng</summary>
 public record SalesBookingInvoiceDto(
@@ -94,6 +96,9 @@ public class SalesBookingLineRequest
 {
     public int ProductId { get; set; }
     public int UnitId { get; set; }
+    /// <summary>Đơn vị bán (tên trong thiết lập đơn vị của hàng); trống = đơn vị cơ bản</summary>
+    public string? UnitName { get; set; }
+    /// <summary>Số lượng theo đơn vị bán</summary>
     public decimal Quantity { get; set; }
     /// <summary>Đơn giá (theo bảng giá)</summary>
     public decimal OriginalPrice { get; set; }

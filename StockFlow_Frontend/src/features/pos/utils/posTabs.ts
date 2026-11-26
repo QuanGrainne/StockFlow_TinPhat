@@ -16,8 +16,13 @@ export interface PosLine {
   code: string;
   name: string;
   imageUrl?: string | null;
+  /** Đơn vị bán đang chọn (hiển thị) */
   uom: string;
   unitId: number;
+  /** Bán theo đơn vị quy đổi: tên đơn vị (trống = đơn vị cơ bản) và hệ số (VD túi = 10 bịch) */
+  unitName?: string;
+  rate?: number;
+  /** Tồn theo đơn vị cơ bản (hiển thị chia cho hệ số) */
   stock: number;
   /** Đơn giá theo bảng giá */
   unitPrice: number;
@@ -53,7 +58,8 @@ export interface PosTab {
   /** BOOKING (sửa): tiền khách đã trả trước; INVOICE từ đơn: tiền trả trước còn lại được trừ vào hóa đơn */
   bookingPaid?: number;
   /** INVOICE từ đơn: các dòng hàng đã đặt (so với SL khách lấy để hỏi tạo đơn chờ cho phần còn lại) */
-  bookingItems?: { productId: number; code: string; name: string; unit: string; quantity: number }[];
+  /** rate: hệ số quy đổi của đơn vị đặt (so SL đặt / lấy theo đơn vị cơ bản) */
+  bookingItems?: { productId: number; code: string; name: string; unit: string; quantity: number; rate?: number }[];
   /** Chi nhánh xử lý của đơn đặt (hóa đơn từ đơn / sửa đơn phải ở đúng chi nhánh này) */
   warehouseId?: number | null;
   /** Thời gian giao hàng (YYYY-MM-DDTHH:mm) */

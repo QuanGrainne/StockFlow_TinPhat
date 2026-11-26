@@ -44,10 +44,13 @@ export interface UpdateProductPayload extends Partial<CreateProductPayload> {
   clearLeadTime?: boolean;
 }
 
+/** Nhóm hàng (GET/POST/PUT /api/Products/categories – ProductCategoryDto) */
 export interface ProductCategoryItem {
-  id: number;
-  code: string;
-  name: string;
+  categoryId: number;
+  categoryName: string;
+  description?: string | null;
+  isActive: boolean;
+  productCount: number;
 }
 
 
@@ -72,6 +75,8 @@ export interface ImportProductItemPayload {
   isDirectSale?: boolean;
   supplier?: string;
   warehouseName?: string;
+  /** Đơn vị quy đổi / thuộc tính / mã nhóm hàng cùng loại (JSON như variants_json) */
+  variantsJson?: string;
 }
 
 export interface ImportProductsPayload {
@@ -238,6 +243,18 @@ export const productService = {
   async createCategory(payload: { categoryName: string; description?: string }): Promise<ProductCategoryItem> {
     const token = typeof window !== 'undefined' ? tabSession.get('stockflow_token') ?? undefined : undefined;
     return await apiClient.post<ProductCategoryItem>('/api/Products/categories', payload, token);
+  },
+
+  /** Sửa tên / mô tả nhóm hàng */
+  async updateCategory(id: number, payload: { categoryName: string; description?: string }): Promise<ProductCategoryItem> {
+    const token = typeof window !== 'undefined' ? tabSession.get('stockflow_token') ?? undefined : undefined;
+    return await apiClient.put<ProductCategoryItem>(`/api/Products/categories/${id}`, payload, token);
+  },
+
+  /** Xóa nhóm hàng (backend chặn khi nhóm còn hàng hóa) */
+  async deleteCategory(id: number): Promise<void> {
+    const token = typeof window !== 'undefined' ? tabSession.get('stockflow_token') ?? undefined : undefined;
+    await apiClient.delete(`/api/Products/categories/${id}`, token);
   },
 
   async getUnits(): Promise<ProductUnitItem[]> {

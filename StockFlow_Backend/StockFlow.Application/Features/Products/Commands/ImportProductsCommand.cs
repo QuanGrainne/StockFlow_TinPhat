@@ -72,6 +72,21 @@ public class ImportProductsCommandHandler : IRequestHandler<ImportProductsComman
         var categories = await _context.MstProductCategories.ToListAsync(cancellationToken);
         var units = await _context.MstUnits.ToListAsync(cancellationToken);
 
+        // Nạp sẵn hàng đã có theo các mã trong lượt import (1 truy vấn thay vì 1 truy vấn / dòng)
+        var requestCodes = req.Products
+            .Where(p => !string.IsNullOrWhiteSpace(p.Code))
+            .Select(p => p.Code.Trim().ToUpper())
+            .Distinct()
+            .ToList();
+        var existingByCode = (await _context.MstProducts
+                .Include(p => p.Category)
+                .Include(p => p.BaseUnit)
+                .Include(p => p.TrxInventoryBalances)
+                .Where(p => p.ProductCode != null && requestCodes.Contains(p.ProductCode))
+                .ToListAsync(cancellationToken))
+            .GroupBy(p => p.ProductCode!)
+            .ToDictionary(g => g.Key, g => g.First());
+
         for (int i = 0; i < req.Products.Count; i++)
         {
             var pReq = req.Products[i];
@@ -84,11 +99,7 @@ public class ImportProductsCommandHandler : IRequestHandler<ImportProductsComman
             var name = !string.IsNullOrWhiteSpace(pReq.Name) ? pReq.Name.Trim() : code;
 
             // Check if product already exists
-            var existingProduct = await _context.MstProducts
-                .Include(p => p.Category)
-                .Include(p => p.BaseUnit)
-                .Include(p => p.TrxInventoryBalances)
-                .FirstOrDefaultAsync(p => p.ProductCode == code, cancellationToken);
+            existingByCode.TryGetValue(code, out var existingProduct);
 
             if (existingProduct != null)
             {
@@ -134,6 +145,11 @@ public class ImportProductsCommandHandler : IRequestHandler<ImportProductsComman
                 if (pReq.Weight.HasValue)
                 {
                     existingProduct.Weight = pReq.Weight.Value;
+                }
+
+                if (!string.IsNullOrWhiteSpace(pReq.VariantsJson))
+                {
+                    existingProduct.VariantsJson = pReq.VariantsJson;
                 }
 
                 // Import lại lô cũ: thay ảnh khi hàng chưa có ảnh lưu trên máy chủ (trống, link ngoài hoặc base64 cũ)
@@ -231,11 +247,14 @@ public class ImportProductsCommandHandler : IRequestHandler<ImportProductsComman
                     IsDirectSale = pReq.IsDirectSale ?? true,
                     HasRewardPoints = true,
                     IsActive = pReq.IsActive ?? true,
+                    VariantsJson = string.IsNullOrWhiteSpace(pReq.VariantsJson) ? null : pReq.VariantsJson,
                     CreatedAt = DateTime.UtcNow
                 };
 
                 await _context.MstProducts.AddAsync(newProduct, cancellationToken);
                 await _context.SaveChangesAsync(cancellationToken);
+                // Mã lặp lại trong cùng lượt → coi như hàng đã có
+                existingByCode[code] = newProduct;
 
                 // Add inventory balance if stock specified
                 var initialQty = pReq.StockQuantity ?? 0;

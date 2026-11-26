@@ -29,11 +29,14 @@ import { WarehouseFacility } from '@/features/admin/types';
 import { transferService } from '@/features/transfers/services/transferService';
 import { orderSettingsService } from '@/features/settings/services/orderSettingsService';
 import { ProductForTransfer, TransferItem } from '@/features/transfers/types';
+import * as XLSX from 'xlsx';
 import { toLocalDatetimeInputString } from '@/features/transfers/utils/dateUtils';
 import { productService, BackendProduct } from '@/features/products/services/productService';
 import { AddFromCategoryPopover } from '@/features/purchases';
 import { NumberInput } from '@/components/inputs/NumberInput';
 import { ProductThumb } from '@/components/ProductThumb';
+import { UnitSelect } from '@/components/products/UnitSelect';
+import { parseSaleUnits, type SaleUnitOption } from '@/lib/products/saleUnits';
 
 // Bố cục cột bảng hàng hóa (cùng kiểu màn Nhập hàng): Xóa | STT | Ảnh | Mã | Tên | ĐVT | Tồn kho | Tồn kho nhận | SL | Giá | Thành tiền
 /** Tiền tố mã khi sao chép phiếu (giống phiếu nhập / kiểm kho) — khi lưu hệ thống tự sinh mã mới */
@@ -55,7 +58,32 @@ interface CreateItemRow {
   notes?: string;
   /** Ảnh hàng hóa (dòng nạp từ phiếu cũ được bổ sung khi lấy lại tồn kho) */
   imageUrl?: string | null;
+  /**
+   * Chọn đơn vị khi lập phiếu (VD chuyển theo thùng): SL chuyển / giá chuyển theo đơn vị đang chọn (rate),
+   * tồn kho xuất / nhận vẫn giữ theo đơn vị cơ bản (hiển thị ÷ hệ số). Gửi lên server quy về đơn vị cơ bản.
+   */
+  units?: SaleUnitOption[];
+  rate?: number;
 }
+
+/** Đổi đơn vị của dòng: giá chuyển × (hệ số mới ÷ hệ số cũ); SL giữ nguyên số đã nhập */
+function changeTransferRowUnit(row: CreateItemRow, unit: SaleUnitOption): CreateItemRow {
+  const price = Math.round(row.transferPrice * (unit.rate / (row.rate ?? 1)));
+  return {
+    ...row,
+    rate: unit.rate,
+    unitName: unit.name,
+    productCode: unit.code || row.units?.[0]?.code || row.productCode,
+    transferPrice: price,
+    lineTotal: row.transferQuantity * price,
+  };
+}
+
+/** SL theo đơn vị cơ bản (so với tồn, gửi lên server) */
+const baseQtyOf = (row: CreateItemRow) => row.transferQuantity * (row.rate ?? 1);
+/** Tồn (đơn vị cơ bản) hiển thị theo đơn vị đang chọn */
+const stockInUnit = (row: CreateItemRow, stock: number) =>
+  (stock / (row.rate ?? 1)).toLocaleString('vi-VN', { maximumFractionDigits: 3 });
 
 export default function CreateTransferScreen() {
   const router = useRouter();
@@ -402,6 +430,8 @@ export default function CreateTransferScreen() {
         transferPrice: initialPrice,
         lineTotal: initialPrice * 1,
         imageUrl: product.imageUrl ?? null,
+        units: parseSaleUnits(product.variantsJson, product.unitName || 'Cái', product.productCode),
+        rate: 1,
       };
       return [newRow, ...prev];
     });
@@ -491,85 +521,112 @@ export default function CreateTransferScreen() {
     setItems((prev) => prev.filter((it) => it.productId !== productId));
   };
 
-  // Import mock Excel file
+  // Import danh sách hàng chuyển từ file Excel: cột "Mã hàng", "Số lượng" (tùy chọn "Giá chuyển").
+  // Trước đây là import giả (luôn nạp 3 hàng mẫu viết cứng, không đọc file).
   const handleImportExcelClick = () => {
     fileInputRef.current?.click();
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
-
-    // Simulate Excel parsing with sample transfer items
-    const sampleImportedItems: CreateItemRow[] = [
-      {
-        productId: 1,
-        productCode: 'TP-MC200',
-        productName: 'Máng cáp 200x100x1.5mm sơn tĩnh điện',
-        unitName: 'Cây',
-        sourceStock: 120,
-        destStock: 30,
-        transferQuantity: 20,
-        transferPrice: 185000,
-        lineTotal: 3700000,
-      },
-      {
-        productId: 2,
-        productCode: 'TP-KC150',
-        productName: 'Khay cáp 150x75x1.2mm tôn ZAM',
-        unitName: 'Cây',
-        sourceStock: 80,
-        destStock: 15,
-        transferQuantity: 15,
-        transferPrice: 140000,
-        lineTotal: 2100000,
-      },
-      {
-        productId: 4,
-        productCode: 'TP-PK01',
-        productName: 'Co vuông 90 độ cho máng cáp 200x100',
-        unitName: 'Cái',
-        sourceStock: 300,
-        destStock: 50,
-        transferQuantity: 10,
-        transferPrice: 45000,
-        lineTotal: 450000,
-      },
-    ];
-
-    setItems((prev) => {
-      // Merge imported items
-      const existingIds = new Set(prev.map((i) => i.productId));
-      const newlyAdded = sampleImportedItems.filter((i) => !existingIds.has(i.productId));
-      return [...newlyAdded, ...prev];
-    });
-
-    showToast(`Đã import thành công danh sách từ file ${file.name}!`);
     e.target.value = '';
+    if (!file) return;
+    if (!sourceWarehouseId) {
+      showToast('Chưa chọn chi nhánh chuyển đi.', 'error');
+      return;
+    }
+    const num = (v: unknown) => Number(String(v ?? '').replace(/,/g, '').trim());
+    try {
+      const wb = XLSX.read(await file.arrayBuffer());
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const data = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: '' });
+      const lines = data
+        .map((r) => ({
+          // Nhận cả tên cột của file mẫu cũ (Ma_Hang, So_Luong, Gia_Chuyen)
+          code: String(r['Mã hàng'] ?? r['Ma hang'] ?? r['Ma_Hang'] ?? r['code'] ?? '').trim(),
+          qty: num(r['Số lượng'] ?? r['SL chuyển'] ?? r['So luong'] ?? r['So_Luong'] ?? r['quantity']),
+          price: num(r['Giá chuyển'] ?? r['Đơn giá'] ?? r['Gia chuyen'] ?? r['Gia_Chuyen'] ?? r['price']),
+        }))
+        .filter((l) => l.code);
+      if (lines.length === 0) {
+        showToast('File không có dữ liệu. Cần cột "Mã hàng" và "Số lượng" (tùy chọn "Giá chuyển").', 'error');
+        return;
+      }
+
+      const destId = destWarehouseId ? Number(destWarehouseId) : undefined;
+      const found = await Promise.all(
+        lines.map((l) =>
+          transferService.getProductsForTransfer(sourceWarehouseId, destId, l.code).catch(() => [] as ProductForTransfer[])
+        )
+      );
+      const missing: string[] = [];
+      const imported: CreateItemRow[] = [];
+      lines.forEach((l, i) => {
+        const upper = l.code.toUpperCase();
+        // Mã hàng chính, hoặc mã đơn vị quy đổi (VD SP004346 = túi của SP004345) → chọn sẵn đơn vị đó
+        const match = found[i].find(
+          (p) =>
+            p.productCode.toUpperCase() === upper ||
+            parseSaleUnits(p.variantsJson, p.unitName, p.productCode).some((u) => (u.code || '').toUpperCase() === upper)
+        );
+        if (!match) {
+          missing.push(l.code);
+          return;
+        }
+        const units = parseSaleUnits(match.variantsJson, match.unitName || 'Cái', match.productCode);
+        const unit = units.find((u) => (u.code || '').toUpperCase() === upper) ?? units[0];
+        const basePrice = match.costPrice > 0 ? match.costPrice : match.standardPrice;
+        const qty = Number.isFinite(l.qty) && l.qty > 0 ? l.qty : 1;
+        const price = Number.isFinite(l.price) && l.price > 0 ? l.price : Math.round(basePrice * unit.rate);
+        imported.push({
+          productId: match.productId,
+          productCode: unit.code || match.productCode,
+          productName: match.productName,
+          unitName: unit.name,
+          sourceStock: match.sourceStock,
+          destStock: destId ? match.destStock : 0,
+          transferQuantity: qty,
+          transferPrice: price,
+          lineTotal: qty * price,
+          imageUrl: match.imageUrl ?? null,
+          units,
+          rate: unit.rate,
+        });
+      });
+
+      // Hàng đã có trên phiếu thì thay bằng dòng trong file
+      setItems((prev) => {
+        const importedIds = new Set(imported.map((r) => r.productId));
+        return [...imported, ...prev.filter((r) => !importedIds.has(r.productId))];
+      });
+      showToast(
+        missing.length > 0
+          ? `Đã thêm ${imported.length} hàng. Không tìm thấy: ${missing.slice(0, 5).join(', ')}${missing.length > 5 ? '...' : ''}`
+          : `Đã thêm ${imported.length} hàng từ file ${file.name}`,
+        missing.length > 0 ? 'error' : 'success'
+      );
+    } catch {
+      showToast('Không đọc được file Excel.', 'error');
+    }
   };
 
-  // Download Sample Excel Template
+  // Tải file mẫu chuyển hàng (đúng cột mà import đọc). Không dùng hàng mẫu viết cứng:
+  // phiếu đang có hàng thì điền sẵn các dòng đó, chưa có thì chỉ có dòng tiêu đề.
   const handleDownloadTemplate = () => {
-    const csvContent =
-      'data:text/csv;charset=utf-8,' +
-      'Ma_Hang,Ten_Hang,DVT,So_Luong,Gia_Chuyen\n' +
-      'TP-MC200,Máng cáp 200x100x1.5mm sơn tĩnh điện,Cây,20,185000\n' +
-      'TP-KC150,Khay cáp 150x75x1.2mm tôn ZAM,Cây,15,140000\n' +
-      'TP-PK01,Co vuông 90 độ cho máng cáp 200x100,Cái,10,45000\n';
-
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', 'mau_chuyen_hang_stockflow.csv');
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    showToast('Đang tải về file mẫu chuyển hàng...');
+    const header = ['Mã hàng', 'Tên hàng', 'ĐVT', 'Số lượng', 'Giá chuyển'];
+    const rows = items.map((it) => [it.productCode, it.productName, it.unitName, it.transferQuantity, it.transferPrice]);
+    const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
+    ws['!cols'] = [{ wch: 16 }, { wch: 40 }, { wch: 18 }, { wch: 12 }, { wch: 14 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'ChuyenHang');
+    XLSX.writeFile(wb, 'mau_chuyen_hang_stockflow.xlsx');
+    showToast('Đã tải file mẫu chuyển hàng (cột Mã hàng, Số lượng, Giá chuyển).');
   };
 
   // Calculations
   const totalQuantity = useMemo(() => {
-    return items.reduce((acc, it) => acc + (Number(it.transferQuantity) || 0), 0);
+    // Theo đơn vị cơ bản (dòng chọn đơn vị quy đổi: SL × hệ số)
+    return items.reduce((acc, it) => acc + (Number(baseQtyOf(it)) || 0), 0);
   }, [items]);
 
   const totalAmount = useMemo(() => {
@@ -618,7 +675,7 @@ export default function CreateTransferScreen() {
 
   // Check Over Stock Warning
   const checkOverStock = (): boolean => {
-    const overStockItems = items.filter((it) => it.transferQuantity > it.sourceStock);
+    const overStockItems = items.filter((it) => baseQtyOf(it) > it.sourceStock);
     return overStockItems.length > 0;
   };
 
@@ -643,10 +700,11 @@ export default function CreateTransferScreen() {
           : `${toLocalDatetimeInputString(new Date())}:00`,
         notes: notes.trim() || undefined,
         status: submitStatus,
+        // Quy về đơn vị cơ bản (dòng chọn đơn vị quy đổi: SL × hệ số, giá ÷ hệ số)
         items: items.map((it) => ({
           productId: it.productId,
-          quantity: it.transferQuantity,
-          transferPrice: it.transferPrice,
+          quantity: baseQtyOf(it),
+          transferPrice: Math.round((it.transferPrice / (it.rate ?? 1)) * 10000) / 10000,
           notes: it.notes,
         })),
       };
@@ -699,8 +757,8 @@ export default function CreateTransferScreen() {
     const hasOverStock = checkOverStock();
     if (hasOverStock) {
       const overStockNames = items
-        .filter((it) => it.transferQuantity > it.sourceStock)
-        .map((it) => `${it.productCode} (SL: ${it.transferQuantity} / Tồn: ${it.sourceStock})`)
+        .filter((it) => baseQtyOf(it) > it.sourceStock)
+        .map((it) => `${it.productCode} (SL: ${it.transferQuantity} ${it.unitName} / Tồn: ${stockInUnit(it, it.sourceStock)} ${it.unitName})`)
         .join(', ');
 
       if (!allowNegativeTransfer) {
@@ -1107,18 +1165,27 @@ export default function CreateTransferScreen() {
                       </div>
 
                       {/* ĐVT */}
-                      <div className="pl-2 pt-1.5 text-[#0070f4]">{row.unitName}</div>
+                      <div className="pl-2 pt-1.5 text-[#0070f4] min-w-0">
+                        <UnitSelect
+                          units={row.units}
+                          value={row.unitName}
+                          onChange={(u) =>
+                            setItems((prev) => prev.map((it) => (it.productId === row.productId ? changeTransferRowUnit(it, u) : it)))
+                          }
+                          className="text-[#0070f4]"
+                        />
+                      </div>
 
-                      {/* Tồn kho (kho xuất) */}
+                      {/* Tồn kho (kho xuất) – theo đơn vị đang chọn */}
                       <div
                         className={`text-right pr-2 pt-1.5 ${row.sourceStock < 0 ? 'text-[#fb2c36]' : 'text-[#15171a]'}`}
                       >
-                        {row.sourceStock.toLocaleString('vi-VN')}
+                        {stockInUnit(row, row.sourceStock)}
                       </div>
 
-                      {/* Tồn kho nhận */}
+                      {/* Tồn kho nhận – theo đơn vị đang chọn */}
                       <div className="text-right pr-2 pt-1.5 text-[#15171a]">
-                        {destWarehouseId ? row.destStock.toLocaleString('vi-VN') : '-'}
+                        {destWarehouseId ? stockInUnit(row, row.destStock) : '-'}
                       </div>
 
                       {/* SL chuyển */}

@@ -81,8 +81,9 @@ public class SalesReturnCommandHandler :
         TrxOrder? invoice = null;
         MstBusinessPartner? partner;
         int warehouseId;
-        // (ProductId, OrderItemId, giá bán) của từng dòng trả
-        var resolved = new List<(SalesReturnLineRequest Line, int ProductId, int? OrderItemId, decimal SalePrice)>();
+        // (ProductId, OrderItemId, giá bán, hệ số quy đổi của đơn vị bán) của từng dòng trả.
+        // SL trả theo đơn vị đã bán trên hóa đơn; nhập lại kho theo đơn vị cơ bản = SL × hệ số.
+        var resolved = new List<(SalesReturnLineRequest Line, int ProductId, int? OrderItemId, decimal SalePrice, decimal Rate)>();
         Dictionary<int, MstProduct> products;
 
         if (isQuick)
@@ -101,7 +102,7 @@ public class SalesReturnCommandHandler :
             var ids = lines.Select(l => l.ProductId).Distinct().ToList();
             products = await _context.MstProducts.Where(p => ids.Contains(p.ProductId)).ToDictionaryAsync(p => p.ProductId, ct);
             if (lines.Any(l => !products.ContainsKey(l.ProductId))) return Fail("Có hàng hóa trả không tồn tại.");
-            resolved.AddRange(lines.Select(l => (l, l.ProductId, (int?)null, l.ReturnPrice)));
+            resolved.AddRange(lines.Select(l => (l, l.ProductId, (int?)null, l.ReturnPrice, 1m)));
         }
         else
         {
@@ -135,7 +136,8 @@ public class SalesReturnCommandHandler :
                     return Fail($"\"{name}\" chỉ còn được trả {remaining:N0} (đã mua {oi.Quantity:N0}, đã trả {returned.GetValueOrDefault(g.Key):N0}) (BR-19).");
                 }
             }
-            resolved.AddRange(lines.Select(l => (l, orderItems[l.OrderItemId].ProductId, (int?)l.OrderItemId, orderItems[l.OrderItemId].UnitPrice ?? 0)));
+            resolved.AddRange(lines.Select(l => (l, orderItems[l.OrderItemId].ProductId, (int?)l.OrderItemId, orderItems[l.OrderItemId].UnitPrice ?? 0,
+                orderItems[l.OrderItemId].ConversionRate > 0 ? orderItems[l.OrderItemId].ConversionRate : 1m)));
         }
 
         var totalGoods = lines.Sum(l => Math.Round(l.Quantity * l.ReturnPrice, 2));
@@ -212,7 +214,7 @@ public class SalesReturnCommandHandler :
             {
                 var product = products[g.Key];
                 var (_, cost) = await TransferStockOps.WarehouseStockAsync(_context, warehouseId, product, ct);
-                await TransferStockOps.InboundAsync(_context, warehouseId, product, g.Sum(x => x.Line.Quantity), cost,
+                await TransferStockOps.InboundAsync(_context, warehouseId, product, g.Sum(x => x.Line.Quantity * x.Rate), cost,
                     SalesReturnOps.StockInType, ret.ReturnRequestId, userId, ct, SalesReturnOps.ReferenceType);
             }
 
@@ -252,7 +254,7 @@ public class SalesReturnCommandHandler :
         var userId = _currentUser.UserId.Value;
         var ret = await _context.TrxReturnRequests
             .Include(r => r.Partner)
-            .Include(r => r.DtlReturnRequestItems)
+            .Include(r => r.DtlReturnRequestItems).ThenInclude(i => i.OrderItem)
             .FirstOrDefaultAsync(r => r.ReturnRequestId == command.ReturnId, ct);
         if (ret == null) return Result.Failure<bool>("Không tìm thấy phiếu trả hàng.");
         if (ret.Status == SalesReturnOps.Cancelled) return Result.Failure<bool>($"Phiếu {ret.ReturnCode} đã hủy trước đó.");
@@ -264,7 +266,8 @@ public class SalesReturnCommandHandler :
         {
             // Xuất lại kho phần hàng đã nhập (dòng DEFECTIVE cũ nếu có thì chưa từng nhập kho)
             var goodByProduct = ret.DtlReturnRequestItems.Where(i => i.Condition != "DEFECTIVE")
-                .GroupBy(i => i.ProductId).ToDictionary(g => g.Key, g => g.Sum(x => x.Quantity ?? 0));
+                // Quy về đơn vị cơ bản theo hệ số của dòng hóa đơn gốc (trả nhanh: 1)
+                .GroupBy(i => i.ProductId).ToDictionary(g => g.Key, g => g.Sum(x => (x.Quantity ?? 0) * (x.OrderItem?.ConversionRate > 0 ? x.OrderItem.ConversionRate : 1m)));
             var products = await _context.MstProducts.Where(p => goodByProduct.Keys.Contains(p.ProductId)).ToDictionaryAsync(p => p.ProductId, ct);
             foreach (var (productId, qty) in goodByProduct)
             {

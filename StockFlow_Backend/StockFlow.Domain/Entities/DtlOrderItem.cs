@@ -15,6 +15,12 @@ public partial class DtlOrderItem
 
     public int UnitId { get; set; }
 
+    /// <summary>
+    /// Số đơn vị cơ bản trong 1 đơn vị bán của dòng (bán theo đơn vị quy đổi: 1 túi = 10 bịch → 10).
+    /// Quantity, UnitPrice, LineTotal theo đơn vị bán; tồn kho trừ Quantity × ConversionRate.
+    /// </summary>
+    public decimal ConversionRate { get; set; } = 1;
+
     public decimal? UnitPrice { get; set; }
 
     public decimal OriginalPrice { get; set; }

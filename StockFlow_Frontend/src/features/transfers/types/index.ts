@@ -72,4 +72,6 @@ export interface ProductForTransfer {
   sourceStock: number;
   destStock: number;
   imageUrl?: string | null;
+  /** Đơn vị quy đổi (JSON) – chọn đơn vị khi lập phiếu chuyển / kiểm kho, lưu quy về đơn vị cơ bản */
+  variantsJson?: string | null;
 }
