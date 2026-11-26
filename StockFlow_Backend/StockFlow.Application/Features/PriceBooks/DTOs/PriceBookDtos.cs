@@ -42,7 +42,11 @@ public record PriceBookMatrixItemDto(
     decimal CostPrice,
     decimal LatestPurchasePrice,
     decimal StockQuantity,
-    Dictionary<int, decimal?> Prices
+    Dictionary<int, decimal?> Prices,
+    // Dòng đơn vị quy đổi của hàng (VD SP004330 = "bịch" của SP004328): mã đơn vị và số đơn vị cơ bản trong 1 đơn vị.
+    // null = dòng hàng (đơn vị cơ bản). Giá vốn, tồn đã quy theo đơn vị này.
+    string? UnitCode = null,
+    decimal ConversionRate = 1
 );
 
 public record PriceBookMatrixResultDto(
@@ -54,5 +58,7 @@ public record PriceBookMatrixResultDto(
 
 public record UpdateProductPriceItemDto(
     int ProductId,
-    decimal Price
+    decimal Price,
+    // Có giá trị = giá của đơn vị quy đổi có mã này (chỉ sửa ở Bảng giá chung, lưu vào giá bán của đơn vị trong variants_json)
+    string? UnitCode = null
 );

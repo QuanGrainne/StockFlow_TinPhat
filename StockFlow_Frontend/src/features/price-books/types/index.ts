@@ -34,6 +34,10 @@ export interface PriceBookMatrixItem {
   latestPurchasePrice: number;
   stockQuantity: number;
   prices: Record<number, number | null>;
+  /** Dòng đơn vị quy đổi (VD SP004330 = "bịch" của SP004328): mã đơn vị; null/không có = dòng hàng */
+  unitCode?: string | null;
+  /** Số đơn vị cơ bản trong 1 đơn vị của dòng (1 = đơn vị cơ bản) */
+  conversionRate?: number;
 }
 
 export interface PriceBookMatrixResult {
@@ -88,4 +92,6 @@ export interface UpdatePriceBookPayload extends CreatePriceBookPayload {
 export interface UpdateProductPriceItemPayload {
   productId: number;
   price: number;
+  /** Giá của đơn vị quy đổi có mã này (chỉ ở Bảng giá chung) */
+  unitCode?: string;
 }
