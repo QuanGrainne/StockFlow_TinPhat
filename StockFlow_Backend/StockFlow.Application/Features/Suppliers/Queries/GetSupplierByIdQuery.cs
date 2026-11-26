@@ -112,7 +112,7 @@ public class GetSupplierByIdQueryHandler : IRequestHandler<GetSupplierByIdQuery,
             .OrderByDescending(b => b.TotalPurchasedAmount)
             .ToList();
 
-        // 4. Sổ "Nợ cần trả nhà cung cấp" theo kiểu KiotViet (SupplierDebtLedger, dùng chung với báo cáo công nợ UC-86).
+        // 4. Sổ "Nợ cần trả nhà cung cấp" (SupplierDebtLedger, dùng chung với báo cáo công nợ UC-86).
         //    Khoản trả ngay khi nhập hàng được trừ thẳng vào dòng PN đó → Giá trị = tiền hàng − đã trả = nợ phát sinh.
         //    Chỉ thanh toán KHÔNG gắn với phiếu nhập hoàn thành nào (thanh toán công nợ riêng) mới thành dòng riêng.
         //    Nợ đầu kỳ = Nợ hiện tại − Σ giá trị các dòng — gồm nợ khai báo ban đầu / điều chỉnh tay.
@@ -152,7 +152,7 @@ public class GetSupplierByIdQueryHandler : IRequestHandler<GetSupplierByIdQuery,
             running += m.Amount;
             ledger.Add(new SupplierDebtLedgerEntryDto(m.Code, m.Date, m.Type, m.Label, m.Ref, m.Amount, running));
         }
-        ledger.Reverse(); // mới nhất lên đầu giống KiotViet
+        ledger.Reverse(); // mới nhất lên đầu
 
         // 5. Người tạo nhà cung cấp (tên tài khoản đã tạo)
         string? createdByName = null;

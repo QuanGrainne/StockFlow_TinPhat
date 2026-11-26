@@ -1,5 +1,5 @@
 // src/features/purchases/screens/CreatePurchaseScreen.tsx
-// Màn hình Tạo mới & Chỉnh sửa phiếu nhập hàng chuẩn hóa theo giao diện Chuyển hàng & KiotViet
+// Màn hình Tạo mới & Chỉnh sửa phiếu nhập hàng chuẩn hóa theo giao diện Chuyển hàng
 
 'use client';
 
@@ -946,7 +946,7 @@ export default function CreatePurchaseScreen({ mode = 'receipt' }: CreatePurchas
     executeSave('DRAFT');
   };
 
-  // Lưu phiếu đã nhập hàng (giống KiotViet: hỏi xác nhận cập nhật)
+  // Lưu phiếu đã nhập hàng (hỏi xác nhận cập nhật)
   const handleSaveCompleted = () => {
     if (items.length === 0) {
       showToast('Vui lòng chọn ít nhất 1 mặt hàng vào phiếu nhập', 'warning');
@@ -1796,7 +1796,7 @@ export default function CreatePurchaseScreen({ mode = 'receipt' }: CreatePurchas
 
               )}
 
-              {/* Tính vào công nợ (âm = còn nợ nhà cung cấp, giống KiotViet) */}
+              {/* Tính vào công nợ (âm = còn nợ nhà cung cấp) */}
               {!isOrder && (
               <div className="flex items-center justify-between gap-3">
                 <span>Tính vào công nợ</span>

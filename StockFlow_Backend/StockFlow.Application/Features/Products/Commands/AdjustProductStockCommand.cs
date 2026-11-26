@@ -66,7 +66,7 @@ public class AdjustProductStockHandler : IRequestHandler<AdjustProductStockComma
         string? stocktakeCode = null;
         if (delta != 0)
         {
-            // Mọi thay đổi tồn kho từ Danh mục hàng hóa đều sinh 1 phiếu kiểm kho "Đã cân bằng kho" (giống KiotViet):
+            // Mọi thay đổi tồn kho từ Danh mục hàng hóa đều sinh 1 phiếu kiểm kho "Đã cân bằng kho":
             // thực tế = tồn mới, cân bằng ngay → ghi thẻ kho STOCKTAKE_IN / STOCKTAKE_OUT, giá vốn giữ nguyên.
             var userId = _currentUser.UserId.Value;
             var code = await StocktakeLogic.ResolveCodeAsync(_context, null, null, ct);

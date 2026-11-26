@@ -1,12 +1,12 @@
 // src/features/orders/screens/OrderDetailScreen.tsx
-// Màn hình Chi tiết đơn hàng chuyên nghiệp chuẩn KiotViet
+// Màn hình Chi tiết đơn hàng chuyên nghiệp
 
 'use client';
 
 import React from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
-import { KiotVietOrderDetail } from '@/features/orders/components/KiotVietOrderDetail';
+import { OrderDetailPanel } from '@/features/orders/components/OrderDetailPanel';
 
 interface OrderDetailScreenProps {
   id: string;
@@ -29,9 +29,9 @@ export default function OrderDetailScreen({ id }: OrderDetailScreenProps) {
         </button>
       </div>
 
-      {/* Khung chi tiết đơn hàng chuẩn KiotViet */}
+      {/* Khung chi tiết đơn hàng */}
       <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs overflow-hidden">
-        <KiotVietOrderDetail
+        <OrderDetailPanel
           orderId={id}
           orderCode={id}
           onClose={() => router.push('/orders')}

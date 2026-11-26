@@ -8,7 +8,7 @@ using StockFlow.Domain.Entities;
 namespace StockFlow.Application.Features.Suppliers.Helpers;
 
 /// <summary>
-/// Sổ "Nợ cần trả nhà cung cấp" theo kiểu KiotViet (tách nguyên văn từ GetSupplierByIdQuery để dùng chung với báo cáo công nợ UC-86):
+/// Sổ "Nợ cần trả nhà cung cấp" (tách nguyên văn từ GetSupplierByIdQuery để dùng chung với báo cáo công nợ UC-86):
 /// - Phiếu nhập COMPLETED (+): tiền hàng − khoản trả ngay lúc nhập (thanh toán không mã phiếu chi, gắn phiếu nhập hoàn thành).
 /// - Phiếu chi có mã (PC...) (−): gộp các phần phân bổ thành 1 dòng. Thanh toán không mã khác (−) thành dòng riêng.
 /// - Trả hàng nhập COMPLETED (−): NCC cần trả − tiền NCC trả ngay lúc trả hàng.

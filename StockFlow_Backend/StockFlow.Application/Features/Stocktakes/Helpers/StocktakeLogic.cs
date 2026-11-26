@@ -8,7 +8,7 @@ using StockFlow.Domain.Entities;
 namespace StockFlow.Application.Features.Stocktakes.Helpers;
 
 /// <summary>
-/// Nghiệp vụ kiểm kho (giống KiotViet):
+/// Nghiệp vụ kiểm kho:
 /// - Phiếu tạm (DRAFT): ghi số lượng thực tế, chưa đổi tồn kho.
 /// - Hoàn thành = Cân bằng kho (BALANCED): tồn kho của từng hàng được đặt bằng SL thực tế
 ///   (chênh lệch tính lại theo tồn hiện tại lúc cân bằng), ghi thẻ kho STOCKTAKE_IN / STOCKTAKE_OUT, giá vốn giữ nguyên.

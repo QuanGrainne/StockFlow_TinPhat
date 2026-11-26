@@ -10,7 +10,7 @@ using StockFlow.Domain.Services;
 namespace StockFlow.Application.Features.Purchases.Helpers;
 
 /// <summary>
-/// Các hàm nghiệp vụ cốt lõi cho Module Nhập hàng theo chuẩn KiotViet & Kế toán kho (VAS 02).
+/// Các hàm nghiệp vụ cốt lõi cho Module Nhập hàng theo Kế toán kho (VAS 02).
 /// </summary>
 public static class GoodsReceiptHelper
 {
@@ -35,7 +35,7 @@ public static class GoodsReceiptHelper
         => CostingPolicy.CalculateMovingAverageCost(currentQty, currentUnitCost, incomingQty, incomingUnitPrice);
 
     /// <summary>
-    /// Tự động sinh mã phiếu nhập hàng tiếp theo theo định dạng chuẩn KiotViet: PN000001, PN000002...
+    /// Tự động sinh mã phiếu nhập hàng tiếp theo theo định dạng: PN000001, PN000002...
     /// Tự động tăng và kiểm tra tránh trùng lặp.
     /// </summary>
     public static async Task<string> GenerateNextGoodsReceiptCodeAsync(

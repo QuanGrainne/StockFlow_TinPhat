@@ -141,7 +141,7 @@ public class SalesReturnCommandHandler :
         var totalGoods = lines.Sum(l => Math.Round(l.Quantity * l.ReturnPrice, 2));
         var discount = Math.Min(totalGoods, req.DiscountAmount);
 
-        // Hóa đơn có giảm giá tổng: hàng trả phải chịu phần giảm giá phân bổ (như KiotViet),
+        // Hóa đơn có giảm giá tổng: hàng trả phải chịu phần giảm giá phân bổ,
         // để không trả khách nhiều hơn số tiền khách đã thực trả cho hàng đó.
         if (invoice != null && invoice.DiscountAmount > 0)
         {

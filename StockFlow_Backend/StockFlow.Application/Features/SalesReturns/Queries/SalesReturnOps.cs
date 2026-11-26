@@ -19,7 +19,7 @@ public static class SalesReturnOps
     public const string RefundTxType = "CUSTOMER_REFUND";
 
     /// <summary>
-    /// Giảm giá hóa đơn phân bổ cho hàng trả (như KiotViet): giảm giá tổng hóa đơn × (giá trị hàng trả theo giá bán gốc
+    /// Giảm giá hóa đơn phân bổ cho hàng trả: giảm giá tổng hóa đơn × (giá trị hàng trả theo giá bán gốc
     /// ÷ tổng tiền hàng của hóa đơn), làm tròn tới đồng. Hàng trả chỉ được hoàn đúng số khách đã thực trả cho hàng đó.
     /// </summary>
     /// <param name="invoiceSubTotal">Tổng tiền hàng của hóa đơn (sau giảm giá từng dòng, trước giảm giá hóa đơn)</param>

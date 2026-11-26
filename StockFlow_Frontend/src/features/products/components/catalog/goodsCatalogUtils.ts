@@ -38,7 +38,7 @@ export function calculateDaysUntilOutOfStock(
     };
   }
 
-  // 4. Nếu có tốc độ tiêu thụ nhưng tồn kho = 0: hiển thị '0 ngày' (chuẩn theo ảnh mẫu KiotViet)
+  // 4. Nếu có tốc độ tiêu thụ nhưng tồn kho = 0: hiển thị '0 ngày'
   if (actualStock <= 0) {
     return {
       days: 0,
