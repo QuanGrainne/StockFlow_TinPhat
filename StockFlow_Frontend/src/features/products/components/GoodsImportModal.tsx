@@ -3,7 +3,8 @@
 
 import React, { useState, useRef } from 'react';
 import { X, Info, Lightbulb, ChevronDown, Check, Loader2 } from 'lucide-react';
-import { productService, ImportProductItemPayload } from '../services/goodsCatalogService';
+import { productService } from '../services/goodsCatalogService';
+import { buildProductImport, type ImportCell } from '../utils/productImportGrouping';
 import * as XLSX from 'xlsx';
 import { GoodsItem } from '../screens/GoodsCatalogScreen';
 import type { WarehouseFacility } from '@/features/admin/types';
@@ -380,6 +381,8 @@ export default function GoodsImportModal({
   const [updateDescription, setUpdateDescription] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isImporting, setIsImporting] = useState<boolean>(false);
+  /** Tiến độ lưu theo lượt (VD "Đang lưu 1.200/5.630 hàng hóa...") */
+  const [importProgress, setImportProgress] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -407,223 +410,89 @@ export default function GoodsImportModal({
         return;
       }
 
-      const rows = XLSX.utils.sheet_to_json<any[]>(worksheet, { header: 1 });
+      const rows = XLSX.utils.sheet_to_json<ImportCell[]>(worksheet, { header: 1 });
       if (rows.length < 2) {
         setErrorMessage('File dữ liệu không có dòng sản phẩm nào.');
         return;
       }
 
-      const headerRow: string[] = (rows[0] as string[]).map((h) => String(h || '').trim());
-      
-      const getColIdx = (name: string): number => {
-        return headerRow.findIndex((h) => h.toLowerCase().includes(name.toLowerCase()));
-      };
-
-      const idxLoaiHang = getColIdx('loại hàng');
-      const idxNhomHang = getColIdx('nhóm hàng');
-      const idxMaHang = getColIdx('mã hàng');
-      const idxTenHang = getColIdx('tên hàng');
-      const idxThuongHieu = getColIdx('thương hiệu');
-      const idxGiaBan = getColIdx('giá bán');
-      const idxGiaVon = getColIdx('giá vốn');
-      const idxTonKho = getColIdx('tồn kho');
-      const idxTonNhoNhat = getColIdx('tồn nhỏ nhất');
-      const idxTonLonNhat = getColIdx('tồn lớn nhất');
-      const idxDVT = getColIdx('đvt');
-      const idxHinhAnh = getColIdx('hình ảnh');
-      const idxTrongLuong = getColIdx('trọng lượng');
-      const idxViTri = getColIdx('vị trí');
-      const idxMoTa = getColIdx('mô tả');
-      const idxDangKinhDoanh = getColIdx('đang kinh doanh');
-      const idxBanTrucTiep = getColIdx('bán trực tiếp');
-      const idxThuocTinh = getColIdx('thuộc tính');
-
-      if (idxMaHang === -1 && idxTenHang === -1) {
+      const headerRow: string[] = (rows[0] ?? []).map((h) => String(h ?? '').trim());
+      const lowerHeader = headerRow.map((h) => h.toLowerCase());
+      if (!lowerHeader.includes('mã hàng') && !lowerHeader.includes('tên hàng')) {
         setErrorMessage('File Excel thiếu cột "Mã hàng" hoặc "Tên hàng". Vui lòng kiểm tra lại cấu trúc file mẫu.');
         return;
       }
 
       // Kho áp dụng: "Chi nhánh" = kho đã chọn; "Toàn hệ thống" = kho làm việc (không gán cứng tên kho)
       const targetWarehouse = costPriceScope === 'BRANCH' ? costBranch : fallbackWarehouse;
-      const currentGoods = [...existingGoods];
-      const goodsByCode = new Map<string, GoodsItem>();
-      currentGoods.forEach((g) => goodsByCode.set(g.code.toUpperCase(), g));
 
-      let importedCount = 0;
-      const updatedGoodsList = [...currentGoods];
+      // Gộp dòng đơn vị quy đổi vào hàng cơ bản, gắn nhóm hàng cùng loại (xem productImportGrouping.ts)
+      const built = buildProductImport(headerRow, rows.slice(1), { targetWarehouse });
+      if (built.products.length === 0) {
+        setErrorMessage('File dữ liệu không có dòng sản phẩm nào.');
+        return;
+      }
 
-      for (let i = 1; i < rows.length; i++) {
-        const row = rows[i];
-        if (!row || row.length === 0) continue;
-
-        const code = String(row[idxMaHang] || '').trim();
-        const name = String(row[idxTenHang] || '').trim();
-        if (!code && !name) continue;
-
-        const productCode = code || `SP${Date.now() + i}`;
-        const productName = name || code;
-
-        const existing = goodsByCode.get(productCode.toUpperCase());
-
-        if (existing) {
-          // Trùng mã hàng
-          if (existing.name !== productName && duplicateCodeAction === 'ERROR') {
-            setErrorMessage(`Dòng ${i + 1}: Trùng mã hàng "${productCode}" nhưng khác tên hàng hóa ("${existing.name}" vs "${productName}").`);
-            return;
-          }
-
-          // Cập nhật sản phẩm hiện có theo tùy chọn
-          const itemIdx = updatedGoodsList.findIndex((g) => g.id === existing.id);
-          if (itemIdx !== -1) {
-            const target = { ...updatedGoodsList[itemIdx] };
-            if (duplicateCodeAction === 'REPLACE_NAME' && productName) {
-              target.name = productName;
-            }
-            if (updateStock && idxTonKho !== -1) {
-              target.stockQuantity = Number(row[idxTonKho] || 0);
-              target.availableQuantity = target.stockQuantity;
-            }
-            if (updateCostPrice && idxGiaVon !== -1) {
-              target.costPrice = Number(row[idxGiaVon] || 0);
-            }
-            if (updateDescription && idxMoTa !== -1) {
-              target.description = String(row[idxMoTa] || target.description || '');
-            }
-            if (idxGiaBan !== -1 && row[idxGiaBan] !== undefined) {
-              target.standardPrice = Number(row[idxGiaBan] || target.standardPrice);
-            }
-            if (idxViTri !== -1 && row[idxViTri]) {
-              target.locationName = String(row[idxViTri]);
-            }
-            updatedGoodsList[itemIdx] = target;
-            importedCount++;
-          }
-        } else {
-          // Thêm mới sản phẩm từ dòng Excel
-          const newCategory = (idxNhomHang !== -1 && row[idxNhomHang] ? String(row[idxNhomHang]) : 'Hàng hóa') as any;
-          const newBrand = idxThuongHieu !== -1 && row[idxThuongHieu] ? String(row[idxThuongHieu]) : '';
-          const newUom = idxDVT !== -1 && row[idxDVT] ? String(row[idxDVT]) : 'Cái';
-          const newSalePrice = idxGiaBan !== -1 ? Number(row[idxGiaBan] || 0) : 0;
-          const newCostPrice = idxGiaVon !== -1 ? Number(row[idxGiaVon] || 0) : 0;
-          const newStock = idxTonKho !== -1 ? Number(row[idxTonKho] || 0) : 0;
-          const newMinStock = idxTonNhoNhat !== -1 ? Number(row[idxTonNhoNhat] || 0) : 0;
-          const newMaxStock = idxTonLonNhat !== -1 ? Number(row[idxTonLonNhat] || 999999999) : 999999999;
-          const newWeight = idxTrongLuong !== -1 ? Number(row[idxTrongLuong] || 0) : 0;
-          const newLocation = idxViTri !== -1 ? String(row[idxViTri] || '') : '';
-          const newDesc = idxMoTa !== -1 ? String(row[idxMoTa] || '') : '';
-          const newImage = idxHinhAnh !== -1 ? String(row[idxHinhAnh] || '') : '';
-          const newIsActive = idxDangKinhDoanh !== -1 ? (Number(row[idxDangKinhDoanh]) === 1 ? 'ACTIVE' : 'DISCONTINUED') : 'ACTIVE';
-          const newIsDirectSale = idxBanTrucTiep !== -1 ? Number(row[idxBanTrucTiep]) === 1 : true;
-          const rawAttr = idxThuocTinh !== -1 ? String(row[idxThuocTinh] || '') : '';
-
-          const newItem: GoodsItem = {
-            id: `G-IMP-${Date.now()}-${i}`,
-            code: productCode,
-            name: productName,
-            category: newCategory.includes('Nguyên vật liệu') ? 'Nguyên vật liệu' : 'Thành phẩm',
-            subCategory: newCategory,
-            brand: newBrand,
-            uom: newUom,
-            specification: rawAttr,
-            warehouse: targetWarehouse,
-            stockQuantity: newStock,
-            reservedQuantity: 0,
-            availableQuantity: newStock,
-            minSafeStock: newMinStock,
-            maxSafeStock: newMaxStock,
-            standardPrice: newSalePrice,
-            costPrice: newCostPrice,
-            barcode: productCode,
-            status: newIsActive,
-            weight: newWeight,
-            locationName: newLocation,
-            imageUrl: newImage,
-            description: newDesc,
-            isDirectSale: newIsDirectSale,
-            createdAt: new Date().toLocaleDateString('vi-VN') + ' ' + new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
-            stockByWarehouse: [
-              {
-                warehouseName: targetWarehouse,
-                actualStock: newStock,
-                availableStock: newStock,
-                standardPrice: newSalePrice,
-                costPrice: newCostPrice,
-              },
-            ],
-            stockCardRecent: [],
-          };
-
-          updatedGoodsList.push(newItem);
-          goodsByCode.set(productCode.toUpperCase(), newItem);
-          importedCount++;
+      // "Báo lỗi" khi trùng mã khác tên: kiểm tra trước toàn bộ file, tránh lưu dở một phần rồi mới lỗi
+      if (duplicateCodeAction === 'ERROR') {
+        const existingByCode = new Map(existingGoods.map((g) => [g.code.toUpperCase(), g]));
+        const conflict = built.products.find((p) => {
+          const ex = existingByCode.get(p.code.trim().toUpperCase());
+          return !!ex && ex.name.trim().toLowerCase() !== p.name.trim().toLowerCase();
+        });
+        if (conflict) {
+          const ex = existingByCode.get(conflict.code.trim().toUpperCase());
+          setErrorMessage(
+            `Trùng mã hàng "${conflict.code}" nhưng khác tên hàng hóa ("${ex?.name}" vs "${conflict.name}"). ` +
+              'Chọn "Thay thế tên hàng cũ" nếu muốn cập nhật.'
+          );
+          return;
         }
       }
 
-      // Lưu trực tiếp vào CSDL SQL Server thông qua API backend
-      const payloadProducts: ImportProductItemPayload[] = [];
-      for (let i = 1; i < rows.length; i++) {
-        const row = rows[i];
-        if (!row || row.length === 0) continue;
-        const code = String(row[idxMaHang] || '').trim();
-        const name = String(row[idxTenHang] || '').trim();
-        if (!code && !name) continue;
-
-        const productCode = code || `SP${Date.now() + i}`;
-        const productName = name || code;
-        const newCategory = (idxNhomHang !== -1 && row[idxNhomHang] ? String(row[idxNhomHang]) : 'Hàng hóa');
-        const newBrand = idxThuongHieu !== -1 && row[idxThuongHieu] ? String(row[idxThuongHieu]) : '';
-        const newUom = idxDVT !== -1 && row[idxDVT] ? String(row[idxDVT]) : 'Cái';
-        const newSalePrice = idxGiaBan !== -1 ? Number(row[idxGiaBan] || 0) : 0;
-        const newCostPrice = idxGiaVon !== -1 ? Number(row[idxGiaVon] || 0) : 0;
-        const newStock = idxTonKho !== -1 ? Number(row[idxTonKho] || 0) : 0;
-        const newMinStock = idxTonNhoNhat !== -1 ? Number(row[idxTonNhoNhat] || 0) : 0;
-        const newMaxStock = idxTonLonNhat !== -1 ? Number(row[idxTonLonNhat] || 999999999) : 999999999;
-        const newWeight = idxTrongLuong !== -1 ? Number(row[idxTrongLuong] || 0) : 0;
-        const newLocation = idxViTri !== -1 ? String(row[idxViTri] || '') : '';
-        const newDesc = idxMoTa !== -1 ? String(row[idxMoTa] || '') : '';
-        const newImage = idxHinhAnh !== -1 ? String(row[idxHinhAnh] || '') : '';
-        const newIsActive = idxDangKinhDoanh !== -1 ? (Number(row[idxDangKinhDoanh]) === 1) : true;
-        const newIsDirectSale = idxBanTrucTiep !== -1 ? Number(row[idxBanTrucTiep]) === 1 : true;
-
-        payloadProducts.push({
-          code: productCode,
-          name: productName,
-          categoryName: newCategory,
-          brand: newBrand,
-          uom: newUom,
-          standardPrice: newSalePrice,
-          costPrice: newCostPrice,
-          stockQuantity: newStock,
-          minSafeStock: newMinStock,
-          maxSafeStock: newMaxStock,
-          barcode: productCode,
-          description: newDesc,
-          weight: newWeight,
-          locationName: newLocation,
-          imageUrl: newImage,
-          isActive: newIsActive,
-          isDirectSale: newIsDirectSale,
-          warehouseName: targetWarehouse,
-        });
-      }
-
+      // Lưu theo từng lượt nhỏ: file lớn (hàng nghìn mã) không bị một request quá lâu, có tiến độ
+      const BATCH_SIZE = 200;
+      const total = built.products.length;
+      let imported = 0;
+      let updated = 0;
+      const serverNotes: string[] = [];
       setIsImporting(true);
       try {
-        const importRes = await productService.importProducts({
-          products: payloadProducts,
-          duplicateCodeAction,
-          updateStock,
-          updateCostPrice,
-          updateDescription,
-          targetWarehouse,
-        });
-        onImportSuccess(importRes.totalCount || importRes.importedCount || importedCount, file.name, updatedGoodsList, importRes.message);
+        for (let start = 0; start < total; start += BATCH_SIZE) {
+          setImportProgress(`Đang lưu ${start.toLocaleString('vi-VN')}/${total.toLocaleString('vi-VN')} hàng hóa...`);
+          const res = await productService.importProducts({
+            products: built.products.slice(start, start + BATCH_SIZE),
+            duplicateCodeAction,
+            updateStock,
+            updateCostPrice,
+            updateDescription,
+            targetWarehouse,
+          });
+          imported += res.importedCount || 0;
+          updated += res.updatedCount || 0;
+          // Ghi chú thêm của máy chủ (VD ảnh không tải được), bỏ câu đếm số lượng của từng lượt
+          const note = (res.message || '').replace(/^Nhập thành công[^.]*\.\s*/, '').trim();
+          if (note) serverNotes.push(note);
+        }
+        const parts = [
+          `Đã nhập ${imported.toLocaleString('vi-VN')} hàng hóa mới, cập nhật ${updated.toLocaleString('vi-VN')} hàng hóa`,
+          built.mergedUnitRows > 0 ? `gộp ${built.mergedUnitRows.toLocaleString('vi-VN')} dòng đơn vị quy đổi vào hàng cơ bản` : '',
+          built.groupCount > 0 ? `${built.groupCount.toLocaleString('vi-VN')} nhóm hàng cùng loại` : '',
+        ].filter(Boolean);
+        onImportSuccess(imported + updated, file.name, existingGoods, `${parts.join(', ')}. ${serverNotes.join(' ')}`.trim());
         onClose();
-      } catch (apiErr: any) {
+      } catch (apiErr: unknown) {
         console.error('Lỗi API import vào CSDL:', apiErr);
-        setErrorMessage(`Lỗi khi lưu vào cơ sở dữ liệu: ${apiErr?.message || 'Không thể kết nối máy chủ'}`);
+        const saved = imported + updated;
+        setErrorMessage(
+          `Lỗi khi lưu vào cơ sở dữ liệu: ${apiErr instanceof Error ? apiErr.message : 'Không thể kết nối máy chủ'}` +
+            (saved > 0 ? ` (đã lưu ${saved.toLocaleString('vi-VN')}/${total.toLocaleString('vi-VN')} hàng hóa trước khi lỗi).` : '')
+        );
+        // Đã lưu được một phần: vẫn tải lại danh sách để thấy đúng dữ liệu trong DB
+        if (saved > 0) onImportSuccess(saved, file.name, existingGoods, `Đã lưu ${saved} hàng hóa trước khi lỗi.`);
       } finally {
         setIsImporting(false);
+        setImportProgress(null);
       }
     } catch (err: any) {
       console.error('Lỗi khi đọc file Excel:', err);
@@ -833,6 +702,14 @@ export default function GoodsImportModal({
                       ))}
                     </select>
                   </div>
+                  {/* Ghi rõ kho nhận tồn / giá vốn để không nhầm */}
+                  <p className="text-[11px] text-slate-500">
+                    Tồn kho và giá vốn nhập vào:{' '}
+                    <strong className="text-slate-700">
+                      {(costPriceScope === 'BRANCH' ? costBranch : fallbackWarehouse) || 'kho làm việc'}
+                    </strong>
+                    {costPriceScope === 'ALL' ? ' (kho làm việc trên thanh trên cùng)' : ''}
+                  </p>
                 </div>
               </div>
 
@@ -944,7 +821,7 @@ export default function GoodsImportModal({
             className="px-5 py-2.5 text-xs font-semibold text-white bg-[#0070F3] hover:bg-[#005fcf] disabled:opacity-60 disabled:cursor-not-allowed rounded-lg transition cursor-pointer shadow-xs active:scale-[0.98] flex items-center gap-2"
           >
             {isImporting && <Loader2 size={14} className="animate-spin" />}
-            <span>{isImporting ? 'Đang lưu vào CSDL...' : 'Chọn file dữ liệu'}</span>
+            <span>{isImporting ? importProgress || 'Đang lưu vào CSDL...' : 'Chọn file dữ liệu'}</span>
           </button>
         </div>
       </div>

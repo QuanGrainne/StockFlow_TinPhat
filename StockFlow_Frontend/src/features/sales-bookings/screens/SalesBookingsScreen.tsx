@@ -342,7 +342,10 @@ export default function SalesBookingsScreen() {
                           </td>
                           <td className="py-2.5 px-3 font-mono font-bold text-[#0070f4] whitespace-nowrap">{r.orderCode}</td>
                           <td className="py-2.5 px-3 whitespace-nowrap">{formatDateTimeVN(r.orderDate)}</td>
-                          <td className="py-2.5 px-3 whitespace-nowrap">{r.partnerCode}</td>
+                          <td className="py-2.5 px-3 whitespace-nowrap">
+                            {/* Mã KH bấm được → mở khách hàng (tab mới), giống cột Mã KH ở màn Hóa đơn */}
+                            <PartnerLink kind="customer" code={r.partnerCode} partnerId={r.partnerId} />
+                          </td>
                           <td className="py-2.5 px-3">
                             <PartnerLink kind="customer" code={r.partnerCode} partnerId={r.partnerId}>
                               {r.partnerName}

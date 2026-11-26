@@ -1,18 +1,7 @@
 // src/features/products/components/catalog/goodsCatalogDefaults.ts
 // Dữ liệu mặc định / gợi ý của Danh mục Hàng hóa (T19 lát 1: chuyển nguyên văn từ screens/GoodsCatalogScreen.tsx).
-// Danh sách gợi ý mặc định (người dùng vừa có thể chọn, vừa có thể gõ tự do bất kỳ chữ gì)
-export const DEFAULT_SUBCATEGORY_OPTIONS = [
-  'Sữa',
-  'Tấm ốp Nano PVC',
-  'Phào chỉ PU',
-  'Nẹp trang trí',
-  'Lam sóng PVC',
-  'Tấm than tre cao cấp',
-  'Hạt nhựa công nghiệp',
-  'Keo dán & Phụ kiện',
-  'Vật tư xây dựng',
-  'Bánh kẹo & Nước ngọt',
-];
+// Danh sách gợi ý mặc định (người dùng vừa có thể chọn, vừa có thể gõ tự do bất kỳ chữ gì).
+// Nhóm hàng không còn gợi ý viết cứng (26/11/2026): chỉ lấy nhóm thật trong DB.
 
 export const DEFAULT_BRAND_OPTIONS = [
   'Ba Vì Milk',

@@ -225,6 +225,42 @@ public class ProductsController : ControllerBase
     }
 
     /// <summary>
+    /// Sửa tên / mô tả nhóm hàng.
+    /// </summary>
+    [HttpPut("categories/{id:int}")]
+    [ProducesResponseType(typeof(ProductCategoryDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [RequirePermission("GOODS_UPDATE")]
+    [RequireFeature("feat-goods")]
+    public async Task<IActionResult> UpdateProductCategory(int id, [FromBody] UpdateCategoryRequest request)
+    {
+        var result = await _mediator.Send(new UpdateProductCategoryCommand(id, request));
+        if (!result.IsSuccess)
+        {
+            return BadRequest(new { message = result.Error });
+        }
+        return Ok(result.Value);
+    }
+
+    /// <summary>
+    /// Xóa nhóm hàng (chỉ khi nhóm không còn hàng hóa).
+    /// </summary>
+    [HttpDelete("categories/{id:int}")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [RequirePermission("GOODS_DELETE")]
+    [RequireFeature("feat-goods")]
+    public async Task<IActionResult> DeleteProductCategory(int id)
+    {
+        var result = await _mediator.Send(new DeleteProductCategoryCommand(id));
+        if (!result.IsSuccess)
+        {
+            return BadRequest(new { message = result.Error });
+        }
+        return Ok(new { message = "Đã xóa nhóm hàng." });
+    }
+
+    /// <summary>
     /// Lấy danh sách đơn vị tính đo lường (Units of Measure).
     /// </summary>
     [HttpGet("units")]

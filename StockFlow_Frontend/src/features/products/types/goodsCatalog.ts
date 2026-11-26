@@ -65,6 +65,8 @@ export interface GoodsItem {
   units?: GoodsUnitConversion[];
   attributes?: GoodsAttributeDef[];
   variants?: GoodsVariantItem[];
+  /** Mã nhóm hàng cùng loại (import danh mục: "Mã HH Liên quan"); các hàng cùng mã hiện chung tab Hàng hóa cùng loại */
+  groupCode?: string;
   stockByWarehouse: {
     /** Id kho trong DB (ProductWarehouseStockDto.warehouseId) — dùng để ghép đúng kho, không dò theo tên */
     warehouseId?: number;

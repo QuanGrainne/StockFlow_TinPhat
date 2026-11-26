@@ -45,10 +45,13 @@ public class GetProductsForTransferQueryHandler : IRequestHandler<GetProductsFor
         if (!string.IsNullOrWhiteSpace(request.Search))
         {
             var term = request.Search.Trim().ToLower();
+            // Mã đơn vị quy đổi / hàng cùng loại nằm trong variants_json ("Code":"SP004346") → ra hàng chính
+            var codeInJson = "\"code\":\"" + term;
             productQuery = productQuery.Where(p =>
                 (p.ProductCode != null && p.ProductCode.ToLower().Contains(term)) ||
                 (p.ProductName != null && p.ProductName.ToLower().Contains(term)) ||
-                (p.Barcode != null && p.Barcode.ToLower().Contains(term)));
+                (p.Barcode != null && p.Barcode.ToLower().Contains(term)) ||
+                (p.VariantsJson != null && p.VariantsJson.ToLower().Contains(codeInJson)));
         }
 
         var products = await productQuery
@@ -93,7 +96,8 @@ public class GetProductsForTransferQueryHandler : IRequestHandler<GetProductsFor
                 StandardPrice: p.StandardPrice ?? 0,
                 SourceStock: sourceStock,
                 DestStock: destStock,
-                ImageUrl: p.ImageUrl
+                ImageUrl: p.ImageUrl,
+                VariantsJson: p.VariantsJson
             );
         }).ToList();
 

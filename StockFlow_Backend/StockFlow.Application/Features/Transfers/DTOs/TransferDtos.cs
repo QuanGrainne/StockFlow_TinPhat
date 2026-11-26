@@ -76,7 +76,9 @@ public record ProductWithStockDto(
     decimal StandardPrice,
     decimal SourceStock,
     decimal DestStock,
-    string? ImageUrl = null
+    string? ImageUrl = null,
+    /// <summary>Đơn vị quy đổi (chọn đơn vị khi lập phiếu chuyển / kiểm kho; lưu quy về đơn vị cơ bản)</summary>
+    string? VariantsJson = null
 );
 
 public class CreateTransferItemRequest

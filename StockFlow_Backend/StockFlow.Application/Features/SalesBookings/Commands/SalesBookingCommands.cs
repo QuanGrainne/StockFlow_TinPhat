@@ -3,6 +3,7 @@ using MediatR;
 using Microsoft.EntityFrameworkCore;
 using StockFlow.Application.Common;
 using StockFlow.Application.Common.Interfaces;
+using StockFlow.Application.Features.Products.Helpers;
 using StockFlow.Application.Features.SalesBookings.Common;
 using StockFlow.Application.Features.SalesBookings.DTOs;
 using StockFlow.Domain.Entities;
@@ -101,15 +102,28 @@ public class SalesBookingCommandHandler :
         if (customer.IsActive == false) return Fail($"Khách hàng '{customer.PartnerName}' đang ngừng hoạt động.");
 
         var productIds = req.Items.Select(i => i.ProductId).Distinct().ToList();
-        var products = await _context.MstProducts.AsNoTracking().Where(p => productIds.Contains(p.ProductId)).ToDictionaryAsync(p => p.ProductId, ct);
+        var products = await _context.MstProducts.AsNoTracking().Include(p => p.BaseUnit)
+            .Where(p => productIds.Contains(p.ProductId)).ToDictionaryAsync(p => p.ProductId, ct);
         foreach (var id in productIds)
         {
             if (!products.TryGetValue(id, out var p)) return Fail($"Hàng hóa ID {id} không tồn tại.");
             if (p.IsActive == false) return Fail($"Hàng '{p.ProductName}' ({p.ProductCode}) đã ngừng kinh doanh.");
         }
 
+        // Đơn vị bán từng dòng (theo thứ tự req.Items): hệ số lấy từ thiết lập đơn vị của hàng
+        var lineUnits = new List<(int UnitId, decimal Rate)>();
+        var unitIdCache = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        foreach (var i in req.Items)
+        {
+            var prod = products[i.ProductId];
+            var saleUnit = ProductSaleUnits.Find(prod, i.UnitName);
+            if (saleUnit == null)
+                return Fail($"Hàng '{prod.ProductName}' ({prod.ProductCode}) không có đơn vị \"{i.UnitName}\" trong thiết lập đơn vị tính.");
+            lineUnits.Add((await ProductSaleUnits.UnitIdAsync(_context, prod, saleUnit, unitIdCache, ct), saleUnit.Rate));
+        }
+
         // Tiền: giảm giá dòng theo VNĐ / % trên 1 đơn vị, rồi giảm giá đơn
-        var lines = req.Items.Select(i =>
+        var lines = req.Items.Select((i, idx) =>
         {
             var type = string.Equals(i.DiscountType, "PERCENT", StringComparison.OrdinalIgnoreCase) ? "PERCENT" : "AMOUNT";
             var perUnit = type == "PERCENT"
@@ -119,7 +133,8 @@ public class SalesBookingCommandHandler :
             return new DtlOrderItem
             {
                 ProductId = i.ProductId,
-                UnitId = i.UnitId > 0 ? i.UnitId : products[i.ProductId].BaseUnitId,
+                UnitId = lineUnits[idx].UnitId,
+                ConversionRate = lineUnits[idx].Rate,
                 Quantity = i.Quantity,
                 OriginalPrice = i.OriginalPrice,
                 DiscountType = type,
@@ -333,11 +348,12 @@ public class SalesBookingCommandHandler :
         {
             // Hàng trùng (cùng mã, cùng giá bán) cộng dồn số lượng
             var items = sources.SelectMany(o => o.DtlOrderItems)
-                .GroupBy(i => new { i.ProductId, i.UnitId, i.OriginalPrice, Price = i.UnitPrice ?? 0, i.DiscountType, i.DiscountValue })
+                .GroupBy(i => new { i.ProductId, i.UnitId, i.ConversionRate, i.OriginalPrice, Price = i.UnitPrice ?? 0, i.DiscountType, i.DiscountValue })
                 .Select(g => new DtlOrderItem
                 {
                     ProductId = g.Key.ProductId,
                     UnitId = g.Key.UnitId,
+                    ConversionRate = g.Key.ConversionRate,
                     OriginalPrice = g.Key.OriginalPrice,
                     DiscountType = g.Key.DiscountType,
                     DiscountValue = g.Key.DiscountValue,

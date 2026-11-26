@@ -24,6 +24,8 @@ export interface BackendProduct {
   imageUrl?: string | null;
   /** MRP: thời gian giao (ngày); null = chưa khai báo */
   leadTimeDays?: number | null;
+  /** Đơn vị quy đổi / hàng cùng loại (JSON) – chọn đơn vị khi lập phiếu */
+  variantsJson?: string | null;
 }
 
 /** Nhóm hàng (GET /api/Products/categories → ProductCategoryDto) */
