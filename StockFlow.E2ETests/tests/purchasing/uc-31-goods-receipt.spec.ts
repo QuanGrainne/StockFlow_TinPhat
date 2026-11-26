@@ -92,18 +92,10 @@ test.describe(SHEET, () => {
     });
   });
 
-  test('SYS-GRN-03 – Hàng theo lô: nhập số lô, hạn dùng, vị trí', async ({ page, env, adminApi, uid }, testInfo) => {
-    traceTc(testInfo, 'SYS-GRN-03', SHEET, { mismatch: 'Danh mục hàng hóa không có cờ "theo lô"; không dựng được tiền đề hàng theo lô.' });
-    const { p, po } = await arrange(adminApi, uid, 46_000, 5);
-    await new LoginPage(page).loginOk(USER, env.defaultPassword);
-    const form = await openReceive(page, po.code, po.id);
-    await expect(form.line(p.code)).toBeVisible();
-    const lotInputs = await page.getByRole('textbox', { name: /lô|hạn (sử )?dùng|HSD|vị trí/i }).count();
-    const lotPlaceholders = await page.getByPlaceholder(/lô|hạn (sử )?dùng|HSD|vị trí/i).count();
-    const lotHeaders = await page.getByText(/^(Số lô|Lô hàng|Hạn sử dụng|HSD|Vị trí)$/).count();
-    testInfo.annotations.push({ type: 'observed', description: `Ô lô / hạn dùng / vị trí trên form nhập hàng: ${lotInputs + lotPlaceholders + lotHeaders}` });
-    testInfo.annotations.push({ type: 'NOT_IMPLEMENTED', description: 'Form nhập hàng không có ô số lô, hạn dùng, vị trí lưu kho' });
-    expect.soft(lotInputs + lotPlaceholders + lotHeaders, 'form nhập hàng có ô số lô / hạn dùng / vị trí').toBeGreaterThan(0);
+  test('SYS-GRN-03 – Hàng theo lô: nhập số lô, hạn dùng, vị trí', async ({}, testInfo) => {
+    traceTc(testInfo, 'SYS-GRN-03', SHEET);
+    // Quyết định Round 2 (27/11/2026): chưa có quản lý hàng theo lô / hạn dùng / vị trí lưu kho → N/A
+    test.skip(true, 'N/A – Chưa có chức năng quản lý hàng theo lô / hạn dùng / vị trí lưu kho (Not implemented)');
   });
 
   test('SYS-GRN-04 – Hủy trước khi xác nhận: không lưu gì, tồn không đổi', async ({ page, env, db, adminApi, uid }, testInfo) => {

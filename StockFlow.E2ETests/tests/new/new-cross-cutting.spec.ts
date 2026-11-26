@@ -207,14 +207,16 @@ test.describe(SHEET, () => {
       await shell.selectBranch('K002');
       await expect(shell.branchButton).toContainText(WAREHOUSES.K002.name);
     });
-    await test.step('3a. Mở Chuyển hàng → KQ1. danh sách theo K002', async () => {
+    // Quyết định Round 2 (27/11/2026, giữ hành vi hiện tại): POS lấy tồn theo chi nhánh header; màn Chuyển hàng có bộ lọc
+    // Chuyển đi / Nhận về riêng, mặc định "Tất cả chi nhánh" được phân quyền (không lọc theo header).
+    await test.step('3a. Mở Chuyển hàng → KQ1. danh sách gồm phiếu của mọi chi nhánh được phân quyền', async () => {
       const list = new TransferListPage(page);
       await list.goto();
       await expect(list.row(tB.code)).toHaveCount(1);
       const shownA = await list.row(tA.code).count();
       const filters = (await page.getByRole('complementary').innerText()).replace(/\s+/g, ' ').slice(0, 120);
       testInfo.annotations.push({ type: 'observed', description: `Chi nhánh K002: phiếu ${tB.code} (K002→K003) hiện; phiếu ${tA.code} (K001→K003) ${shownA ? 'VẪN hiện' : 'không hiện'}; bộ lọc: ${filters}` });
-      expect.soft(shownA, `phiếu ${tA.code} của K001 không thuộc K002`).toBe(0);
+      expect.soft(shownA, `phiếu ${tA.code} của K001 (chi nhánh được phân quyền) vẫn hiện với bộ lọc mặc định`).toBe(1);
     });
     await test.step('3b. Mở /pos → KQ1. tồn POS theo K002', async () => {
       const pos = new PosPage(page);

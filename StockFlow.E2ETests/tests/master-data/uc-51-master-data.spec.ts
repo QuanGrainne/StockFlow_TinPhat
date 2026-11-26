@@ -1,6 +1,7 @@
 // Report 5.3 – sheet "UC-51 Master Data" (SYS-MST-01..20). Actor Manager = manager01. MST-16 là N/A theo Note.
-// Kho (/warehouses → /roles/warehouses) thuộc chức năng "Phân quyền kho" chỉ của Admin: ghi theo quy ước UI chặn thao tác.
-import { test, expect, traceTc } from '../../fixtures/test';
+// Kho (/warehouses → /roles/warehouses) thuộc chức năng "Phân quyền kho" chỉ của Admin. Quyết định Round 2 (27/11/2026):
+// danh mục Kho do Admin quản lý → MST-01 kiểm Manager bị chặn ở màn Kho; MST-15 / 17 thao tác kho bằng Admin.
+import { test, expect, traceTc, newUserContext } from '../../fixtures/test';
 import { LoginPage } from '../../pages/LoginPage';
 import { BomPage, CustomersAdminPage, ProductsPage, SuppliersPage, fieldAfter } from '../../pages/MasterDataPages';
 import { PosPage } from '../../pages/PosPage';
@@ -9,7 +10,7 @@ import { ApiSession } from '../../fixtures/api';
 import { addStock, createProduct } from '../../fixtures/data';
 import { createCustomer, createInvoice, phoneFrom, setCreditLimit } from '../../fixtures/sales';
 import { bomsOfProduct, creditHistory, partnerById, partnersByName, productActive, productByName, productVariantsJson, productsLike, unitConversions } from '../../fixtures/dbq3';
-import { backendError, readToast, uiBlocksAction, needsClarification } from '../../fixtures/ui';
+import { backendError, readToast, seeMessage, uiBlocksAction } from '../../fixtures/ui';
 import type { Page } from '@playwright/test';
 
 const SHEET = 'UC-51 Master Data';
@@ -51,7 +52,9 @@ test.describe(SHEET, () => {
       const denied = await page.getByRole('heading', { name: NO_WH }).count();
       const h1 = (await page.getByRole('heading', { level: 1 }).first().innerText().catch(() => '')).trim();
       seen.push(`${name} ${url} → ${new URL(page.url()).pathname}: ${denied ? 'KHÔNG CÓ QUYỀN' : h1}`);
-      expect.soft(denied, `${name} mở được với Manager`).toBe(0);
+      // Kho chỉ Admin quản lý (Expected Round 2): Manager phải bị chặn; các danh mục khác mở được
+      if (url === '/warehouses') expect.soft(denied, 'màn Kho chặn Manager (chỉ Admin quản lý kho)').toBeGreaterThan(0);
+      else expect.soft(denied, `${name} mở được với Manager`).toBe(0);
     }
     testInfo.annotations.push({ type: 'observed', description: seen.join(' | ') });
   });
@@ -379,18 +382,50 @@ test.describe(SHEET, () => {
     expect(num((await partnerById(db, c.partnerId))?.credit_limit)).toBe(10_000_000);
   });
 
-  test('SYS-MST-15 – Tạo và sửa kho', async ({ page, env, uid }, testInfo) => {
+  test('SYS-MST-15 – Tạo và sửa kho', async ({ page, browser, env, adminApi, uid, dialogs }, testInfo) => {
     traceTc(testInfo, 'SYS-MST-15', SHEET);
-    await login(page, env);
-    const denied = await openWarehouses(page);
-    await expect(page).toHaveURL(/\/roles\/warehouses/);
-    testInfo.annotations.push({ type: 'observed', description: `/warehouses chuyển tới /roles/warehouses; Manager: ${denied ? 'không có quyền "Phân quyền kho"' : 'mở được'}` });
-    if (denied) {
+    const name = `Kho E2E ${uid}`;
+    const renamed = `${name} sửa`;
+    await test.step('Manager không vào được màn Kho; API tạo kho trả 403', async () => {
+      await login(page, env);
+      expect(await openWarehouses(page), 'Manager bị chặn ở màn Kho').toBe(true);
       const mgr = await ApiSession.login(env, USER, env.defaultPassword);
-      const be = await backendError(() => mgr.post('/api/warehouses', { warehouseCode: `KE2E${uid.replace(/\D/g, '').slice(-4)}`, warehouseName: `Kho E2E ${uid}`, address: 'E2E' }));
+      const be = await backendError(() => mgr.post('/api/warehouses', { warehouseCode: `KE2E${uid.replace(/\D/g, '').slice(-4)}`, warehouseName: name, address: 'E2E' }));
       await mgr.dispose();
-      needsClarification(testInfo, 'màn Kho (Phân quyền kho) chỉ dành cho Admin – actor của UC-51 phần Kho', 'Warehouse saved.', be);
-    } else expect.soft(false, 'Manager mở được màn Kho: cần bổ sung bước tạo / sửa kho trong test').toBe(true);
+      testInfo.annotations.push({ type: 'observed', description: `Manager gọi API tạo kho: "${be}"` });
+      expect(be.startsWith('(không lỗi)'), 'API tạo kho từ chối Manager').toBe(false);
+    });
+    // Admin thao tác ở context riêng (phiên đăng nhập lưu theo tab)
+    const admin = await newUserContext(browser, testInfo, dialogs);
+    const ap = admin.page;
+    await new LoginPage(ap).loginOk(SEEDED.admin.username, env.defaultPassword);
+    expect(await openWarehouses(ap), 'Admin mở được màn Kho').toBe(false);
+    const card = (text: string) => ap.locator('div.shadow-2xs').filter({ hasText: text });
+    try {
+      await test.step('1. Admin tạo kho mới → lưu, hiện trong danh sách', async () => {
+        await ap.getByRole('button', { name: 'Thêm cơ sở kho' }).click();
+        await ap.getByPlaceholder('Vd: Kho Cầu Giấy').fill(name);
+        await ap.getByPlaceholder('Vd: Số 10 Duy Tân, Cầu Giấy, Hà Nội').fill(`Địa chỉ E2E ${uid}`);
+        await ap.getByRole('button', { name: 'Tạo cơ sở kho' }).click();
+        await expect(ap.getByText(new RegExp(`^Đã thêm mới cơ sở kho: ${name} `))).toBeVisible();
+        await expect(card(name).first()).toBeVisible();
+      });
+      await test.step('2. Admin sửa tên kho → lưu thay đổi', async () => {
+        await card(name).first().getByTitle('Chỉnh sửa thông tin kho').click();
+        await ap.getByPlaceholder('Vd: Kho Tổng Gia Lâm').fill(renamed);
+        await ap.getByRole('button', { name: 'Lưu thay đổi' }).click();
+        await expect(ap.getByText(new RegExp(`^Đã cập nhật cơ sở kho: ${renamed} `))).toBeVisible();
+      });
+    } finally {
+      // Dọn kho thử để không ảnh hưởng danh sách kho của các ca sau
+      const list = await adminApi.get<{ warehouseId?: number; id?: number; warehouseName?: string; name?: string }[]>('/api/warehouses').catch(() => []);
+      const w = list.find((x) => (x.warehouseName ?? x.name ?? '').startsWith(name));
+      const id = w?.warehouseId ?? w?.id;
+      const del = id ? await backendError(() => adminApi.delete(`/api/warehouses/${id}`)) : '(không tìm thấy kho thử)';
+      testInfo.annotations.push({ type: 'note', description: `Dọn kho thử: ${del}` });
+      void dialogs;
+    }
+    await admin.context.close();
   });
 
   test('SYS-MST-16 – Tạo và sửa vị trí lưu kho', async ({}, testInfo) => {
@@ -398,17 +433,37 @@ test.describe(SHEET, () => {
     test.skip(true, 'N/A – Chưa có chức năng danh mục vị trí lưu kho (Note: Not implemented)');
   });
 
-  test('SYS-MST-17 – Xóa kho đang có tồn hoặc nhân sự bị từ chối', async ({ page, env }, testInfo) => {
+  test('SYS-MST-17 – Xóa kho đang có tồn hoặc nhân sự bị từ chối', async ({ page, browser, env, adminApi, dialogs }, testInfo) => {
     traceTc(testInfo, 'SYS-MST-17', SHEET);
-    await login(page, env);
-    const denied = await openWarehouses(page);
-    testInfo.annotations.push({ type: 'observed', description: `Manager mở màn Kho: ${denied ? 'không có quyền' : 'mở được'}` });
-    if (denied) {
+    await test.step('Manager không vào được màn Kho; API xóa kho trả 403', async () => {
+      await login(page, env);
+      expect(await openWarehouses(page), 'Manager bị chặn ở màn Kho').toBe(true);
       const mgr = await ApiSession.login(env, USER, env.defaultPassword);
       const be = await backendError(() => mgr.delete('/api/warehouses/3'));
       await mgr.dispose();
-      needsClarification(testInfo, 'màn Kho (Phân quyền kho) chỉ dành cho Admin – actor của UC-51 phần Kho', 'thông báo kho đang có tồn / nhân sự', be);
-    } else expect.soft(false, 'Manager mở được màn Kho: cần bổ sung bước xóa kho trong test').toBe(true);
+      expect(be.startsWith('(không lỗi)'), 'API xóa kho từ chối Manager').toBe(false);
+    });
+    // Admin thao tác ở context riêng (phiên đăng nhập lưu theo tab)
+    const admin = await newUserContext(browser, testInfo, dialogs);
+    const ap = admin.page;
+    await new LoginPage(ap).loginOk(SEEDED.admin.username, env.defaultPassword);
+    expect(await openWarehouses(ap), 'Admin mở được màn Kho').toBe(false);
+    // Thẻ kho = khối có mã K001 và nút sửa kho (tránh khớp bảng nhân sự cũng chứa tên kho)
+    const k001Card = () =>
+      ap.locator('div.shadow-2xs').filter({ has: ap.getByText('K001', { exact: true }) }).filter({ has: ap.getByTitle('Chỉnh sửa thông tin kho') }).last();
+    await test.step('1. Admin xóa K001 (đang có nhân sự và tồn kho) → bị từ chối', async () => {
+      dialogs.expect(/Không thể xóa cơ sở kho/);
+      await k001Card().getByTitle(/Không thể xóa|Xóa cơ sở kho/).click();
+      await seeMessage(ap, dialogs, /Không thể xóa cơ sở kho "Kho Tổng Gia Lâm" \(K001\) vì hiện đang có \d+ nhân sự trực thuộc/);
+      const be = await backendError(() => adminApi.delete('/api/warehouses/3'));
+      testInfo.annotations.push({ type: 'observed', description: `API xóa K001 bằng Admin: "${be}"` });
+      expect(be).toMatch(/^Không thể xóa cơ sở kho 'Kho Tổng Gia Lâm' vì (đang có \d+ nhân sự|kho đang có hàng tồn kho)/);
+    });
+    await test.step('KQ. Kho vẫn còn', async () => {
+      await ap.reload();
+      await expect(k001Card()).toBeVisible();
+    });
+    await admin.context.close();
   });
 
   test('SYS-MST-18 – Lưu phiên bản định mức với NVL, định mức, hao hụt', async ({ page, env, db, adminApi, uid }, testInfo) => {

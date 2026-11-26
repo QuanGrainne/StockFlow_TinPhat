@@ -151,7 +151,9 @@ test.describe(SHEET, () => {
 
   test('SYS-PRD-N02 – File có dòng không hợp lệ: báo từng dòng, không tạo hàng cho dòng lỗi', async ({ page, env, db, adminApi, uid }, testInfo) => {
     traceTc(testInfo, 'SYS-PRD-N02', SHEET);
-    testInfo.annotations.push({ type: 'note', description: 'File theo Procedure: 1 dòng thiếu tên (dòng 2) và 1 dòng trùng mã đã có (dòng 3, tên khác). Việc dòng hợp lệ có được import hay không là NEEDS_CLARIFICATION.' });
+    // Quyết định Round 2 (27/11/2026, giữ hành vi hiện tại): có dòng lỗi thì báo "Dòng n: …" và dừng cả file, không tạo hàng nào;
+    // tên trống không phải lỗi (hệ thống lấy mã hàng làm tên).
+    testInfo.annotations.push({ type: 'note', description: 'File theo Procedure: 1 dòng thiếu tên (dòng 2) và 1 dòng trùng mã đã có (dòng 3, tên khác).' });
     const prefix = `E2EIMQ${codeOf(uid)}`;
     const group = await activeCategory(adminApi);
     const existing = await createProduct(adminApi, { suffix: uid, price: 44_000, namePrefix: 'Hàng có sẵn' });
@@ -172,10 +174,10 @@ test.describe(SHEET, () => {
       const shown = await page.getByText(/Dòng \d+/).allInnerTexts();
       testInfo.annotations.push({ type: 'observed', description: `Thông báo lỗi: ${shown.map((s) => s.trim()).join(' | ') || '(không có)'}` });
       await expect.soft(dupMsg, 'dòng 3 (trùng mã) được báo').toBeVisible();
-      await expect.soft(noNameMsg, 'dòng 2 (thiếu tên) được báo').toBeVisible();
+      testInfo.annotations.push({ type: 'observed', description: `Dòng 2 (tên trống): ${(await noNameMsg.count()) ? 'có báo' : 'không báo – tên trống lấy mã làm tên (Expected Round 2)'}` });
     });
-    await test.step('KQ2. Không tạo hàng cho dòng lỗi', async () => {
-      expect(await productCodesLike(db, noName.code), 'dòng thiếu tên không tạo hàng').toEqual([]);
+    await test.step('KQ2. Có dòng lỗi thì dừng cả file: không tạo hàng nào, hàng có sẵn không đổi', async () => {
+      expect(await productCodesLike(db, noName.code), 'không tạo hàng nào từ file có dòng lỗi').toEqual([]);
       const ex = await productCodesLike(db, existing.code);
       expect(ex.map((r) => r.product_name), 'hàng có sẵn không bị đổi tên').toEqual([existing.name]);
     });

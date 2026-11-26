@@ -20,7 +20,20 @@
 | DEF-E2E-09 | Đã sửa | Khung trang báo "Không thể kết nối đến máy chủ. Vui lòng thử lại." + Thử lại khi không tải được quyền; màn Hàng hóa báo lỗi + Thử lại và không xoá danh sách |
 
 Lỗi đã biết của Report 5.2 gặp lại (DEF-IT-01/02/03/04) đã được sửa trên `dev`; SYS-TRF-N03 thêm: ô SL nhận không còn tự đổi số âm thành 0.
-Mục 3 (lệch SPEC / Expected): câu chữ đã đổi theo Expected; ca giao diện chặn sớm, BOM → định mức, BR-37 / BR-42 đã cập nhật Expected trong bản nháp Report 5.3 (Round 2). Còn cần nhóm làm rõ: SYS-MRQ-03, SYS-MST-01 / 15 / 17, SYS-PRD-N02, SYS-XCT-N05, SYS-ORD-N02 (QR trên bản in), SYS-GRN-03 (quản lý theo lô chưa làm).
+Mục 3 (lệch SPEC / Expected): câu chữ đã đổi theo Expected; ca giao diện chặn sớm, BOM → định mức, BR-37 / BR-42 đã cập nhật Expected trong bản nháp Report 5.3 (Round 2).
+
+8 ca cần làm rõ – **quyết định tạm 27/11/2026 (Claude, theo uỷ quyền người dùng; nhóm duyệt lại)**, đều giữ hành vi code hiện tại:
+
+| Ca | Quyết định |
+|---|---|
+| SYS-MRQ-03 | N/A – định mức đã dùng cho lệnh không xóa được nên không dựng được tiền đề |
+| SYS-GRN-03 | N/A – chưa có quản lý theo lô / hạn dùng / vị trí |
+| SYS-MST-01 / 15 / 17 | Danh mục Kho chỉ Admin quản lý; Manager bị chặn; test tạo / sửa / xóa kho bằng Admin |
+| SYS-PRD-N02 | Có dòng lỗi thì dừng cả file; tên trống lấy mã làm tên |
+| SYS-XCT-N05 | Màn Chuyển hàng dùng bộ lọc riêng, mặc định mọi chi nhánh được phân quyền |
+| SYS-ORD-N02 | Bỏ yêu cầu QR trên bản in |
+
+Round 2 (E2E toàn bộ 27/11/2026): **192 Passed, 0 Failed, 55 N/A / 247 TC**.
 
 ## 1. Danh sách lỗi
 

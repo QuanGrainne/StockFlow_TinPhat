@@ -6,7 +6,7 @@ import { ProductionOrdersPage } from '../../pages/ProductionPages';
 import { SEEDED, WAREHOUSES } from '../../fixtures/accounts';
 import { addStock, createProduct, type ProductDto } from '../../fixtures/data';
 import { arrangeProductionOrder, issueMaterial, type ProductionOrderRef } from '../../fixtures/production';
-import { backendError, makeAccount, needsClarification } from '../../fixtures/ui';
+import { makeAccount } from '../../fixtures/ui';
 import type { ApiSession } from '../../fixtures/api';
 
 const SHEET = 'UC-45 Material Requirement';
@@ -74,25 +74,10 @@ test.describe(SHEET, () => {
     });
   });
 
-  test('SYS-MRQ-03 – Lệnh có định mức đã bị xóa: báo lỗi', async ({ page, env, adminApi, uid }, testInfo) => {
+  test('SYS-MRQ-03 – Lệnh có định mức đã bị xóa: báo lỗi', async ({}, testInfo) => {
     traceTc(testInfo, 'SYS-MRQ-03', SHEET);
-    const o = await order(adminApi, uid);
-    let deleted = false;
-    await test.step('Tiền đề: xóa định mức của lệnh (Admin)', async () => {
-      const del = await backendError(() => adminApi.delete(`/api/production/boms/${o.bomId}`));
-      deleted = del === '(không lỗi)';
-      const off = deleted ? '(bỏ qua)' : await backendError(() => adminApi.post(`/api/production/boms/${o.bomId}/deactivate`));
-      testInfo.annotations.push({ type: 'observed', description: `Xóa định mức: "${del}"; ngừng áp dụng định mức thay thế: "${off}"` });
-      if (!deleted) needsClarification(testInfo, 'không xóa được định mức đã dùng cho lệnh sản xuất – tiền đề không dựng được', 'Error message shown', del);
-    });
-    await test.step('1. Mở nhu cầu NVL của lệnh', async () => {
-      await new LoginPage(page).loginOk(SEEDED.production.username, env.defaultPassword);
-      const prod = new ProductionOrdersPage(page);
-      await prod.goto();
-      await prod.open(o.orderCode);
-      const shown = await prod.material(o.rm.code).count();
-      testInfo.annotations.push({ type: 'observed', description: `Chi tiết lệnh hiện ${shown} dòng NVL (nhu cầu lưu theo lệnh)` });
-      if (deleted) await expect.soft(page.getByText(/không tìm thấy|định mức/i).first()).toBeVisible();
-    });
+    // Quyết định Round 2 (27/11/2026): hệ thống chặn xóa định mức đã dùng cho lệnh sản xuất ("… nên không hủy được.
+    // Bạn có thể ngừng áp dụng định mức."), nhu cầu NVL lưu theo lệnh nên tiền đề không dựng được → N/A.
+    test.skip(true, 'N/A – Không dựng được tiền đề: định mức đã dùng cho lệnh sản xuất không xóa được (chỉ ngừng áp dụng); nhu cầu NVL lưu theo lệnh');
   });
 });

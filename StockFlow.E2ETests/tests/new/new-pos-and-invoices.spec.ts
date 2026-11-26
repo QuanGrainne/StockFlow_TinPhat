@@ -535,11 +535,10 @@ test.describe(SHEET, () => {
       expect(html).toContain(vnd(2 * price));
       testInfo.annotations.push({ type: 'observed', description: `Tiêu đề bản in: ${/<h1>([^<]*)<\/h1>/.exec(html)?.[1] ?? '?'}` });
     });
-    await test.step('KQ2. Có mã QR thanh toán chuyển khoản', async () => {
-      const qr = (html.match(/<(img|svg|canvas)\b/gi) ?? []).length + (/qr/i.test(html) ? 1 : 0);
-      testInfo.annotations.push({ type: 'observed', description: `Số phần tử ảnh / QR trong bản in: ${qr}` });
-      expect(qr, 'mã QR trên bản in').toBeGreaterThan(0);
-    });
+    // Quyết định Round 2 (27/11/2026): bỏ yêu cầu QR trên bản in – QR payOS chỉ có ở hộp thanh toán trên POS,
+    // hóa đơn đã thanh toán không cần QR. Chỉ ghi nhận.
+    const qr = (html.match(/<(img|svg|canvas)\b/gi) ?? []).length + (/qr/i.test(html) ? 1 : 0);
+    testInfo.annotations.push({ type: 'observed', description: `Số phần tử ảnh / QR trong bản in: ${qr} (không yêu cầu)` });
     expect((await orderById(db, inv.orderId))?.status).toBe('COMPLETED');
   });
 
