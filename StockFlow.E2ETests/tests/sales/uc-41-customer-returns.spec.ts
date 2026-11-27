@@ -1,6 +1,6 @@
 // Report 5.3 – sheet "UC-41 Customer Returns" (SYS-CRT-01..07). Code: phiếu trả lập trên POS (tab Trả hàng) theo hóa đơn,
 // cộng tồn ngay, không có bước nhận / phân loại hàng. Người thao tác: sales01 (vai trò có chức năng Trả hàng) thay "Warehouse
-// Accountant" – ghi rõ ở annotation. CRT-02, 05, 06, 07 là N/A theo Note.
+// Accountant" – ghi rõ ở annotation. Ca CRT-02, 05, 06, 07 (đã xoá 27/11/2026: chức năng nhóm bỏ, Report 3 ghi ngoài phạm vi).
 import { test, expect, traceTc } from '../../fixtures/test';
 import { LoginPage } from '../../pages/LoginPage';
 import { SEEDED } from '../../fixtures/accounts';
@@ -11,7 +11,7 @@ import { queryRows } from '../../fixtures/pg';
 import { stockQty } from '../../fixtures/dbq';
 import { backendError, uiBlocksAction } from '../../fixtures/ui';
 import type { Client } from 'pg';
-import type { Locator, Page, TestInfo } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 
 const SHEET = 'UC-41 Customer Returns';
 const priceOf = (uid: string, base: number): number => base + (Number(uid.replace(/\D/g, '').slice(-3)) % 900) * 10;
@@ -89,11 +89,6 @@ async function submitReturn(pos: Page): Promise<string> {
   return (await msg.innerText()).trim();
 }
 
-function na(testInfo: TestInfo, tc: string): void {
-  traceTc(testInfo, tc, SHEET);
-  test.skip(true, 'N/A – Chưa có chức năng (không có bước phân loại / sửa chữa hàng trả)');
-}
-
 test.describe(SHEET, () => {
   test('SYS-CRT-01 – Trả hàng từ hóa đơn ghi nợ: cộng tồn, giảm nợ theo giá bán, phiếu hoàn thành @p1', async ({ page, env, db, adminApi, uid, dialogs }, testInfo) => {
     traceTc(testInfo, 'SYS-CRT-01', SHEET, { mismatch: 'Code: cộng tồn ngay, không có bước kiểm tra hàng trả.' });
@@ -113,10 +108,6 @@ test.describe(SHEET, () => {
     expect((await returnRows(db, inv.orderId)).map((r) => [r.status, Number(r.total_amount), Number(r.refund_amount ?? 0)])).toEqual([['COMPLETED', 2 * price, 0]]);
     expect(await stockQty(db, p.productId, 'K001')).toBe(stock0 + 2);
     expect(await debtOf(db, c.partnerId)).toBe(debt0 - 2 * price);
-  });
-
-  test('SYS-CRT-02 – Hoàn tất sửa chữa hàng trả', async ({}, testInfo) => {
-    na(testInfo, 'SYS-CRT-02');
   });
 
   test('SYS-CRT-03 – Khách không có nợ: ghi nhận trả tiền cho khách', async ({ page, env, db, adminApi, uid, dialogs }, testInfo) => {
@@ -159,15 +150,4 @@ test.describe(SHEET, () => {
     expect(await returnRows(db, inv.orderId)).toEqual([]);
   });
 
-  test('SYS-CRT-05 – Phân loại "Nhập lại kho"', async ({}, testInfo) => {
-    na(testInfo, 'SYS-CRT-05');
-  });
-
-  test('SYS-CRT-06 – Phân loại "Sửa chữa"', async ({}, testInfo) => {
-    na(testInfo, 'SYS-CRT-06');
-  });
-
-  test('SYS-CRT-07 – Phân loại "Hủy bỏ" chờ xuất hủy', async ({}, testInfo) => {
-    na(testInfo, 'SYS-CRT-07');
-  });
 });

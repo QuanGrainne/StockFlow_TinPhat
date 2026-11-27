@@ -599,6 +599,8 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoadingDb, setIsLoadingDb] = useState(false);
+  // Lỗi tải danh sách hàng hóa từ API (DEF-E2E-09): hiện thông báo + nút Thử lại thay vì chỉ ghi console
+  const [loadError, setLoadError] = useState<string | null>(null);
   // Tăng để tải lại toàn bộ hàng hóa từ DB (VD sau khi import file)
   const [productsReloadTick, setProductsReloadTick] = useState(0);
   const [viewingPriceBookItem, setViewingPriceBookItem] = useState<GoodsItem | null>(null);
@@ -637,8 +639,9 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
     let isMounted = true;
     const fetchApiProducts = async () => {
       setIsLoadingDb(true);
+      setLoadError(null);
       try {
-        const apiProducts = await productService.getProducts();
+        const apiProducts = await productService.getProductsOrThrow();
         if (!isMounted || !apiProducts) return;
         if (apiProducts.length === 0) {
           // DB chưa có hàng hóa: hiện danh sách trống và xoá bản lưu cũ, không giữ hàng mẫu / hàng đã xoá
@@ -843,6 +846,9 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
         }
       } catch (err) {
         console.warn('Lỗi lấy hàng hóa từ database:', err);
+        if (isMounted) {
+          setLoadError('Không tải được danh sách hàng hóa. Vui lòng kiểm tra kết nối đến máy chủ rồi thử lại.');
+        }
       } finally {
         if (isMounted) setIsLoadingDb(false);
       }
@@ -1878,11 +1884,11 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
   const handleSaveItem = (e?: React.FormEvent, keepOpen = false) => {
     if (e) e.preventDefault();
     if (!formName.trim()) {
-      alert('Vui lòng nhập Tên hàng hóa!');
+      alert('Tên hàng hóa không được để trống.');
       return;
     }
     if (isProductCodeDuplicate) {
-      alert(`Mã hàng hóa '${formCode.trim().toUpperCase()}' đã tồn tại trong hệ thống! Vui lòng chọn mã khác.`);
+      alert(`Mã hàng hóa '${formCode.trim().toUpperCase()}' đã tồn tại trong hệ thống.`);
       return;
     }
 
@@ -2970,6 +2976,24 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
           </button>
         </div>
       </header>
+
+      {loadError && (
+        <div
+          role="alert"
+          className="shrink-0 mx-3 sm:mx-4 mt-2 px-3 py-2 rounded-lg border border-rose-200 bg-rose-50 text-rose-700 text-xs font-medium flex items-center justify-between gap-3"
+        >
+          <span>{loadError}</span>
+          <button
+            type="button"
+            onClick={() => setProductsReloadTick((t) => t + 1)}
+            disabled={isLoadingDb}
+            className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-rose-300 bg-white text-rose-700 hover:bg-rose-100 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            <RefreshCw size={12} className={isLoadingDb ? 'animate-spin' : ''} />
+            Thử lại
+          </button>
+        </div>
+      )}
 
       {/* 2. Main Workspace: Sidebar & Table */}
       <div className="flex-1 min-h-0 flex overflow-hidden">
@@ -5053,6 +5077,11 @@ export const GoodsCatalogScreen: React.FC<GoodsCatalogScreenProps> = ({
                           const label = ref ? ref.name : tempUnits.find((x) => x.isBase)?.name || 'đơn vị cơ bản';
                           const current = ref && u.refRate ? u.refRate : u.conversionRate;
                           const rate = prompt(`1 ${u.name} = ? ${label}`, current.toString());
+                          // Hệ số 0 / âm / không phải số: báo lỗi thay vì lặng lẽ bỏ qua (SYS-MST-08)
+                          if (rate !== null && !(Number(rate) > 0)) {
+                            alert('Số lượng quy đổi phải lớn hơn 0.');
+                            return;
+                          }
                           if (rate && Number(rate) > 0) {
                             const r = Number(rate);
                             const edited: GoodsUnitConversion = ref

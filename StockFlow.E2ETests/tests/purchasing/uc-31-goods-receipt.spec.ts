@@ -1,6 +1,6 @@
 // Report 5.3 – sheet "UC-31 Goods Receipt" (SYS-GRN-01..12). Actor "Warehouse Accountant" = whstaff01 (K001 + K002).
 // Nhập hàng theo phiếu đặt: dòng phiếu đặt → "Nhập hàng" → /purchases/create?po=<id> (nạp phần chưa nhập) → Hoàn thành.
-// GRN-09, GRN-12 là N/A theo Note.
+// Ca GRN-03, GRN-09, GRN-12 (đã xoá 27/11/2026: chức năng nhóm bỏ, Report 3 ghi ngoài phạm vi).
 import { test, expect, traceTc } from '../../fixtures/test';
 import { LoginPage } from '../../pages/LoginPage';
 import { PoListPage, PurchaseReturnFormPage, ReceiptFormPage, ReceiptListPage } from '../../pages/PurchasingPages';
@@ -90,20 +90,6 @@ test.describe(SHEET, () => {
       const form = await openReceive(page, po.code, po.id);
       await expect(form.received(p.code)).toHaveValue('4');
     });
-  });
-
-  test('SYS-GRN-03 – Hàng theo lô: nhập số lô, hạn dùng, vị trí', async ({ page, env, adminApi, uid }, testInfo) => {
-    traceTc(testInfo, 'SYS-GRN-03', SHEET, { mismatch: 'Danh mục hàng hóa không có cờ "theo lô"; không dựng được tiền đề hàng theo lô.' });
-    const { p, po } = await arrange(adminApi, uid, 46_000, 5);
-    await new LoginPage(page).loginOk(USER, env.defaultPassword);
-    const form = await openReceive(page, po.code, po.id);
-    await expect(form.line(p.code)).toBeVisible();
-    const lotInputs = await page.getByRole('textbox', { name: /lô|hạn (sử )?dùng|HSD|vị trí/i }).count();
-    const lotPlaceholders = await page.getByPlaceholder(/lô|hạn (sử )?dùng|HSD|vị trí/i).count();
-    const lotHeaders = await page.getByText(/^(Số lô|Lô hàng|Hạn sử dụng|HSD|Vị trí)$/).count();
-    testInfo.annotations.push({ type: 'observed', description: `Ô lô / hạn dùng / vị trí trên form nhập hàng: ${lotInputs + lotPlaceholders + lotHeaders}` });
-    testInfo.annotations.push({ type: 'NOT_IMPLEMENTED', description: 'Form nhập hàng không có ô số lô, hạn dùng, vị trí lưu kho' });
-    expect.soft(lotInputs + lotPlaceholders + lotHeaders, 'form nhập hàng có ô số lô / hạn dùng / vị trí').toBeGreaterThan(0);
   });
 
   test('SYS-GRN-04 – Hủy trước khi xác nhận: không lưu gì, tồn không đổi', async ({ page, env, db, adminApi, uid }, testInfo) => {
@@ -245,11 +231,6 @@ test.describe(SHEET, () => {
     expect(await receiptsOfPo(db, po.id)).toEqual([]);
   });
 
-  test('SYS-GRN-09 – Hàng đang kiểm kho: không xác nhận được phiếu nhập (BR-42)', async ({}, testInfo) => {
-    traceTc(testInfo, 'SYS-GRN-09', SHEET);
-    test.skip(true, 'N/A – Khoá kiểm kho chưa áp dụng cho phiếu nhập (Note: c60ea62)');
-  });
-
   test('SYS-GRN-10 – SL lỗi ghi riêng, chỉ SL đạt vào tồn', async ({ page, env, db, adminApi, uid }, testInfo) => {
     traceTc(testInfo, 'SYS-GRN-10', SHEET);
     const { p, s, price, po } = await arrange(adminApi, uid, 52_000, 65);
@@ -304,8 +285,4 @@ test.describe(SHEET, () => {
     expect(await supplierPayable(db, s.id)).toBe(payable0 - 3 * price);
   });
 
-  test('SYS-GRN-12 – Từ chối cả lô giao hàng kèm lý do', async ({}, testInfo) => {
-    traceTc(testInfo, 'SYS-GRN-12', SHEET);
-    test.skip(true, 'N/A – Chưa có chức năng (Note: Not implemented)');
-  });
 });

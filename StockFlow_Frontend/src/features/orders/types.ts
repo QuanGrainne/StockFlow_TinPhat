@@ -44,6 +44,21 @@ export interface OrderPaymentTransaction {
   createdByName: string;
   status: string;
   description?: string;
+  /** Phiếu thu là tiền khách trả thừa ở hóa đơn khác ("Tính vào công nợ") → hóa đơn đó */
+  sourceOrderId?: number | null;
+  sourceOrderCode?: string | null;
+  sourceOrderDate?: string | null;
+}
+
+/** Một phiếu thu trả nợ cũ tạo từ tiền khách trả thừa ở hóa đơn đang xem */
+export interface OrderExcessDebtPayment {
+  txId: number;
+  txCode: string;
+  amount: number;
+  /** Hóa đơn cũ được trừ nợ; null = phiếu thu chung (PT...) cho phần nợ không gắn hóa đơn */
+  targetOrderId?: number | null;
+  targetOrderCode?: string | null;
+  targetOrderDate?: string | null;
 }
 
 export interface OrderStockIssueItem {
@@ -139,6 +154,8 @@ export interface OrderDetail {
   outstandingAmount: number;
 
   paymentTransactions: OrderPaymentTransaction[];
+  /** Khách trả thừa ở hóa đơn này, chọn "Tính vào công nợ": các phiếu thu trả nợ cũ tạo lúc thanh toán */
+  excessDebtPayments?: OrderExcessDebtPayment[];
   stockIssues: OrderStockIssue[];
   returnRequests: OrderReturnRequest[];
   timelineEvents: OrderTimelineEvent[];

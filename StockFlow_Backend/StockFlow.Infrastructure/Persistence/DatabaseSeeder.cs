@@ -316,6 +316,22 @@ public static class DatabaseSeeder
             }
         }
 
+        // 7b. Bù quyền cho DB đã seed theo bộ mặc định cũ (DEF-E2E-06, DEF-E2E-08).
+        // Ma trận chức năng luôn cấp đủ thao tác cho phân hệ được tick, nên vai trò có X_UPDATE mà thiếu X_DELETE
+        // (hoặc có PURCHASE_CREATE mà thiếu PURCHASE_UPDATE) chỉ có thể là quyền seed cũ. Chạy lại không thêm trùng.
+        foreach (var (haveCode, addCode) in new[] { ("SALES_UPDATE", "SALES_DELETE"), ("PURCHASE_CREATE", "PURCHASE_UPDATE") })
+        {
+            await context.Database.ExecuteSqlRawAsync(
+                @"INSERT INTO stockflow.jnc_role_permissions (role_id, permission_id)
+                  SELECT rp.role_id, pa.permission_id
+                  FROM stockflow.jnc_role_permissions rp
+                  JOIN stockflow.sec_permissions ph ON ph.permission_id = rp.permission_id AND UPPER(ph.permission_code) = {0}
+                  CROSS JOIN stockflow.sec_permissions pa
+                  WHERE UPPER(pa.permission_code) = {1}
+                  ON CONFLICT DO NOTHING",
+                haveCode, addCode);
+        }
+
         // 8. Seed initial Suppliers into mst_business_partners
         var initialSuppliers = new List<MstBusinessPartner>
         {

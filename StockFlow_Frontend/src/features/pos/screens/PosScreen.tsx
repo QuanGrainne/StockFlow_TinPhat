@@ -1010,8 +1010,8 @@ export default function PosScreen() {
       return message.warning('Vui lòng chọn khách hàng đặt hàng.');
     }
     if (!warehouseId) return message.error('Chưa xác định chi nhánh làm việc. Vui lòng chọn chi nhánh ở góc trên.');
-    if (tab.lines.length === 0) return message.warning('Đơn đặt hàng chưa có hàng hóa.');
-    if (tab.lines.some((l) => l.quantity <= 0)) return message.warning('Số lượng hàng hóa phải lớn hơn 0.');
+    if (tab.lines.length === 0) return message.warning('Đơn đặt hàng phải có ít nhất 1 hàng hóa.');
+    if (tab.lines.some((l) => l.quantity <= 0)) return message.warning('Số lượng đặt phải lớn hơn 0.');
     if (tab.warehouseId && tab.warehouseId !== warehouseId)
       return message.error('Đơn thuộc chi nhánh khác — hãy đổi chi nhánh làm việc về chi nhánh xử lý của đơn.');
     if (bookingPaidTotal > due) return message.error(`Tiền khách trả trước (${fmt(bookingPaidTotal)}) vượt quá giá trị đơn (${fmt(due)}).`);

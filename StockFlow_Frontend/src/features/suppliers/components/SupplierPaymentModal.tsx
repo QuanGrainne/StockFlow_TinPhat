@@ -86,7 +86,7 @@ export default function SupplierPaymentModal({
 
   const handleSubmit = async () => {
     if (amount <= 0) {
-      setError('Vui lòng nhập số tiền thanh toán.');
+      setError('Số tiền thanh toán phải lớn hơn 0.');
       return;
     }
     if (amount > currentPayable) {

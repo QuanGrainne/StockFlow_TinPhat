@@ -6,7 +6,7 @@ import { ProductionOrdersPage } from '../../pages/ProductionPages';
 import { SEEDED, WAREHOUSES } from '../../fixtures/accounts';
 import { addStock, createProduct, type ProductDto } from '../../fixtures/data';
 import { arrangeProductionOrder, issueMaterial, type ProductionOrderRef } from '../../fixtures/production';
-import { backendError, makeAccount, uiBlocksAction } from '../../fixtures/ui';
+import { backendError, makeAccount } from '../../fixtures/ui';
 import type { ApiSession } from '../../fixtures/api';
 
 const SHEET = 'UC-45 Material Requirement';
@@ -74,25 +74,29 @@ test.describe(SHEET, () => {
     });
   });
 
-  test('SYS-MRQ-03 – Lệnh có định mức đã bị xóa: báo lỗi', async ({ page, env, adminApi, uid }, testInfo) => {
+  test('SYS-MRQ-03 – Định mức của lệnh bị ngừng áp dụng / không xóa được: nhu cầu NVL của lệnh giữ nguyên', async ({ page, env, adminApi, uid }, testInfo) => {
     traceTc(testInfo, 'SYS-MRQ-03', SHEET);
+    // Expected Round 2 (27/11/2026, đã duyệt): nhu cầu NVL chốt theo lệnh lúc lập. Định mức đã dùng cho lệnh không xóa được
+    // (chỉ ngừng áp dụng); ngừng áp dụng / sửa định mức không làm đổi nhu cầu của lệnh đã lập.
     const o = await order(adminApi, uid);
-    let deleted = false;
-    await test.step('Tiền đề: xóa định mức của lệnh (Admin)', async () => {
+    await test.step('1. Xóa định mức đã dùng cho lệnh → bị từ chối', async () => {
       const del = await backendError(() => adminApi.delete(`/api/production/boms/${o.bomId}`));
-      deleted = del === '(không lỗi)';
-      const off = deleted ? '(bỏ qua)' : await backendError(() => adminApi.post(`/api/production/boms/${o.bomId}/deactivate`));
-      testInfo.annotations.push({ type: 'observed', description: `Xóa định mức: "${del}"; ngừng áp dụng định mức thay thế: "${off}"` });
-      if (!deleted) uiBlocksAction(testInfo, 'không xóa được định mức đã dùng cho lệnh sản xuất – tiền đề không dựng được', 'Error message shown', del);
+      testInfo.annotations.push({ type: 'observed', description: `Xóa định mức: "${del}"` });
+      expect(del.startsWith('(không lỗi)'), 'không xóa được định mức đã dùng cho lệnh').toBe(false);
+      expect(del).toMatch(/Định mức đã được dùng cho lệnh sản xuất/);
     });
-    await test.step('1. Mở nhu cầu NVL của lệnh', async () => {
+    await test.step('2. Ngừng áp dụng định mức', async () => {
+      const off = await backendError(() => adminApi.post(`/api/production/boms/${o.bomId}/deactivate`));
+      expect(off, 'ngừng áp dụng được').toBe('(không lỗi)');
+    });
+    await test.step('KQ. Chi tiết lệnh vẫn hiện nhu cầu NVL như lúc lập (20)', async () => {
       await new LoginPage(page).loginOk(SEEDED.production.username, env.defaultPassword);
       const prod = new ProductionOrdersPage(page);
       await prod.goto();
       await prod.open(o.orderCode);
-      const shown = await prod.material(o.rm.code).count();
-      testInfo.annotations.push({ type: 'observed', description: `Chi tiết lệnh hiện ${shown} dòng NVL (nhu cầu lưu theo lệnh)` });
-      if (deleted) await expect.soft(page.getByText(/không tìm thấy|định mức/i).first()).toBeVisible();
+      const cells = await prod.materialCells(o.rm.code);
+      testInfo.annotations.push({ type: 'observed', description: `Dòng NVL sau khi ngừng áp dụng định mức: ${JSON.stringify(cells)}` });
+      expect(num(cells['Nhu cầu'])).toBe(20);
     });
   });
 });

@@ -286,7 +286,7 @@ export default function CreateDisposalScreen() {
     }
     const noQty = rows.find((r) => !r.quantity || r.quantity <= 0);
     if (noQty) {
-      showToast(`Hàng ${noQty.productCode} chưa nhập số lượng hủy.`, 'error');
+      showToast('Số lượng hủy phải lớn hơn 0.', 'error');
       return false;
     }
     if (dateValue && dateValue > toInputValue(new Date())) {
@@ -296,7 +296,7 @@ export default function CreateDisposalScreen() {
     if (status === 'COMPLETED') {
       const over = rows.find((r) => (r.quantity ?? 0) > r.stock);
       if (over) {
-        showToast(`Hàng ${over.productCode} chỉ còn ${qtyFmt(over.stock)} trong kho, không thể hủy ${qtyFmt(over.quantity ?? 0)}.`, 'error');
+        showToast(`Hàng ${over.productCode} - ${over.productName} chỉ còn ${qtyFmt(over.stock)} trong kho, không thể hủy ${qtyFmt(over.quantity ?? 0)}.`, 'error');
         return false;
       }
       if (!reason.trim()) {

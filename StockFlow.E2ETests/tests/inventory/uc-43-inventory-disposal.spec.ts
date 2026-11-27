@@ -93,18 +93,19 @@ test.describe(SHEET, () => {
       await test.step(`1a. SL 0 → "${msgZero}"`, async () => {
         await form.setQty(p.code, 0);
         const toast = page.getByText(new RegExp(`^Hàng ${p.code} chưa nhập số lượng hủy\\.$|^Số lượng hủy phải lớn hơn 0\\.$`));
-        const [res] = await Promise.all([form.complete(), expect(toast).toBeVisible()]);
+        // Toast chỉ hiện vài giây: đọc chữ ngay khi hiện (song song với complete)
+        const [res, shown] = await Promise.all([form.complete(), toast.innerText()]);
         expect(res).toBeNull();
-        testInfo.annotations.push({ type: 'observed', description: `SL 0: "${(await toast.innerText()).trim()}"; backend: "${await backendError(post(0))}"` });
-        await expect.soft(page.getByText(msgZero, { exact: true })).toBeVisible({ timeout: 1_000 });
+        testInfo.annotations.push({ type: 'observed', description: `SL 0: "${shown.trim()}"; backend: "${await backendError(post(0))}"` });
+        expect.soft(shown.trim(), 'câu thông báo').toBe(msgZero);
       });
       await test.step('1b. SL vượt tồn (6 / 4) → thông báo BR', async () => {
         await form.setQty(p.code, 6);
         const toast = page.getByText(/chỉ còn 4 trong kho, không thể hủy 6\.$/);
-        const [res] = await Promise.all([form.complete(), expect(toast).toBeVisible()]);
+        const [res, shown] = await Promise.all([form.complete(), toast.innerText()]);
         expect(res).toBeNull();
-        testInfo.annotations.push({ type: 'observed', description: `SL 6: "${(await toast.innerText()).trim()}"; backend: "${await backendError(post(6))}"` });
-        await expect.soft(page.getByText(msgOver, { exact: true })).toBeVisible({ timeout: 1_000 });
+        testInfo.annotations.push({ type: 'observed', description: `SL 6: "${shown.trim()}"; backend: "${await backendError(post(6))}"` });
+        expect.soft(shown.trim(), 'câu thông báo').toBe(msgOver);
       });
     } finally {
       await api.dispose();

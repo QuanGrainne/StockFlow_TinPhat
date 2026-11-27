@@ -185,21 +185,31 @@ export function unitRowsOf(item: GoodsItem): UnitSuggestion[] {
   if (variants.length === 0) {
     return [{ key: item.id, item, code: item.code, unitName: item.uom, rate: 1, salePrice: item.standardPrice || 0 }];
   }
-  return variants.map((v, i) => ({
-    key: `${item.id}-${v.code || v.unitName || i}`,
-    item,
-    code: v.code || item.code,
-    unitName: v.unitName || item.uom,
-    rate: v.conversionRate > 0 ? v.conversionRate : 1,
-    salePrice: v.salePrice || 0,
-  }));
+  // Hàng kiểu cũ có nhiều giá trị thuộc tính trong cùng một hàng: mỗi giá trị một dòng hệ số 1 với mã riêng → giữ mã đó
+  const baseRows = variants.filter((v) => !(v.conversionRate > 1)).length;
+  return variants.map((v, i) => {
+    const rate = v.conversionRate > 0 ? v.conversionRate : 1;
+    // Đơn vị cơ bản chính là hàng: mã = mã hàng, giá = giá bán của hàng (như cột Giá bán của bảng).
+    // Hàng tạo từ bản cũ có thể lưu mã đơn vị cơ bản sai (VD "SP") → bấm gợi ý sẽ lọc theo "SP" ra gần hết danh mục.
+    const isBase = rate === 1 && baseRows === 1;
+    return {
+      key: `${item.id}-${v.code || v.unitName || i}`,
+      item,
+      code: isBase ? item.code : v.code || item.code,
+      unitName: v.unitName || item.uom,
+      rate,
+      salePrice: isBase ? item.standardPrice || v.salePrice || 0 : v.salePrice || 0,
+    };
+  });
 }
 
 /** Một dòng đơn vị có khớp từ khóa không: mã, mã vạch của đơn vị, hoặc "tên hàng + tên đơn vị" (VD "hồng bịch") */
 export function unitRowMatches(row: UnitSuggestion, query: string): boolean {
   const q = query.trim().toLowerCase();
   if (!q) return false;
-  const variant = row.item.variants?.find((v) => (v.code || row.item.code) === row.code && v.unitName === row.unitName);
+  const variant =
+    row.item.variants?.find((v) => (v.code || row.item.code) === row.code && v.unitName === row.unitName) ??
+    (row.rate === 1 ? row.item.variants?.find((v) => v.unitName === row.unitName && !(v.conversionRate > 1)) : undefined);
   return (
     row.code.toLowerCase().includes(q) ||
     (variant?.barcode ?? '').toLowerCase().includes(q) ||

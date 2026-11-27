@@ -56,6 +56,12 @@ public class OrderDetailDto
     // E. Lịch sử thanh toán
     public List<OrderPaymentTransactionDto> PaymentTransactions { get; set; } = new();
 
+    /// <summary>
+    /// Khách trả thừa ở hóa đơn này và chọn "Tính vào công nợ": các phiếu thu trả nợ cũ tạo lúc thanh toán
+    /// (gắn hóa đơn cũ – TTHD..., hoặc phiếu thu chung PT... khi nợ không gắn hóa đơn)
+    /// </summary>
+    public List<OrderExcessDebtPaymentDto> ExcessDebtPayments { get; set; } = new();
+
     // F. Thông tin xuất kho
     public List<OrderStockIssueDto> StockIssues { get; set; } = new();
 
@@ -112,6 +118,22 @@ public class OrderPaymentTransactionDto
     public string CreatedByName { get; set; } = string.Empty;
     public string Status { get; set; } = "COMPLETED";
     public string? Description { get; set; }
+    /// <summary>Phiếu thu là tiền khách trả thừa ở hóa đơn khác ("Tính vào công nợ") → hóa đơn đó; null = thu trực tiếp</summary>
+    public int? SourceOrderId { get; set; }
+    public string? SourceOrderCode { get; set; }
+    public DateTime? SourceOrderDate { get; set; }
+}
+
+/// <summary>Một phiếu thu trả nợ cũ tạo từ tiền khách trả thừa ở hóa đơn đang xem</summary>
+public class OrderExcessDebtPaymentDto
+{
+    public int TxId { get; set; }
+    public string TxCode { get; set; } = string.Empty;
+    public decimal Amount { get; set; }
+    /// <summary>Hóa đơn cũ được trừ nợ; null = phiếu thu chung (PT...) cho phần nợ không gắn hóa đơn</summary>
+    public int? TargetOrderId { get; set; }
+    public string? TargetOrderCode { get; set; }
+    public DateTime? TargetOrderDate { get; set; }
 }
 
 public class OrderStockIssueDto

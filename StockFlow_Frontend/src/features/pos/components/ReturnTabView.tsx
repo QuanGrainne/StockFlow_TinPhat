@@ -93,7 +93,7 @@ export function ReturnTabView({ tab, userName, onChange, onDone, canReturn, ware
   const handleSubmit = async () => {
     if (submitting || (!tab.returnInvoiceId && !isQuick)) return;
     if (!canReturn) return message.error('Vai trò của bạn chưa được phân quyền chức năng Trả hàng.');
-    if (active.length === 0) return message.warning('Nhập số lượng trả cho ít nhất 1 hàng hóa.');
+    if (active.length === 0) return message.warning('Chọn ít nhất 1 hàng hóa với số lượng trả lớn hơn 0.');
     if (walkIn && refund < mustRefund) return message.error('Khách lẻ không có công nợ — phải trả đủ tiền cho khách.');
     if (discountTooLow)
       return message.error(

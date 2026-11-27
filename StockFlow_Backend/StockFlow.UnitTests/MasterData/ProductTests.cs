@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Moq;
 using StockFlow.Application.Common;
 using StockFlow.Application.Common.Interfaces;
@@ -85,6 +85,30 @@ public class ImportProductsTests
         var r = await Import(db, new ImportProductItemRequest { Code = "SP-IMP-01", Name = "Đèn lồng xanh" });
         Assert.False(r.IsSuccess);
         Assert.Equal("Dòng 1: Trùng mã hàng 'SP-IMP-01' nhưng khác tên hàng hóa ('Đèn lồng đỏ' vs 'Đèn lồng xanh').", r.Error);
+        Assert.Equal("Đèn lồng đỏ", (await db.MstProducts.AsNoTracking().SingleAsync(p => p.ProductId == 60)).ProductName);
+    }
+
+    [Fact(DisplayName = "ImportProducts/SYS-PRD-N02 – dòng 2 hàng mới thiếu tên: báo \"Dòng 2: Thiếu tên hàng hóa.\", không tạo hàng nào")]
+    public async Task NewProductWithoutName_StopsWholeFile()
+    {
+        var db = Db();
+        var r = await Import(db,
+            new ImportProductItemRequest { Code = "SP-IMP-01", Name = "Đèn lồng đỏ", StandardPrice = 50_000 },
+            new ImportProductItemRequest { Code = "SP-IMP-02", Name = "", StandardPrice = 60_000 });
+        Assert.False(r.IsSuccess);
+        Assert.Equal("Dòng 2: Thiếu tên hàng hóa.", r.Error);
+        // Cả file trong một transaction: lỗi thì không Commit (InMemory không rollback thật nên kiểm qua transaction giả)
+        var tx = Assert.Single(db.Transactions);
+        tx.Verify(t => t.CommitAsync(It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact(DisplayName = "ImportProducts/SYS-PRD-N02 – hàng đã có để trống tên: giữ tên cũ")]
+    public async Task ExistingProductWithoutName_KeepsName()
+    {
+        var db = Db();
+        AddLantern(db);
+        var r = await Import(db, new ImportProductItemRequest { Code = "SP-IMP-01", Name = "", StandardPrice = 55_000 });
+        Assert.True(r.IsSuccess, r.Error);
         Assert.Equal("Đèn lồng đỏ", (await db.MstProducts.AsNoTracking().SingleAsync(p => p.ProductId == 60)).ProductName);
     }
 }

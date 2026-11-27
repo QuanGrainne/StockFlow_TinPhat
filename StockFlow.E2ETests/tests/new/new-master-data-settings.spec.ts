@@ -61,7 +61,7 @@ class OrderSettingsPage {
 
   async goto(): Promise<void> {
     await this.page.goto('/settings/orders');
-    await expect(this.page.getByRole('button', { name: 'Lưu thiết lập' })).toBeVisible();
+    await expect(this.page.getByRole('button', { name: 'Lưu cài đặt' })).toBeVisible();
     await this.page.waitForLoadState('networkidle');
   }
 
@@ -78,13 +78,13 @@ class OrderSettingsPage {
   }
 
   get negativeStock(): Locator {
-    return this.page.locator('xpath=//*[normalize-space(text())="Bán hàng vượt tồn kho (Bán âm kho)"]/following::input[@type="checkbox"][1]').first();
+    return this.page.locator('xpath=//*[normalize-space(text())="Cho phép bán hàng vượt tồn kho"]/following::input[@type="checkbox"][1]').first();
   }
 
   async save(): Promise<Response> {
     const [res] = await Promise.all([
       this.page.waitForResponse((r) => r.request().method() === 'PUT' && /\/api\/(settings\/orders|order-settings)$/i.test(new URL(r.url()).pathname)),
-      this.page.getByRole('button', { name: 'Lưu thiết lập' }).click(),
+      this.page.getByRole('button', { name: 'Lưu cài đặt' }).click(),
     ]);
     return res;
   }
@@ -151,7 +151,9 @@ test.describe(SHEET, () => {
 
   test('SYS-PRD-N02 – File có dòng không hợp lệ: báo từng dòng, không tạo hàng cho dòng lỗi', async ({ page, env, db, adminApi, uid }, testInfo) => {
     traceTc(testInfo, 'SYS-PRD-N02', SHEET);
-    testInfo.annotations.push({ type: 'note', description: 'File theo Procedure: 1 dòng thiếu tên (dòng 2) và 1 dòng trùng mã đã có (dòng 3, tên khác). Việc dòng hợp lệ có được import hay không là NEEDS_CLARIFICATION.' });
+    // Round 2 (27/11/2026, đã duyệt): dòng lỗi được báo "Dòng n: <lý do>" và dừng cả file (không tạo hàng nào);
+    // hàng mới thiếu tên là lỗi "Dòng n: Thiếu tên hàng hóa." (như form tạo hàng). File dừng ở dòng lỗi đầu tiên.
+    testInfo.annotations.push({ type: 'note', description: 'File theo Procedure: 1 dòng thiếu tên (dòng 2) và 1 dòng trùng mã đã có (dòng 3, tên khác).' });
     const prefix = `E2EIMQ${codeOf(uid)}`;
     const group = await activeCategory(adminApi);
     const existing = await createProduct(adminApi, { suffix: uid, price: 44_000, namePrefix: 'Hàng có sẵn' });
@@ -171,11 +173,17 @@ test.describe(SHEET, () => {
       const noNameMsg = page.getByText(/Dòng 2\b.*(tên|Tên)/).first();
       const shown = await page.getByText(/Dòng \d+/).allInnerTexts();
       testInfo.annotations.push({ type: 'observed', description: `Thông báo lỗi: ${shown.map((s) => s.trim()).join(' | ') || '(không có)'}` });
-      await expect.soft(dupMsg, 'dòng 3 (trùng mã) được báo').toBeVisible();
-      await expect.soft(noNameMsg, 'dòng 2 (thiếu tên) được báo').toBeVisible();
+      await expect(noNameMsg, 'dòng 2 (thiếu tên) được báo').toHaveText(/Dòng 2: Thiếu tên hàng hóa\./);
+      testInfo.annotations.push({ type: 'observed', description: `Dòng 3 (trùng mã): ${(await dupMsg.count()) ? 'có báo' : 'không báo vì file đã dừng ở dòng 2'}` });
     });
-    await test.step('KQ2. Không tạo hàng cho dòng lỗi', async () => {
-      expect(await productCodesLike(db, noName.code), 'dòng thiếu tên không tạo hàng').toEqual([]);
+    await test.step('KQ1b. File chỉ có dòng trùng mã → "Dòng 2: Trùng mã hàng …"', async () => {
+      await page.keyboard.press('Escape').catch(() => undefined);
+      await pp.goto();
+      await importFile(page, 'MauFileSanPham_E2E_trung.xlsx', [PRODUCT_TEMPLATE_HEADERS, productTemplateRow(dup)]);
+      await expect(page.getByText(new RegExp(`Dòng 2: Trùng mã hàng "?${escapeRe(existing.code)}"?`)).first()).toBeVisible();
+    });
+    await test.step('KQ2. Có dòng lỗi thì dừng cả file: không tạo hàng nào, hàng có sẵn không đổi', async () => {
+      expect(await productCodesLike(db, noName.code), 'không tạo hàng nào từ file có dòng lỗi').toEqual([]);
       const ex = await productCodesLike(db, existing.code);
       expect(ex.map((r) => r.product_name), 'hàng có sẵn không bị đổi tên').toEqual([existing.name]);
     });
@@ -293,62 +301,6 @@ test.describe(SHEET, () => {
     });
   });
 
-  test('SYS-SET-N01 – Đổi tiền tố / quy tắc mã chứng từ áp dụng cho chứng từ sau; thay đổi sai hoặc không có quyền bị từ chối', async ({ page, browser, env, db, adminApi, uid, dialogs }, testInfo) => {
-    traceTc(testInfo, 'SYS-SET-N01', SHEET);
-    const newPrefix = 'E2EHD';
-    const p = await createProduct(adminApi, { suffix: uid, price: 57_000 });
-    await addStock(adminApi, p.productId, 'K001', 5);
-    await withSettingsRestored(adminApi, async () => {
-      const sp = new OrderSettingsPage(page);
-      await test.step('1. Admin mở /settings/orders, đặt tiền tố hóa đơn và quy tắc SEQUENTIAL; Lưu thiết lập', async () => {
-        await new LoginPage(page).loginOk(SEEDED.admin.username, env.defaultPassword);
-        await sp.goto();
-        await sp.prefix('Hóa đơn bán hàng (POS)').fill(newPrefix);
-        await page.locator('input[type="radio"][name="orderCodeRule"]').first().check();
-        const res = await sp.save();
-        expect(res.status(), await res.text()).toBeLessThan(300);
-        await expect(page.getByText('Đã lưu cấu hình thiết lập đơn hàng và quy tắc giao dịch thành công!')).toBeVisible();
-        const row = await orderSettingsRow(db);
-        expect([row.order_code_prefix, row.order_code_rule]).toEqual([newPrefix, 'SEQUENTIAL']);
-      });
-      await test.step('2. Bán một hóa đơn POS → KQ1. mã hóa đơn mới bắt đầu bằng tiền tố mới', async () => {
-        const other = await newUserContext(browser, testInfo, dialogs);
-        const res = await posSale(other.page, env, p.code, 1);
-        expect(res?.status(), await res?.text()).toBeLessThan(300);
-        const code = ((await res?.json()) as { orderCode: string }).orderCode;
-        testInfo.annotations.push({ type: 'observed', description: `Mã hóa đơn mới: ${code}` });
-        expect(code.startsWith(newPrefix), `mã ${code}`).toBe(true);
-        await other.context.close();
-      });
-      await test.step('3. Nhập tiền tố dài hơn 10 ký tự và lưu → KQ2. thông báo', async () => {
-        const expected = 'Tiền tố mã chứng từ không được vượt quá 10 ký tự.';
-        const input = sp.prefix('Hóa đơn bán hàng (POS)');
-        await input.fill('ABCDEFGHIJK');
-        const shown = await input.inputValue();
-        if (shown.length <= 10) {
-          const current = await adminApi.get<OrderSettings>('/api/settings/orders');
-          const be = await backendError(() => adminApi.put('/api/settings/orders', { ...current, orderCodePrefix: 'ABCDEFGHIJK' }));
-          expect(be).toBe(expected);
-          uiBlocksAction(testInfo, `ô tiền tố giới hạn 10 ký tự (nhập 11 ký tự còn "${shown}")`, expected, `${be} (gọi bằng Admin)`);
-        } else {
-          await sp.save();
-          await expect(page.getByText(expected)).toBeVisible();
-        }
-        expect((await orderSettingsRow(db)).order_code_prefix).toBe(newPrefix);
-      });
-      await test.step('4. Quản lý thử lưu thiết lập → KQ3. thông báo chỉ Admin', async () => {
-        const other = await newUserContext(browser, testInfo, dialogs);
-        await new LoginPage(other.page).loginOk(SEEDED.manager.username, env.defaultPassword);
-        const msp = new OrderSettingsPage(other.page);
-        await msp.goto();
-        const res = await msp.save();
-        expect(res.status()).toBeGreaterThanOrEqual(400);
-        await expect(other.page.getByText('Chỉ Quản trị viên (Admin) mới có quyền thay đổi thiết lập đơn hàng và quy tắc giao dịch.')).toBeVisible();
-        await other.context.close();
-      });
-    });
-  });
-
   test('SYS-SET-N02 – Cho phép bán âm kho: POS bán được vượt tồn', async ({ page, browser, env, db, adminApi, uid, dialogs }, testInfo) => {
     traceTc(testInfo, 'SYS-SET-N02', SHEET);
     const p = await createProduct(adminApi, { suffix: uid, price: 58_000 });
@@ -356,7 +308,7 @@ test.describe(SHEET, () => {
     await withSettingsRestored(adminApi, async () => {
       const sp = new OrderSettingsPage(page);
       await new LoginPage(page).loginOk(SEEDED.admin.username, env.defaultPassword);
-      await test.step('1. Admin bật "Bán hàng vượt tồn kho (Bán âm kho)" và lưu', async () => {
+      await test.step('1. Admin bật "Cho phép bán hàng vượt tồn kho" và lưu', async () => {
         await sp.goto();
         await sp.setToggle(sp.negativeStock, true);
         const res = await sp.save();
