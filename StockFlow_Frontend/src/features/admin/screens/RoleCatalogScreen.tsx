@@ -29,6 +29,8 @@ export const RoleCatalogScreen: React.FC<RoleCatalogScreenProps> = ({ onNavigate
   const [newRoleName, setNewRoleName] = useState('');
   const [newRoleCode, setNewRoleCode] = useState('');
   const [newRoleDesc, setNewRoleDesc] = useState('');
+  // Lỗi tạo vai trò (VD trùng tên / mã) hiện ngay trong hộp thoại, đúng câu backend trả (SYS-ROL-04)
+  const [createError, setCreateError] = useState<string | null>(null);
 
   // Modal Sửa Vai trò
   const [editModalOpen, setEditModalOpen] = useState(false);
@@ -77,9 +79,10 @@ export const RoleCatalogScreen: React.FC<RoleCatalogScreenProps> = ({ onNavigate
         description: newRoleDesc.trim(),
       });
     } catch (err) {
-      alert('Không thể tạo vai trò: ' + (err instanceof Error ? err.message : String(err)));
+      setCreateError(err instanceof Error ? err.message : String(err));
       return;
     }
+    setCreateError(null);
 
     setRoles((prev) => [...prev, createdRole]);
     setCreateModalOpen(false);
@@ -175,7 +178,10 @@ export const RoleCatalogScreen: React.FC<RoleCatalogScreenProps> = ({ onNavigate
 
         <button
           type="button"
-          onClick={() => setCreateModalOpen(true)}
+          onClick={() => {
+            setCreateError(null);
+            setCreateModalOpen(true);
+          }}
           className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#1E56A0] hover:bg-[#184580] text-xs font-semibold text-white transition cursor-pointer shadow-xs"
         >
           <Plus size={15} />
@@ -324,6 +330,12 @@ export const RoleCatalogScreen: React.FC<RoleCatalogScreenProps> = ({ onNavigate
                   className="w-full p-3 rounded-xl border border-slate-200 text-xs focus:outline-none focus:border-blue-500 shadow-xs resize-none"
                 />
               </div>
+
+              {createError && (
+                <p role="alert" className="text-xs text-rose-600 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2">
+                  {createError}
+                </p>
+              )}
 
               <div className="pt-2 flex items-center justify-end gap-2.5">
                 <button

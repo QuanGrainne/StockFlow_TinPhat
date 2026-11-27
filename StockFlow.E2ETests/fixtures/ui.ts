@@ -25,15 +25,27 @@ export async function seeMessage(page: Page, dialogs: DialogRecorder, pattern: R
   return where ?? 'page';
 }
 
-/** Ghi nhận ca mà giao diện CHẶN thao tác (ẩn / khoá nút, select không có lựa chọn rỗng) nên không thể hiện thông báo
- *  như Expected. Theo quyết định 2–3: không tự đổi tiêu chí → soft-fail kèm SPEC_CODE_MISMATCH, đính kèm thông báo
- *  backend (gọi API) làm bằng chứng. */
+/** Ca mà giao diện CHẶN thao tác sai từ trước (ẩn / khoá nút, ô không nhận số âm, select không có lựa chọn rỗng)
+ *  nên thông báo của Expected không hiện trên UI.
+ *  Quyết định 26/11/2026 (Round 2): giữ giao diện, Expected của Report 5.3 đổi thành "giao diện không cho thao tác sai;
+ *  gọi thẳng API thì bị từ chối". Ca đạt khi backend (gọi API) vẫn từ chối; nếu backend nhận thao tác sai thì fail.
+ *  backendMessage = kết quả backendError(); bỏ trống khi ca không gọi API được. */
 export function uiBlocksAction(testInfo: TestInfo, what: string, expectedMessage: string, backendMessage?: string): void {
   testInfo.annotations.push({
-    type: 'SPEC_CODE_MISMATCH',
-    description: `UI chặn thao tác (${what}) nên không hiện "${expectedMessage}"${backendMessage ? `; backend trả: "${backendMessage}"` : ''}`,
+    type: 'UI_BLOCKS_ACTION',
+    description: `UI chặn thao tác (${what}); thông báo gốc của Expected: "${expectedMessage}"${backendMessage ? `; backend trả: "${backendMessage}"` : ''}`,
   });
-  expect.soft(false, `Expected "${expectedMessage}" không quan sát được trên UI: ${what}`).toBe(true);
+  if (backendMessage === undefined) return;
+  expect.soft(backendMessage.startsWith('(không lỗi)'), `UI chặn (${what}) nhưng gọi thẳng API không bị từ chối`).toBe(false);
+}
+
+/** Ca chưa kiểm được vì Expected cần nhóm làm rõ (tiền đề không dựng được, actor khác code…): vẫn soft-fail. */
+export function needsClarification(testInfo: TestInfo, what: string, expectedMessage: string, evidence?: string): void {
+  testInfo.annotations.push({
+    type: 'NEEDS_CLARIFICATION',
+    description: `${what}; Expected: "${expectedMessage}"${evidence ? `; bằng chứng: "${evidence}"` : ''}`,
+  });
+  expect.soft(false, `Cần nhóm làm rõ: ${what}`).toBe(true);
 }
 
 /** Tài khoản thử riêng cho từng test (tạo qua API bằng Admin) */

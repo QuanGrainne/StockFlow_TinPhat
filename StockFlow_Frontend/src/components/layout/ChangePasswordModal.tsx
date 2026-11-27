@@ -7,7 +7,7 @@
 import React, { useState } from 'react';
 import { Check, CheckCircle2, Eye, EyeOff, KeyRound, X } from 'lucide-react';
 import { apiClient, type ApiClientError } from '@/lib/api/client';
-import { PASSWORD_RULES } from '@/lib/auth/passwordPolicy';
+import { PASSWORD_RULES, passwordRuleMessage } from '@/lib/auth/passwordPolicy';
 
 interface ChangePasswordModalProps {
   open: boolean;
@@ -66,7 +66,7 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({ open, 
     if (!values.currentPassword) errs.currentPassword = 'Vui lòng nhập mật khẩu hiện tại.';
     const failed = RULES.find((r) => !r.test(values.newPassword));
     if (!values.newPassword) errs.newPassword = 'Vui lòng nhập mật khẩu mới.';
-    else if (failed) errs.newPassword = `Mật khẩu mới chưa đạt: ${failed.label.toLowerCase()}.`;
+    else if (failed) errs.newPassword = passwordRuleMessage('Mật khẩu mới', failed);
     else if (values.newPassword === values.currentPassword)
       errs.newPassword = 'Mật khẩu mới không được trùng mật khẩu hiện tại.';
     if (!values.confirmNewPassword) errs.confirmNewPassword = 'Vui lòng nhập lại mật khẩu mới.';

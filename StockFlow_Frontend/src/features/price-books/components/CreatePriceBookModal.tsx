@@ -250,7 +250,7 @@ export default function CreatePriceBookModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!priceBookName.trim()) {
-      setErrorMsg('Vui lòng nhập tên bảng giá.');
+      setErrorMsg('Tên bảng giá không được để trống.');
       setActiveTab('info');
       return;
     }
@@ -368,7 +368,7 @@ export default function CreatePriceBookModal({
         </div>
 
         {/* Form Body */}
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-6 py-4 space-y-4 text-slate-800">
+        <form noValidate onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-6 py-4 space-y-4 text-slate-800">
           {errorMsg && (
             <div className="rounded-lg bg-rose-50 border border-rose-200 px-4 py-2.5 text-xs text-rose-700">
               {errorMsg}

@@ -51,7 +51,10 @@ interface UnitDto {
 }
 
 /** Tạo hàng hóa thành phẩm, đơn vị "Cái", nhóm hàng đầu tiên đang hoạt động */
-export async function createProduct(admin: ApiSession, opts: { suffix: string; price: number; namePrefix?: string }): Promise<ProductDto> {
+export async function createProduct(
+  admin: ApiSession,
+  opts: { suffix: string; price: number; namePrefix?: string; extra?: Record<string, unknown> }
+): Promise<ProductDto> {
   const cats = await admin.get<CategoryDto[]>('/api/products/categories');
   const cat = cats.find((c) => c.isActive) ?? cats[0];
   const units = await admin.get<UnitDto[]>('/api/products/units');
@@ -66,6 +69,7 @@ export async function createProduct(admin: ApiSession, opts: { suffix: string; p
     standardPrice: opts.price,
     costPrice: Math.round(opts.price * 0.6),
     isDirectSale: true,
+    ...(opts.extra ?? {}),
   });
 }
 

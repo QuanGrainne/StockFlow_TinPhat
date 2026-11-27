@@ -80,11 +80,15 @@ public static class PermissionConstants
                 result.Add("PARTNER_CREATE");
                 result.Add("SALES_CREATE");
                 result.Add("SALES_UPDATE");
+                // Huỷ đơn đặt / phiếu trả của mình (UC-18, UC-28) cần SALES_DELETE (DEF-E2E-06)
+                result.Add("SALES_DELETE");
                 break;
 
             case "ROLE_WAREHOUSE":
                 foreach (var m in Modules) result.Add($"{m.ModuleKey}_READ");
                 result.Add("PURCHASE_CREATE");
+                // Sửa / huỷ phiếu đặt hàng nhập, mở lại phiếu nhập (UC-30, UC-31) cần PURCHASE_UPDATE (DEF-E2E-08)
+                result.Add("PURCHASE_UPDATE");
                 result.Add("STOCK_CREATE");
                 result.Add("STOCK_UPDATE");
                 break;

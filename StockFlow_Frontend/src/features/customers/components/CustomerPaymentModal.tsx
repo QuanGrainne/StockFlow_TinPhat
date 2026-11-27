@@ -127,11 +127,11 @@ export default function CustomerPaymentModal({ customer, currentDebt, openOrders
 
   const handleSubmit = async (withPrint: boolean) => {
     if (amount <= 0) {
-      setError('Vui lòng nhập số tiền thu.');
+      setError('Số tiền thu phải lớn hơn 0.');
       return;
     }
     if (amount > currentDebt) {
-      setError(`Số tiền thu vượt quá nợ hiện tại của khách (${fmt(currentDebt)}).`);
+      setError(`Số tiền thu (${fmt(amount)}) vượt quá nợ hiện tại của khách (${fmt(currentDebt)}).`);
       return;
     }
     if (allocate && allocatedTotal > amount) {

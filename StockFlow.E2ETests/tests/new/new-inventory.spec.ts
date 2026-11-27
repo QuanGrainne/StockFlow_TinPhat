@@ -115,7 +115,7 @@ test.describe(SHEET, () => {
   });
 
   test('SYS-TRF-N03 – Số lượng nhận âm bị từ chối', async ({ page, env, db, adminApi, uid }, testInfo) => {
-    traceTc(testInfo, 'SYS-TRF-N03', SHEET, { knownDefect: 'DEF-IT-03 (Report 5.2): số lượng nhận âm bị đổi thành 0' });
+    traceTc(testInfo, 'SYS-TRF-N03', SHEET);
     const p = await createProduct(adminApi, { suffix: uid, price: 83_000 });
     await addStock(adminApi, p.productId, 'K001', 10);
     const t = await inTransitTransfer(adminApi, 'K001', 'K002', p.productId, 4);
@@ -135,6 +135,9 @@ test.describe(SHEET, () => {
       testInfo.annotations.push({ type: 'observed', description: `Ô SL nhận sau khi nhập -1: "${await qty.inputValue()}"` });
       const res = page.waitForResponse((r) => /\/api\/transfers\/\d+\/receive$/i.test(new URL(r.url()).pathname), { timeout: 5_000 }).catch(() => null);
       await page.getByRole('button', { name: 'Nhận hàng', exact: true }).last().click();
+      // Toast chỉ hiện vài giây: bắt ngay sau khi bấm
+      const negMsg = `Hàng ${p.code} - ${p.name}: số lượng nhận không được âm.`;
+      const negSeen = await page.getByText(negMsg).waitFor({ state: 'visible', timeout: 4_000 }).then(() => true).catch(() => false);
       const shortage = page.getByText(/^Phát hiện nhận thiếu hàng! /);
       if (await shortage.isVisible().catch(() => false)) {
         // SL -1 bị coi là 0 → giao diện đòi ghi chú nhận thiếu; người nhận ghi lý do rồi bấm lại
@@ -145,6 +148,8 @@ test.describe(SHEET, () => {
       } else {
         const r = await res;
         testInfo.annotations.push({ type: 'observed', description: `Nhận hàng → ${r ? `HTTP ${r.status()}` : 'không gửi request'}` });
+        // Giao diện chặn với cùng câu backend trả khi gọi API (ReceiveTransferCommand)
+        if (!r) expect.soft(negSeen, `thông báo "${negMsg}"`).toBe(true);
       }
     });
     await test.step('KQ1. Bị từ chối; T vẫn Đang chuyển', async () => {
@@ -264,8 +269,8 @@ test.describe(SHEET, () => {
         status: 'BALANCED',
         notes: `E2E cân bằng ${uid}`,
         items: [
-          { productId: p1.productId, actualQty: 7 },
-          { productId: p2.productId, actualQty: 8 },
+          { productId: p1.productId, actualQty: 7, reason: 'E2E thiếu hàng' },
+          { productId: p2.productId, actualQty: 8, reason: 'E2E thừa hàng' },
         ],
       })
     );

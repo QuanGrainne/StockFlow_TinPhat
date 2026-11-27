@@ -8,7 +8,7 @@ import { SEEDED, WAREHOUSES } from '../../fixtures/accounts';
 import { addStock, createProduct } from '../../fixtures/data';
 import { ledgerRows, orderByCode, stockIssuesOfOrder, stockQty, userByUsername } from '../../fixtures/dbq';
 import { partnerById, vouchersOf } from '../../fixtures/dbq3';
-import { orderById, orderItemsOf, orderSettingsRow, ordersWithProduct } from '../../fixtures/dbq4';
+import { orderById, orderItemsOf, orderSettingsRow, ordersWithProduct, withOrderSettings } from '../../fixtures/dbq4';
 import { cancelInvoice, createBooking, createCustomer, createInvoice, createSalesReturn, setCreditLimit } from '../../fixtures/sales';
 import type { Locator, Page, Response } from '@playwright/test';
 import type { E2EEnv } from '../../fixtures/env';
@@ -255,59 +255,66 @@ test.describe(SHEET, () => {
 
   test('SYS-POS-N04 – Số lượng vượt tồn bị từ chối khi không cho bán âm kho', async ({ page, env, db, adminApi, uid }, testInfo) => {
     traceTc(testInfo, 'SYS-POS-N04', SHEET);
-    expect((await orderSettingsRow(db)).allow_negative_stock_sale, 'tiền đề: thiết lập bán âm kho đang tắt').toBe(false);
-    const p = await createProduct(adminApi, { suffix: uid, price: 95_000 });
-    await addStock(adminApi, p.productId, 'K001', 3);
-    let pos = new PosPage(page);
-    await test.step('1. Mở /pos, thêm hàng P', async () => {
-      pos = await salesAtPos(page, env);
-      await pos.addProduct(p.code);
-    });
-    await test.step('2. Đặt số lượng lớn hơn tồn của P tại K001 (5 > 3)', async () => {
-      await pos.setQuantity(p.code, 5);
-      await expect(pos.qtyInput(p.code)).toHaveValue('5');
-    });
-    await test.step('3. Bấm THANH TOÁN → KQ1. Thông báo không đủ tồn kho', async () => {
-      const expected = `"${p.name}" không đủ tồn kho (tồn 3). Thiết lập hiện không cho bán âm kho.`;
-      const [res] = await Promise.all([pos.tryPay(4_000), expect(page.getByText(expected, { exact: true })).toBeVisible()]);
-      expect(res, 'không gửi request tạo hóa đơn').toBeNull();
-    });
-    await test.step('KQ2. Không tạo hóa đơn; tồn không đổi', async () => {
-      expect(await ordersWithProduct(db, p.productId)).toEqual([]);
-      expect(await stockQty(db, p.productId, 'K001')).toBe(3);
+    // Tiền đề: tắt "Cho phép bán hàng vượt tồn kho" (mặc định mới từ 24/11/2026 là bật), trả lại sau khi chạy
+    await withOrderSettings(adminApi, { allowNegativeStockSale: false }, async () => {
+      expect((await orderSettingsRow(db)).allow_negative_stock_sale, 'tiền đề: thiết lập bán âm kho đang tắt').toBe(false);
+      const p = await createProduct(adminApi, { suffix: uid, price: 95_000 });
+      await addStock(adminApi, p.productId, 'K001', 3);
+      let pos = new PosPage(page);
+      await test.step('1. Mở /pos, thêm hàng P', async () => {
+        pos = await salesAtPos(page, env);
+        await pos.addProduct(p.code);
+      });
+      await test.step('2. Đặt số lượng lớn hơn tồn của P tại K001 (5 > 3)', async () => {
+        await pos.setQuantity(p.code, 5);
+        await expect(pos.qtyInput(p.code)).toHaveValue('5');
+      });
+      await test.step('3. Bấm THANH TOÁN → KQ1. Thông báo không đủ tồn kho', async () => {
+        const expected = `"${p.name}" không đủ tồn kho (tồn 3). Thiết lập hiện không cho bán âm kho.`;
+        const [res] = await Promise.all([pos.tryPay(4_000), expect(page.getByText(expected, { exact: true })).toBeVisible()]);
+        expect(res, 'không gửi request tạo hóa đơn').toBeNull();
+      });
+      await test.step('KQ2. Không tạo hóa đơn; tồn không đổi', async () => {
+        expect(await ordersWithProduct(db, p.productId)).toEqual([]);
+        expect(await stockQty(db, p.productId, 'K001')).toBe(3);
+      });
     });
   });
 
   test('SYS-POS-N05 – Hàng đang giữ cho đơn đặt không bán được khi không cho bán hàng đã giữ', async ({ page, env, db, adminApi, uid }, testInfo) => {
     traceTc(testInfo, 'SYS-POS-N05', SHEET);
-    expect((await orderSettingsRow(db)).allow_selling_reserved_stock, 'tiền đề: thiết lập bán hàng đã giữ đang tắt').toBe(false);
-    const price = 77_000;
-    const p = await createProduct(adminApi, { suffix: uid, price });
-    await addStock(adminApi, p.productId, 'K001', 5);
-    const holder = await createCustomer(adminApi, { suffix: uid });
-    const booking = await createBooking(adminApi, { partnerId: holder.partnerId, warehouse: 'K001', lines: [{ productId: p.productId, qty: 4, price }] });
-    expect((await orderById(db, booking.orderId))?.status, 'tiền đề: đơn đặt còn mở giữ 4').toBe('DRAFT');
-    let pos = new PosPage(page);
-    let body = '';
-    await test.step('1. Mở /pos, thêm P với số lượng 3', async () => {
-      pos = await salesAtPos(page, env);
-      await pos.addProduct(p.code);
-      await pos.setQuantity(p.code, 3);
-    });
-    await test.step('2. Bấm THANH TOÁN', async () => {
-      const res = await pos.tryPay(8_000);
-      expect(res, 'có request tạo hóa đơn').not.toBeNull();
-      body = (await res?.text()) ?? '';
-      expect(res?.status(), body).toBe(400);
-    });
-    await test.step('KQ1. Bán bị từ chối; thông báo nêu tồn 5, đang giữ 4, khả dụng 1', async () => {
-      const msg = page.getByText(/có tồn kho 5 nhưng đang tạm giữ 4.*Tồn khả dụng: 1/).first();
-      await expect(msg).toBeVisible();
-      testInfo.annotations.push({ type: 'observed', description: `Thông báo: ${(await msg.innerText()).trim()}` });
-    });
-    await test.step('KQ2. Không tạo hóa đơn; tồn không đổi', async () => {
-      expect((await ordersWithProduct(db, p.productId)).filter((o) => o.order_type !== 'BOOKING')).toEqual([]);
-      expect(await stockQty(db, p.productId, 'K001')).toBe(5);
+    // Từ 24/11/2026 không còn tuỳ chọn riêng "bán hàng đã giữ": tắt "Cho phép bán hàng vượt tồn kho" thì POS không bán phần
+    // hàng đang tạm giữ cho đơn đặt (CreatePosOrderCommand). Tiền đề: tắt tuỳ chọn này, trả lại sau khi chạy.
+    await withOrderSettings(adminApi, { allowNegativeStockSale: false }, async () => {
+      expect((await orderSettingsRow(db)).allow_negative_stock_sale, 'tiền đề: thiết lập bán âm kho đang tắt').toBe(false);
+      const price = 77_000;
+      const p = await createProduct(adminApi, { suffix: uid, price });
+      await addStock(adminApi, p.productId, 'K001', 5);
+      const holder = await createCustomer(adminApi, { suffix: uid });
+      const booking = await createBooking(adminApi, { partnerId: holder.partnerId, warehouse: 'K001', lines: [{ productId: p.productId, qty: 4, price }] });
+      expect((await orderById(db, booking.orderId))?.status, 'tiền đề: đơn đặt còn mở giữ 4').toBe('DRAFT');
+      let pos = new PosPage(page);
+      let body = '';
+      await test.step('1. Mở /pos, thêm P với số lượng 3', async () => {
+        pos = await salesAtPos(page, env);
+        await pos.addProduct(p.code);
+        await pos.setQuantity(p.code, 3);
+      });
+      await test.step('2. Bấm THANH TOÁN', async () => {
+        const res = await pos.tryPay(8_000);
+        expect(res, 'có request tạo hóa đơn').not.toBeNull();
+        body = (await res?.text()) ?? '';
+        expect(res?.status(), body).toBe(400);
+      });
+      await test.step('KQ1. Bán bị từ chối; thông báo nêu tồn 5, đang giữ 4, khả dụng 1', async () => {
+        const msg = page.getByText(/có tồn kho 5 nhưng đang tạm giữ 4.*Tồn khả dụng: 1/).first();
+        await expect(msg).toBeVisible();
+        testInfo.annotations.push({ type: 'observed', description: `Thông báo: ${(await msg.innerText()).trim()}` });
+      });
+      await test.step('KQ2. Không tạo hóa đơn; tồn không đổi', async () => {
+        expect((await ordersWithProduct(db, p.productId)).filter((o) => o.order_type !== 'BOOKING')).toEqual([]);
+        expect(await stockQty(db, p.productId, 'K001')).toBe(5);
+      });
     });
   });
 
@@ -528,11 +535,10 @@ test.describe(SHEET, () => {
       expect(html).toContain(vnd(2 * price));
       testInfo.annotations.push({ type: 'observed', description: `Tiêu đề bản in: ${/<h1>([^<]*)<\/h1>/.exec(html)?.[1] ?? '?'}` });
     });
-    await test.step('KQ2. Có mã QR thanh toán chuyển khoản', async () => {
-      const qr = (html.match(/<(img|svg|canvas)\b/gi) ?? []).length + (/qr/i.test(html) ? 1 : 0);
-      testInfo.annotations.push({ type: 'observed', description: `Số phần tử ảnh / QR trong bản in: ${qr}` });
-      expect(qr, 'mã QR trên bản in').toBeGreaterThan(0);
-    });
+    // Quyết định Round 2 (27/11/2026): bỏ yêu cầu QR trên bản in – QR payOS chỉ có ở hộp thanh toán trên POS,
+    // hóa đơn đã thanh toán không cần QR. Chỉ ghi nhận.
+    const qr = (html.match(/<(img|svg|canvas)\b/gi) ?? []).length + (/qr/i.test(html) ? 1 : 0);
+    testInfo.annotations.push({ type: 'observed', description: `Số phần tử ảnh / QR trong bản in: ${qr} (không yêu cầu)` });
     expect((await orderById(db, inv.orderId))?.status).toBe('COMPLETED');
   });
 

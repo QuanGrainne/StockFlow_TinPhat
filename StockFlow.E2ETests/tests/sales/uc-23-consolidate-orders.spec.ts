@@ -1,4 +1,4 @@
-// Report 5.3 – sheet "UC-23 Consolidate Orders" (SYS-CON-01..11). CON-01/02/06 là N/A (chưa có chức năng).
+// Report 5.3 – sheet "UC-23 Consolidate Orders" (SYS-CON-01..11). Ca CON-01/02/06 (đã xoá 27/11/2026: chức năng nhóm bỏ, Report 3 ghi ngoài phạm vi).
 import { test, expect, traceTc, newUserContext } from '../../fixtures/test';
 import { LoginPage } from '../../pages/LoginPage';
 import { PosPage } from '../../pages/PosPage';
@@ -41,16 +41,6 @@ async function creditRequests(db: Client, partnerId: number): Promise<{ request_
 }
 
 test.describe(SHEET, () => {
-  for (const [id, title, reason] of [
-    ['SYS-CON-01', 'Gộp đơn, ghi nhận thanh toán, tạo yêu cầu xuất kho', 'Chưa có chức năng gộp đơn / yêu cầu xuất kho trong c60ea62'],
-    ['SYS-CON-02', 'Chỉ chọn được kho xuất được phân quyền khi gộp', 'Chưa có chức năng trong c60ea62'],
-    ['SYS-CON-06', 'Số tiền âm, vượt tổng hoặc chuyển khoản thiếu mã tham chiếu bị từ chối', 'Chưa có chức năng trong c60ea62'],
-  ] as const) {
-    test(`${id} – ${title}`, async ({}, testInfo) => {
-      traceTc(testInfo, id, SHEET);
-      test.skip(true, `N/A – ${reason}`);
-    });
-  }
 
   test('SYS-CON-03 – Gộp 2 đơn Phiếu tạm cùng khách: đơn mới đủ dòng, đơn nguồn bị hủy', async ({ page, env, db, adminApi, uid }, testInfo) => {
     traceTc(testInfo, 'SYS-CON-03', SHEET, { mismatch: 'Description: gộp số lượng kèm mã đơn nguồn; Expected (code): tạo đơn mới, đơn nguồn bị hủy (Merge Bookings).' });
