@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json.Nodes;
 using System.Threading;
 using System.Threading.Tasks;
 using MediatR;
@@ -42,14 +43,27 @@ public class UpdatePriceBookPricesCommandHandler : IRequestHandler<UpdatePriceBo
             return Result.Failure("Không tìm thấy bảng giá.");
         }
 
-        var productIds = request.Items.Select(i => i.ProductId).Distinct().ToList();
+        // Giá đơn vị quy đổi (UnitCode) chỉ sửa ở Bảng giá chung: lưu vào giá bán của đơn vị trong variants_json
+        var unitItems = request.Items.Where(i => !string.IsNullOrWhiteSpace(i.UnitCode)).ToList();
+        var baseItems = request.Items.Where(i => string.IsNullOrWhiteSpace(i.UnitCode)).ToList();
+        if (unitItems.Count > 0 && !pb.IsDefault)
+        {
+            return Result.Failure("Giá của đơn vị quy đổi chỉ sửa được ở Bảng giá chung.");
+        }
+        if (unitItems.Count > 0)
+        {
+            var unitError = await UpdateUnitSalePricesAsync(unitItems, cancellationToken);
+            if (unitError != null) return Result.Failure(unitError);
+        }
+
+        var productIds = baseItems.Select(i => i.ProductId).Distinct().ToList();
         var existingItems = await _context.DtlPriceBookItems
             .Where(i => i.PriceBookId == request.PriceBookId && productIds.Contains(i.ProductId))
             .ToListAsync(cancellationToken);
 
         var existingMap = existingItems.ToDictionary(i => i.ProductId, i => i);
 
-        foreach (var item in request.Items)
+        foreach (var item in baseItems)
         {
             var validPrice = Math.Max(0, item.Price);
             if (existingMap.TryGetValue(item.ProductId, out var existing))
@@ -80,7 +94,9 @@ public class UpdatePriceBookPricesCommandHandler : IRequestHandler<UpdatePriceBo
                 .Where(p => productIds.Contains(p.ProductId))
                 .ToListAsync(cancellationToken);
 
-            var priceLookup = request.Items.ToDictionary(x => x.ProductId, x => Math.Max(0, x.Price));
+            var priceLookup = baseItems
+                .GroupBy(x => x.ProductId)
+                .ToDictionary(g => g.Key, g => Math.Max(0, g.Last().Price));
             foreach (var prod in products)
             {
                 if (priceLookup.TryGetValue(prod.ProductId, out var newStdPrice))
@@ -109,7 +125,7 @@ public class UpdatePriceBookPricesCommandHandler : IRequestHandler<UpdatePriceBo
 
                 foreach (var depBook in dependentBooks)
                 {
-                    foreach (var item in request.Items)
+                    foreach (var item in baseItems)
                     {
                         var basePrice = Math.Max(0, item.Price);
                         var calculatedPrice = PriceFormulaCalculator.CalculatePrice(
@@ -144,5 +160,58 @@ public class UpdatePriceBookPricesCommandHandler : IRequestHandler<UpdatePriceBo
         await _context.SaveChangesAsync(cancellationToken);
 
         return Result.Success();
+    }
+
+    /// <summary>
+    /// Ghi giá bán của đơn vị quy đổi (theo mã đơn vị) vào variants_json của hàng: mọi dòng "variants" có Code trùng.
+    /// Trả thông báo lỗi nếu không tìm thấy đơn vị; null = thành công (chưa SaveChanges).
+    /// </summary>
+    private async Task<string?> UpdateUnitSalePricesAsync(List<UpdateProductPriceItemDto> unitItems, CancellationToken ct)
+    {
+        var ids = unitItems.Select(i => i.ProductId).Distinct().ToList();
+        var products = await _context.MstProducts.Where(p => ids.Contains(p.ProductId)).ToListAsync(ct);
+        foreach (var group in unitItems.GroupBy(i => i.ProductId))
+        {
+            var product = products.FirstOrDefault(p => p.ProductId == group.Key);
+            if (product == null || string.IsNullOrWhiteSpace(product.VariantsJson))
+            {
+                return $"Không tìm thấy hàng hóa có đơn vị quy đổi (id {group.Key}).";
+            }
+
+            JsonNode? root;
+            try
+            {
+                root = JsonNode.Parse(product.VariantsJson);
+            }
+            catch (System.Text.Json.JsonException)
+            {
+                return $"Dữ liệu đơn vị của hàng {product.ProductCode} bị lỗi, không lưu được giá.";
+            }
+            var variants = (root?["variants"] ?? root?["Variants"]) as JsonArray;
+            if (variants == null)
+            {
+                return $"Hàng {product.ProductCode} chưa thiết lập đơn vị quy đổi.";
+            }
+
+            foreach (var item in group)
+            {
+                var code = item.UnitCode!.Trim();
+                var matched = false;
+                foreach (var v in variants.OfType<JsonObject>())
+                {
+                    var vCode = (v["Code"] ?? v["code"])?.GetValue<string>();
+                    if (vCode == null || !vCode.Trim().Equals(code, StringComparison.OrdinalIgnoreCase)) continue;
+                    var key = v.ContainsKey("SalePrice") || !v.ContainsKey("salePrice") ? "SalePrice" : "salePrice";
+                    v[key] = Math.Max(0, item.Price);
+                    matched = true;
+                }
+                if (!matched)
+                {
+                    return $"Không tìm thấy đơn vị có mã {code} của hàng {product.ProductCode}.";
+                }
+            }
+            product.VariantsJson = root!.ToJsonString();
+        }
+        return null;
     }
 }

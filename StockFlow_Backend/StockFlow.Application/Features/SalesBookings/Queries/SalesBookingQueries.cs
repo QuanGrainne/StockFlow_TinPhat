@@ -85,7 +85,8 @@ public class SalesBookingQueryHandler :
                 o.Partner.Phone,
                 o.Status,
                 CreatedBy = o.CreatedByNavigation.FullName ?? o.CreatedByNavigation.Username,
-                Qty = o.DtlOrderItems.Sum(i => i.Quantity ?? 0),
+                // Theo đơn vị cơ bản (cùng đơn vị với SL đã giao)
+                Qty = o.DtlOrderItems.Sum(i => (i.Quantity ?? 0) * i.ConversionRate),
                 Total = o.TotalAmount ?? 0,
                 Paid = o.PaidAmount ?? 0,
                 o.Notes,
@@ -121,12 +122,14 @@ public class SalesBookingQueryHandler :
         var items = o.DtlOrderItems.OrderBy(i => i.OrderItemId).Select(i =>
         {
             var qty = i.Quantity ?? 0;
-            var done = Math.Min(qty, left.GetValueOrDefault(i.ProductId));
-            left[i.ProductId] = left.GetValueOrDefault(i.ProductId) - done;
+            var rate = i.ConversionRate > 0 ? i.ConversionRate : 1;
+            // SL đã giao tính theo đơn vị cơ bản → chia lại theo đơn vị bán của dòng
+            var doneBase = Math.Min(qty * rate, left.GetValueOrDefault(i.ProductId));
+            left[i.ProductId] = left.GetValueOrDefault(i.ProductId) - doneBase;
             return new SalesBookingItemDto(
                 i.OrderItemId, i.ProductId, i.Product?.ProductCode ?? $"SP{i.ProductId}", i.Product?.ProductName ?? "Sản phẩm",
-                i.Unit?.UnitName ?? i.Product?.BaseUnit?.UnitName ?? "Cái", i.UnitId, qty, done, i.OriginalPrice,
-                i.DiscountType, i.DiscountValue, i.UnitPrice ?? 0, i.LineTotal);
+                i.Unit?.UnitName ?? i.Product?.BaseUnit?.UnitName ?? "Cái", i.UnitId, qty, Math.Round(doneBase / rate, 4), i.OriginalPrice,
+                i.DiscountType, i.DiscountValue, i.UnitPrice ?? 0, i.LineTotal, rate);
         }).ToList();
 
         var invoices = await _context.TrxOrders.AsNoTracking()

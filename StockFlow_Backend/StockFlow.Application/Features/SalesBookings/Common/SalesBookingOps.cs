@@ -39,7 +39,8 @@ public static class SalesBookingOps
             .Where(i => i.Order.BookingOrderId.HasValue && bookingIds.Contains(i.Order.BookingOrderId.Value)
                         && i.Order.Status == "COMPLETED")
             .GroupBy(i => new { BookingId = i.Order.BookingOrderId!.Value, i.ProductId })
-            .Select(g => new { g.Key.BookingId, g.Key.ProductId, Qty = g.Sum(x => x.Quantity ?? 0) })
+            // Quy về đơn vị cơ bản (dòng bán theo đơn vị quy đổi: SL × hệ số)
+            .Select(g => new { g.Key.BookingId, g.Key.ProductId, Qty = g.Sum(x => (x.Quantity ?? 0) * x.ConversionRate) })
             .ToListAsync(ct);
         return rows.GroupBy(r => r.BookingId)
             .ToDictionary(g => g.Key, g => g.ToDictionary(r => r.ProductId, r => r.Qty));
@@ -55,8 +56,9 @@ public static class SalesBookingOps
     }
 
     /// <summary>1 dòng hàng của hóa đơn giao từ đơn đặt (đầu vào của SettleWithInvoice)</summary>
+    /// <param name="ConversionRate">Hệ số quy đổi của đơn vị bán (1 = đơn vị cơ bản); Quantity, giá theo đơn vị bán</param>
     public sealed record InvoiceLine(int ProductId, int UnitId, decimal Quantity, decimal OriginalPrice,
-        string DiscountType, decimal DiscountValue, decimal UnitPrice);
+        string DiscountType, decimal DiscountValue, decimal UnitPrice, decimal ConversionRate = 1);
 
     /// <summary>Tiền của hóa đơn giao hàng (đầu vào của SettleWithInvoice)</summary>
     public sealed record InvoiceMoney(decimal SubTotal, string DiscountType, decimal DiscountValue, decimal DiscountAmount, decimal Total);
@@ -80,7 +82,8 @@ public static class SalesBookingOps
                 for (var k = 0; k < invoiceLines.Count; k++)
                 {
                     var inv = invoiceLines[k];
-                    if (invLeft[k] <= 0 || inv.ProductId != line.ProductId) continue;
+                    // Chỉ ghép dòng cùng hàng và cùng đơn vị (đặt 2 túi giao 20 bịch là 2 dòng khác nhau)
+                    if (invLeft[k] <= 0 || inv.ProductId != line.ProductId || inv.ConversionRate != line.ConversionRate) continue;
                     if (samePriceOnly && !SamePrice(line, inv)) continue;
                     var take = Math.Min((line.Quantity ?? 0) - taken[line], invLeft[k]);
                     if (take <= 0) continue;
@@ -112,7 +115,8 @@ public static class SalesBookingOps
             var inv = invoiceLines[k];
             var extra = invLeft[k];
             if (extra <= 0) continue;
-            var same = booking.DtlOrderItems.FirstOrDefault(l => l.ProductId == inv.ProductId && SamePrice(l, inv));
+            var same = booking.DtlOrderItems.FirstOrDefault(l =>
+                l.ProductId == inv.ProductId && l.ConversionRate == inv.ConversionRate && SamePrice(l, inv));
             if (same != null)
             {
                 SetQuantity(same, (same.Quantity ?? 0) + extra);
@@ -122,6 +126,7 @@ public static class SalesBookingOps
             {
                 ProductId = inv.ProductId,
                 UnitId = inv.UnitId,
+                ConversionRate = inv.ConversionRate,
                 OriginalPrice = inv.OriginalPrice,
                 DiscountType = inv.DiscountType,
                 DiscountValue = inv.DiscountValue,
@@ -198,6 +203,7 @@ public static class SalesBookingOps
         {
             ProductId = src.ProductId,
             UnitId = src.UnitId,
+            ConversionRate = src.ConversionRate,
             OriginalPrice = src.OriginalPrice,
             DiscountType = src.DiscountType,
             DiscountValue = src.DiscountValue,
@@ -223,7 +229,7 @@ public static class SalesBookingOps
         var lines = await context.DtlOrderItems.AsNoTracking()
             .Where(i => i.Order.OrderType == OrderType && i.Order.Status != null && OpenStatuses.Contains(i.Order.Status)
                         && i.Order.WarehouseId.HasValue && productIds.Contains(i.ProductId))
-            .Select(i => new { i.OrderId, WarehouseId = i.Order.WarehouseId!.Value, i.ProductId, Qty = i.Quantity ?? 0 })
+            .Select(i => new { i.OrderId, WarehouseId = i.Order.WarehouseId!.Value, i.ProductId, Qty = (i.Quantity ?? 0) * i.ConversionRate })
             .ToListAsync(ct);
         if (lines.Count == 0) return new();
 
@@ -252,7 +258,7 @@ public static class SalesBookingOps
 
         var lines = await context.DtlOrderItems.AsNoTracking()
             .Where(i => bookings.Any(b => b.OrderId == i.OrderId) && (productIds == null || productIds.Count == 0 || productIds.Contains(i.ProductId)))
-            .Select(i => new { i.OrderId, i.ProductId, Qty = i.Quantity ?? 0 })
+            .Select(i => new { i.OrderId, i.ProductId, Qty = (i.Quantity ?? 0) * i.ConversionRate })
             .ToListAsync(ct);
         if (lines.Count == 0) return new();
 

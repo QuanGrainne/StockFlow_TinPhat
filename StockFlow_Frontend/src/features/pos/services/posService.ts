@@ -3,6 +3,7 @@
 
 import { apiClient } from '@/lib/api/client';
 import { PosProduct, PosCustomer, PosCategory, PosPriceBook } from '../types';
+import { parseSaleUnits } from '@/lib/products/saleUnits';
 
 export interface OrderFilterParams {
   search?: string;
@@ -41,8 +42,11 @@ export interface PosSaleRequest {
   excessAction?: 'RETURN_CASH' | 'RECORD_DEBT';
   items: {
     productId: number;
+    /** Số lượng theo đơn vị bán */
     quantity: number;
     unitId: number;
+    /** Đơn vị bán (bán theo đơn vị quy đổi); trống = đơn vị cơ bản */
+    unitName?: string;
     /** Đơn giá (theo bảng giá) */
     originalPrice: number;
     /** Giá bán sau giảm giá dòng */
@@ -124,6 +128,7 @@ export const posService = {
           minSafeStock: item.minSafeStock ? Number(item.minSafeStock) : null,
           imageUrl: item.imageUrl || null,
           description: item.description || null,
+          units: parseSaleUnits(item.variantsJson, item.uom || 'Cái', item.code || ''),
         }));
       }
       return [];

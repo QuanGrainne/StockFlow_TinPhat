@@ -269,6 +269,8 @@ public class UpdateProductCommandHandler : IRequestHandler<UpdateProductCommand,
             var attributes = req.Attributes;
             var variants = req.Variants;
             string? supplierToSave = req.Supplier?.Trim();
+            // Mã nhóm hàng cùng loại (từ import danh mục) không có trên form sửa → giữ nguyên
+            string? groupCode = null;
 
             if (!string.IsNullOrEmpty(product.VariantsJson))
             {
@@ -292,6 +294,10 @@ public class UpdateProductCommandHandler : IRequestHandler<UpdateProductCommand,
                     {
                         supplierToSave = supEl.GetString();
                     }
+                    if (root.TryGetProperty("groupCode", out var grpEl) && grpEl.ValueKind == System.Text.Json.JsonValueKind.String)
+                    {
+                        groupCode = grpEl.GetString();
+                    }
                 }
                 catch { }
             }
@@ -301,7 +307,8 @@ public class UpdateProductCommandHandler : IRequestHandler<UpdateProductCommand,
                 units = units,
                 attributes = attributes,
                 variants = variants,
-                supplier = supplierToSave
+                supplier = supplierToSave,
+                groupCode
             });
         }
 

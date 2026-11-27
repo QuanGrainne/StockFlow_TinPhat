@@ -40,6 +40,8 @@ export interface SalesBookingItem {
   discountValue: number;
   unitPrice: number;
   lineTotal: number;
+  /** Hệ số quy đổi của đơn vị bán (1 = đơn vị cơ bản) */
+  conversionRate?: number;
 }
 
 export interface SalesBookingInvoice {
@@ -101,6 +103,8 @@ export interface SalesBookingDetail {
 export interface SalesBookingLinePayload {
   productId: number;
   unitId: number;
+  /** Đơn vị bán (bán theo đơn vị quy đổi); trống = đơn vị cơ bản */
+  unitName?: string;
   quantity: number;
   originalPrice: number;
   discountType: 'AMOUNT' | 'PERCENT';

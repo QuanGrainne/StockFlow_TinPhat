@@ -6,8 +6,11 @@ namespace StockFlow.Application.Features.Orders.DTOs;
 public class PosOrderItemRequest
 {
     public int ProductId { get; set; }
+    /// <summary>Số lượng theo đơn vị bán (UnitName)</summary>
     public decimal Quantity { get; set; }
     public int UnitId { get; set; }
+    /// <summary>Đơn vị bán (tên trong thiết lập đơn vị của hàng); trống = đơn vị cơ bản. Hệ số quy đổi lấy từ thiết lập của hàng.</summary>
+    public string? UnitName { get; set; }
     public decimal OriginalPrice { get; set; }
     public decimal UnitPrice { get; set; }
     public string DiscountType { get; set; } = "AMOUNT"; // "PERCENT" hoặc "AMOUNT"

@@ -151,7 +151,8 @@ public class GetRevenueProfitReportQueryHandler : IRequestHandler<GetRevenueProf
                 ProductId = i.ProductId,
                 PartnerId = o.PartnerId,
                 CategoryId = i.Product.CategoryId,
-                Quantity = i.Quantity ?? 0,
+                // SL theo đơn vị cơ bản (dòng bán theo đơn vị quy đổi: SL × hệ số)
+                Quantity = (i.Quantity ?? 0) * i.ConversionRate,
                 Revenue = i.LineTotal,
                 Discount = o.SubTotal > 0 ? o.DiscountAmount * i.LineTotal / o.SubTotal : 0,
             }));

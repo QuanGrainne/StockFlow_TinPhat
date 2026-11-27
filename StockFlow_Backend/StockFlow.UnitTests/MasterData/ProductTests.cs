@@ -228,13 +228,19 @@ public class DeleteProductTests
         await AssertRejected(db, "Sản phẩm này đã phát sinh giao dịch xuất/nhập kho (thẻ kho). Không thể xóa vĩnh viễn để bảo đảm tính toàn vẹn của sổ sách kho!");
     }
 
-    [Fact(DisplayName = "DeleteProduct/UTCID04 – còn tồn 5, chưa có thẻ kho")]
-    [Trait("Function", Function)][Trait("UTCID", "DeleteProduct/UTCID04")][Trait("Type", "A")]
-    public async Task UTCID04_HasStock_ReturnsError()
+    [Fact(DisplayName = "DeleteProduct/UTCID04 – còn tồn 5 (tồn ban đầu), chưa có thẻ kho: xóa hàng và dòng tồn")]
+    [Trait("Function", Function)][Trait("UTCID", "DeleteProduct/UTCID04")][Trait("Type", "B")]
+    public async Task UTCID04_HasInitialStock_Deleted()
     {
         var db = Db();
         TestData.SetStock(db, TestData.K001, NewProduct, 5, 1000);
-        await AssertRejected(db, "Sản phẩm hiện vẫn còn tồn kho thực tế. Vui lòng xuất kho hoặc cân chỉnh tồn về 0 trước khi xóa.");
+
+        var r = await Delete(db, NewProduct);
+
+        // 26/11/2026: chưa có đơn / thẻ kho / phiếu nhập thì xóa được kể cả còn tồn (tồn ban đầu, không có trong sổ sách)
+        Assert.True(r.IsSuccess, r.Error);
+        Assert.False(await db.MstProducts.AnyAsync(p => p.ProductId == NewProduct));
+        Assert.False(await db.TrxInventoryBalances.AnyAsync(b => b.ProductId == NewProduct));
     }
 
     [Fact(DisplayName = "DeleteProduct/UTCID05 – hàng hóa 999999 không tồn tại")]

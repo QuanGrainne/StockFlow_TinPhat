@@ -124,7 +124,8 @@ public class GetDashboardSummaryQueryHandler : IRequestHandler<GetDashboardSumma
             .Select(g => new
             {
                 ProductId = g.Key,
-                Quantity = g.Sum(i => i.Quantity ?? 0),
+                // SL theo đơn vị cơ bản (dòng bán theo đơn vị quy đổi: SL × hệ số)
+                Quantity = g.Sum(i => (i.Quantity ?? 0) * i.ConversionRate),
                 Revenue = g.Sum(i => i.LineTotal != 0 ? i.LineTotal : (i.Quantity ?? 0) * (i.UnitPrice ?? 0)),
             })
             .OrderByDescending(x => x.Revenue)

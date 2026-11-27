@@ -41,6 +41,10 @@ import { customerService } from '@/features/customers/services/customerService';
 import type { CreateCustomerPayload } from '@/features/customers/types';
 import { orderSettingsService } from '@/features/settings/services/orderSettingsService';
 import { salesBookingService } from '@/features/sales-bookings/services/salesBookingService';
+import { printSalesBooking } from '@/features/sales-bookings';
+import { printInvoice } from '@/features/orders';
+import { orderService } from '@/features/orders/services/orderService';
+import { ProductCodeLink } from '@/components/links/EntityLinks';
 import type { SaveSalesBookingPayload } from '@/features/sales-bookings/types';
 import { permissionService } from '@/features/admin/services/permissionService';
 import { getStoredRole } from '@/lib/navigation/currentRole';
@@ -56,7 +60,7 @@ import type { PayosPayment } from '../types';
 import { MyCreditRequestsDialog } from '../components/MyCreditRequestsDialog';
 import { isOverCreditLimitError } from '@/features/credit-requests';
 import { salesReturnService } from '@/features/sales-returns/services/salesReturnService';
-import type { PosCustomer, PosPriceBook, PosProduct } from '../types';
+import type { PosCustomer, PosPriceBook, PosProduct, PosSaleUnit } from '../types';
 import {
   newPosId as newId,
   nextTabNumber,
@@ -76,16 +80,20 @@ interface DisplayPrefs {
   code: boolean;
   stock: boolean;
   note: boolean;
+  /** Tự mở hộp thoại in hóa đơn / đơn đặt hàng ngay sau khi thanh toán / lưu đơn */
+  autoPrint: boolean;
 }
 
 const PREFS_KEY = 'stockflow_pos_display_v1';
-const DEFAULT_PREFS: DisplayPrefs = { image: true, code: true, stock: true, note: true };
+const DEFAULT_PREFS: DisplayPrefs = { image: true, code: true, stock: true, note: true, autoPrint: true };
 const PAY_METHODS: { value: PayMethod; label: string }[] = [
   { value: 'CASH', label: 'Tiền mặt' },
   { value: 'VIETQR', label: 'Chuyển khoản' },
 ];
 
 const fmt = (n: number) => Math.round(n || 0).toLocaleString('vi-VN');
+/** Số lượng (tồn theo đơn vị quy đổi có thể lẻ, VD 79 hộp = 6,583 thùng) */
+const fmtQty = (n: number) => (n || 0).toLocaleString('vi-VN', { maximumFractionDigits: 3 });
 const parseNum = (s: string) => Number(s.replace(/[^\d]/g, '')) || 0;
 
 function emptyTab(index: number, priceBookId: number | null, kind: PosTabKind = 'INVOICE'): PosTab {
@@ -541,21 +549,31 @@ export default function PosScreen() {
         const lines: PosLine[] = b.items
           .map((it) => ({ it, qty: it.quantity }))
           .filter((x) => x.qty > 0)
-          .map(({ it, qty }) => ({
-            key: newId(),
-            productId: it.productId,
-            code: it.productCode,
-            name: it.productName,
-            imageUrl: null,
-            uom: it.unit,
-            unitId: it.unitId,
-            stock: 0,
-            unitPrice: it.originalPrice,
-            discountMode: it.discountType === 'PERCENT' ? 'PERCENT' : 'VND',
-            discountValue: it.discountType === 'PERCENT' ? it.discountValue : it.originalPrice - it.unitPrice,
-            quantity: qty,
-            note: '',
-          }));
+          .map(({ it, qty }): PosLine => {
+            // Dòng đặt theo đơn vị quy đổi: giữ đơn vị + hệ số, mã theo đơn vị
+            const rate = it.conversionRate ?? 1;
+            const unitCode =
+              rate !== 1
+                ? products.find((x) => x.productId === it.productId)?.units.find((u) => u.name === it.unit)?.code
+                : undefined;
+            return {
+              key: newId(),
+              productId: it.productId,
+              code: unitCode || it.productCode,
+              name: it.productName,
+              imageUrl: null,
+              uom: it.unit,
+              unitId: it.unitId,
+              unitName: rate !== 1 ? it.unit : undefined,
+              rate,
+              stock: 0,
+              unitPrice: it.originalPrice,
+              discountMode: it.discountType === 'PERCENT' ? 'PERCENT' : 'VND',
+              discountValue: it.discountType === 'PERCENT' ? it.discountValue : it.originalPrice - it.unitPrice,
+              quantity: qty,
+              note: '',
+            };
+          });
         if (lines.length === 0) {
           message.warning(`Đơn ${b.orderCode} đã giao đủ hàng.`);
           return;
@@ -601,6 +619,7 @@ export default function PosScreen() {
                   name: it.productName,
                   unit: it.unit,
                   quantity: it.quantity,
+                  rate: it.conversionRate ?? 1,
                 }))
               : undefined,
           warehouseId: b.warehouseId,
@@ -692,6 +711,21 @@ export default function PosScreen() {
     (defaultPriceBookId != null ? priceMatrix[productId]?.[defaultPriceBookId] : undefined) ??
     standard;
 
+  // ── Bán theo đơn vị quy đổi (VD 1 túi = 10 bịch) ──
+  /** Đơn vị bán của hàng (đơn vị cơ bản đứng đầu) */
+  const unitsOf = (productId: number): PosSaleUnit[] => products.find((x) => x.productId === productId)?.units ?? [];
+  /** Đơn giá theo đơn vị bán: giá đã thiết lập cho đơn vị, chưa có thì giá bảng giá × hệ số */
+  const unitPriceFor = (
+    p: PosProduct,
+    unit: PosSaleUnit | undefined,
+    book: (productId: number, standard: number) => number = priceOf
+  ) =>
+    unit && !unit.isBase
+      ? unit.salePrice > 0
+        ? unit.salePrice
+        : Math.round(book(p.productId, p.standardPrice) * unit.rate)
+      : book(p.productId, p.standardPrice);
+
   const lineCalc = (l: PosLine) => {
     const disc = unitDiscount(l.unitPrice, l.discountMode, l.discountValue);
     return { disc, sale: l.unitPrice - disc, total: (l.unitPrice - disc) * l.quantity };
@@ -722,7 +756,8 @@ export default function PosScreen() {
 
   const qtyByProduct = useMemo(() => {
     const m = new Map<number, number>();
-    tab.lines.forEach((l) => m.set(l.productId, (m.get(l.productId) ?? 0) + l.quantity));
+    // Theo đơn vị cơ bản (dòng bán theo đơn vị quy đổi: SL × hệ số) để so với tồn
+    tab.lines.forEach((l) => m.set(l.productId, (m.get(l.productId) ?? 0) + l.quantity * (l.rate ?? 1)));
     return m;
   }, [tab.lines]);
 
@@ -734,7 +769,7 @@ export default function PosScreen() {
   const updateLine = (key: string, patch: Partial<PosLine>) =>
     updateTab((t) => ({ lines: t.lines.map((l) => (l.key === key ? { ...l, ...patch } : l)), paid: resetPaid(t) }));
 
-  const addProduct = (p: PosProduct, asNewLine = false) => {
+  const addProduct = (p: PosProduct, asNewLine = false, unit?: PosSaleUnit) => {
     if (tab.kind === 'RETURN') {
       updateTab((t) => {
         // Trả nhanh: hàng chưa có trong phiếu thì thêm dòng mới, giá theo bảng giá
@@ -767,21 +802,27 @@ export default function PosScreen() {
       setProductDropdown(false);
       return;
     }
+    // Đơn vị quy đổi được chọn (từ kết quả tìm theo mã đơn vị, VD SP004346 = túi); không có = đơn vị cơ bản
+    const u = unit && !unit.isBase ? unit : undefined;
     updateTab((t) => {
-      const existing = !asNewLine ? t.lines.find((l) => l.productId === p.productId) : undefined;
+      const existing = !asNewLine
+        ? t.lines.find((l) => l.productId === p.productId && (l.unitName ?? '') === (u?.name ?? ''))
+        : undefined;
       if (existing) {
         return { lines: t.lines.map((l) => (l.key === existing.key ? { ...l, quantity: l.quantity + 1 } : l)), paid: resetPaid(t) };
       }
       const line: PosLine = {
         key: newId(),
         productId: p.productId,
-        code: p.code,
+        code: u?.code || p.code,
         name: p.name,
         imageUrl: p.imageUrl,
-        uom: p.uom,
+        uom: u?.name ?? p.uom,
         unitId: p.baseUnitId,
+        unitName: u?.name,
+        rate: u?.rate ?? 1,
         stock: p.stockQuantity,
-        unitPrice: priceOf(p.productId, p.standardPrice),
+        unitPrice: unitPriceFor(p, u),
         discountMode: 'VND',
         discountValue: 0,
         quantity: 1,
@@ -794,6 +835,21 @@ export default function PosScreen() {
     productSearchRef.current?.focus();
   };
 
+  // Đổi đơn vị bán của dòng (bịch ↔ túi): mã, đơn giá theo đơn vị mới; giảm giá theo VNĐ đặt lại 0
+  const changeLineUnit = (l: PosLine, unitName: string) => {
+    const p = products.find((x) => x.productId === l.productId);
+    const u = p?.units.find((x) => x.name === unitName);
+    if (!p || !u) return;
+    updateLine(l.key, {
+      unitName: u.isBase ? undefined : u.name,
+      rate: u.rate,
+      uom: u.name,
+      code: (u.isBase ? p.code : u.code) || p.code,
+      unitPrice: unitPriceFor(p, u),
+      discountValue: l.discountMode === 'PERCENT' ? l.discountValue : 0,
+    });
+  };
+
   // Đổi bảng giá → đơn giá các dòng lấy lại theo bảng giá mới
   const changePriceBook = (id: number) => {
     const book = (pid: number, std: number) =>
@@ -803,7 +859,10 @@ export default function PosScreen() {
       paid: resetPaid(t),
       lines: t.lines.map((l) => {
         const p = products.find((x) => x.productId === l.productId);
-        return { ...l, unitPrice: book(l.productId, p?.standardPrice ?? l.unitPrice) };
+        if (!p) return { ...l, unitPrice: book(l.productId, l.unitPrice) };
+        // Dòng bán theo đơn vị quy đổi: giá đơn vị đã thiết lập, chưa có thì giá bảng giá mới × hệ số
+        const u = l.unitName ? p.units.find((x) => x.name === l.unitName) : undefined;
+        return { ...l, unitPrice: unitPriceFor(p, u, book) };
       }),
     }));
   };
@@ -839,11 +898,43 @@ export default function PosScreen() {
     const q = productQuery.trim().toLowerCase();
     if (!q) return [];
     const returnIds = tab.kind === 'RETURN' && !tab.returnQuick ? new Set(tab.lines.map((l) => l.productId)) : null;
-    return products
-      .filter((p) => !returnIds || returnIds.has(p.productId))
-      .filter((p) => p.code.toLowerCase().includes(q) || p.name.toLowerCase().includes(q) || (p.barcode || '').toLowerCase() === q)
-      .slice(0, 30);
+    // Mỗi đơn vị bán là 1 kết quả (như KiotViet): tìm tên → cả đơn vị cơ bản và đơn vị quy đổi;
+    // tìm mã đơn vị (VD SP004346) → đúng đơn vị đó. Trả hàng chỉ theo đơn vị cơ bản.
+    const out: { key: string; p: PosProduct; unit?: PosSaleUnit }[] = [];
+    for (const p of products) {
+      if (out.length >= 30) break;
+      if (returnIds && !returnIds.has(p.productId)) continue;
+      const nameHit = p.name.toLowerCase().includes(q);
+      if (p.code.toLowerCase().includes(q) || nameHit || (p.barcode || '').toLowerCase() === q) out.push({ key: String(p.productId), p });
+      if (tab.kind === 'RETURN') continue;
+      p.units
+        .filter((u) => !u.isBase && (nameHit || (u.code || '').toLowerCase().includes(q)))
+        .forEach((u) => out.push({ key: `${p.productId}-${u.name}`, p, unit: u }));
+    }
+    return out.slice(0, 30);
   }, [products, productQuery, tab.kind, tab.lines, tab.returnQuick]);
+
+  // ── In ngay sau khi hoàn thành (tùy chọn Hiển thị → "In sau khi hoàn thành") ──
+  /** In hóa đơn vừa thanh toán (lấy chi tiết từ server để in đúng số đã lưu) */
+  const printAfterSale = (orderId: number) => {
+    orderService
+      .getOrderDetail(orderId)
+      .then((order) => printInvoice(order))
+      .catch(() => message.warning('Đã thanh toán nhưng không mở được bản in hóa đơn. Có thể in lại ở màn Hóa đơn.'));
+  };
+  /** In đơn đặt hàng vừa lưu */
+  const printAfterBooking = (orderId: number) => {
+    salesBookingService
+      .getBooking(orderId)
+      .then((b) => printSalesBooking(b, b.notes ?? ''))
+      .catch(() => message.warning('Đã lưu đơn nhưng không mở được bản in. Có thể in lại ở màn Đặt hàng.'));
+  };
+
+  /** Chọn 1 kết quả tìm hàng (bấm chuột / Enter): thêm đúng đơn vị của kết quả đó */
+  const pickMatch = (index: number) => {
+    const m = productMatches[index];
+    if (m) addProduct(m.p, false, m.unit);
+  };
 
   // ── Tab hóa đơn / đặt hàng ──
   const defaultKind: PosTabKind = canInvoice || !canBooking ? 'INVOICE' : 'BOOKING';
@@ -943,6 +1034,7 @@ export default function PosScreen() {
         return {
           productId: l.productId,
           unitId: l.unitId,
+          unitName: l.unitName || undefined,
           quantity: l.quantity,
           originalPrice: markup ? c.sale : l.unitPrice,
           discountType: l.discountMode === 'PERCENT' && !markup ? 'PERCENT' : 'AMOUNT',
@@ -957,6 +1049,7 @@ export default function PosScreen() {
         ? await salesBookingService.updateBooking(tab.bookingId, payload)
         : await salesBookingService.createBooking(payload);
       message.success(tab.bookingId ? `Đã lưu đơn đặt hàng ${res.orderCode}` : `Đã tạo đơn đặt hàng ${res.orderCode}`);
+      if (prefs.autoPrint) printAfterBooking(res.orderId);
       closeTab(tab.id);
       setSaleTime(null);
       setReloadTick((t) => t + 1); // cập nhật SL khách đặt
@@ -989,16 +1082,23 @@ export default function PosScreen() {
 
     // Hóa đơn từ đơn đặt: khách lấy ít hơn số đặt → hỏi tạo đơn chờ cho phần còn lại hay chỉ thanh toán
     if (tab.bookingId && tab.bookingItems && remainderChoice === undefined) {
+      // So theo đơn vị cơ bản (đặt 2 túi, lấy 20 bịch = đủ); nếu cả hàng chỉ đặt 1 đơn vị thì hiện theo đơn vị đó
       const taken = new Map<number, number>();
-      tab.lines.forEach((l) => taken.set(l.productId, (taken.get(l.productId) ?? 0) + l.quantity));
-      const ordered = new Map<number, BookingShortageLine>();
+      tab.lines.forEach((l) => taken.set(l.productId, (taken.get(l.productId) ?? 0) + l.quantity * (l.rate ?? 1)));
+      const ordered = new Map<number, BookingShortageLine & { rate: number }>();
       tab.bookingItems.forEach((it) => {
+        const rate = it.rate ?? 1;
         const cur = ordered.get(it.productId);
-        if (cur) cur.ordered += it.quantity;
-        else ordered.set(it.productId, { productId: it.productId, code: it.code, name: it.name, unit: it.unit, ordered: it.quantity, taken: 0 });
+        if (cur && cur.rate === rate) cur.ordered += it.quantity;
+        else if (cur) {
+          // Đặt nhiều đơn vị khác nhau: quy hết về đơn vị cơ bản
+          cur.ordered = cur.ordered * cur.rate + it.quantity * rate;
+          cur.rate = 1;
+          cur.unit = unitsOf(it.productId)[0]?.name ?? cur.unit;
+        } else ordered.set(it.productId, { productId: it.productId, code: it.code, name: it.name, unit: it.unit, ordered: it.quantity, taken: 0, rate });
       });
       const short = [...ordered.values()]
-        .map((x) => ({ ...x, taken: Math.min(x.ordered, taken.get(x.productId) ?? 0) }))
+        .map((x) => ({ ...x, taken: Math.min(x.ordered, (taken.get(x.productId) ?? 0) / x.rate) }))
         .filter((x) => x.taken < x.ordered);
       if (short.length > 0) {
         setShortage(short);
@@ -1033,6 +1133,7 @@ export default function PosScreen() {
           productId: l.productId,
           quantity: l.quantity,
           unitId: l.unitId,
+          unitName: l.unitName || undefined,
           originalPrice: markup ? c.sale : l.unitPrice,
           unitPrice: c.sale,
           discountType: l.discountMode === 'PERCENT' ? 'PERCENT' : 'AMOUNT',
@@ -1060,6 +1161,7 @@ export default function PosScreen() {
       closeTab(tab.id);
       setSaleTime(null);
       setReloadTick((t) => t + 1); // tồn kho thay đổi
+      if (prefs.autoPrint) printAfterSale(res.orderId);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Thanh toán không thành công.';
       if (tab.customer && isOverCreditLimitError(msg)) {
@@ -1137,7 +1239,7 @@ export default function PosScreen() {
                 setProductActive((i) => Math.max(i - 1, 0));
               } else if (e.key === 'Enter' && productMatches[productActive]) {
                 e.preventDefault();
-                addProduct(productMatches[productActive]);
+                pickMatch(productActive);
               } else if (e.key === 'Escape') setProductDropdown(false);
             }}
             placeholder={isReturn ? 'Tìm hàng trả (F3)' : 'Tìm hàng hóa (F3)'}
@@ -1148,24 +1250,28 @@ export default function PosScreen() {
               {productMatches.length === 0 ? (
                 <div className="p-4 text-center text-[13px] text-[#677484]">Không tìm thấy hàng hóa phù hợp</div>
               ) : (
-                productMatches.map((p, idx) => (
+                productMatches.map(({ key, p, unit }, idx) => (
                   <button
-                    key={p.productId}
+                    key={key}
                     type="button"
                     onMouseEnter={() => setProductActive(idx)}
-                    onClick={() => addProduct(p)}
+                    onClick={() => pickMatch(idx)}
                     className={`w-full text-left px-3 py-2.5 flex items-center gap-3 cursor-pointer ${idx === productActive ? 'bg-[#eff6ff]' : 'bg-white'}`}
                   >
                     <ProductThumb src={p.imageUrl} alt={p.name} size={44} />
                     <div className="min-w-0 flex-1">
                       <div className="text-[14px] font-semibold truncate">
-                        {p.name} <span className="font-normal text-[#0070f4]">{p.uom}</span>
+                        {p.name} <span className="font-normal text-[#0070f4]">{unit?.name ?? p.uom}</span>
                       </div>
                       <div className="text-[12px] text-[#677484]">
-                        {p.code} • Giá bán: {fmt(priceOf(p.productId, p.standardPrice))}
+                        {unit?.code || p.code} • Giá bán: {fmt(unitPriceFor(p, unit))}
                       </div>
                       <div className="text-[12px] text-[#677484]">
-                        Tồn: <span className={p.stockQuantity > 0 ? 'text-[#16a34a] font-semibold' : ''}>{fmt(p.stockQuantity)}</span> • Khách
+                        Tồn:{' '}
+                        <span className={p.stockQuantity > 0 ? 'text-[#16a34a] font-semibold' : ''}>
+                          {fmtQty(p.stockQuantity / (unit?.rate ?? 1))}
+                        </span>{' '}
+                        • Khách
                         đặt: {fmt(reserved[p.productId] ?? 0)}
                       </div>
                     </div>
@@ -1315,6 +1421,7 @@ export default function PosScreen() {
                         ['code', 'Mã hàng'],
                         ['stock', 'Tồn kho'],
                         ['note', 'Ghi chú hàng hóa'],
+                        ['autoPrint', 'In sau khi hoàn thành'],
                       ] as [keyof DisplayPrefs, string][]
                     ).map(([k, label]) => (
                       <label key={k} className="flex items-center gap-2 cursor-pointer">
@@ -1429,7 +1536,11 @@ export default function PosScreen() {
                         <Trash2 size={18} />
                       </button>
                       {prefs.image && <ProductThumb src={l.imageUrl} alt={l.name} size={48} />}
-                      {prefs.code && <span className="w-24 shrink-0 truncate text-[13px] text-[#677484]">{l.code}</span>}
+                      {prefs.code && (
+                        <span className="w-24 shrink-0 truncate text-[13px]">
+                          <ProductCodeLink code={l.code} productId={l.productId} />
+                        </span>
+                      )}
                       <div className="flex-1 min-w-[110px] flex items-center gap-2">
                         <span className="line-clamp-2 font-medium" title={l.name}>{l.name}</span>
                         <span title={`${l.code} • ${l.name}`}>
@@ -1437,9 +1548,28 @@ export default function PosScreen() {
                         </span>
                       </div>
                       <span className="w-[84px] shrink-0 flex justify-center">
-                        <span className="max-w-full truncate px-2 py-0.5 rounded bg-[#e6f1fe] text-[#0070f4] text-[13px]" title={l.uom}>
-                          {l.uom}
-                        </span>
+                        {(() => {
+                          // Hàng có đơn vị quy đổi: chọn đơn vị bán (bịch / túi); trả hàng giữ đơn vị đã bán
+                          const units = unitsOf(l.productId);
+                          return units.length > 1 && tab.kind !== 'RETURN' ? (
+                            <select
+                              value={l.unitName ?? units[0].name}
+                              onChange={(e) => changeLineUnit(l, e.target.value)}
+                              className="max-w-full truncate px-1.5 py-0.5 rounded bg-[#e6f1fe] text-[#0070f4] text-[13px] border-0 outline-none cursor-pointer"
+                              title="Đổi đơn vị bán"
+                            >
+                              {units.map((u) => (
+                                <option key={u.name} value={u.name}>
+                                  {u.name}
+                                </option>
+                              ))}
+                            </select>
+                          ) : (
+                            <span className="max-w-full truncate px-2 py-0.5 rounded bg-[#e6f1fe] text-[#0070f4] text-[13px]" title={l.uom}>
+                              {l.uom}
+                            </span>
+                          );
+                        })()}
                       </span>
 
                       {/* Số lượng ± (rê chuột xem tồn / đặt) */}
@@ -1469,7 +1599,10 @@ export default function PosScreen() {
                         </button>
                         {prefs.stock && (
                           <div className="hidden group-hover:block absolute left-1/2 -translate-x-1/2 top-full mt-2 z-30 bg-white rounded-lg shadow-lg border border-slate-200 px-4 py-2 text-[13px] whitespace-nowrap">
-                            <div>Tồn: {fmt(l.stock)}</div>
+                            {/* Tồn theo đơn vị đang chọn (100 bịch = 10 túi) */}
+                            <div>
+                              Tồn: {fmtQty(l.stock / (l.rate ?? 1))} {l.uom}
+                            </div>
                             <div>Khách đặt: {fmt(reserved[l.productId] ?? 0)}</div>
                           </div>
                         )}
@@ -1505,7 +1638,7 @@ export default function PosScreen() {
                         type="button"
                         onClick={() => {
                           const p = products.find((x) => x.productId === l.productId);
-                          if (p) addProduct(p, true);
+                          if (p) addProduct(p, true, p.units.find((u) => u.name === l.unitName));
                         }}
                         className="w-[26px] shrink-0 p-1 rounded text-[#677484] hover:bg-slate-100 hover:text-[#0070f4] cursor-pointer"
                         title="Thêm dòng cho hàng này"

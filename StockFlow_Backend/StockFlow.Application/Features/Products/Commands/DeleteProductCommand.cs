@@ -42,16 +42,12 @@ public class DeleteProductCommandHandler : IRequestHandler<DeleteProductCommand,
             return Result.Failure<bool>("Sản phẩm này đã phát sinh giao dịch xuất/nhập kho (thẻ kho). Không thể xóa vĩnh viễn để bảo đảm tính toàn vẹn của sổ sách kho!");
         }
 
-        // 3. Kiểm tra nếu sản phẩm vẫn còn tồn kho thực tế > 0
+        // 3. Chưa có đơn, chưa có thẻ kho, chưa có phiếu nhập → xóa được kể cả còn tồn (26/11/2026, nhóm chốt).
+        //    Tồn lúc này chỉ là tồn ban đầu (tạo hàng / import), không nằm trong sổ sách nào; frontend đã hỏi xác nhận.
+        //    Trước đây chặn "còn tồn", nhưng muốn về 0 phải cân chỉnh tồn → sinh thẻ kho → không bao giờ xóa được nữa.
         var balances = await _context.TrxInventoryBalances
             .Where(b => b.ProductId == command.ProductId)
             .ToListAsync(cancellationToken);
-        if (balances.Any(b => (b.Quantity ?? 0) > 0))
-        {
-            return Result.Failure<bool>("Sản phẩm hiện vẫn còn tồn kho thực tế. Vui lòng xuất kho hoặc cân chỉnh tồn về 0 trước khi xóa.");
-        }
-
-        // 4. Nếu là sản phẩm mới tạo / hàng rác (chưa có đơn hàng, chưa có giao dịch xuất nhập)
         if (balances.Count > 0)
         {
             _context.TrxInventoryBalances.RemoveRange(balances);

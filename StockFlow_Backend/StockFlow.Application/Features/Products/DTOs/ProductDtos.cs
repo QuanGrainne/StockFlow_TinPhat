@@ -225,6 +225,9 @@ public class ImportProductItemRequest
     public bool? IsDirectSale { get; set; } = true;
     public string? Supplier { get; set; }
     public string? WarehouseName { get; set; }
+    /// <summary>Đơn vị quy đổi / thuộc tính / mã nhóm hàng cùng loại (JSON như variants_json của hàng hóa).
+    /// File danh mục KiotViet: dòng đơn vị quy đổi được gộp vào hàng cơ bản ở đây, không tạo hàng riêng.</summary>
+    public string? VariantsJson { get; set; }
 }
 
 public class ImportProductsRequest

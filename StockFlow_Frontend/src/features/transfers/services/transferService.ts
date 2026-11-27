@@ -69,6 +69,7 @@ interface ApiProductWithStock {
   sourceStock: number;
   destStock: number;
   imageUrl?: string | null;
+  variantsJson?: string | null;
 }
 
 export interface SaveTransferPayload {
@@ -203,6 +204,7 @@ export const transferService = {
       sourceStock: p.sourceStock ?? 0,
       destStock: p.destStock ?? 0,
       imageUrl: p.imageUrl ?? null,
+      variantsJson: p.variantsJson ?? null,
     }));
   },
 
