@@ -80,10 +80,10 @@ const isWalkIn = (order: OrderDetail) =>
 
 /**
  * Nợ cũ của khách ngay trước hóa đơn này: lấy từ sổ công nợ (dòng SALE của hóa đơn → dư nợ trước = dư nợ sau − phát sinh).
- * Không tìm thấy thì ước lượng = công nợ hiện tại − phần còn nợ của hóa đơn.
+ * Không tìm thấy thì ước lượng = công nợ hiện tại − phần còn nợ của hóa đơn + phần tiền thừa đã trừ nợ cũ.
  */
-async function loadOldDebt(order: OrderDetail): Promise<number> {
-  const fallback = (order.customer?.currentDebt || 0) - (order.outstandingAmount || 0);
+async function loadOldDebt(order: OrderDetail, debtPaid: number): Promise<number> {
+  const fallback = (order.customer?.currentDebt || 0) - (order.outstandingAmount || 0) + debtPaid;
   try {
     const detail = await customerService.getCustomerById(order.customer.partnerId);
     const sale = (detail.debtLedger ?? []).find((l) => l.type === 'SALE' && Number(l.referenceId) === order.orderId);
@@ -96,10 +96,15 @@ async function loadOldDebt(order: OrderDetail): Promise<number> {
 /** In hóa đơn theo mẫu "PHIẾU XUẤT KHO" khổ A4 của Tín Phát (iframe ẩn, chỉ in đúng phiếu) */
 export async function printInvoice(order: OrderDetail): Promise<void> {
   const walkIn = isWalkIn(order);
-  const oldDebt = walkIn ? 0 : await loadOldDebt(order);
+  // Khách trả thừa, chọn "Tính vào công nợ": các phiếu thu trả nợ cũ gắn hóa đơn cũ (TTHD...) / phiếu PT...
+  // không nằm trong "Đã trả" của hóa đơn này → cộng riêng (máy chủ trả về trong excessDebtPayments)
+  const debtPaid = walkIn ? 0 : (order.excessDebtPayments ?? []).reduce((s, p) => s + p.amount, 0);
+  const oldDebt = walkIn ? 0 : await loadOldDebt(order, debtPaid);
   const goodsTotal = order.items.reduce((s, it) => s + (it.lineTotal || 0), 0);
   const outstanding = order.outstandingAmount || 0;
-  const totalDebt = oldDebt + outstanding;
+  // Khách đã trả = trả cho hóa đơn + phần trả thừa trừ vào nợ cũ; Tổng nợ = nợ cũ + còn nợ của hóa đơn − phần trả nợ cũ
+  const customerPaid = (order.paidAmount || 0) + debtPaid;
+  const totalDebt = oldDebt + outstanding - debtPaid;
 
   const d = order.orderDate ? new Date(order.orderDate) : new Date();
   const day = pad(d.getDate());
@@ -131,7 +136,7 @@ export async function printInvoice(order: OrderDetail): Promise<void> {
   const summary = [
     sumRow('Tổng cộng tiền hàng', goodsTotal, true),
     order.orderDiscountAmount > 0 ? sumRow('Chiết khấu hóa đơn', order.orderDiscountAmount) : '',
-    order.paidAmount > 0 ? sumRow('Khách đã trả', order.paidAmount) : '',
+    customerPaid > 0 ? sumRow('Khách đã trả', customerPaid) : '',
     walkIn ? sumRow('Còn phải thanh toán', outstanding, true) : sumRow('Nợ cũ', oldDebt),
     walkIn ? '' : sumRow('Tổng nợ', totalDebt, true),
     `<tr class="sum"><td colspan="8"><i>Tổng số tiền (Viết bằng chữ):</i> <b>${escapeHtml(
