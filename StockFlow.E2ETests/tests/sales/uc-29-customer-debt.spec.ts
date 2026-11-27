@@ -1,4 +1,4 @@
-// Report 5.3 – sheet "UC-29 Customer Debt" (SYS-DEB-01..03). DEB-02 là N/A.
+// Report 5.3 – sheet "UC-29 Customer Debt" (SYS-DEB-01..03). Ca DEB-02 (đã xoá 27/11/2026: chức năng nhóm bỏ, Report 3 ghi ngoài phạm vi).
 import { test, expect, traceTc } from '../../fixtures/test';
 import { LoginPage } from '../../pages/LoginPage';
 import { CustomersPage } from '../../pages/SalesPages';
@@ -12,10 +12,6 @@ const SHEET = 'UC-29 Customer Debt';
 const vnd = (n: number): string => n.toLocaleString('vi-VN');
 
 test.describe(SHEET, () => {
-  test('SYS-DEB-02 – Ghi chú nhắc nợ (ngày liên hệ, kết quả, ngày hẹn)', async ({}, testInfo) => {
-    traceTc(testInfo, 'SYS-DEB-02', SHEET);
-    test.skip(true, 'N/A – Chưa có chức năng ghi chú nhắc nợ');
-  });
 
   test('SYS-DEB-01 – Khách có nợ: hiện dư nợ, hạn mức, tín dụng còn lại; chứng từ chưa thanh toán và phiếu thu', async ({ page, env, db, adminApi, uid }, testInfo) => {
     traceTc(testInfo, 'SYS-DEB-01', SHEET, { mismatch: 'Nợ quá hạn chưa có (SPEC FR-CRD-01 Một phần); kiểm dư nợ, hạn mức, tín dụng còn lại và chứng từ.' });

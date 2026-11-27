@@ -96,8 +96,11 @@ public static class FeatureConstants
         new(Settings, "Cài đặt", "AUTH", None),
     };
 
-    /// <summary>Admin luôn giữ quyền vào màn phân quyền (không tự khóa mình)</summary>
-    public static readonly string[] AdminLockedFeatureIds = { "feat-roles", "feat-role-matrix" };
+    /// <summary>
+    /// Admin luôn có mọi chức năng (SPEC FR-ROLE-04): cột Quản trị viên trên ma trận bị khóa,
+    /// bỏ tick cũng không làm Admin mất quyền vào màn nào (DEF-E2E-05).
+    /// </summary>
+    public static readonly string[] AdminLockedFeatureIds = Features.Select(f => f.Id).ToArray();
 
     private static readonly string[] GoodsFeats = { "feat-goods", "feat-price-books" };
     private static readonly string[] StockFeats = { "feat-transfers", "feat-stocktake", "feat-disposal" };

@@ -129,18 +129,18 @@ test.describe(SHEET, () => {
     testInfo.annotations.push({ type: 'note', description: ACTOR });
     const o = await order(adminApi, uid, 10, 20);
     const fgp = await open(page, env, o);
-    await test.step('1a. SL đạt 0 → "Số lượng đạt phải lớn hơn 0."', async () => {
+    // Expected Round 2 (theo luật hiện hành của Duyệt hoàn thành): cho phép lô chỉ có hàng lỗi nên kiểm "đạt + lỗi > 0";
+    // số lô không bắt buộc (để trống = theo mã lệnh).
+    await test.step('1a. SL đạt 0, lỗi 0 → "Tổng số lượng thành phẩm (đạt + lỗi) phải lớn hơn 0. …"', async () => {
       await fgp.setAccepted(o.fg.code, 0);
-      const msg = page.getByText(/phải lớn hơn 0\.$/).first();
+      const msg = page.getByText(/phải lớn hơn 0\./).first();
       const [res, shown] = await Promise.all([fgp.submit(4_000), readToast(msg)]);
       expect(res).toBeNull();
       testInfo.annotations.push({ type: 'observed', description: `SL 0: "${shown}"` });
-      expect.soft(shown, 'câu thông báo').toBe('Số lượng đạt phải lớn hơn 0.');
+      expect.soft(shown.startsWith('Tổng số lượng thành phẩm (đạt + lỗi) phải lớn hơn 0.'), 'câu thông báo').toBe(true);
     });
-    await test.step('1b. Bỏ trống số lô → "Vui lòng nhập số lô thành phẩm."', async () => {
+    await test.step('1b. Số lô để trống được phép (= theo mã lệnh)', async () => {
       await expect(fgp.lot).toHaveAttribute('placeholder', 'Để trống = theo mã lệnh');
-      testInfo.annotations.push({ type: 'observed', description: 'Ô Số lô không bắt buộc (để trống = theo mã lệnh)' });
-      expect.soft(false, 'Expected "Vui lòng nhập số lô thành phẩm." – số lô không bắt buộc trên form').toBe(true);
     });
     await test.step('1c. Kho không được phân quyền', async () => {
       const options = (await fgp.warehouse.locator('option').allInnerTexts()).map((x) => x.trim());

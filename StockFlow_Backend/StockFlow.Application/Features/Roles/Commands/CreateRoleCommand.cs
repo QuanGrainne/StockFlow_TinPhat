@@ -38,9 +38,25 @@ public class CreateRoleCommandHandler : IRequestHandler<CreateRoleCommand, Resul
         var roleCode = req.Code.Trim();
         var roleName = req.Name.Trim();
 
-        var exists = await _context.SecRoles.AnyAsync(r => 
-            r.RoleName != null && (r.RoleName.ToLower() == roleName.ToLower() || r.RoleName.ToLower() == roleCode.ToLower()), 
-            cancellationToken);
+        // So cả tên lưu trong DB ("Manager"), tên hiển thị ("Quản lý") và mã vai trò ("ROLE_MANAGER",
+        // vai trò tự tạo lưu mã ở "[CODE:…]" trong mô tả) để không tạo được vai trò trùng (DEF-E2E-04).
+        var newCode = PermissionConstants.ToRoleCode(roleCode);
+        var roles = await _context.SecRoles
+            .AsNoTracking()
+            .Where(r => r.RoleName != null)
+            .Select(r => new { r.RoleName, r.Description })
+            .ToListAsync(cancellationToken);
+
+        var exists = roles.Any(r =>
+        {
+            var name = r.RoleName!.Trim();
+            var codeMatch = System.Text.RegularExpressions.Regex.Match(r.Description ?? "", @"\[CODE:([^\]]+)\]");
+            var existingCode = PermissionConstants.ToRoleCode(codeMatch.Success ? codeMatch.Groups[1].Value.Trim() : name);
+            return name.Equals(roleName, StringComparison.OrdinalIgnoreCase)
+                || PermissionConstants.ToRoleDisplayName(name).Equals(roleName, StringComparison.OrdinalIgnoreCase)
+                || existingCode.Equals(newCode, StringComparison.OrdinalIgnoreCase)
+                || PermissionConstants.ToRoleCode(name).Equals(newCode, StringComparison.OrdinalIgnoreCase);
+        });
 
         if (exists)
         {

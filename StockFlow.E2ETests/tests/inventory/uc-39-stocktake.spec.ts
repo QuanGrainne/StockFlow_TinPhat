@@ -1,5 +1,5 @@
 // Report 5.3 – sheet "UC-39 Stocktake" (SYS-STK-01..06). Actor "Warehouse Accountant" = whstaff01 (K001 + K002, kho làm việc K001).
-// Code: Hoàn thành = cân bằng kho ngay (không có bước Manager duyệt). STK-03 là N/A theo Note.
+// Code: Hoàn thành = cân bằng kho ngay (không có bước Manager duyệt). Ca STK-03 (đã xoá 27/11/2026: chức năng nhóm bỏ, Report 3 ghi ngoài phạm vi).
 import { test, expect, traceTc } from '../../fixtures/test';
 import { LoginPage } from '../../pages/LoginPage';
 import { DisposalFormPage, DocListPage, StocktakeFormPage } from '../../pages/InventoryPages';
@@ -63,7 +63,9 @@ test.describe(SHEET, () => {
   });
 
   test('SYS-STK-02 – Hàng trong phiếu kiểm đang mở bị khoá nhập / xuất', async ({ page, env, db, adminApi, uid, dialogs }, testInfo) => {
-    traceTc(testInfo, 'SYS-STK-02', SHEET, { knownDefect: 'DEF-IT-08 (Report 5.2): khoá kiểm kho chỉ áp dụng cho xuất hủy và sản xuất' });
+    // Phạm vi khoá kiểm kho theo Report 3 BR-42 (chốt khi sửa DEF-IT-08, Report 5.2 v1.1): xuất hủy, xuất NVL,
+    // nhập thành phẩm, duyệt hoàn thành. Nhập hàng / chuyển hàng / POS không thuộc phạm vi → chỉ ghi nhận (Expected Round 2).
+    traceTc(testInfo, 'SYS-STK-02', SHEET);
     testInfo.annotations.push({ type: 'note', description: 'Các thao tác ở bước 2 làm bằng Admin (đủ chức năng và kho) để chỉ còn điều kiện khoá kiểm kho' });
     test.setTimeout(240_000);
     const p = await createProduct(adminApi, { suffix: `${uid}p`, price: 72_000 });
@@ -140,16 +142,12 @@ test.describe(SHEET, () => {
       expect.soft(results.disposal, 'xuất hủy bị chặn').toBe(true);
       expect.soft(results.materialIssue, 'xuất NVL bị chặn').toBe(true);
     });
-    await test.step('KQ2. Nhập hàng, chuyển hàng, POS cũng phải bị chặn', async () => {
-      expect.soft(results.receipt, 'nhập hàng bị chặn').toBe(true);
-      expect.soft(results.transfer, 'chuyển hàng bị chặn').toBe(true);
-      expect.soft(results.pos, 'bán POS bị chặn').toBe(true);
+    await test.step('KQ2. Nhập hàng, chuyển hàng, POS: ngoài phạm vi khoá BR-42 (Report 3) – chỉ ghi nhận', async () => {
+      testInfo.annotations.push({
+        type: 'note',
+        description: `Ngoài phạm vi BR-42: nhập hàng ${results.receipt ? 'bị chặn' : 'không chặn'}, chuyển hàng ${results.transfer ? 'bị chặn' : 'không chặn'}, POS ${results.pos ? 'bị chặn' : 'không chặn'}`,
+      });
     });
-  });
-
-  test('SYS-STK-03 – Kiểm lại: phiếu quay về Đang kiểm', async ({}, testInfo) => {
-    traceTc(testInfo, 'SYS-STK-03', SHEET);
-    test.skip(true, 'N/A – Chưa có chức năng (không có bước duyệt / kiểm lại)');
   });
 
   test('SYS-STK-04 – Hủy phiếu kiểm chưa gửi: CANCELLED, tồn không đổi, giải phóng hàng', async ({ page, env, db, adminApi, uid }, testInfo) => {

@@ -433,6 +433,15 @@ export default function GoodsImportModal({
         return;
       }
 
+      // Tên bắt buộc với hàng mới (như form tạo hàng, SYS-MST-03 / SYS-PRD-N02); hàng đã có thì giữ tên cũ.
+      // Kiểm tra trước toàn bộ file: có dòng lỗi thì dừng, không lưu dòng nào.
+      const existingCodes = new Set(existingGoods.map((g) => g.code.trim().toUpperCase()));
+      const unnamedNew = built.unnamedRows.find((r) => !existingCodes.has(r.code.trim().toUpperCase()));
+      if (unnamedNew) {
+        setErrorMessage(`Dòng ${unnamedNew.line}: Thiếu tên hàng hóa.`);
+        return;
+      }
+
       // "Báo lỗi" khi trùng mã khác tên: kiểm tra trước toàn bộ file, tránh lưu dở một phần rồi mới lỗi
       if (duplicateCodeAction === 'ERROR') {
         const existingByCode = new Map(existingGoods.map((g) => [g.code.toUpperCase(), g]));

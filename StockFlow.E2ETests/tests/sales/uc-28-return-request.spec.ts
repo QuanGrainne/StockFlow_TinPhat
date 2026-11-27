@@ -1,5 +1,5 @@
 // Report 5.3 – sheet "UC-28 Return Request" (SYS-RRQ-01..06). Code: Trả hàng theo hóa đơn (không có trạng thái "Chờ nhận").
-// RRQ-02 là N/A. Phiếu trả được lập trên POS (tab Trả hàng): màn /sales-returns mở POS ?returnInvoice=<id> ở tab mới.
+// Ca RRQ-02 (đã xoá 27/11/2026: chức năng nhóm bỏ, Report 3 ghi ngoài phạm vi). Phiếu trả được lập trên POS (tab Trả hàng): màn /sales-returns mở POS ?returnInvoice=<id> ở tab mới.
 import { test, expect, traceTc } from '../../fixtures/test';
 import { LoginPage } from '../../pages/LoginPage';
 import { SEEDED } from '../../fixtures/accounts';
@@ -70,10 +70,6 @@ async function setReturnQty(pos: Page, code: string, qty: number): Promise<void>
 }
 
 test.describe(SHEET, () => {
-  test('SYS-RRQ-02 – Sửa yêu cầu trả hàng đang chờ nhận', async ({}, testInfo) => {
-    traceTc(testInfo, 'SYS-RRQ-02', SHEET);
-    test.skip(true, 'N/A – Chưa có chức năng (phiếu trả không có trạng thái chờ nhận)');
-  });
 
   test('SYS-RRQ-01 – Lập phiếu trả từ hóa đơn hoàn thành: phiếu hoàn thành, cộng lại tồn ngay @p1', async ({ page, env, db, adminApi, uid, dialogs }, testInfo) => {
     traceTc(testInfo, 'SYS-RRQ-01', SHEET, { mismatch: 'Description: chờ nhận hàng; Expected (code): COMPLETED, cộng tồn ngay.' });

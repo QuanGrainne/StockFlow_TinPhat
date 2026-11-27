@@ -118,12 +118,13 @@ test.describe(SHEET, () => {
     await login(page, env);
     const prod = new ProductionOrdersPage(page);
     await prod.goto(`?code=${o.orderCode}&id=${o.orderId}`);
-    await prod.detail().getByRole('button', { name: 'Đóng lệnh' }).click();
-    await expect(page.getByRole('heading', { name: 'Đóng lệnh sản xuất', level: 3 })).toBeVisible();
+    // Từ 24/11/2026 (commit 72903ee) nút "Đóng lệnh" đổi tên thành "Kết thúc lệnh", cùng API /close
+    await prod.detail().getByRole('button', { name: 'Kết thúc lệnh' }).click();
+    await expect(page.getByRole('heading', { name: 'Kết thúc lệnh sản xuất', level: 3 })).toBeVisible();
     await page.locator('xpath=//*[starts-with(normalize-space(text()),"Lý do")]/following::textarea[1] | //*[starts-with(normalize-space(text()),"Lý do")]/following::input[1]').first().fill(reason);
     const [res] = await Promise.all([
       page.waitForResponse((r) => r.request().method() === 'POST' && /\/api\/production\/orders\/\d+\/close$/.test(new URL(r.url()).pathname)),
-      page.getByRole('button', { name: 'Đóng lệnh', exact: true }).last().click(),
+      page.getByRole('button', { name: 'Kết thúc lệnh', exact: true }).last().click(),
     ]);
     expect(res.status(), await res.text()).toBeLessThan(300);
     const po = await productionOrderRow(db, o.orderId);
@@ -135,7 +136,8 @@ test.describe(SHEET, () => {
   test('SYS-MPR-05 – Thành phẩm không có định mức đang áp dụng không lập lệnh được', async ({ page, env, db, adminApi, uid }, testInfo) => {
     traceTc(testInfo, 'SYS-MPR-05', SHEET);
     testInfo.annotations.push({ type: 'note', description: 'Tiền đề: kế hoạch duyệt khi còn định mức, sau đó định mức bị ngừng áp dụng' });
-    const expected = 'Thành phẩm chưa có BOM đang áp dụng. Vui lòng thiết lập BOM trước.';
+    // Expected Round 2: thuật ngữ BOM → "định mức"; backend nối thêm "(<mã>)" sau câu
+    const expected = 'Thành phẩm chưa có định mức đang áp dụng. Vui lòng thiết lập định mức trước.';
     const { fg, rm } = await products(adminApi, uid);
     const plan = await arrangeApprovedPlan(adminApi, { uid, fgId: fg.productId, materials: [{ id: rm.productId, norm: 2 }], qty: 10, wh: 'K002' });
     await adminApi.post(`/api/production/boms/${plan.bomId}/deactivate`);
@@ -152,7 +154,7 @@ test.describe(SHEET, () => {
     await expect(msg).toBeVisible();
     const shown = (await msg.innerText()).trim();
     testInfo.annotations.push({ type: 'observed', description: `HTTP ${res?.status() ?? '(không gửi)'}; thông báo "${shown}"` });
-    expect.soft(shown, 'câu thông báo').toBe(expected);
+    expect.soft(shown.startsWith(expected), `câu thông báo bắt đầu bằng "${expected}"`).toBe(true);
     expect(await productionOrdersOfPlan(db, plan.planId)).toEqual([]);
   });
 
@@ -236,8 +238,10 @@ test.describe(SHEET, () => {
     for (const r of receipts) await expect(prod.detail().getByText(r.fgr_code).first()).toBeVisible();
     await expect(prod.detail().getByRole('columnheader', { name: 'SL lỗi' })).toBeVisible();
     await expect(prod.detail().getByText('Lỗi sơn').first()).toBeVisible();
+    // Expected Round 2: BR-37 đã chốt là chặn (Report 3, 25/11/2026) nên không còn phiếu gắn cờ cảnh báo định mức;
+    // phiếu vượt NVL phải bị từ chối. Nếu có phiếu gắn cờ (dữ liệu cũ) thì ghi chú phải hiện.
+    expect.soft(warn.startsWith('(không lỗi)'), 'phiếu dùng NVL vượt số đã xuất bị từ chối (BR-37)').toBe(false);
     const flagged = receipts.filter((r) => r.needs_review);
-    expect.soft(flagged.length, 'có phiếu nhập gắn cờ cảnh báo định mức để kiểm hiển thị').toBeGreaterThan(0);
     for (const r of flagged) await expect.soft(prod.detail().getByText(r.review_note ?? '(trống)').first()).toBeVisible();
   });
 });

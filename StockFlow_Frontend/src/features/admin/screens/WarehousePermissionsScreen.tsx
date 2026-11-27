@@ -547,8 +547,23 @@ export const WarehousePermissionsScreen: React.FC = () => {
             </div>
 
             <div className="space-y-3 mb-6">
-              <div className="text-xs text-slate-600 mb-2">
-                Chọn các cơ sở kho mà nhân viên này được phép truy cập, lập phiếu và xem tồn kho:
+              <div className="flex items-center justify-between gap-3 mb-2">
+                <div className="text-xs text-slate-600">
+                  Chọn các cơ sở kho mà nhân viên này được phép truy cập, lập phiếu và xem tồn kho:
+                </div>
+                {/* Chọn / bỏ chọn tất cả kho (SYS-WHA-04) */}
+                <label className="shrink-0 flex items-center gap-1.5 text-xs font-semibold text-blue-700 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    aria-label="Chọn tất cả"
+                    checked={facilities.length > 0 && facilities.every((f) => selectedWarehouses.includes(f.code))}
+                    onChange={(e) =>
+                      setSelectedWarehouses(e.target.checked ? facilities.map((f) => f.code) : [])
+                    }
+                    className="rounded text-blue-600"
+                  />
+                  Chọn tất cả
+                </label>
               </div>
 
               {facilities.map((fac) => {

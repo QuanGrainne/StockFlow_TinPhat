@@ -26,12 +26,16 @@ export interface ProductImportResult {
   groupCount: number;
   /** Dòng đơn vị quy đổi không tìm thấy dòng cơ bản trong file → import như hàng riêng */
   orphanUnitRows: number;
+  /** Dòng hàng (không phải dòng đơn vị quy đổi) bỏ trống tên: hàng mới thì phải chặn (SYS-PRD-N02) */
+  unnamedRows: { line: number; code: string }[];
 }
 
 interface ParsedRow {
   line: number;
   code: string;
   name: string;
+  /** Ô "Tên hàng" để trống (name đã tạm lấy theo mã) */
+  nameMissing: boolean;
   category: string;
   brand: string;
   uom: string;
@@ -144,6 +148,7 @@ export function buildProductImport(
       line: i + 2,
       code: code || `SP${Date.now()}${i}`,
       name: name || code,
+      nameMissing: !name,
       category: text(row, idx.category) || 'Hàng hóa',
       brand: text(row, idx.brand),
       uom: text(row, idx.uom) || 'Cái',
@@ -269,5 +274,6 @@ export function buildProductImport(
     mergedUnitRows: parsed.filter(isUnitRow).length,
     groupCount: groups.size,
     orphanUnitRows,
+    unnamedRows: parsed.filter((r) => r.nameMissing && !isUnitRow(r)).map((r) => ({ line: r.line, code: r.code })),
   };
 }

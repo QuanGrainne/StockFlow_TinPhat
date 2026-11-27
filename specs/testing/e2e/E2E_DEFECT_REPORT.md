@@ -5,6 +5,41 @@
 - Không sửa code nghiệp vụ. Lỗi được ghi kèm bằng chứng; người phụ trách quyết định cách sửa.
 - Bằng chứng (trace, ảnh, error-context) nằm ở `StockFlow.E2ETests/test-results/<tên test>/` sau mỗi lượt chạy (thư mục bị ignore). Có thể chạy lại bằng `npx playwright test --grep <mã TC>`.
 
+## 0. Trạng thái sau khi sửa (Round 2, 26/11/2026 – nhánh `fix/system-test-r1`)
+
+| Mã | Trạng thái | Cách sửa |
+|---|---|---|
+| DEF-E2E-01 | Đã sửa | `getDefaultReceiveDate` so theo phút; cùng phút với giờ chuyển thì gợi ý giờ chuyển + 1 phút |
+| DEF-E2E-02 | Đã sửa | Phân trang 15 dòng / trang ở màn Nhân viên; thêm mới thì chuyển tới trang cuối |
+| DEF-E2E-03 | Đã sửa | Bỏ bắt buộc chọn kho khi tạo / sửa nhân viên |
+| DEF-E2E-04 | Đã sửa | `CreateRoleCommand` so cả tên hiển thị và mã vai trò; lỗi hiện trong hộp thoại |
+| DEF-E2E-05 | Đã sửa | Admin luôn có mọi chức năng (`AdminLockedFeatureIds` = mọi chức năng), cột Quản trị viên bị khoá |
+| DEF-E2E-06 | Đã sửa | Quyền mặc định SalesStaff thêm SALES_DELETE (không thêm SALES_APPROVE); seeder bù quyền cho DB cũ |
+| DEF-E2E-07 | Đã sửa | Câu báo lỗi mật khẩu dùng đúng câu backend "… phải có ít nhất 1 chữ in hoa (BR-35)." |
+| DEF-E2E-08 | Đã sửa | Quyền mặc định WarehouseStaff thêm PURCHASE_UPDATE; seeder bù quyền cho DB cũ |
+| DEF-E2E-09 | Đã sửa | Khung trang báo "Không thể kết nối đến máy chủ. Vui lòng thử lại." + Thử lại khi không tải được quyền; màn Hàng hóa báo lỗi + Thử lại và không xoá danh sách |
+
+Lỗi đã biết của Report 5.2 gặp lại (DEF-IT-01/02/03/04) đã được sửa trên `dev`; SYS-TRF-N03 thêm: ô SL nhận không còn tự đổi số âm thành 0.
+Mục 3 (lệch SPEC / Expected): câu chữ đã đổi theo Expected; ca giao diện chặn sớm, BOM → định mức, BR-37 / BR-42 đã cập nhật Expected trong bản nháp Report 5.3 (Round 2).
+
+8 ca cần làm rõ – **đã chốt 27/11/2026 (nhóm duyệt đề xuất)**:
+
+| Ca | Quyết định |
+|---|---|
+| SYS-MRQ-03 | Kiểm thật: định mức đã dùng cho lệnh không xóa được (chỉ ngừng áp dụng), lệnh giữ nguyên nhu cầu NVL |
+| SYS-GRN-03 | Xoá ca – không quản lý theo lô với hàng nhập từ NCC (Report 3 BR-27) |
+| SYS-MST-01 / 15 / 17 | Danh mục Kho chỉ Admin quản lý; Manager bị chặn; test tạo / sửa / xóa kho bằng Admin |
+| SYS-PRD-N02 | Sửa code: hàng mới thiếu tên báo "Dòng n: Thiếu tên hàng hóa."; cả file trong một transaction |
+| SYS-XCT-N05 | Sửa code: màn Chuyển hàng lọc theo chi nhánh đang chọn trên header |
+| SYS-ORD-N02 | Bỏ yêu cầu QR trên bản in |
+
+Phạm vi (27/11/2026): nhóm bỏ các chức năng Report 3 ghi ngoài phạm vi / không áp dụng, tài liệu theo code hiện tại. Đã **xoá 43 ca** khỏi Report 5.3 và bộ E2E
+(phiếu yêu cầu xuất kho bán hàng, phân bổ chi phí nhập – xoá sheet UC-34, UC-35; duyệt phiếu kiểm kho / xuất hủy; phân loại / sửa chữa hàng trả; theo lô, hạn dùng;
+màn tổng quan Mua hàng / Trả hàng; ghi chú nhắc nợ; gộp đơn kèm thanh toán và yêu cầu xuất; tiền tố mã chứng từ; khoá kiểm kho ngoài BR-42; báo cáo chi phí).
+Đổi sang kiểm thật trên màn Báo cáo / form hàng hóa: SYS-FIN-01/02/08/09/10/12, SYS-MIN-01/02/13, SYS-MSC-01, SYS-MST-16. Report 3 sửa kèm (dòng 27/11 trong Record of Changes).
+
+Round 2 (E2E toàn bộ 27/11/2026): **204 Passed, 0 Failed, 0 N/A / 204 TC**.
+
 ## 1. Danh sách lỗi
 
 | Mã | Loại | Mức | Tóm tắt | TC |

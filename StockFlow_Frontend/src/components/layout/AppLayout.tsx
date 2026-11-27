@@ -64,6 +64,10 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ initialScreen, children })
     permissionService.peekAllowedFeatures(`ROLE_${getStoredRole()}`)
   );
 
+  // Không tải được quyền vì mất kết nối máy chủ: hiện thông báo + Thử lại thay vì để trống vùng nội dung (SYS-XCT-N06)
+  const [featureLoadFailed, setFeatureLoadFailed] = useState(false);
+  const [featureRetryTick, setFeatureRetryTick] = useState(0);
+
   // Tải quyền của vai trò; tải lại khi Admin lưu ma trận phân quyền
   React.useEffect(() => {
     let stale = false;
@@ -71,10 +75,14 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ initialScreen, children })
       permissionService
         .getAllowedFeatures(`ROLE_${currentRole}`)
         .then((feats) => {
-          if (!stale) setAllowedFeatures(feats);
+          if (stale) return;
+          setAllowedFeatures(feats);
+          setFeatureLoadFailed(false);
         })
-        .catch(() => {
-          // Hết phiên: client tự chuyển về trang đăng nhập
+        .catch((err: unknown) => {
+          // Hết phiên (401): client tự chuyển về trang đăng nhập
+          if (stale || (err as { status?: number } | null)?.status === 401) return;
+          setFeatureLoadFailed(true);
         });
     };
     load();
@@ -83,7 +91,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ initialScreen, children })
       stale = true;
       window.removeEventListener('stockflow_permissions_updated', load);
     };
-  }, [currentRole]);
+  }, [currentRole, featureRetryTick]);
 
   const isPermitted = allowedFeatures ? canOpenScreen(activeScreen, allowedFeatures) : false;
   const homePath = allowedFeatures ? firstAllowedPath(allowedFeatures) : null;
@@ -136,7 +144,21 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ initialScreen, children })
 
   const renderActiveScreen = () => {
     // Chưa tải xong quyền: chưa hiện gì; không có quyền (bỏ tick hoặc gõ thẳng đường dẫn): chặn hẳn màn hình
-    if (!allowedFeatures) return null;
+    if (!allowedFeatures) {
+      if (!featureLoadFailed) return null;
+      return (
+        <div role="alert" className="m-6 p-5 rounded-xl border border-rose-200 bg-rose-50 text-rose-700 text-sm flex items-center justify-between gap-4">
+          <span>Không thể kết nối đến máy chủ. Vui lòng thử lại.</span>
+          <button
+            type="button"
+            onClick={() => setFeatureRetryTick((t) => t + 1)}
+            className="shrink-0 px-3 py-1.5 rounded-lg border border-rose-300 bg-white text-rose-700 text-xs font-semibold hover:bg-rose-100 cursor-pointer"
+          >
+            Thử lại
+          </button>
+        </div>
+      );
+    }
     if (!isPermitted) {
       // Đang chuyển từ Tổng quan sang trang đầu tiên được phép
       if (activeScreen === 'admin-dashboard' && homePath && homePath !== '/dashboard') return null;

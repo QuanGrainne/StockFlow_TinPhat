@@ -68,6 +68,9 @@ public class ImportProductsCommandHandler : IRequestHandler<ImportProductsComman
         int importedCount = 0;
         int updatedCount = 0;
 
+        // Cả file trong một transaction: có dòng lỗi thì không lưu dòng nào (SYS-PRD-N02)
+        await using var tx = _context.HasActiveTransaction ? null : await _context.BeginTransactionAsync(cancellationToken);
+
         // Preload categories and units into memory for fast lookup
         var categories = await _context.MstProductCategories.ToListAsync(cancellationToken);
         var units = await _context.MstUnits.ToListAsync(cancellationToken);
@@ -96,10 +99,16 @@ public class ImportProductsCommandHandler : IRequestHandler<ImportProductsComman
             }
 
             var code = !string.IsNullOrWhiteSpace(pReq.Code) ? pReq.Code.Trim().ToUpper() : $"SP{DateTime.UtcNow.Ticks + i}";
-            var name = !string.IsNullOrWhiteSpace(pReq.Name) ? pReq.Name.Trim() : code;
 
             // Check if product already exists
             existingByCode.TryGetValue(code, out var existingProduct);
+
+            // Tên bắt buộc với hàng mới (SYS-PRD-N02); hàng đã có mà để trống tên thì giữ tên cũ.
+            if (string.IsNullOrWhiteSpace(pReq.Name) && existingProduct == null)
+            {
+                return Result.Failure<ImportProductsResultDto>($"Dòng {i + 1}: Thiếu tên hàng hóa.");
+            }
+            var name = !string.IsNullOrWhiteSpace(pReq.Name) ? pReq.Name.Trim() : (existingProduct!.ProductName ?? code);
 
             if (existingProduct != null)
             {
@@ -272,6 +281,7 @@ public class ImportProductsCommandHandler : IRequestHandler<ImportProductsComman
         }
 
         await _context.SaveChangesAsync(cancellationToken);
+        if (tx != null) await tx.CommitAsync(cancellationToken);
 
         var message = $"Nhập thành công {importedCount} sản phẩm mới và cập nhật {updatedCount} sản phẩm.";
         var failedImages = images.Values.Count(r => r.Error != null);

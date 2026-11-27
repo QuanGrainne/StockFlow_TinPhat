@@ -130,6 +130,13 @@ public class UpdateStaffCommandHandler : IRequestHandler<UpdateStaffCommand, Res
 
         var isAdminUser = user.UserId == 1 || string.Equals(user.Username, "admin", StringComparison.OrdinalIgnoreCase);
 
+        // Tài khoản phải luôn có vai trò (UC-10 E10.x, SYS-ROL-08): gửi vai trò rỗng thì báo lỗi như khi tạo mới,
+        // không lặng lẽ giữ vai trò cũ. Admin ban đầu luôn được gán lại vai trò Admin bên dưới.
+        if (!isAdminUser && string.IsNullOrWhiteSpace(roleInput))
+        {
+            return Result.Failure<StaffDto>("Vai trò không được để trống.");
+        }
+
         // Nếu là tài khoản Admin ban đầu: vai trò cố định là Admin, không thể đổi sang vai trò khác
         if (isAdminUser)
         {

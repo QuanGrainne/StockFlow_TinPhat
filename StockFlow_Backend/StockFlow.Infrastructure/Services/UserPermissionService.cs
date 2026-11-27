@@ -98,7 +98,7 @@ public class UserPermissionService : IUserPermissionService
             if (isAdmin)
             {
                 // Admin luôn có toàn quyền phân hệ, kể cả khi ma trận quyền của vai trò Admin bị sửa nhầm.
-                // Chức năng navbar của Admin vẫn theo ma trận (bỏ tick là không vào được), trừ màn phân quyền.
+                // Chức năng navbar cũng vậy: Admin luôn có mọi chức năng, không tự khóa mình (DEF-E2E-05).
                 codes.UnionWith(PermissionConstants.GetDefaultPermissionCodes("ROLE_ADMIN"));
                 features.UnionWith(FeatureConstants.AdminLockedFeatureIds.Select(FeatureConstants.ToCode));
             }

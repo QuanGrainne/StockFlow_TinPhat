@@ -128,7 +128,8 @@ export const ReceiveTransferScreen: React.FC<Props> = ({
   const handleQtyChange = (productId: number, val: number) => {
     setReceivedQtys((prev) => ({
       ...prev,
-      [productId]: Math.max(0, isNaN(val) ? 0 : val),
+      // Giữ nguyên số âm để báo lỗi khi lưu (SYS-TRF-N03), không lặng lẽ đổi thành 0 rồi nhận 0
+      [productId]: isNaN(val) ? 0 : val,
     }));
   };
 
@@ -219,6 +220,9 @@ export const ReceiveTransferScreen: React.FC<Props> = ({
 
   // Thông báo cùng câu với backend: "Hàng <mã> - <tên>: số lượng nhận (x) không được lớn hơn số lượng chuyển (y)."
   const overReceivedMessage = (): string | null => {
+    // Số âm: cùng câu với backend "Hàng <mã> - <tên>: số lượng nhận không được âm." (DEF-IT-03)
+    const negative = (transfer.items || []).find((it) => (receivedQtys[it.productId] ?? it.transferQuantity) < 0);
+    if (negative) return `Hàng ${negative.productCode} - ${negative.productName}: số lượng nhận không được âm.`;
     if (overReceivedItems.length === 0) return null;
     const first = overReceivedItems[0];
     const more = overReceivedItems.length > 1 ? ` (và ${overReceivedItems.length - 1} mặt hàng khác)` : '';
@@ -458,7 +462,8 @@ export const ReceiveTransferScreen: React.FC<Props> = ({
                   displayedItems.map((it, idx) => {
                     const currentRecQty = receivedQtys[it.productId] ?? it.transferQuantity;
                     const isDiff = currentRecQty !== it.transferQuantity;
-                    const isOver = currentRecQty > it.transferQuantity;
+                    // Vượt số chuyển hoặc âm: tô đỏ, bấm Nhận hàng sẽ bị chặn kèm thông báo
+                    const isOver = currentRecQty > it.transferQuantity || currentRecQty < 0;
                     const currentLineTotal = currentRecQty * (it.transferPrice || 0);
 
                     return (
@@ -526,7 +531,13 @@ export const ReceiveTransferScreen: React.FC<Props> = ({
                             onChange={(e) =>
                               handleQtyChange(it.productId, Number(e.target.value))
                             }
-                            title={isOver ? `Số lượng nhận không được lớn hơn số lượng chuyển (${it.transferQuantity})` : undefined}
+                            title={
+                              currentRecQty < 0
+                                ? 'Số lượng nhận không được âm'
+                                : isOver
+                                  ? `Số lượng nhận không được lớn hơn số lượng chuyển (${it.transferQuantity})`
+                                  : undefined
+                            }
                             className={`w-20 h-7 px-2 text-right rounded-[6px] border text-xs font-bold transition focus:outline-none ${
                               isOver
                                 ? 'border-[#fb2c36] bg-[#fef2f2] text-[#fb2c36] focus:ring-1 focus:ring-[#fb2c36]'

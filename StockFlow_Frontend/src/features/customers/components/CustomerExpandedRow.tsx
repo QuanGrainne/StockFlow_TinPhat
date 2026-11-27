@@ -228,6 +228,18 @@ export default function CustomerExpandedRow({
                           <span>
                             Hạn mức nợ: <span className="text-[#15171a]">{money.format(c.creditLimit || 0)}</span>
                           </span>
+                          {(c.creditLimit || 0) > 0 && (
+                            <>
+                              <span className="text-slate-300">|</span>
+                              {/* Tín dụng còn lại = hạn mức − dư nợ (UC-29, SYS-DEB-01), cùng cách tính ô "Còn lại" trên POS */}
+                              <span>
+                                Tín dụng còn lại:{' '}
+                                <span className={c.isOverCreditLimit ? 'text-[#fb2c36] font-semibold' : 'text-[#15171a]'}>
+                                  {money.format(Math.max(0, (c.creditLimit || 0) - (c.currentDebt || 0)))}
+                                </span>
+                              </span>
+                            </>
+                          )}
                         </div>
                       </div>
                     </div>

@@ -24,7 +24,10 @@ import {
 } from 'lucide-react';
 import { StaffAccount, UserRole, RoleDefinition, WarehouseFacility } from '../types';
 import { adminService } from '../services/adminService';
-import { PASSWORD_RULES, firstPasswordViolation } from '@/lib/auth/passwordPolicy';
+import { PASSWORD_RULES, firstPasswordViolation, passwordRuleMessage } from '@/lib/auth/passwordPolicy';
+
+/** Số tài khoản mỗi trang (theo chuẩn màn Hàng hóa) */
+const STAFF_PAGE_SIZE = 15;
 
 const getNextStaffCode = (list: StaffAccount[]): string => {
   let maxId = 0;
@@ -70,6 +73,8 @@ export const StaffAccountsScreen: React.FC<StaffAccountsScreenProps> = ({
     initialFilter === 'ACTIVE' ? 'ACTIVE' : 'ALL'
   );
   const [roleFilter, setRoleFilter] = useState<string>('ALL');
+  // Trang đang xem gắn với bộ lọc lúc chọn trang: đổi bộ lọc thì tự về trang 1
+  const [pageState, setPageState] = useState({ filterKey: '', page: 1 });
   // Modal State: Create / Edit
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editingStaff, setEditingStaff] = useState<StaffAccount | null>(null);
@@ -78,6 +83,8 @@ export const StaffAccountsScreen: React.FC<StaffAccountsScreenProps> = ({
   const [formUsername, setFormUsername] = useState('');
   const [formAvatar, setFormAvatar] = useState<string>('');
   const [formEmail, setFormEmail] = useState('');
+  // Lỗi theo ô (SYS-ACC-06): tô đỏ ô và hiện câu giống backend CreateStaffCommand
+  const [formErrors, setFormErrors] = useState<{ name?: string; email?: string }>({});
   const [formPhone, setFormPhone] = useState('');
   const [formTitle, setFormTitle] = useState('');
   const [formRole, setFormRole] = useState<UserRole>('ROLE_WAREHOUSE');
@@ -168,6 +175,17 @@ export const StaffAccountsScreen: React.FC<StaffAccountsScreenProps> = ({
     return true;
   });
 
+  // Phân trang phía client, 15 dòng / trang như màn Hàng hóa (DEF-E2E-02)
+  const filterKey = `${search}|${statusFilter}|${roleFilter}`;
+  const page = pageState.filterKey === filterKey ? pageState.page : 1;
+  const setPage = (next: number) => setPageState({ filterKey, page: next });
+  const totalPages = Math.max(1, Math.ceil(filteredStaffList.length / STAFF_PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const pagedStaffList = filteredStaffList.slice(
+    (currentPage - 1) * STAFF_PAGE_SIZE,
+    currentPage * STAFF_PAGE_SIZE
+  );
+
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 2500);
@@ -229,6 +247,7 @@ export const StaffAccountsScreen: React.FC<StaffAccountsScreenProps> = ({
     setFormRole(defaultRole);
     setFormPassword('TinPhat@2026');
     setFormWarehouses(warehouseList[0] ? [warehouseList[0].code] : []);
+    setFormErrors({});
     setEditModalOpen(true);
   };
 
@@ -257,6 +276,7 @@ export const StaffAccountsScreen: React.FC<StaffAccountsScreenProps> = ({
     setFormPassword('');
     const normalizedWarehouses = (staff.assignedWarehouses || []).map((code) => normalizeWarehouseCode(code));
     setFormWarehouses(normalizedWarehouses.length > 0 ? normalizedWarehouses : (warehouseList[0] ? [warehouseList[0].code] : []));
+    setFormErrors({});
     setEditModalOpen(true);
   };
 
@@ -264,10 +284,12 @@ export const StaffAccountsScreen: React.FC<StaffAccountsScreenProps> = ({
     e.preventDefault();
 
     const trimmedName = formName.trim();
-    if (!trimmedName) {
-      alert('Vui lòng nhập Họ và tên nhân viên');
-      return;
-    }
+    const errors: { name?: string; email?: string } = {};
+    if (!trimmedName) errors.name = 'Họ và tên nhân viên không được để trống.';
+    const trimmedEmail = formEmail.trim();
+    if (trimmedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) errors.email = 'Email không đúng định dạng.';
+    setFormErrors(errors);
+    if (errors.name || errors.email) return;
 
     const trimmedUsername = formUsername.trim().toLowerCase();
     if (!trimmedUsername) {
@@ -286,7 +308,7 @@ export const StaffAccountsScreen: React.FC<StaffAccountsScreenProps> = ({
     if (trimmedPassword) {
       const violation = firstPasswordViolation(trimmedPassword);
       if (violation) {
-        alert(`Mật khẩu chưa đạt yêu cầu: ${violation.label.toLowerCase()}.\nMật khẩu cần tối thiểu 8 ký tự, có chữ in hoa, chữ thường, chữ số và ký tự đặc biệt.`);
+        alert(`${passwordRuleMessage('Mật khẩu', violation)}\nMật khẩu cần tối thiểu 8 ký tự, có chữ in hoa, chữ thường, chữ số và ký tự đặc biệt.`);
         return;
       }
     }
@@ -302,15 +324,10 @@ export const StaffAccountsScreen: React.FC<StaffAccountsScreenProps> = ({
     const isEditingAdmin = isTargetAdmin(editingStaff);
     const finalRoleToSave = isEditingAdmin ? 'ROLE_ADMIN' : formRole;
 
-    // Bắt buộc chọn ít nhất 1 kho trực thuộc cho nhân viên
+    // Cho phép tài khoản chưa có kho (quyết định nhóm 10/11/2026, giống màn Phân quyền kho) – DEF-E2E-03
     const finalWarehousesToSave = Array.from(
       new Set(formWarehouses.map((w) => normalizeWarehouseCode(w)).filter(Boolean))
     );
-
-    if (finalWarehousesToSave.length === 0) {
-      alert('Vui lòng chọn ít nhất 1 chi nhánh kho trực thuộc cho nhân viên!');
-      return;
-    }
 
     const matchedRole = availableRoles.find(
       (r) =>
@@ -401,6 +418,8 @@ export const StaffAccountsScreen: React.FC<StaffAccountsScreenProps> = ({
           password: formPassword.trim() || 'TinPhat@2026',
         });
         showToast(`Đã thêm nhân viên mới ${trimmedName}`);
+        // Danh sách xếp theo thứ tự tạo: chuyển tới trang cuối để thấy ngay tài khoản vừa thêm (trang bị kẹp về trang cuối)
+        setPage(Number.MAX_SAFE_INTEGER);
       }
 
       setEditModalOpen(false);
@@ -561,7 +580,7 @@ export const StaffAccountsScreen: React.FC<StaffAccountsScreenProps> = ({
                   </td>
                 </tr>
               ) : (
-                filteredStaffList.map((staff) => {
+                pagedStaffList.map((staff) => {
                   const isLocked = staff.status === 'LOCKED';
                   const initials = staff.name
                     .split(' ')
@@ -726,20 +745,28 @@ export const StaffAccountsScreen: React.FC<StaffAccountsScreenProps> = ({
         {/* Footer Pagination */}
         <div className="p-4 border-t border-slate-200/80 flex items-center justify-between text-xs text-slate-500">
           <div>
-            Hiển thị <span className="font-bold text-slate-800">{staffList.length}</span> trên{' '}
-            <span className="font-bold text-slate-800">{staffList.length}</span> tài khoản
+            Hiển thị <span className="font-bold text-slate-800">{pagedStaffList.length}</span> trên{' '}
+            <span className="font-bold text-slate-800">{filteredStaffList.length}</span> tài khoản
           </div>
           <div className="flex items-center gap-2">
             <button
-              disabled
-              className="p-1 rounded border border-slate-200 text-slate-300 cursor-not-allowed"
+              type="button"
+              aria-label="Trang trước"
+              disabled={currentPage <= 1}
+              onClick={() => setPage(currentPage - 1)}
+              className="p-1 rounded border border-slate-200 text-slate-600 hover:bg-slate-50 cursor-pointer disabled:text-slate-300 disabled:hover:bg-transparent disabled:cursor-not-allowed"
             >
               <ChevronLeft size={14} />
             </button>
-            <span className="font-semibold text-slate-700">Trang 1 / 1</span>
+            <span className="font-semibold text-slate-700">
+              Trang {currentPage} / {totalPages}
+            </span>
             <button
-              disabled
-              className="p-1 rounded border border-slate-200 text-slate-300 cursor-not-allowed"
+              type="button"
+              aria-label="Trang sau"
+              disabled={currentPage >= totalPages}
+              onClick={() => setPage(currentPage + 1)}
+              className="p-1 rounded border border-slate-200 text-slate-600 hover:bg-slate-50 cursor-pointer disabled:text-slate-300 disabled:hover:bg-transparent disabled:cursor-not-allowed"
             >
               <ChevronRight size={14} />
             </button>
@@ -772,7 +799,7 @@ export const StaffAccountsScreen: React.FC<StaffAccountsScreenProps> = ({
               </div>
             </div>
 
-            <form onSubmit={handleSaveStaff} className="flex-1 min-h-0 flex flex-col">
+            <form noValidate onSubmit={handleSaveStaff} className="flex-1 min-h-0 flex flex-col">
               <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4 space-y-3.5">
               {/* Mục Avatar nhân viên */}
               <div className="flex items-center gap-4 p-3 rounded-xl bg-slate-50 border border-slate-200/80">
@@ -868,12 +895,18 @@ export const StaffAccountsScreen: React.FC<StaffAccountsScreenProps> = ({
                   </label>
                   <input
                     type="text"
-                    required
                     value={formName}
-                    onChange={(e) => setFormName(e.target.value)}
+                    onChange={(e) => {
+                      setFormName(e.target.value);
+                      setFormErrors((prev) => ({ ...prev, name: undefined }));
+                    }}
                     placeholder="Bắt buộc"
-                    className="w-full h-10 px-3.5 rounded-xl border border-slate-200 text-xs focus:outline-none focus:border-blue-500 shadow-xs placeholder:text-slate-400"
+                    aria-invalid={!!formErrors.name}
+                    className={`w-full h-10 px-3.5 rounded-xl border text-xs focus:outline-none focus:border-blue-500 shadow-xs placeholder:text-slate-400 ${
+                      formErrors.name ? 'border-rose-400 bg-rose-50/40' : 'border-slate-200'
+                    }`}
                   />
+                  {formErrors.name && <p className="mt-1 text-[11px] text-rose-600">{formErrors.name}</p>}
                 </div>
               </div>
 
@@ -953,13 +986,18 @@ export const StaffAccountsScreen: React.FC<StaffAccountsScreenProps> = ({
                     onChange={(e) => {
                       const newEmail = e.target.value;
                       setFormEmail(newEmail);
+                      setFormErrors((prev) => ({ ...prev, email: undefined }));
                       if (!editingStaff && (!formUsername || formUsername === formEmail.split('@')[0])) {
                         setFormUsername(newEmail.split('@')[0].toLowerCase());
                       }
                     }}
                     placeholder=""
-                    className="w-full h-10 px-3.5 rounded-xl border border-slate-200 text-xs focus:outline-none focus:border-blue-500 shadow-xs"
+                    aria-invalid={!!formErrors.email}
+                    className={`w-full h-10 px-3.5 rounded-xl border text-xs focus:outline-none focus:border-blue-500 shadow-xs ${
+                      formErrors.email ? 'border-rose-400 bg-rose-50/40' : 'border-slate-200'
+                    }`}
                   />
+                  {formErrors.email && <p className="mt-1 text-[11px] text-rose-600">{formErrors.email}</p>}
                 </div>
               </div>
 
@@ -1083,8 +1121,8 @@ export const StaffAccountsScreen: React.FC<StaffAccountsScreenProps> = ({
                 </div>
 
                 {formWarehouses.length === 0 && (
-                  <p className="text-[11px] text-rose-500 font-semibold flex items-center gap-1 pt-0.5">
-                    ⚠️ Bắt buộc phải chọn ít nhất 1 chi nhánh kho trực thuộc cho nhân viên.
+                  <p className="text-[11px] text-slate-500 flex items-center gap-1 pt-0.5">
+                    Chưa gán kho: nhân viên chưa xem / thao tác được dữ liệu kho nào. Có thể gán sau ở màn Phân quyền kho.
                   </p>
                 )}
               </div>
