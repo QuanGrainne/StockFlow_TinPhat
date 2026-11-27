@@ -20,6 +20,7 @@ public static class CustomerDebtPaymentOps
     private const string ReceiptTxType = "RECEIPT";
     private const string SalesOrderRef = "SALES_ORDER";
 
+    /// <param name="description">Ghi chú của các phiếu thu (VD "Tiền thừa từ HD00063")</param>
     /// <returns>Mã các phiếu thu đã tạo</returns>
     public static async Task<List<string>> ApplyAsync(
         IStockFlowDbContext context,
@@ -29,7 +30,8 @@ public static class CustomerDebtPaymentOps
         string paymentMethod,
         DateTime paymentDate,
         int userId,
-        CancellationToken ct)
+        CancellationToken ct,
+        string? description = null)
     {
         var codes = new List<string>();
         if (amount <= 0) return codes;
@@ -64,6 +66,7 @@ public static class CustomerDebtPaymentOps
             TransactionDate = paymentDate,
             CreatedBy = userId,
             Status = "COMPLETED",
+            Description = description,
         };
 
         var leftover = amount;

@@ -655,7 +655,7 @@ CreatedBy = currentUserId,
             {
                 debtPaymentCodes = await CustomerDebtPaymentOps.ApplyAsync(
                     _context, customer.PartnerId, debtPayment, order.OrderId, req.PaymentMethod, finalOrderDate,
-                    currentUserId, cancellationToken);
+                    currentUserId, cancellationToken, $"Tiền thừa từ {order.OrderCode}");
             }
 
             await _context.SaveChangesAsync(cancellationToken);

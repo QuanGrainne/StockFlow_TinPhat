@@ -82,6 +82,67 @@ public class GetOrderDetailQueryHandler : IRequestHandler<GetOrderDetailQuery, R
             .AsNoTracking()
             .ToListAsync(cancellationToken);
 
+        // Tiền khách trả thừa "Tính vào công nợ" (CreatePosOrderCommand → CustomerDebtPaymentOps): phiếu thu trả nợ cũ được
+        // ghi ĐÚNG THỜI ĐIỂM của hóa đơn (finalOrderDate, đến micro-giây) nhưng gắn vào hóa đơn cũ. Bảng phiếu thu không có
+        // cột trỏ về hóa đơn sinh ra tiền thừa nên ghép theo thời điểm đó (áp dụng được cả cho phiếu tạo trước khi có ghi chú):
+        //  (a) phiếu thu của hóa đơn này trùng thời điểm một hóa đơn khác của khách → tiền thừa từ hóa đơn đó;
+        //  (b) phiếu thu của khách trùng thời điểm hóa đơn này mà không gắn hóa đơn này → tiền thừa của hóa đơn này đi trả nợ cũ.
+        var receiptDates = financialTxs
+            .Where(ft => ft.TransactionDate.HasValue && ft.TransactionDate != order.OrderDate)
+            .Select(ft => ft.TransactionDate!.Value)
+            .Distinct()
+            .ToList();
+        var sourceOrderByDate = receiptDates.Count == 0
+            ? new Dictionary<DateTime, (int OrderId, string Code, DateTime Date)>()
+            : (await _context.TrxOrders.AsNoTracking()
+                .Where(o => o.PartnerId == order.PartnerId && o.OrderId != order.OrderId
+                            && o.Status != null && o.Status.ToUpper() == "COMPLETED"
+                            && o.OrderDate != null && receiptDates.Contains(o.OrderDate.Value))
+                .Select(o => new { o.OrderId, o.OrderCode, OrderDate = o.OrderDate!.Value })
+                .ToListAsync(cancellationToken))
+                .GroupBy(o => o.OrderDate)
+                .ToDictionary(g => g.Key, g =>
+                {
+                    var o = g.OrderBy(x => x.OrderId).First();
+                    return (o.OrderId, Code: o.OrderCode ?? $"HD{o.OrderId:D5}", Date: o.OrderDate);
+                });
+
+        var excessDebtPayments = new List<OrderExcessDebtPaymentDto>();
+        if (order.OrderDate.HasValue && string.Equals(order.Status, "COMPLETED", StringComparison.OrdinalIgnoreCase))
+        {
+            var checkoutAt = order.OrderDate.Value;
+            var excessTxs = await _context.TrxFinancialTransactions.AsNoTracking()
+                .Where(ft => ft.PartnerId == order.PartnerId && ft.TxType == "RECEIPT" && ft.TransactionDate == checkoutAt
+                             && (ft.Status == null || ft.Status != "CANCELLED")
+                             && !(ft.ReferenceType == "SALES_ORDER" && ft.ReferenceId == order.OrderId))
+                .OrderBy(ft => ft.TxId)
+                .ToListAsync(cancellationToken);
+            var targetIds = excessTxs
+                .Where(ft => ft.ReferenceType == "SALES_ORDER" && ft.ReferenceId.HasValue)
+                .Select(ft => ft.ReferenceId!.Value)
+                .Distinct()
+                .ToList();
+            var targets = targetIds.Count == 0
+                ? new Dictionary<int, (string? Code, DateTime? Date)>()
+                : await _context.TrxOrders.AsNoTracking()
+                    .Where(o => targetIds.Contains(o.OrderId))
+                    .ToDictionaryAsync(o => o.OrderId, o => (Code: o.OrderCode, Date: o.OrderDate), cancellationToken);
+            excessDebtPayments = excessTxs.Select(ft =>
+            {
+                var hasTarget = ft.ReferenceType == "SALES_ORDER" && ft.ReferenceId.HasValue && targets.ContainsKey(ft.ReferenceId.Value);
+                var target = hasTarget ? targets[ft.ReferenceId!.Value] : default;
+                return new OrderExcessDebtPaymentDto
+                {
+                    TxId = ft.TxId,
+                    TxCode = ft.TxCode ?? $"PT{ft.TxId:D6}",
+                    Amount = ft.Amount ?? 0,
+                    TargetOrderId = hasTarget ? ft.ReferenceId : null,
+                    TargetOrderCode = hasTarget ? target.Code ?? $"HD{ft.ReferenceId:D5}" : null,
+                    TargetOrderDate = hasTarget ? target.Date : null,
+                };
+            }).ToList();
+        }
+
         // Trích xuất tên bảng giá & người bán từ Notes nếu có dạng [Bảng giá: ...] hoặc [Người bán: ...]
         string? priceBookName = null;
         string salesRepName = order.CreatedByNavigation?.FullName ?? "Trần Minh Tuấn";
@@ -186,16 +247,25 @@ public class GetOrderDetailQueryHandler : IRequestHandler<GetOrderDetailQuery, R
 
         // Mapped Payment Transactions
         // Lịch sử thanh toán: phiếu mới nhất lên đầu
-        var paymentTxsDto = financialTxs.OrderByDescending(ft => ft.TransactionDate).ThenByDescending(ft => ft.TxId).Select(ft => new OrderPaymentTransactionDto
+        var paymentTxsDto = financialTxs.OrderByDescending(ft => ft.TransactionDate).ThenByDescending(ft => ft.TxId).Select(ft =>
         {
-            TxId = ft.TxId,
-            TxCode = ft.TxCode ?? $"TT{order.OrderCode}",
-            TransactionDate = ft.TransactionDate,
-            PaymentMethod = ft.PaymentMethod ?? "CASH",
-            Amount = ft.Amount ?? 0,
-            CreatedByName = ft.CreatedByNavigation?.FullName ?? "Quản trị viên",
-            Status = ft.Status ?? "COMPLETED",
-            Description = ft.Description ?? $"Thanh toán cho đơn hàng {order.OrderCode}"
+            var fromOther = ft.TransactionDate.HasValue && sourceOrderByDate.TryGetValue(ft.TransactionDate.Value, out var src)
+                ? src
+                : ((int OrderId, string Code, DateTime Date)?)null;
+            return new OrderPaymentTransactionDto
+            {
+                TxId = ft.TxId,
+                TxCode = ft.TxCode ?? $"TT{order.OrderCode}",
+                TransactionDate = ft.TransactionDate,
+                PaymentMethod = ft.PaymentMethod ?? "CASH",
+                Amount = ft.Amount ?? 0,
+                CreatedByName = ft.CreatedByNavigation?.FullName ?? "Quản trị viên",
+                Status = ft.Status ?? "COMPLETED",
+                Description = ft.Description ?? $"Thanh toán cho đơn hàng {order.OrderCode}",
+                SourceOrderId = fromOther?.OrderId,
+                SourceOrderCode = fromOther?.Code,
+                SourceOrderDate = fromOther?.Date,
+            };
         }).ToList();
 
         // Mapped Stock Issues
@@ -360,6 +430,7 @@ public class GetOrderDetailQueryHandler : IRequestHandler<GetOrderDetailQuery, R
             OutstandingAmount = order.OutstandingAmount ?? 0,
 
             PaymentTransactions = paymentTxsDto,
+            ExcessDebtPayments = excessDebtPayments,
             StockIssues = stockIssuesDto,
             ReturnRequests = returnRequestsDto,
             TimelineEvents = timeline

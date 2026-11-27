@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { message, Modal } from 'antd';
 import { supplierService } from '../services/supplierService';
 import { exportSuppliersToXLSX } from '../utils/exportExcel';
@@ -52,27 +52,43 @@ export function useSuppliers(initial?: SupplierInitialLink) {
   const [expandedRowKey, setExpandedRowKey] = useState<number | null>(initial?.expandId ?? null);
   const [detailsCache, setDetailsCache] = useState<Record<number, SupplierDetail>>({});
   const [loadingDetailId, setLoadingDetailId] = useState<number | null>(initial?.expandId ?? null);
-  const [linkedId] = useState(initial?.expandId ?? null);
-
-  // Mở sẵn NCC theo link: tải chi tiết dòng đang mở
+  // Dòng đang mở, đọc trong effect khi màn hiện lại (không đưa vào deps để effect chỉ chạy lúc hiện màn)
+  const expandedRowRef = useRef<number | null>(expandedRowKey);
   useEffect(() => {
-    if (!linkedId) return;
+    expandedRowRef.current = expandedRowKey;
+  }, [expandedRowKey]);
+
+  // Next 16 (cacheComponents) không gỡ màn khi chuyển trang mà ẩn bằng <Activity>: state giữ nguyên, effect chạy lại
+  // khi quay lại. Danh sách tự tải lại nhưng chi tiết NCC đang mở thì không → sau khi nhập hàng / thanh toán ở màn
+  // khác, quay lại vẫn thấy lịch sử và sổ nợ cũ. Nên khi màn bị ẩn: bỏ chi tiết đã nạp, đánh dấu dòng đang mở là đang tải.
+  useLayoutEffect(
+    () => () => {
+      setDetailsCache({});
+      setLoadingDetailId(expandedRowRef.current);
+    },
+    []
+  );
+
+  // Khi màn hiện (lần đầu – kể cả mở sẵn NCC theo link – và mỗi lần quay lại): nạp chi tiết của dòng đang mở
+  useEffect(() => {
+    const id = expandedRowRef.current;
+    if (!id) return;
     let cancelled = false;
     supplierService
-      .getSupplierById(linkedId)
+      .getSupplierById(id)
       .then((detail) => {
-        if (!cancelled) setDetailsCache((prev) => ({ ...prev, [linkedId]: detail }));
+        if (!cancelled) setDetailsCache((prev) => ({ ...prev, [id]: detail }));
       })
       .catch(() => {
         if (!cancelled) message.error('Không thể tải chi tiết nhà cung cấp.');
       })
       .finally(() => {
-        if (!cancelled) setLoadingDetailId((cur) => (cur === linkedId ? null : cur));
+        if (!cancelled) setLoadingDetailId((cur) => (cur === id ? null : cur));
       });
     return () => {
       cancelled = true;
     };
-  }, [linkedId]);
+  }, []);
 
   // 2. Tải danh sách nhà cung cấp từ API
   const loadSuppliers = async () => {

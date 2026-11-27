@@ -17,8 +17,32 @@ import type { OrderDetail } from '../types';
 import { orderService } from '../services/orderService';
 import { exportInvoiceDetailToXLSX, formatDateTime, paymentMethodLabel, printInvoice, stripNoteTags } from '../utils/invoiceUtils';
 import { newPosId, queuePosTab, type PosLine } from '@/features/pos/utils/posTabs';
+import InvoicePreviewModal, { invoiceLinkHref } from './InvoicePreviewModal';
 
 const money = new Intl.NumberFormat('vi-VN');
+
+/** Mã hóa đơn khác (tiền thừa trả nợ cũ): bấm mở xem nhanh, Ctrl/giữa chuột mở tab mới */
+function InvoiceCodeLink({ id, code, date }: { id: number; code: string; date?: string | null }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <a
+        href={invoiceLinkHref({ orderId: id, orderCode: code, orderDate: date })}
+        onClick={(e) => {
+          e.stopPropagation();
+          if (e.ctrlKey || e.metaKey || e.shiftKey || e.button !== 0) return;
+          e.preventDefault();
+          setOpen(true);
+        }}
+        className="font-medium text-[#0070f4] hover:underline"
+        title={`Xem hóa đơn ${code}`}
+      >
+        {code}
+      </a>
+      {open && <InvoicePreviewModal orderId={id} onClose={() => setOpen(false)} />}
+    </>
+  );
+}
 
 const textBtnCls =
   'inline-flex items-center gap-1.5 px-2.5 h-8 rounded-[8px] text-[13px] font-semibold text-[#15171a] hover:bg-[#f7f8f9] transition cursor-pointer';
@@ -264,6 +288,8 @@ export const OrderDetailPanel: React.FC<OrderDetailPanelProps> = ({
   const hasCustomer = !!cust && cust.partnerId > 0 && cust.partnerCode !== 'KH00000';
   const customerName = hasCustomer && cust ? cust.partnerName : 'Khách lẻ';
   const totalQty = order.totalQuantity || order.items.reduce((s, it) => s + it.quantity, 0);
+  const excessPayments = order.excessDebtPayments ?? [];
+  const excessTotal = excessPayments.reduce((s, p) => s + p.amount, 0);
   const badge = isCancelled
     ? { label: 'Đã hủy', cls: 'bg-[#fef2f2] text-[#fb2c36] border-[#fecaca]' }
     : order.status === 'COMPLETED'
@@ -416,6 +442,36 @@ export const OrderDetailPanel: React.FC<OrderDetailPanelProps> = ({
                   <dt className="text-[#677484]">Khách đã trả</dt>
                   <dd className="font-mono font-semibold">{money.format(order.paidAmount)}</dd>
                 </div>
+                {/* Khách trả thừa, chọn "Tính vào công nợ": phần thừa đã trừ vào nợ cũ (hóa đơn còn nợ cũ nhất trước) */}
+                {excessPayments.length > 0 && (
+                  <div>
+                    <div className="flex justify-between">
+                      <dt className="text-[#677484]">Tiền thừa trừ nợ cũ</dt>
+                      <dd className="font-mono font-semibold">{money.format(excessTotal)}</dd>
+                    </div>
+                    <ul className="mt-1 space-y-0.5 text-[12px] text-[#677484]">
+                      {excessPayments.map((p) => (
+                        <li key={p.txId} className="flex justify-between gap-3 pl-3">
+                          <span>
+                            {p.txCode} · {p.targetOrderId && p.targetOrderCode ? (
+                              <>
+                                trừ nợ{' '}
+                                <InvoiceCodeLink id={p.targetOrderId} code={p.targetOrderCode} date={p.targetOrderDate} />
+                              </>
+                            ) : (
+                              'trừ nợ không gắn hóa đơn'
+                            )}
+                          </span>
+                          <span className="font-mono">{money.format(p.amount)}</span>
+                        </li>
+                      ))}
+                    </ul>
+                    <div className="mt-1 flex justify-between">
+                      <dt className="text-[#677484]">Tổng khách đưa</dt>
+                      <dd className="font-mono">{money.format(order.paidAmount + excessTotal)}</dd>
+                    </div>
+                  </div>
+                )}
                 {order.outstandingAmount > 0 && (
                   <div className="flex justify-between font-semibold text-[#fb2c36]">
                     <dt>Còn nợ</dt>
@@ -503,7 +559,16 @@ export const OrderDetailPanel: React.FC<OrderDetailPanelProps> = ({
                     const cancelledTx = tx.status === 'CANCELLED';
                     return (
                       <tr key={tx.txId} className="hover:bg-[#f7f8f9]">
-                        <td className="py-2.5 px-3 font-medium text-[#0070f4]">{tx.txCode}</td>
+                        <td className="py-2.5 px-3">
+                          <div className="font-medium text-[#0070f4]">{tx.txCode}</div>
+                          {/* Phiếu thu sinh từ tiền khách trả thừa ở hóa đơn khác */}
+                          {tx.sourceOrderId && tx.sourceOrderCode && (
+                            <div className="text-[12px] text-[#677484] whitespace-nowrap">
+                              Tiền thừa từ{' '}
+                              <InvoiceCodeLink id={tx.sourceOrderId} code={tx.sourceOrderCode} date={tx.sourceOrderDate} />
+                            </div>
+                          )}
+                        </td>
                         <td className="py-2.5 px-3 whitespace-nowrap">{formatDateTime(tx.transactionDate)}</td>
                         <td className="py-2.5 px-3">{tx.createdByName || '—'}</td>
                         <td className="py-2.5 px-3">{paymentMethodLabel(tx.paymentMethod)}</td>
